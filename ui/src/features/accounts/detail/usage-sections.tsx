@@ -59,7 +59,7 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
         {t("detail.statistics")}
       </h2>
       {hasUsage ? (
-        <div className="px-4 py-4 sm:px-6">
+        <div className="p-4">
           <UsageMeter account={account} labelled />
           {resetSec !== null ? (
             <p className="mt-2 text-meta text-muted-foreground">
@@ -141,7 +141,7 @@ function ActivityStrip({
   // Shaped like the chart it holds the place of, not a flat block.
   const placeholder = <ChartSkeleton style={{ height: CHART_HEIGHT }} />;
   return (
-    <div className={cn("px-4 py-3.5 sm:px-6", className)}>
+    <div className={cn("px-4 py-3.5", className)}>
       <div className="flex items-baseline justify-between gap-3 text-meta text-muted-foreground">
         <span>{t("detail.activity")}</span>
         {/* skullet measures the line it will show (the empty day's summary while it loads), so

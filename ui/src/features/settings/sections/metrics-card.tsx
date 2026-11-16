@@ -135,7 +135,7 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
             description={t("metrics.tokenHint")}
             title={<span id={tokenLabel}>{t("metrics.token")}</span>}
           />
-          <div className="px-4 py-4 sm:px-6">
+          <div className="p-4">
             {/* The token masked on screen, as above; Copy copies the job with the whole token. */}
             <CodeBlock
               code={scrapeConfig(origin, settings.path, maskMetricsToken(settings.token))}

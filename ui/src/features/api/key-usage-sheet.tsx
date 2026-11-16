@@ -462,7 +462,7 @@ export function ApiKeyUsageSheet({
         {apiKey ? (
           <SectionCard icon={KeyRoundIcon} slim title={t("usage.keyDetails")}>
             {/* Label over value, two across: seven facts in four or five short rows. */}
-            <div className="px-4 py-4 sm:px-6">
+            <div className="p-4">
               <KeyValueGrid
                 items={[
                   // Its badges (state, label, routing) wrap less across the full width.

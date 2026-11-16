@@ -47,7 +47,7 @@ export function AccountSection({ account }: { account: Account }): JSX.Element {
   }
   return (
     <SectionCard icon={UserCircleIcon} slim title={t("detail.account")}>
-      <div className="px-4 py-4 sm:px-6">
+      <div className="p-4">
         <KeyValueGrid items={facts} />
       </div>
       <InlineEditList>

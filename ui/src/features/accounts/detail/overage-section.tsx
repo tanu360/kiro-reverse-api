@@ -127,7 +127,7 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         title={t("detail.overageSwitch")}
       />
       {/* Label over value, two across: the four numbers and the sync time in three short rows. */}
-      <div className="px-4 py-4 sm:px-6">
+      <div className="p-4">
         <KeyValueGrid items={facts} />
       </div>
     </SectionCard>

@@ -331,16 +331,16 @@ export function RequestDetailSheet({
           title={t("detail.request")}
         >
           {record.replayOf ? (
-            <div className="px-4 pt-4 sm:px-6">
+            <div className="px-4 pt-4">
               <Badge size="sm" tone="primary">
                 {t("replay.badge", { id: record.replayOf })}
               </Badge>
             </div>
           ) : null}
-          <div className="px-4 py-4 sm:px-6">
+          <div className="p-4">
             <KeyValueGrid items={facts} />
           </div>
-          <div className="px-4 py-4 sm:px-6">
+          <div className="p-4">
             <KeyValueGrid columns={1} items={ids} />
           </div>
         </SectionCard>
@@ -590,7 +590,7 @@ function NumbersCard({
       </h2>
       <StatStrip items={stats} />
       {usage ? (
-        <div className="border-border-subtle border-t px-4 py-4 sm:px-6">
+        <div className="border-border-subtle border-t p-4">
           {/* Each part grows by its count; a 4 px floor keeps a small output visible. */}
           <div
             aria-hidden="true"

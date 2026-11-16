@@ -59,7 +59,7 @@ export function KeyLimitsCard({
           className="grid divide-y divide-border-subtle @lg:grid-cols-3 @lg:divide-x @lg:divide-y-0"
         >
           {LIMIT_KINDS.map((kind) => (
-            <li className="flex min-w-0 flex-col gap-2 px-4 py-4 sm:px-6" key={kind}>
+            <li className="flex min-w-0 flex-col gap-2 p-4" key={kind}>
               <div className="flex items-center justify-between gap-3">
                 <span className="font-medium text-sm">{t(`keys.${kind}`)}</span>
                 <Skeleton className="h-4 w-24" />
@@ -98,7 +98,7 @@ export function KeyLimitsCard({
           const shown = flooredShare(row.used, row.limit, 1);
           const tone = limitTone(row.used, row.limit);
           return (
-            <li className="flex min-w-0 flex-col gap-2 px-4 py-4 sm:px-6" key={row.kind}>
+            <li className="flex min-w-0 flex-col gap-2 p-4" key={row.kind}>
               {/* Wraps the figures under the name when a third of the card is too narrow. */}
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <span className="font-medium text-sm">{t(`keys.${row.kind}`)}</span>

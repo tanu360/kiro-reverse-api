@@ -80,7 +80,7 @@ const FILTER_FROM = 8;
 /** The columns every row shares (a subgrid): grip, number, match, arrow, target, menu. */
 const LIST_COLUMNS =
   "grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto]";
-const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4 sm:px-6";
+const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4";
 
 /** The mapping being added (`rowId` null) or edited; `session` remounts the form per open. */
 interface EditorState {

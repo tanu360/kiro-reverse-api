@@ -33,7 +33,7 @@ export function AttemptsCard({ attempts }: { attempts?: RequestAttempt[] }): JSX
       slim
       title={t("attempts.title")}
     >
-      <ol className="px-4 py-4 sm:px-6">
+      <ol className="p-4">
         {attempts.flatMap((attempt, index) => {
           const item = (
             <AttemptItem

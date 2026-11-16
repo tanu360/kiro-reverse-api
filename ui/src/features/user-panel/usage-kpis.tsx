@@ -150,7 +150,7 @@ function Trend({
 
 type LimitKind = "calls" | "credits" | "tokens";
 
-const FOOTER_CLASS = "min-h-11 flex-col flex-nowrap items-stretch gap-2 py-3";
+const FOOTER_CLASS = "min-h-11 flex-col flex-nowrap items-stretch gap-2 py-4";
 
 function FooterSkeleton(): JSX.Element {
   return (

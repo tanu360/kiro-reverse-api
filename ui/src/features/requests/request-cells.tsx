@@ -88,7 +88,7 @@ export function Rail({ variant }: { variant: "table" | "card" }): JSX.Element {
   return (
     <span
       aria-hidden="true"
-      className="pointer-events-none absolute inset-y-0 start-6.5 flex w-px flex-col sm:start-8.5"
+      className="pointer-events-none absolute inset-y-0 start-6.5 flex w-px flex-col"
       data-slot="request-rail"
     >
       <span className={cn("w-px bg-border", variant === "table" ? "flex-1" : "h-3.5")} />

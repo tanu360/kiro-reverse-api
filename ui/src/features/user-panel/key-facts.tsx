@@ -41,7 +41,7 @@ function Fact({
   className?: string;
 }): JSX.Element {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1.5 px-4 py-3.5 sm:px-6", className)}>
+    <div className={cn("flex min-w-0 flex-col gap-1.5 px-4 py-3.5", className)}>
       <dt className="flex items-center gap-1.5 text-meta text-muted-foreground">
         <HugeiconsIcon aria-hidden="true" className="size-4 shrink-0" icon={icon} />
         {label}

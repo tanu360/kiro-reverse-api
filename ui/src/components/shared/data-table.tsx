@@ -135,9 +135,8 @@ type CardsBelow = "xs" | "lg" | "2xl" | "3xl" | "4xl" | "5xl";
 /** Set by DataTableCard: a DataTable inside it is inset without the prop. */
 export const DataTableInsetContext = createContext(false);
 
-const BLEED_WRAPPER = "-mx-4 sm:-mx-6";
-const INSET_TABLE =
-  "[&_tr>*:first-child]:ps-4 sm:[&_tr>*:first-child]:ps-6 [&_tr>*:last-child]:pe-4 sm:[&_tr>*:last-child]:pe-6";
+const BLEED_WRAPPER = "-mx-4";
+const INSET_TABLE = "[&_tr>*:first-child]:ps-4 [&_tr>*:last-child]:pe-4";
 const DENSITY_CLASS = { compact: undefined, comfortable: "[&_tbody_td]:py-3" } as const;
 
 // Container-query switch between the cards and the table: both are rendered, CSS shows one.
@@ -158,7 +157,7 @@ const CARD_LIST_CLASS = {
 } as const;
 // Stacked or gridded cards need room around them inside an edge-to-edge table's card (the
 // card's panel padding); divided rows carry their own.
-const CARD_LIST_PAD = { inset: "px-4 py-4 sm:px-6", bleed: "px-4 sm:px-6" } as const;
+const CARD_LIST_PAD = { inset: "p-4", bleed: "px-4" } as const;
 
 // Row-level click and key handlers ignore events that start inside these.
 const INTERACTIVE_SELECTOR =
@@ -384,7 +383,7 @@ export function DataTable<T>({
               // The table header's select-all, for the cards (they have no header row): one
               // slim row over the list, its checkbox in line with the cards' own.
               <label
-                className="flex cursor-pointer items-center gap-3 border-border-subtle border-b px-4 py-2.5 text-meta text-muted-foreground transition-colors hover:text-foreground sm:px-6"
+                className="flex cursor-pointer items-center gap-3 border-border-subtle border-b px-4 py-2.5 text-meta text-muted-foreground transition-colors hover:text-foreground"
                 data-slot="data-table-select-all"
                 htmlFor={selectAllId}
               >

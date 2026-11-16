@@ -41,10 +41,7 @@ export function StatStrip({
     <dl className={cn("grid", GRID[count], className)}>
       {items.slice(0, 4).map((item) => (
         <div
-          className={cn(
-            "flex min-w-0 flex-col gap-1 border-border-subtle px-4 py-3 sm:px-6",
-            CELL[count],
-          )}
+          className={cn("flex min-w-0 flex-col gap-1 border-border-subtle px-4 py-3", CELL[count])}
           key={item.label}
         >
           <dt className="truncate text-meta text-muted-foreground">{item.label}</dt>

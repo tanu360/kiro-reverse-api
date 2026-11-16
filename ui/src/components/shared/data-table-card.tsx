@@ -30,7 +30,7 @@ export function DataTableCard({
     <Card className={cn("min-w-0 gap-0 overflow-hidden", className)}>
       {toolbar ? (
         <div
-          className="flex min-w-0 flex-col gap-3 border-border-subtle border-b px-4 py-4 sm:px-6"
+          className="flex min-w-0 flex-col gap-3 border-border-subtle border-b p-4"
           data-slot="data-table-card-toolbar"
         >
           {toolbar}
@@ -40,10 +40,7 @@ export function DataTableCard({
         <DataTableInsetContext.Provider value={true}>{children}</DataTableInsetContext.Provider>
       </div>
       {footer ? (
-        <div
-          className="border-border-subtle border-t px-4 py-2.5 sm:px-6"
-          data-slot="data-table-card-footer"
-        >
+        <div className="border-border-subtle border-t p-4" data-slot="data-table-card-footer">
           {footer}
         </div>
       ) : null}

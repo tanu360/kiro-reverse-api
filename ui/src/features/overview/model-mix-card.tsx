@@ -331,10 +331,7 @@ export function ModelMixPanel({
         aria-label={
           chartLabel ?? t(credits ? "modelMix.chartLabel" : "modelMix.chartLabelRequests")
         }
-        className={cn(
-          "w-full max-w-64 shrink-0 self-center px-4 py-4 sm:px-6",
-          BESIDE[besideFrom].ring,
-        )}
+        className={cn("w-full max-w-64 shrink-0 self-center p-4", BESIDE[besideFrom].ring)}
       >
         <Suspense
           fallback={<Skeleton className="mx-auto aspect-square w-full max-w-56 rounded-full" />}

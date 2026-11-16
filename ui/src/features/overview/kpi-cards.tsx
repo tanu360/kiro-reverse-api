@@ -226,7 +226,7 @@ export function KpiCard({
 } & KpiFooter): JSX.Element {
   return (
     <Card className="min-w-0" data-slot="kpi-card">
-      <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-6">
+      <div className="flex min-w-0 flex-1 flex-col p-4">
         <div className="flex min-h-5 min-w-0 items-center gap-1.5 text-meta text-muted-foreground">
           <HugeiconsIcon aria-hidden="true" className="size-4 shrink-0" icon={icon} />
           <span className="min-w-0 truncate">{label}</span>
@@ -257,7 +257,7 @@ export function KpiCard({
         <CardFooter className="p-0 sm:p-0">
           <Link
             {...footer.link}
-            className="flex min-w-0 flex-1 items-center justify-between gap-2 px-4 py-3 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline sm:px-6"
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 p-4 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline"
           >
             <span className="min-w-0 truncate">{footer.linkLabel}</span>
             <HugeiconsIcon

@@ -315,8 +315,8 @@
    *                   into a field whose text is under 16 px. Set by --control-text below.
    * Weights: 400 for text, 500 for controls, names, table heads and badges, 600 only for titles
    * and KPI figures; no bold outside the sign-in showcase art.
-   * Spacing: a card pads 16 px on phones and 24 px from sm, its header too, on every side; its
-   * footer 12 px above and below; list rows run about 64 px with 16 px icons and a 12 px gap.
+   * Spacing: a card pads 16 px on every side at every width (shadcn's compact card spacing), its
+   * header and footer too; list rows run about 64 px with 16 px icons and a 12 px gap.
    * Line heights follow the page's 1.5 unless the step is a title; 12 px text sits on 16 px.
    * Only the large steps tighten their tracking; body text keeps Geist's own spacing.
    * lib/utils.ts lists these steps for cn(), so a new step goes there too.

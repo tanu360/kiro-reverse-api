@@ -274,7 +274,7 @@ export function TopAccounts(): JSX.Element {
   let body: JSX.Element;
   if (query.isError && !accounts) {
     body = (
-      <div className="px-4 py-4 sm:px-6">
+      <div className="p-4">
         <ErrorState
           compact
           error={query.error}

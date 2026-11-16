@@ -85,7 +85,7 @@ export function ConversationSheet({
       <>
         <SectionCard slim title={t("conversation.summary")}>
           <StatStrip items={stats} />
-          <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3 text-muted-foreground text-xs sm:px-6">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3 text-muted-foreground text-xs">
             <span>{conversationSpan(totals.firstTs, totals.lastTs, t, lang)}</span>
             <span>
               {t("conversation.results", {
@@ -163,7 +163,7 @@ function TurnRow({
   return (
     <li
       aria-current={current ? "true" : undefined}
-      className="flex flex-col gap-1.5 px-4 py-3 aria-[current=true]:bg-accent sm:px-6"
+      className="flex flex-col gap-1.5 px-4 py-3 aria-[current=true]:bg-accent"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-sm tabular-nums">

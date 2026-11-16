@@ -366,7 +366,7 @@ export function RequestCard({
 const COMPACT_PADDING = "px-2 @7xl/requests:px-2.5";
 // Below a 56rem container Credits is the last column shown (Duration and Error are hidden), so it
 // takes the card's end padding, as the inset gives the real last cell.
-const CREDITS_END = "pe-4 sm:pe-6 @4xl/requests:pe-2 @7xl/requests:pe-2.5";
+const CREDITS_END = "pe-4 @4xl/requests:pe-2 @7xl/requests:pe-2.5";
 const FROM_4XL = "hidden @4xl/requests:table-cell";
 // With the detail columns the table needs a 72rem container for Speed and Error: below it the
 // speed rides under the duration and a failure's category under the time.

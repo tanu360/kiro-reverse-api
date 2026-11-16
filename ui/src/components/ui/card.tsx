@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 /*
  * One card chrome for the app, taken from the Settings groups: an opaque card surface (--card)
  * under the --border hairline, 12 px radius, no shadow (shadows belong to floating layers).
- * Sections inside it share one rhythm: 16 px inline padding on phones and 24 px from sm up,
- * a 16 px (20 px from sm) header, a 16 px (24 px from sm) panel and a 12 px footer.
+ * Sections inside it share one rhythm, shadcn's compact card spacing: 16 px on every side at
+ * every width, for the header, the panel and the footer alike.
  * Dividers between sections are the subtle hairline (--border-subtle).
  */
 const cardVariants = cva(
@@ -73,16 +73,15 @@ export function Card({
  * (title over a stacked description, or title and an inline description on one baseline) and
  * the actions at the end. Actions wrap below on a narrow card instead of squeezing the title.
  * Items sit at the top, so the chip and the actions line up with the title line (24 px) even
- * when a description or meta wraps under it. The padding is the card's own on every side: 16 px
- * on phones and 24 px from sm. A title-only header is 56 px on phones and 72 px from sm, with or
- * without actions.
+ * when a description or meta wraps under it. The padding is the card's own, 16 px on every side
+ * at every width. A title-only header is 56 px, with or without actions.
  */
 // Literal class strings (Tailwind only sees classes written out in full).
 // A segmented pill in the actions (a range, a metric) stays top right even on a phone: the
 // heading then yields down to 6rem, drops its end padding (the gap already parts it from the
 // pill) and its inline description wraps under the title.
 const HEADER_CLASS =
-  "flex flex-wrap items-start gap-3 p-4 sm:p-6 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:basis-24 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:pe-0";
+  "flex flex-wrap items-start gap-3 p-4 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:basis-24 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:pe-0";
 const HEADING_CLASS =
   "flex min-w-0 flex-1 basis-40 flex-col gap-1 pe-3 [&:has(>[data-slot$=-description][data-variant=inline])]:flex-row [&:has(>[data-slot$=-description][data-variant=inline])]:flex-wrap [&:has(>[data-slot$=-description][data-variant=inline])]:items-baseline [&:has(>[data-slot$=-description][data-variant=inline])]:gap-x-2 [&:has(>[data-slot$=-description][data-variant=inline])]:gap-y-0.5";
 const TITLE_CLASS =
@@ -142,9 +141,9 @@ function useWrappedActions(): {
 
   return { ref, wrapped };
 }
-const PANEL_CLASS = "min-w-0 flex-1 px-4 py-4 sm:p-6";
+const PANEL_CLASS = "min-w-0 flex-1 p-4";
 const FOOTER_CLASS =
-  "flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-meta text-muted-foreground sm:px-6";
+  "flex flex-wrap items-center justify-between gap-3 p-4 text-meta text-muted-foreground";
 
 /**
  * The header's icon: a 28 px chip that takes 24 px of layout (the title row's height), so it
