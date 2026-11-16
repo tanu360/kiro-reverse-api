@@ -177,8 +177,8 @@ export function limitShare(share: number, reached: boolean, lang: Lang): string 
 
 /**
  * The key's own limit for a card's measure, counted since the key was created: a meter in the
- * limit's tone (amber from 75%, red once spent), "used of limit" and the share; or a dotted line,
- * what was used and "No key limit".
+ * limit's tone (amber from 75%, red once spent), "used of limit" and the share; or the same
+ * meter's empty track (so every footer lines up), what was used and "No key limit".
  */
 function LimitFooter({ apiKey, kind }: { apiKey: UserKey | undefined; kind: LimitKind }) {
   const { t, lang } = useT("user-panel");
@@ -197,9 +197,12 @@ function LimitFooter({ apiKey, kind }: { apiKey: UserKey | undefined; kind: Limi
   if (limit <= 0) {
     return (
       <CardFooter className={FOOTER_CLASS} data-limit="none">
-        <div aria-hidden="true" className="flex h-1.5 items-center">
-          <div className="w-full border-border-strong border-t-2 border-dotted" />
-        </div>
+        {/* Decorative: "No key limit" below says it. */}
+        <Meter aria-hidden="true" max={1} min={0} value={0}>
+          <MeterTrack className="h-1.5">
+            <MeterIndicator />
+          </MeterTrack>
+        </Meter>
         <div className="flex items-baseline justify-between gap-3">
           <span className="min-w-0 tabular-nums">
             {t("kpi.usedSinceCreated", { n: short(used) })}
