@@ -7,8 +7,7 @@ import type {
 // Pure helpers for the per-key usage card and sheet: no React, so they test on their own.
 
 export type UsageMetric = "requests" | "tokens" | "credits";
-/** The comparison card ranks by these; the sheet adds tokens. */
-export const CARD_METRICS: readonly UsageMetric[] = ["requests", "credits"];
+/** The measures the usage sheet's chart switches between. */
 export const SHEET_METRICS: readonly UsageMetric[] = ["requests", "tokens", "credits"];
 
 export function isUsageMetric(
@@ -17,9 +16,6 @@ export function isUsageMetric(
 ): value is UsageMetric {
   return typeof value === "string" && (allowed as readonly string[]).includes(value);
 }
-
-/** Keys listed by name in the card; the rest is one "N other keys" row. */
-export const TOP_KEYS = 5;
 
 export const EMPTY_TOTALS: ApiKeyUsageTotals = {
   requests: 0,
@@ -52,60 +48,6 @@ export function findEntry(
   ref: string,
 ): ApiKeyUsageEntry | undefined {
   return data?.keys.find((entry) => entryRef(entry) === ref);
-}
-
-/** The row's amount in the chosen measure. */
-export function metricAmount(totals: ApiKeyUsageTotals, metric: UsageMetric): number {
-  if (metric === "credits") return totals.credits;
-  if (metric === "tokens") return totals.tokens;
-  return totals.requests;
-}
-
-export function addTotals(a: ApiKeyUsageTotals, b: ApiKeyUsageTotals): ApiKeyUsageTotals {
-  return {
-    requests: a.requests + b.requests,
-    succeeded: a.succeeded + b.succeeded,
-    failed: a.failed + b.failed,
-    inTokens: a.inTokens + b.inTokens,
-    outTokens: a.outTokens + b.outTokens,
-    tokens: a.tokens + b.tokens,
-    credits: a.credits + b.credits,
-  };
-}
-
-export interface RankedKeys {
-  /** The busiest entries in the measure, at most `top`. */
-  rows: ApiKeyUsageEntry[];
-  /** Everything after them, summed; null when nothing is left over. */
-  other: { count: number; totals: ApiKeyUsageTotals } | null;
-}
-
-/** Ranks by the measure, then by requests, then by handle, so ties never reorder on a refetch. */
-export function rankEntries(
-  entries: readonly ApiKeyUsageEntry[],
-  metric: UsageMetric,
-  top = TOP_KEYS,
-): RankedKeys {
-  const sorted = [...entries].sort((a, b) => {
-    const byMetric = metricAmount(b.totals, metric) - metricAmount(a.totals, metric);
-    if (byMetric !== 0) return byMetric;
-    if (b.totals.requests !== a.totals.requests) return b.totals.requests - a.totals.requests;
-    const ra = entryRef(a);
-    const rb = entryRef(b);
-    return ra < rb ? -1 : ra > rb ? 1 : 0;
-  });
-  const rows = sorted.slice(0, Math.max(0, top));
-  const rest = sorted.slice(rows.length);
-  return {
-    rows,
-    other:
-      rest.length > 0
-        ? {
-            count: rest.length,
-            totals: rest.reduce((sum, entry) => addTotals(sum, entry.totals), EMPTY_TOTALS),
-          }
-        : null,
-  };
 }
 
 /**

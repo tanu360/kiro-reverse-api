@@ -5,7 +5,7 @@ import type {
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
-import { EMPTY_TOTALS, entryRef, findEntry, rankEntries, seriesBars } from "./key-usage-model";
+import { EMPTY_TOTALS, entryRef, findEntry, seriesBars } from "./key-usage-model";
 
 function totals(partial: Partial<ApiKeyUsageTotals>): ApiKeyUsageTotals {
   const merged = { ...EMPTY_TOTALS, ...partial };
@@ -27,40 +27,6 @@ describe("entryRef", () => {
     expect(entryRef({ id: "a", kind: "deleted" })).toBe("deleted:a");
     expect(entryRef({ id: "none", kind: "none" })).toBe("none");
     expect(entryRef({ id: "invalid", kind: "invalid" })).toBe("invalid");
-  });
-});
-
-describe("rankEntries", () => {
-  const entries = [
-    entry("a", "key", { requests: 10, credits: 1 }),
-    entry("b", "key", { requests: 30, credits: 0.5 }),
-    entry("none", "none", { requests: 20, credits: 4 }),
-    entry("c", "key", { requests: 5, credits: 2, failed: 1 }),
-    entry("d", "deleted", { requests: 5, credits: 3 }),
-    entry("invalid", "invalid", { requests: 7, failed: 7 }),
-    entry("e", "key", { requests: 1, credits: 0.25 }),
-  ];
-
-  it("keeps the top five by requests and sums the rest", () => {
-    const ranked = rankEntries(entries, "requests");
-    expect(ranked.rows.map(entryRef)).toEqual(["key:b", "none", "key:a", "invalid", "deleted:d"]);
-    // c and d tie on 5 requests: the handle decides, so a refetch never swaps them.
-    expect(ranked.other).toEqual({
-      count: 2,
-      totals: totals({ requests: 6, credits: 2.25, failed: 1 }),
-    });
-  });
-
-  it("re-ranks by credits", () => {
-    const ranked = rankEntries(entries, "credits");
-    expect(ranked.rows.map(entryRef)).toEqual(["none", "deleted:d", "key:c", "key:a", "key:b"]);
-    expect(ranked.other?.count).toBe(2);
-    expect(ranked.other?.totals.requests).toBe(8);
-  });
-
-  it("has no other row when everything fits", () => {
-    expect(rankEntries(entries.slice(0, 3), "requests").other).toBeNull();
-    expect(rankEntries([], "requests")).toEqual({ rows: [], other: null });
   });
 });
 

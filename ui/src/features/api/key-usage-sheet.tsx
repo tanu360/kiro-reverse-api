@@ -153,7 +153,7 @@ export function UsageRangeControl({
  * a skullet bar measured from a sample of its size. A range without the key's traffic passes
  * EMPTY_TOTALS.
  */
-export function UsageTotalsStrip({
+function UsageTotalsStrip({
   totals,
   loading,
 }: {

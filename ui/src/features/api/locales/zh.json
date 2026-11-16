@@ -210,6 +210,7 @@
   "endpoints.holderAuthRequired": "以 {bearer} 或 {xApiKey} 发送你的 API Key。",
   "snippets.title": "客户端配置",
   "snippets.description": "本代理的示例。先把 {env} 设为你的一个 API Key。",
+  "snippets.descriptionHolder": "本代理的示例。先把 {env} 设为你的 API Key。",
   "snippets.anyKeyWorks": "当前不要求 API Key，任意值都可以。",
   "snippets.apiRequest": "API 请求",
   "snippets.claudeCode": "Claude Code",

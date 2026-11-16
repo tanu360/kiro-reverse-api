@@ -219,6 +219,7 @@
   "endpoints.holderAuthRequired": "Send your API key as {bearer} or {xApiKey}.",
   "snippets.title": "Client setup",
   "snippets.description": "Examples for this proxy. Set {env} to one of your API keys first.",
+  "snippets.descriptionHolder": "Examples for this proxy. Set {env} to your API key first.",
   "snippets.anyKeyWorks": "API keys are not required now, so any value works.",
   "snippets.apiRequest": "API request",
   "snippets.claudeCode": "Claude Code",

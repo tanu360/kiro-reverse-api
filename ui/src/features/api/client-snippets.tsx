@@ -313,7 +313,10 @@ export function ClientSnippetsCard({
   model?: string;
 } = {}): JSX.Element {
   const { t } = useT("api");
-  const settings = useQuery({ ...settingsQuery(), enabled: requireApiKey === undefined });
+  // A key holder (requireApiKey given) has one key: the card speaks of it, and leaves "keys are
+  // not required" to the panel's own alert, which says what that means for their usage.
+  const keyHolder = requireApiKey !== undefined;
+  const settings = useQuery({ ...settingsQuery(), enabled: !keyHolder });
   const required = requireApiKey ?? settings.data?.requireApiKey;
   const origin = window.location.origin;
   const tools = useMemo(() => buildToolSnippets(origin, model), [origin, model]);
@@ -322,7 +325,12 @@ export function ClientSnippetsCard({
   return (
     <SectionCard
       // One line, so this header lines up with the Endpoints header beside it at xl.
-      description={<CodeText code={env} text={t("snippets.description")} />}
+      description={
+        <CodeText
+          code={env}
+          text={t(keyHolder ? "snippets.descriptionHolder" : "snippets.description")}
+        />
+      }
       icon={CommandLineIcon}
       id="api-client-setup"
       // The tab strip sits 12 px under the header, as the status tabs sit in the Accounts and
@@ -331,7 +339,7 @@ export function ClientSnippetsCard({
       title={t("snippets.title")}
     >
       <Tabs className="min-w-0 flex-1 gap-4" defaultValue="api">
-        {required === false ? (
+        {required === false && !keyHolder ? (
           <Alert role="note" size="sm" variant="info">
             <HugeiconsIcon icon={InfoIcon} aria-hidden="true" />
             <AlertDescription>{t("snippets.anyKeyWorks")}</AlertDescription>

@@ -658,8 +658,11 @@ describe("Endpoints and Client setup given Require API key (the key holder's pag
     expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
       /^Send your API key as Authorization: Bearer <key> or X-Api-Key: <key>\.$/,
     );
-    expect(screen.getByRole("note")).toHaveTextContent(
-      "API keys are not required now, so any value works.",
+    // The key holder's panel says keys are not required in its own alert; the card speaks of
+    // their one key, without the admin's "any value works".
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Client setup" })).toHaveTextContent(
+      "Set KIRO_API_KEY to your API key first.",
     );
     const request = screen.getByRole("tabpanel", { name: "API request" }).querySelector("pre");
     expect(request).toHaveTextContent('"model": "claude-haiku-4.5"');

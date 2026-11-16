@@ -298,16 +298,16 @@ describe("/user", () => {
     expect(adminCalls).toEqual([]);
   });
 
-  it("keeps the endpoints hint to how to send the key when keys are not required", async () => {
+  it("keeps both cards to the holder's own key when keys are not required", async () => {
     mockDb.settings.requireApiKey = false;
     await signIn();
     await renderPanel();
-    // The panel's own alert says keys are not required; the card only says how to send one.
+    // The panel's own alert says keys are not required; the cards only say how to use the key,
+    // with none of the admin's "any value works" or "one of your API keys".
     expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(/^Send your API key as /);
     const setup = screen.getByRole("region", { name: "Client setup" });
-    expect(within(setup).getByRole("note")).toHaveTextContent(
-      "API keys are not required now, so any value works.",
-    );
+    expect(within(setup).queryByRole("note")).not.toBeInTheDocument();
+    expect(setup).toHaveTextContent("Set KIRO_API_KEY to your API key first.");
     await requestsTable();
     expect(adminCalls).toEqual([]);
   });
@@ -344,7 +344,7 @@ describe("/user", () => {
     expect(within(rows[0]).getByText("Claude Code")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Anthropic API")).toBeInTheDocument();
     // 300 output tokens in 2 s; no cache read of the 1,200 input; the ID to quote; no HTTP status.
-    expect(rows[1].querySelector("[data-output-speed]")).toHaveTextContent(/^150 tok\/s$/);
+    expect(rows[1].querySelector("[data-slot=output-speed]")).toHaveTextContent(/^150 tok\/s$/);
     expect(rows[1].querySelector("[data-slot=cache-hit]")).toHaveTextContent("0%");
     expect(rows[1].querySelector("[data-slot=request-id]")).toHaveTextContent("req_1");
     expect(within(rows[1]).getByRole("button", { name: "Copy request ID" })).toBeInTheDocument();

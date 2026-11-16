@@ -210,6 +210,7 @@
   "endpoints.holderAuthRequired": "Gửi API key của bạn qua {bearer} hoặc {xApiKey}.",
   "snippets.title": "Thiết lập client",
   "snippets.description": "Ví dụ cho proxy này. Trước tiên đặt {env} thành một API key của bạn.",
+  "snippets.descriptionHolder": "Ví dụ cho proxy này. Trước tiên đặt {env} thành API key của bạn.",
   "snippets.anyKeyWorks": "Hiện không bắt buộc API key nên giá trị nào cũng được.",
   "snippets.apiRequest": "Yêu cầu API",
   "snippets.claudeCode": "Claude Code",
