@@ -93,11 +93,9 @@ describe("BackupsPage", () => {
     expect(rollback).toHaveAttribute("data-tone", "warning");
     expect(within(rows[0]).getByText("Manual")).toHaveAttribute("data-tone", "primary");
     expect(within(rows[1]).getByText("Scheduled")).toHaveAttribute("data-tone", "neutral");
-    expect(within(rows[1]).getByText("Scheduled (Daily)")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Every day")).toBeInTheDocument();
     expect(within(rows[2]).getByText("7 restored")).toBeInTheDocument();
-    expect(
-      within(rows[4]).getByText("Before restoring from file kiro-backup-x.json"),
-    ).toBeInTheDocument();
+    expect(within(rows[4]).getByText("Before restoring kiro-backup-x.json")).toBeInTheDocument();
   });
 
   it("shows the empty state when the server sends backups:null", async () => {

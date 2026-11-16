@@ -90,7 +90,8 @@ type Mask = (text?: string) => string;
 
 /** The note, or a muted dash when there is none. */
 function NoteCell({ entry, t, mask }: { entry: BackupEntry; t: TFunction; mask: Mask }): ReactNode {
-  const note = noteText(entry, t, mask);
+  const { lang } = useT();
+  const note = noteText(entry, t, mask, lang);
   return note === EMPTY ? <span className="text-muted-foreground">{EMPTY}</span> : note;
 }
 
@@ -250,7 +251,7 @@ function BackupCard({
   const { t, lang } = useT("backups");
   const mask = useMaskText();
   const time = formatDateTime(entry.createdAt, lang);
-  const note = noteText(entry, t, mask);
+  const note = noteText(entry, t, mask, lang);
   return (
     <ListCard
       action={<RowMenu actions={actions} entry={entry} label={t("rowActions", { time })} />}

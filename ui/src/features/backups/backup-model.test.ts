@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BackupEntry } from "@/lib/api/types";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatDateTime } from "@/lib/format";
 import { type Lang, type TParams, translate } from "@/lib/i18n";
 import {
   accountsCell,
@@ -43,11 +43,23 @@ describe("manualNote", () => {
 describe("noteText", () => {
   it("describes a rollback point taken before an upload", () => {
     expect(noteText(entry({ kind: "pre-restore", note: "upload kiro-backup-x.json" }), t)).toBe(
-      "Before restoring from file kiro-backup-x.json",
+      "Before restoring kiro-backup-x.json",
     );
   });
 
-  it("describes a rollback point taken before a restore by id", () => {
+  it("describes a rollback point taken before a restore by the restored backup's time", () => {
+    // A server id starts with its UTC time; the note names that time instead of the long id.
+    const id = "20261115-131200-123456789-abcd1234";
+    const at = Date.UTC(2026, 10, 15, 13, 12, 0) / 1000;
+    expect(
+      noteText(
+        entry({ kind: "pre-restore", note: `auto before restore ${id}` }),
+        t,
+        undefined,
+        "en",
+      ),
+    ).toBe(`Before restoring the backup from ${formatDateTime(at, "en")}`);
+    // An id without that time keeps the id.
     expect(noteText(entry({ kind: "pre-restore", note: "auto before restore abc-123" }), t)).toBe(
       "Before restoring backup abc-123",
     );
@@ -55,19 +67,18 @@ describe("noteText", () => {
 
   it("describes the backup a duplicate merge saves first", () => {
     const merge = entry({ kind: "auto", note: "before merging duplicate accounts" });
-    expect(noteText(merge, t)).toBe("Before merging duplicate accounts");
-    expect(noteText(merge, tFor("zh"))).toBe("合并重复账号之前");
+    expect(noteText(merge, t)).toBe("Duplicate accounts");
+    expect(noteText(merge, tFor("zh"))).toBe("重复账号");
     // The server now saves it with its own kind; the note reads the same.
     const current = entry({ kind: "pre-merge", note: "before merging duplicate accounts" });
-    expect(noteText(current, t)).toBe("Before merging duplicate accounts");
+    expect(noteText(current, t)).toBe("Duplicate accounts");
     expect(noteText(current, tFor("vi"))).not.toBe("before merging duplicate accounts");
   });
 
   it("labels the server note of a scheduled backup", () => {
-    expect(noteText(entry({ kind: "scheduled", note: "auto-daily" }), t)).toBe("Scheduled (Daily)");
-    expect(noteText(entry({ kind: "scheduled", note: "auto-weekly" }), tFor("zh"))).toBe(
-      "定时（每周）",
-    );
+    // How often it runs, without repeating the Kind beside it.
+    expect(noteText(entry({ kind: "scheduled", note: "auto-daily" }), t)).toBe("Every day");
+    expect(noteText(entry({ kind: "scheduled", note: "auto-weekly" }), tFor("zh"))).toBe("每周");
   });
 
   it("shows a plain note through the mask", () => {
@@ -82,7 +93,7 @@ describe("noteText", () => {
     const mask = (text?: string) => (text ?? "").replace("ann@example.com", "an***");
     expect(
       noteText(entry({ kind: "pre-restore", note: "upload ann@example.com.json" }), t, mask),
-    ).toBe("Before restoring from file an***.json");
+    ).toBe("Before restoring an***.json");
   });
 
   it("shows an em dash for an empty note", () => {
