@@ -13,7 +13,6 @@
   "access.keepEditing": "继续编辑",
   "keys.title": "API Key",
   "keys.description": "为每个客户端创建一个 API Key。可设置 Token、Credits 或调用次数限额，0 表示不限。",
-  "keys.userPanel": "API Key 持有者可以在 {link} 查看自己的用量。",
   "keys.metaDisabled": "{total} · {disabled} 个已禁用",
   "keys.create": "创建 API Key",
   "keys.loadFailed": "无法加载 API Key",

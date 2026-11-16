@@ -13,7 +13,6 @@
   "access.keepEditing": "編集を続ける",
   "keys.title": "API キー",
   "keys.description": "クライアントごとにキーを作成します。トークン、クレジット、呼び出し回数の上限を設定でき、0 は無制限です。",
-  "keys.userPanel": "キーの利用者は {link} で自分の使用量を確認できます。",
   "keys.metaDisabled": "{total} · 無効 {disabled}",
   "keys.create": "API キーを作成",
   "keys.loadFailed": "API キーを読み込めませんでした",

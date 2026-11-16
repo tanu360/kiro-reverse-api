@@ -94,20 +94,21 @@ describe("ApiPage", () => {
     expect(within(row("team-a")).queryByText("Limit reached")).not.toBeInTheDocument();
     expect(within(table).getAllByText("Limit reached")).toHaveLength(1);
     expect(within(table).getByText("Unnamed key")).toBeInTheDocument();
-    // The card tells admins where key holders check their own usage, in a new tab.
-    const userPanel = `${window.location.origin}/user`;
-    expect(screen.getByText(/Key holders can check their own usage at/)).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: userPanel });
-    expect(link).toHaveAttribute("href", userPanel);
-    expect(link).toHaveAttribute("target", "_blank");
+    // The card's description is one line; the usage page link lives in the new key's panel.
+    expect(screen.queryByText(/Key holders can check their own usage at/)).not.toBeInTheDocument();
   });
 
   it("points key holders at the public link while it is live", async () => {
     // The admin is on localhost; key holders can only open the public link.
     mockDb.tunnel.pinned = { enabled: true, state: "running", url: "https://kiro.tail1234.ts.net" };
-    await renderPage();
-    const link = await screen.findByRole("link", { name: "https://kiro.tail1234.ts.net/user" });
-    expect(link).toHaveAttribute("href", "https://kiro.tail1234.ts.net/user");
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Create API key" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
+    const panel = await screen.findByTestId("created-key-panel");
+    await waitFor(() =>
+      expect(within(panel).getByText("https://kiro.tail1234.ts.net/user")).toBeInTheDocument(),
+    );
   });
 
   it("creates a key and shows the full key once, ready to copy", async () => {
@@ -403,10 +404,9 @@ describe("ApiPage", () => {
     const { user } = await renderPage();
 
     const teamRow = row("team-a");
-    expect(within(teamRow).getByText("Calls")).toBeInTheDocument();
-    expect(within(teamRow).getByText("20 / 20")).toBeInTheDocument();
-    expect(within(teamRow).getByLabelText("Successful calls: 20 of 20")).toBeInTheDocument();
-    expect(within(row("local-dev")).getByText("2 / 5")).toBeInTheDocument();
+    const calls = (key: HTMLElement) => key.querySelector('[data-measure="calls"]');
+    expect(calls(teamRow)).toHaveTextContent(/^20 \/ 20 100%$/);
+    expect(calls(row("local-dev"))).toHaveTextContent(/^2 \/ 5 40%$/);
 
     // A used-up call limit flags the key, with its own hint: the key stays enabled.
     const badge = within(teamRow).getByRole("button", { name: "Limit reached" });
@@ -416,7 +416,8 @@ describe("ApiPage", () => {
         "The key reached its call limit, so clients get a 429 error. Raise the call limit or reset usage.",
       ),
     ).toBeInTheDocument();
-    expect(within(teamRow).getByText("Enabled")).toBeInTheDocument();
+    // The table shows the one pill: Limit reached stands in for Enabled, never Disabled.
+    expect(within(teamRow).queryByText("Disabled")).not.toBeInTheDocument();
   });
 
   it("deletes a key only after the confirm", async () => {
@@ -491,12 +492,13 @@ describe("ApiPage", () => {
       if (!found) throw new Error(`no card for ${name}`);
       return found;
     };
-    // No limits: the card names the infinity sign, which the table's Usage header names there.
+    // No limits: the card names the infinity sign; the table shows each amount over it, under
+    // its Tokens, Credits or Calls header.
     const limits = card("local-dev").querySelector('[data-slot="key-usage-unlimited"]');
     expect(limits).toHaveTextContent("Limits Unlimited");
     expect(card("local-dev")).toHaveTextContent("Never used");
-    expect(row("local-dev").querySelector('[data-slot="key-usage-unlimited"]')).toHaveTextContent(
-      /^Unlimited$/,
+    expect(row("local-dev").querySelector('[data-measure="tokens"]')).toHaveTextContent(
+      /^0 \/ Unlimited$/,
     );
     // The relative time is a <time>, which keeps itself current and has the date as a tooltip.
     const lastUsed = within(card("team-a")).getByText("5 minutes ago");

@@ -13,7 +13,6 @@
   "access.keepEditing": "Continuar editando",
   "keys.title": "Chaves de API",
   "keys.description": "Crie uma chave por cliente. Defina limites de tokens, créditos ou chamadas; 0 significa ilimitado.",
-  "keys.userPanel": "Quem tem uma chave pode ver o próprio uso em {link}.",
   "keys.metaDisabled": "{total} · {disabled} desabilitadas",
   "keys.create": "Criar chave de API",
   "keys.loadFailed": "Não foi possível carregar as chaves de API",

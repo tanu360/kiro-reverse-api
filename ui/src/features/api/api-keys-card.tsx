@@ -52,23 +52,36 @@ import {
 import { queryKeys } from "@/lib/api/query-keys";
 import { settingsQuery } from "@/lib/api/settings";
 import type { ApiKey } from "@/lib/api/types";
-import { formatCredits, formatItems, formatNumber, formatRelativeTime } from "@/lib/format";
+import {
+  formatCredits,
+  formatFraction,
+  formatItems,
+  formatNumber,
+  formatRelativeTime,
+} from "@/lib/format";
 import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { isKeyExpired, limitReachedReason, wouldLockOutClients } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
-import { CreatedKeyPanel, useUserPanelUrl } from "./created-key-panel";
+import { CreatedKeyPanel } from "./created-key-panel";
 import { keyEntryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
 
 /**
- * The keys turn into cards below DataTable's `cardsBelow="4xl"` (a 56rem container: the table
- * needs about 850 px), two to a row from 42rem. Ten keys a page in either layout, so the card
+ * The keys turn into cards below DataTable's `cardsBelow="4xl"` (a 56rem container: the table,
+ * its narrow columns gone, needs about 900 px), two to a row from 42rem. Ten keys a page in either layout, so the card
  * stays about a screen tall.
  */
 const CARDS_BELOW_PX = 896;
+/**
+ * Narrower tables drop the columns the usage sheet also shows, as the accounts table drops Last
+ * used first: Last used below FULL_TABLE_PX, Successful requests too below NO_LAST_USED_PX. The
+ * name keeps about 180 px either way.
+ */
+const FULL_TABLE_PX = 1190;
+const NO_LAST_USED_PX = 1100;
 const CARD_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE = 10;
 
@@ -317,10 +330,16 @@ export function ApiKeysCard(): JSX.Element {
       // Takes the width the other columns leave and cuts a long name, so the table never
       // scrolls sideways (w-full with max-w-0 lets the cell shrink below its text).
       className: "w-full max-w-0",
+      // The name over its access settings (one muted line), like an account over its plan.
       cell: (apiKey) => (
-        <TruncatedText className={cn("font-medium", !apiKey.name && "text-muted-foreground")}>
-          {keyName(apiKey, t, mask)}
-        </TruncatedText>
+        <span className="flex min-w-0 flex-col items-start gap-1">
+          <TruncatedText
+            className={cn("max-w-full font-medium", !apiKey.name && "text-muted-foreground")}
+          >
+            {keyName(apiKey, t, mask)}
+          </TruncatedText>
+          <KeyAccessLine apiKey={apiKey} />
+        </span>
       ),
     },
     {
@@ -329,8 +348,44 @@ export function ApiKeysCard(): JSX.Element {
       // Fills the cell, so every copy button lines up at the column's end.
       cell: (apiKey) => <MaskedKey apiKey={apiKey} fill />,
     },
-    { id: "status", header: t("keys.status"), cell: (apiKey) => <KeyStatus apiKey={apiKey} /> },
-    { id: "usage", header: t("keys.usage"), cell: (apiKey) => <KeyUsage apiKey={apiKey} /> },
+    { id: "status", header: t("keys.status"), cell: (apiKey) => <KeyStatePill apiKey={apiKey} /> },
+    // One column per limit, each one plain line: used / limit and the share.
+    {
+      id: "tokens",
+      header: t("keys.tokens"),
+      cell: (apiKey) => (
+        <KeyMeasure
+          format={(value) => formatNumber(value, lang)}
+          limit={apiKey.tokenLimit ?? 0}
+          measure="tokens"
+          used={apiKey.tokensUsed}
+        />
+      ),
+    },
+    {
+      id: "credits",
+      header: t("keys.credits"),
+      cell: (apiKey) => (
+        <KeyMeasure
+          format={(value) => formatCredits(value, 2, lang)}
+          limit={apiKey.creditLimit ?? 0}
+          measure="credits"
+          used={apiKey.creditsUsed}
+        />
+      ),
+    },
+    {
+      id: "calls",
+      header: t("keys.calls"),
+      cell: (apiKey) => (
+        <KeyMeasure
+          format={(value) => formatNumber(value, lang)}
+          limit={apiKey.callLimit ?? 0}
+          measure="calls"
+          used={apiKey.successfulCalls ?? 0}
+        />
+      ),
+    },
     {
       id: "requests",
       header: t("keys.requests"),
@@ -340,7 +395,12 @@ export function ApiKeysCard(): JSX.Element {
     {
       id: "lastUsed",
       header: t("keys.lastUsed"),
-      cell: (apiKey) => <RelativeTime value={apiKey.lastUsedAt} />,
+      // Muted and short ("5m ago"), as in the accounts table; the full date is a tooltip.
+      cell: (apiKey) => (
+        <span className="text-muted-foreground">
+          <RelativeTime style="narrow" value={apiKey.lastUsedAt} />
+        </span>
+      ),
     },
     {
       id: "actions",
@@ -352,6 +412,11 @@ export function ApiKeysCard(): JSX.Element {
       cell: actions,
     },
   ];
+
+  const hidden = new Set<string>();
+  if (width > 0 && width < FULL_TABLE_PX) hidden.add("lastUsed");
+  if (width > 0 && width < NO_LAST_USED_PX) hidden.add("requests");
+  const visibleColumns = columns.filter((column) => !hidden.has(column.id));
 
   const renderCard = (apiKey: ApiKey) => (
     <ListCard
@@ -432,30 +497,12 @@ export function ApiKeysCard(): JSX.Element {
           })
         : formatNumber(list.length, lang);
 
-  const userPanel = useUserPanelUrl();
-
   return (
     <SectionCard
       actions={headerActions}
       // Clips the last row's hover tint to the card's rounded corners.
       className="overflow-hidden"
-      description={
-        <>
-          {t("keys.description")}
-          <span className="block">
-            {fillNodes(t("keys.userPanel"), {
-              link: (
-                <Button
-                  render={<a href={userPanel} rel="noopener noreferrer" target="_blank" />}
-                  variant="link-inline"
-                >
-                  {userPanel}
-                </Button>
-              ),
-            })}
-          </span>
-        </>
-      }
+      description={t("keys.description")}
       footer={
         list.length > pageSize ? (
           <DataTablePagination
@@ -494,7 +541,7 @@ export function ApiKeysCard(): JSX.Element {
             caption={t("keys.caption")}
             cardLayout="grid"
             cardsBelow="4xl"
-            columns={columns}
+            columns={visibleColumns}
             data={pageRows}
             emptyState={emptyState}
             getRowId={(apiKey) => apiKey.id}
@@ -572,14 +619,21 @@ export function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
 /** An expiry this close shows as a badge, so nobody is surprised by the 401. */
 const EXPIRY_SOON_SEC = 7 * 86_400;
 
+interface AccessItem {
+  id: string;
+  icon?: typeof Clock01Icon;
+  text: string;
+  /** The tags item, the one that may cut: the others keep their few words. */
+  cuts?: boolean;
+}
+
 /**
- * A reached limit, the account binding (ids and tags), the model list, the RPM limit, an own
- * routing mode and an expiry within a week; nothing for a plain key.
+ * The key's access settings: an expiry within a week, the account binding (ids and tags), the
+ * model list, the RPM limit and an own routing mode; none for a plain key.
  */
-function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
+function useAccessItems(apiKey: ApiKey): AccessItem[] {
   const { t, lang } = useT("api");
   const mask = useMaskText();
-  const reason = limitReachedReason(apiKey);
   const bound = apiKey.accountIds?.length ?? 0;
   const tags = apiKey.accountTags ?? [];
   const models = apiKey.allowedModels ?? [];
@@ -588,58 +642,98 @@ function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
   const now = Date.now() / 1000;
   const expiresAt = apiKey.expiresAt ?? 0;
   const expiresSoon = expiresAt > now && expiresAt - now < EXPIRY_SOON_SEC;
-  if (
-    !reason &&
-    bound === 0 &&
-    tags.length === 0 &&
-    models.length === 0 &&
-    !rpm &&
-    !mode &&
-    !expiresSoon
-  ) {
-    return null;
+  const items: AccessItem[] = [];
+  if (expiresSoon) {
+    items.push({
+      id: "expiry",
+      icon: Clock01Icon,
+      text: t("keys.expiresSoon", { relative: formatRelativeTime(expiresAt, lang) }),
+    });
   }
+  if (bound > 0) {
+    items.push({
+      id: "accounts",
+      icon: UsersIcon,
+      text: t("keys.boundAccounts", { count: bound, n: formatNumber(bound, lang) }),
+    });
+  }
+  if (tags.length > 0) {
+    // The tags themselves: they say more than a count, and there are at most 10.
+    items.push({
+      id: "tags",
+      icon: Tag01Icon,
+      text: formatItems(
+        tags.map((tag) => mask(tag)),
+        lang,
+      ),
+      cuts: true,
+    });
+  }
+  if (models.length > 0) {
+    items.push({
+      id: "models",
+      text: t("keys.allowedModels", { count: models.length, n: formatNumber(models.length, lang) }),
+    });
+  }
+  if (rpm > 0) {
+    items.push({
+      id: "rpm",
+      icon: ZapIcon,
+      text: t("keys.rpmLimit", { n: formatNumber(rpm, lang) }),
+    });
+  }
+  if (mode) items.push({ id: "routing", icon: Route01Icon, text: t(ROUTING_MODE_LABEL[mode]) });
+  return items;
+}
+
+/** A reached limit, then the access settings as badges (the usage sheet); nothing for a plain key. */
+function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
+  const reason = limitReachedReason(apiKey);
+  const items = useAccessItems(apiKey);
+  if (!reason && items.length === 0) return null;
   return (
     <>
       {reason ? <LimitBadge reason={reason} /> : null}
-      {expiresSoon ? (
-        <Badge icon={Clock01Icon} tone="neutral">
-          {t("keys.expiresSoon", { relative: formatRelativeTime(expiresAt, lang) })}
+      {items.map(({ id, icon, text, cuts }) => (
+        <Badge icon={icon} key={id} tone="neutral">
+          {cuts ? <span className="max-w-40 truncate">{text}</span> : text}
         </Badge>
-      ) : null}
-      {bound > 0 ? (
-        <Badge icon={UsersIcon} tone="neutral">
-          {t("keys.boundAccounts", { count: bound, n: formatNumber(bound, lang) })}
-        </Badge>
-      ) : null}
-      {tags.length > 0 ? (
-        <Badge icon={Tag01Icon} tone="neutral">
-          {/* The tags themselves: they say more than a count, and there are at most 10. */}
-          <span className="max-w-40 truncate">
-            {formatItems(
-              tags.map((tag) => mask(tag)),
-              lang,
-            )}
-          </span>
-        </Badge>
-      ) : null}
-      {models.length > 0 ? (
-        <Badge tone="neutral">
-          {t("keys.allowedModels", { count: models.length, n: formatNumber(models.length, lang) })}
-        </Badge>
-      ) : null}
-      {rpm > 0 ? (
-        <Badge icon={ZapIcon} tone="neutral">
-          {t("keys.rpmLimit", { n: formatNumber(rpm, lang) })}
-        </Badge>
-      ) : null}
-      {mode ? (
-        <Badge icon={Route01Icon} tone="neutral">
-          {t(ROUTING_MODE_LABEL[mode])}
-        </Badge>
-      ) : null}
+      ))}
     </>
   );
+}
+
+/**
+ * The access settings as one muted 12 px line under the key's name in the table, each with its
+ * badge icon; the tags cut first. Nothing for a plain key.
+ */
+function KeyAccessLine({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
+  const items = useAccessItems(apiKey);
+  if (items.length === 0) return null;
+  return (
+    <span className="flex w-full min-w-0 items-center gap-x-2.5 overflow-hidden whitespace-nowrap text-meta text-muted-foreground leading-tight">
+      {items.map(({ id, icon, text, cuts }) => (
+        <span
+          className={cn("inline-flex items-center gap-1", cuts ? "min-w-0" : "shrink-0")}
+          key={id}
+        >
+          {icon ? (
+            <HugeiconsIcon aria-hidden="true" className="size-3 shrink-0" icon={icon} />
+          ) : null}
+          {cuts ? <span className="truncate">{text}</span> : text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * The table's one status pill: Limit reached while a limit holds the key (it explains, and the
+ * proxy disabled the key or answers 429), else Enabled, Disabled or Expired.
+ */
+function KeyStatePill({ apiKey }: { apiKey: ApiKey }): JSX.Element {
+  const reason = limitReachedReason(apiKey);
+  return reason ? <LimitBadge reason={reason} /> : <StatusBadge apiKey={apiKey} />;
 }
 
 /** Enabled, Disabled, or Expired for an enabled key past its expiry (clients get 401). */
@@ -791,6 +885,49 @@ export function KeyUsage({
         used={successfulCalls}
       />
     </div>
+  );
+}
+
+/**
+ * One limit in its own table column, plain text on one line: the used amount in semibold over a
+ * muted limit, then the share in purple (amber with the amounts once used up); without a limit,
+ * the used amount over the infinity sign.
+ */
+function KeyMeasure({
+  measure,
+  used,
+  limit,
+  format,
+}: {
+  measure: "tokens" | "credits" | "calls";
+  used: number;
+  limit: number;
+  format: (value: number) => string;
+}): JSX.Element {
+  const reached = limit > 0 && used >= limit;
+  return (
+    <span
+      className={cn(
+        "whitespace-nowrap text-meta tabular-nums",
+        reached && "text-warning-foreground",
+      )}
+      data-measure={measure}
+    >
+      <span className="font-semibold">{format(used)}</span>
+      <span className={cn(!reached && "text-muted-foreground")}>
+        {" / "}
+        {limit > 0 ? format(limit) : <UnlimitedMark />}
+      </span>
+      {limit > 0 ? (
+        <>
+          {" "}
+          <span className={cn("ms-1 font-medium", !reached && "text-info-foreground")}>
+            {/* Floored, so a key short of its limit never reads 100%. */}
+            {formatFraction(reached ? 1 : Math.floor((used / limit) * 100) / 100, 0)}
+          </span>
+        </>
+      ) : null}
+    </span>
   );
 }
 
