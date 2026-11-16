@@ -415,7 +415,7 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
       {setup && !showKey ? (
         <p className="text-muted-foreground text-xs">
           <Button
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground"
             onClick={() => setShowKey(true)}
             type="button"
             variant="link-inline"

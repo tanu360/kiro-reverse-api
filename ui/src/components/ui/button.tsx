@@ -98,10 +98,11 @@ export const buttonVariants = cva(
         ghost:
           "[--control-icon-color:var(--contrast-muted-foreground)] border-transparent text-foreground hover:bg-accent data-pressed:bg-accent",
         link: "border-transparent text-foreground underline-offset-4 hover:underline data-pressed:underline",
-        // A link inside a sentence: the text's own size, no box, a dotted underline that turns
-        // solid on hover. The Button drops the size classes for it.
+        // A link inside a sentence: the text's own size, no box and no underline. On hover or
+        // press it turns the purple link colour, as `link-action` does. The Button drops the size
+        // classes for it.
         "link-inline":
-          "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground underline decoration-dotted underline-offset-3 sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 hover:decoration-solid data-pressed:decoration-solid",
+          "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground transition-[color,box-shadow] duration-150 ease-out sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 hover:text-info-foreground data-pressed:text-info-foreground",
         // A standalone text action with a trailing arrow (the sidebar update card's "See what's
         // new"): the text's own size, no box and no underline. On hover or press the label turns
         // the purple link colour, so it reads as a link, and the icon nudges 2 px toward the

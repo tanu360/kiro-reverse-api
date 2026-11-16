@@ -124,7 +124,7 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
               first: t("publicLink.more"),
               second: (
                 <a
-                  className="font-medium text-foreground underline decoration-dotted underline-offset-3 hover:decoration-solid"
+                  className="font-medium text-foreground transition-colors duration-150 ease-out hover:text-info-foreground"
                   href={FUNNEL_GUIDE}
                   rel="noopener noreferrer"
                   target="_blank"

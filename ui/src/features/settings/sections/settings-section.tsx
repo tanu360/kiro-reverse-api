@@ -71,7 +71,7 @@ export function useSectionSave<V>(
 }
 
 /**
- * A hint of at most two sentences, with the rest behind the dotted "Learn more" (InfoHint's
+ * A hint of at most two sentences, with the rest behind the "Learn more" (InfoHint's
  * link look) at its end.
  */
 export function Hint({ children, more }: { children: ReactNode; more?: ReactNode }): JSX.Element {
