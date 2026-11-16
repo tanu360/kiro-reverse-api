@@ -197,13 +197,11 @@ const LANGUAGE_CHIP =
 
 // One 36 px line (the default control height) in the API's sticker colours, as the sign-in
 // showcase's labels: the pastel fill and its dark label. The others have a faint edge that
-// darkens on hover. The picked one has a 1 px edge in a deeper step of its own pastel
-// (--tile-edge) and a soft halo: a 3 px ring of that step on a light card, a glow of the pastel
-// on a dark one (where the deeper step would read as a dark ring). No dark outline. The
-// keyboard's focus outline sits 2 px out, over the halo. Phones drop the logo so "Completions"
-// fits a third of the row.
+// darkens on hover. The picked one has only a 1 px edge in a deeper step of its own pastel
+// (--tile-edge): no outer ring or glow, no dark outline. The keyboard's focus outline sits 2 px
+// out. Phones drop the logo so "Completions" fits a third of the row.
 const API_TILE =
-  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm transition-shadow [--tile-edge:color-mix(in_oklab,var(--tile-fg)_40%,var(--tile-bg))] focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_1px_var(--tile-edge),0_0_0_3px_color-mix(in_oklab,var(--tile-edge)_35%,transparent)] dark:data-checked:shadow-[inset_0_0_0_1px_var(--tile-edge),0_0_0_1px_color-mix(in_oklab,var(--tile-bg)_50%,transparent),0_0_12px_1px_color-mix(in_oklab,var(--tile-bg)_35%,transparent)] data-unchecked:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_16%,transparent)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_48%,transparent)] max-sm:px-2";
+  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm transition-shadow [--tile-edge:color-mix(in_oklab,var(--tile-fg)_40%,var(--tile-bg))] focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_1px_var(--tile-edge)] data-unchecked:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_16%,transparent)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_48%,transparent)] max-sm:px-2";
 
 /*
  * Pick an API and a language; in Python and Node.js a switch in the code block's strip trades
