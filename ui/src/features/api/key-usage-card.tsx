@@ -37,7 +37,7 @@ import {
 } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { flooredShare } from "./api-key-form";
+import { flooredShare, LIMIT_TONE_TEXT, limitTone } from "./api-key-form";
 import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
 import { entryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
@@ -45,7 +45,6 @@ import { ApiKeyUsageSheet } from "./key-usage-sheet";
 /** A failure rate from this share up reads as a problem: the badge turns red. */
 const HIGH_FAILURE_RATE = 0.05;
 /** A limit used past this share turns its meter amber; a spent one turns it red. */
-const LIMIT_WARNING = 0.75;
 
 type SortColumn = "requests" | "failed" | "credits" | "tokens" | "lastUsed";
 const SORT_COLUMNS: readonly SortColumn[] = ["requests", "failed", "credits", "tokens", "lastUsed"];
@@ -278,7 +277,6 @@ export function KeyUsageCard(): JSX.Element {
           <UnlimitedMark />
         </span>
       );
-    const share = limit.limit > 0 ? limit.used / limit.limit : 0;
     // The exact amounts for a screen reader; the cell shows 95.1M / 100M so the column stays narrow.
     const exact = (value: number) =>
       limit.kind === "credits" ? formatCredits(value, 2, lang) : formatNumber(value, lang);
@@ -286,14 +284,9 @@ export function KeyUsageCard(): JSX.Element {
       limit.kind === "credits" && value < 1000
         ? formatCredits(value, 2, lang)
         : formatCompact(value, lang);
-    // The share in purple, amber from LIMIT_WARNING and red once used up; the amounts follow it
-    // from amber on.
-    const tone =
-      share >= 1
-        ? "text-destructive-foreground"
-        : share >= LIMIT_WARNING
-          ? "text-warning-foreground"
-          : null;
+    // The share in purple, amber from 75 % and red once used up (limitTone, the rule every limit
+    // follows); the amounts follow it from amber on.
+    const tone = LIMIT_TONE_TEXT[limitTone(limit.used, limit.limit)];
     return (
       <span className="whitespace-nowrap text-meta tabular-nums" data-slot="key-limit">
         <span className="sr-only">

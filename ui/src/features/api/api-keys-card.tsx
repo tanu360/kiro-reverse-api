@@ -40,7 +40,6 @@ import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/compone
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { ROUTING_MODE_LABEL } from "@/features/accounts/use-routing-mode";
-import { useElementWidth } from "@/hooks/use-element-width";
 import {
   apiKeysQuery,
   deleteApiKey,
@@ -66,7 +65,9 @@ import { cn } from "@/lib/utils";
 import {
   flooredShare,
   isKeyExpired,
+  LIMIT_TONE_TEXT,
   limitReachedReason,
+  limitTone,
   wouldLockOutClients,
 } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
@@ -75,12 +76,6 @@ import { keyEntryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
 
 /**
- * The keys turn into cards below DataTable's `cardsBelow="4xl"` (a 56rem container: the table,
- * its narrow columns gone, needs about 900 px), two to a row from 42rem. Ten keys a page in either layout, so the card
- * stays about a screen tall.
- */
-const CARDS_BELOW_PX = 896;
-/**
  * Narrower tables drop the columns the usage sheet also shows, as the accounts table drops Last
  * used first: Last used shows from a 1190 px table (74.375rem), Successful requests from 1100 px
  * (68.75rem). Container queries, not a measured width, so the first paint already has the right
@@ -88,8 +83,12 @@ const CARDS_BELOW_PX = 896;
  */
 const LAST_USED_CELL = "hidden @[74.375rem]/data-table:table-cell";
 const REQUESTS_CELL = "hidden @[68.75rem]/data-table:table-cell";
-const CARD_PAGE_SIZE = 10;
-const TABLE_PAGE_SIZE = 10;
+/**
+ * Ten keys a page, as cards (below DataTable's `cardsBelow="4xl"`, a 56rem container: the table,
+ * its narrow columns gone, needs about 900 px) or as the table, so the card stays about a screen
+ * tall either way.
+ */
+const PAGE_SIZE = 10;
 
 interface DialogState {
   open: boolean;
@@ -135,8 +134,6 @@ export function ApiKeysCard(): JSX.Element {
     session: number;
   } | null>(null);
   const [page, setPage] = useState(1);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const width = useElementWidth(bodyRef);
   const createRef = useRef<HTMLButtonElement>(null);
   // Row menu triggers by key id (one in the table, one in the cards), so focus can land on a
   // neighbour when a row goes away.
@@ -158,7 +155,7 @@ export function ApiKeysCard(): JSX.Element {
 
   const list = keys.data ?? [];
   const editingId = dialog.open && dialog.target.mode === "edit" ? dialog.target.apiKey.id : null;
-  const pageSize = width > 0 && width < CARDS_BELOW_PX ? CARD_PAGE_SIZE : TABLE_PAGE_SIZE;
+  const pageSize = PAGE_SIZE;
   const pageCount = Math.max(1, Math.ceil(list.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageRows = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -533,7 +530,7 @@ export function ApiKeysCard(): JSX.Element {
           />
         </CardPanel>
       ) : null}
-      <div className="min-w-0" ref={bodyRef}>
+      <div className="min-w-0">
         {keys.isError ? (
           <ErrorState
             compact
@@ -781,7 +778,8 @@ function LimitBadge({ reason }: { reason: "disabled" | "calls" }): JSX.Element {
         closeDelay={100}
         delay={200}
         openOnHover
-        render={<button className={badgeVariants({ tone: "warning" })} type="button" />}
+        // Red, as a used-up limit's figures are in every table and card.
+        render={<button className={badgeVariants({ tone: "destructive" })} type="button" />}
       >
         <BadgeIcon icon={AlertCircleIcon} />
         {t("keys.limitReached")}
@@ -806,12 +804,12 @@ function UsageLine({
   format: (value: number) => string;
   meterLabel: string;
 }): JSX.Element {
-  const reached = limit > 0 && used >= limit;
+  const tone = limitTone(used, limit);
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs tabular-nums">
         <span className="text-muted-foreground">{label}</span>
-        <span className={cn(reached && "text-warning-foreground")}>
+        <span className={cn(LIMIT_TONE_TEXT[tone])}>
           {format(used)} / {limit > 0 ? format(limit) : <UnlimitedMark />}
         </span>
       </span>
@@ -824,7 +822,7 @@ function UsageLine({
           value={Math.min(used, limit)}
         >
           <MeterTrack>
-            <MeterIndicator tone={reached ? "warning" : "default"} />
+            <MeterIndicator tone={tone} />
           </MeterTrack>
         </Meter>
       ) : null}
@@ -902,8 +900,8 @@ export function KeyUsage({
 
 /**
  * One limit in its own table column, plain text on one line: the used amount in semibold over a
- * muted limit, then the share in purple (amber with the amounts once used up); without a limit,
- * the used amount over the infinity sign.
+ * muted limit, then the share in purple; from 75 % the amounts and share turn amber, and red once
+ * used up (limitTone, as in Usage by key). Without a limit, the used amount over the infinity sign.
  */
 function KeyMeasure({
   measure,
@@ -916,26 +914,25 @@ function KeyMeasure({
   limit: number;
   format: (value: number) => string;
 }): JSX.Element {
-  const reached = limit > 0 && used >= limit;
+  const tone = limitTone(used, limit);
+  const toned = LIMIT_TONE_TEXT[tone];
   return (
     <span
-      className={cn(
-        "whitespace-nowrap text-meta tabular-nums",
-        reached && "text-warning-foreground",
-      )}
+      className={cn("whitespace-nowrap text-meta tabular-nums", toned)}
       data-measure={measure}
+      data-tone={tone}
     >
       <span className="font-semibold">{format(used)}</span>
-      <span className={cn(!reached && "text-muted-foreground")}>
+      <span className={cn(!toned && "text-muted-foreground")}>
         {" / "}
         {limit > 0 ? format(limit) : <UnlimitedMark />}
       </span>
       {limit > 0 ? (
         <>
           {" "}
-          <span className={cn("ms-1 font-medium", !reached && "text-info-foreground")}>
+          <span className={cn("ms-1 font-medium", !toned && "text-info-foreground")}>
             {/* Floored, so a key short of its limit never reads 100%. */}
-            {formatFraction(reached ? 1 : flooredShare(used, limit), 0)}
+            {formatFraction(flooredShare(used, limit), 0)}
           </span>
         </>
       ) : null}

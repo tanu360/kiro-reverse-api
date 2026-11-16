@@ -9,10 +9,9 @@ import type { ApiKey } from "@/lib/api/types";
 import { formatCredits, formatFraction, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { flooredShare } from "./api-key-form";
+import { flooredShare, limitTone } from "./api-key-form";
 
 /** A limit used past this share turns its meter amber; a spent one turns it red. */
-const LIMIT_WARNING = 0.75;
 
 /** The counters and caps the card reads: an admin ApiKey or the key holder's own key. */
 export type KeyLimitsSource = Pick<
@@ -95,10 +94,9 @@ export function KeyLimitsCard({
         {rows.map((row) => {
           const capped = row.limit > 0;
           const reached = capped && row.used >= row.limit;
-          const share = capped ? row.used / row.limit : 0;
           // Floored to a tenth of a percent, so 9,999,998 of 10,000,000 reads 99.9 %, not 100 %.
           const shown = flooredShare(row.used, row.limit, 1);
-          const tone = reached ? "destructive" : share >= LIMIT_WARNING ? "warning" : "default";
+          const tone = limitTone(row.used, row.limit);
           return (
             <li className="flex min-w-0 flex-col gap-2 px-4 py-4 sm:px-6" key={row.kind}>
               {/* Wraps the figures under the name when a third of the card is too narrow. */}

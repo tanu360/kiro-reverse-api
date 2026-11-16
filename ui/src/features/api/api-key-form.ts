@@ -290,6 +290,27 @@ export function flooredShare(used: number, limit: number, digits = 0): number {
   return Math.min(steps - 1, Math.floor((used / limit) * steps + 1e-9)) / steps;
 }
 
+/** From this share of a limit its figures turn amber, before red once it is used up. */
+export const LIMIT_WARNING = 0.75;
+
+/**
+ * A limit's colour, one rule for every place that shows one (the API keys table and cards, Usage
+ * by key, the usage sheet, the key holder's cards): purple below LIMIT_WARNING, amber from it, red
+ * once used up, like the Limit reached badge.
+ */
+export function limitTone(used: number, limit: number): "default" | "warning" | "destructive" {
+  if (limit <= 0) return "default";
+  if (used >= limit) return "destructive";
+  return used / limit >= LIMIT_WARNING ? "warning" : "default";
+}
+
+/** The text colour of a limitTone; none for the default, whose parts keep their own colours. */
+export const LIMIT_TONE_TEXT = {
+  default: null,
+  warning: "text-warning-foreground",
+  destructive: "text-destructive-foreground",
+} as const;
+
 export function countEnabledKeys(keys: readonly ApiKey[]): number {
   return keys.filter((k) => k.enabled).length;
 }

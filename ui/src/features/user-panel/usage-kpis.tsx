@@ -10,6 +10,7 @@ import type { JSX, ReactNode } from "react";
 import { CardFooter } from "@/components/ui/card";
 import { Meter, MeterIndicator, type MeterTone, MeterTrack } from "@/components/ui/meter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { limitTone } from "@/features/api/api-key-form";
 import { MODEL_COLORS } from "@/features/overview/colors";
 import {
   Delta,
@@ -37,7 +38,6 @@ import { cn } from "@/lib/utils";
 export type Metric = "requests" | "failed" | "credits" | "tokens";
 
 /** A limit used past this share turns amber; a spent one red (as the admin's limits card). */
-export const LIMIT_WARNING = 0.75;
 
 /** Each trend's colour: requests in the series purple, credits teal, tokens blue. */
 const TREND_COLOR: Partial<Record<Metric, string>> = {
@@ -222,7 +222,7 @@ function LimitFooter({ apiKey, kind }: { apiKey: UserKey | undefined; kind: Limi
   }
   const reached = used >= limit;
   const share = used / limit;
-  const tone: MeterTone = reached ? "destructive" : share >= LIMIT_WARNING ? "warning" : "default";
+  const tone: MeterTone = limitTone(used, limit);
   // The short forms, unless they would read the same ("2M of 2M" with some left).
   const exact = used !== limit && short(used) === short(limit);
   const shown = (value: number) => (exact ? full(value) : short(value));

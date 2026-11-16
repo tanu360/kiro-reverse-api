@@ -41,7 +41,7 @@ export function KeyStatusBadges({ apiKey }: { apiKey: UserKey }): JSX.Element {
           {t("status.expired")}
         </Badge>
       ) : status !== "active" ? (
-        <Badge icon={AlertCircleIcon} tone="warning">
+        <Badge icon={AlertCircleIcon} tone="destructive">
           {t("status.limitReached")}
         </Badge>
       ) : (
