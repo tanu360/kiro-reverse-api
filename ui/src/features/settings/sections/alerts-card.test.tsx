@@ -1,11 +1,14 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AlertsConfig } from "@/lib/api/alerts";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { AlertsCard } from "./alerts-card";
+
+// The dialog tests type whole forms, so a busy run needs more than the 5 s default.
+vi.setConfig({ testTimeout: 15_000 });
 
 interface Recorded {
   method: string;

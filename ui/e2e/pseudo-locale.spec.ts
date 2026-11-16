@@ -25,7 +25,7 @@ const ALLOWED_WORDS = new Set(
     "Kiro Proxy AWS Builder ID IAM Identity Center Microsoft Entra Claude Code Codex OpenAI",
     "Anthropic JSON URL HTTP GET POST PUT PATCH DELETE Ctrl Shift Alt Enter Esc Tab",
     // Language names, shown in their own script.
-    "English 中文 Tiếng Việt Português Brasil",
+    "English 中文 日本語 Tiếng Việt Português Brasil",
   ]
     .join(" ")
     .split(/\s+/),
