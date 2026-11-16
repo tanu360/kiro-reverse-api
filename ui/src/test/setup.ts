@@ -1,10 +1,14 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { resetMockDb } from "@/lib/mocks/db";
 import { mockServer } from "@/lib/mocks/node";
 import { queryClient } from "@/lib/query-client";
 import { settleRouters } from "./routers";
+
+// waitFor and findBy wait up to 3 s, not 1 s: on a busy CI runner a debounced search and its mock
+// response can take longer than a second to land.
+configure({ asyncUtilTimeout: 3000 });
 
 // The events provider uses the real EventSource only when no test passes createEventSource.
 // Without one it stays 'closed' and requests no ticket. A test can stub its own.

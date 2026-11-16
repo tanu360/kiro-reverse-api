@@ -154,6 +154,9 @@ export default defineConfig(async ({ mode }) => {
       include: ["src/**/*.test.{ts,tsx}"],
       css: false,
       restoreMocks: true,
+      // The page tests click through whole screens; a CI runner takes about twice as long as a
+      // laptop, and a 2.6 s test there ran past the 5 s default.
+      testTimeout: 15_000,
       sequence: sequencer ? { sequencer } : undefined,
     },
   };
