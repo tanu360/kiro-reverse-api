@@ -42,6 +42,16 @@ func (h *Handler) ImportAdminSessions(data []byte) int {
 	return h.adminSessions.Import(data)
 }
 
+// ExportUserSessions and ImportUserSessions carry the user panel's sign-ins across a restart
+// into an update, as the admin's are.
+func (h *Handler) ExportUserSessions() []byte {
+	return h.userSessions.Export()
+}
+
+func (h *Handler) ImportUserSessions(data []byte) int {
+	return h.userSessions.Import(data)
+}
+
 // CloseEventStreams ends every open /events stream, so a shutdown does not wait on them. The
 // pages reconnect to the restarted server on their own.
 func (h *Handler) CloseEventStreams() {

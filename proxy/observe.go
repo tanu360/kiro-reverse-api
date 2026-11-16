@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -812,6 +813,11 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 	}
 	if q.PageSize > 200 {
 		q.PageSize = 200
+	}
+	//! A page so far out that (Page-1)*PageSize overflowed gave a negative offset: SQLite read it
+	//! as 0 and served the first page under that page number, and the in-memory page panicked.
+	if maxPage := math.MaxInt / q.PageSize; q.Page > maxPage {
+		q.Page = maxPage
 	}
 	q.Search = strings.TrimSpace(q.Search)
 	q.Status = strings.TrimSpace(strings.ToLower(q.Status))

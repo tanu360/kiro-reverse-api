@@ -2,7 +2,8 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { USER_API_BASE } from "@/lib/api/user-panel";
-import { USER_TOKEN_KEY } from "@/lib/auth/user-session";
+import { clearSession, getToken } from "@/lib/auth/session";
+import { getUserToken, setUserToken, USER_TOKEN_KEY } from "@/lib/auth/user-session";
 import { mockDb } from "@/lib/mocks/db";
 import { jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
@@ -178,6 +179,63 @@ describe("UserLoginPage", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/user"));
   });
 
+  it("follows a user panel redirect with its query after signing in", async () => {
+    const { user, router } = await renderApp(
+      `/user/login?redirect=${encodeURIComponent("/user?range=7d")}`,
+      { authed: false },
+    );
+    await user.type(keyInput(), KEY);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/user"));
+    expect(router.state.location.search).toEqual({ range: "7d" });
+  });
+
+  it.each(["//evil.example", "/accounts", "javascript:alert(1)"])(
+    "drops the redirect %s and lands on /user",
+    async (redirect) => {
+      const { user, router } = await renderApp(
+        `/user/login?redirect=${encodeURIComponent(redirect)}`,
+        { authed: false },
+      );
+      await user.type(keyInput(), KEY);
+      await user.keyboard("{Enter}");
+      await waitFor(() => expect(router.state.location.pathname).toBe("/user"));
+      expect(router.state.location.search).toEqual({});
+    },
+  );
+
+  it("stays on the sign-in page on Back after signing out", async () => {
+    mockServer.use(http.delete(SESSION_URL, () => new HttpResponse(null, { status: 204 })));
+    const { user, router } = await renderApp("/user/login", { authed: false });
+    await user.type(keyInput(), KEY);
+    await user.keyboard("{Enter}");
+    await screen.findByRole("heading", { level: 1, name: "API key" });
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/user/login"));
+    await act(async () => {
+      router.history.back();
+    });
+    await waitFor(() => expect(router.state.status).toBe("idle"));
+    expect(router.state.location.pathname).toBe("/user/login");
+    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the admin session when the key holder signs out, and the other way round", async () => {
+    mockServer.use(http.delete(SESSION_URL, () => new HttpResponse(null, { status: 204 })));
+    // An admin signed in in this browser too (renderApp's default session).
+    const { user, router } = await renderApp("/user/login", { authed: true });
+    await user.type(keyInput(), KEY);
+    await user.keyboard("{Enter}");
+    await screen.findByRole("heading", { level: 1, name: "API key" });
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/user/login"));
+    expect(getToken()).toBe("mock-test");
+
+    setUserToken("c".repeat(64), true);
+    clearSession("signout");
+    expect(getUserToken()).toBe("c".repeat(64));
+  });
+
   it("links from the admin sign-in to the key sign-in", async () => {
     const { user, router } = await renderApp("/login", { authed: false });
     await user.click(screen.getByRole("link", { name: "Check its usage" }));
@@ -191,7 +249,16 @@ describe("user sign-in redirect", () => {
     expect(validateUserLoginSearch({ redirect: "/user?range=7d" })).toEqual({
       redirect: "/user?range=7d",
     });
-    for (const redirect of ["/accounts", "//evil.example", "/user/login", "/user/../api", "/users"])
+    for (const redirect of [
+      "/accounts",
+      "//evil.example",
+      "/user/login",
+      "/user/../api",
+      "/users",
+      "javascript:alert(1)",
+      "https://evil.example/user",
+      "/user\\@evil.example",
+    ])
       expect(validateUserLoginSearch({ redirect }), redirect).toEqual({ redirect: undefined });
   });
 

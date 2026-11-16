@@ -83,6 +83,19 @@ export function subscribeUserSession(listener: Listener): () => void {
   };
 }
 
+/**
+ * Another tab's sign-in or sign-out reaches this one only as a storage event, and only for the
+ * shared "Stay signed in" token in localStorage. A tab with its own session-only token keeps it.
+ */
+function onStorage(event: StorageEvent): void {
+  if (event.key !== null && event.key !== USER_TOKEN_KEY) return;
+  if (readStorage(USER_TOKEN_KEY, "session")) return;
+  const token = getUserToken();
+  notify(token, token ? "signed-in" : "signed-out");
+}
+
+if (typeof window !== "undefined") window.addEventListener("storage", onStorage);
+
 function subscribeStore(onChange: () => void): () => void {
   return subscribeUserSession(() => onChange());
 }

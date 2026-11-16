@@ -35,7 +35,8 @@ export function PageHeader({
           same height on every page, with or without actions.
         */}
         <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 pointer-coarse:min-h-10">
-          <h1 className="text-balance font-semibold text-title">{title}</h1>
+          {/* A title with no break in it (an API key's name) wraps instead of overflowing. */}
+          <h1 className="min-w-0 text-balance font-semibold text-title wrap-anywhere">{title}</h1>
           {meta}
         </div>
         {description ? (

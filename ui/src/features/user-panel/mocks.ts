@@ -5,7 +5,7 @@ import type {
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
-import type { RequestRecord } from "@/lib/api/types";
+import type { RequestEndpoint, RequestErrorType, RequestRecord } from "@/lib/api/types";
 import type {
   UserKey,
   UserRequest,
@@ -13,7 +13,17 @@ import type {
   UserUsageBreakdown,
 } from "@/lib/api/user-panel";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
-import { createRng, hex } from "@/lib/mocks/fixtures";
+import {
+  createRng,
+  hex,
+  int,
+  maskKey,
+  pick,
+  type Rng,
+  round,
+  uuid,
+  weighted,
+} from "@/lib/mocks/fixtures";
 import { jsonError, mockDelay } from "@/lib/mocks/http";
 import { lifetimeGrid } from "@/lib/mocks/lifetime";
 
@@ -27,6 +37,34 @@ import { lifetimeGrid } from "@/lib/mocks/lifetime";
 //   both datasets: "kiro-dev-1" (Local dev, no traffic); full only: "demo-key" (Demo, expired).
 // Limits, counters, usage and requests are the ones the admin API keys and Requests pages show
 // for that key: everything is read from the same mock DB.
+//
+// Demo keys: one per state of the panel, in every dataset. They live only here, with their own
+// request log, so the admin pages never list them. The mock sign-in page lists them too
+// (features/user-auth/mock-demo-keys.tsx). Their times count back from when they were built: on
+// first use, and again on the first request an hour later.
+//   sk-demo-active          "Web app": 30+ days of everyday traffic over six models, about 4% failed
+//                           (rate limit, upstream, stream, client closed, timeout, bad request),
+//                           cache reads and writes; token and credit limits well under way.
+//   sk-demo-near-limit      "Staging": tokens 95%, credits 98% and calls 90% of their limits.
+//   sk-demo-over-limit      "Hackathon bot": tokens 104% of the limit; the last few requests
+//                           were refused 429 (API key limit).
+//   sk-demo-off             "Old CI runner": turned off; refused 401 since the admin did so.
+//   sk-demo-expired         "Contractor — Q3": expired three days ago; refused 401 since.
+//   sk-demo-expiring        "Trial — Northwind": expires in two days, with a credit limit.
+//   sk-demo-restricted      "Mobile app": two allowed models and 30 requests per minute; a few
+//                           requests refused 429 by that rate limit.
+//   sk-demo-new             No name, created minutes ago, never used: every empty state.
+//   sk-demo-heavy           A 112-character name with emoji and CJK, billions of tokens, tens of
+//                           thousands of credits, 680 logged requests (7 pages of 100) over 200
+//                           days, model names up to 66 characters.
+//   sk-demo-usage-busy      Usage and usage by model answer 429 user_usage_busy (Retry-After 60);
+//                           the key and its requests load.
+//   sk-demo-requests-error  Requests answer 500 internal_error; the key and its usage load.
+//   sk-demo-open-server     The server's "Require API key" is off (keysRequired false), for this
+//                           key only: the not-counted notice shows.
+//   sk-demo-short-session   The session ends 30 s after sign-in: the panel goes back to the
+//                           sign-in page with the "session expired" toast on its next poll.
+// Wrong keys, the empty key and the five-try lockout answer as for any other key.
 
 type StoredKey = (typeof mockDb.apiKeys)[number];
 
@@ -74,12 +112,529 @@ function saveSessions(): void {
   }
 }
 
-/** Forgets every user session and wrong guess (tests). */
+/** Forgets every user session and wrong guess, and rebuilds the demo keys (tests). */
 export function resetUserPanelMock(): void {
   failedLogins = 0;
   lockedSince = 0;
   sessions = new Map();
+  demoCache = null;
   saveSessions();
+}
+
+// ---------------------------------------------------------------------------
+// Demo keys: a key per state of the panel, each with its own request log.
+// ---------------------------------------------------------------------------
+
+export type DemoKeyId =
+  | "active"
+  | "nearLimit"
+  | "overLimit"
+  | "off"
+  | "expired"
+  | "expiring"
+  | "restricted"
+  | "new"
+  | "heavy"
+  | "usageBusy"
+  | "requestsError"
+  | "openServer"
+  | "shortSession";
+
+/** A demo key as the mock sign-in page lists it. */
+export interface DemoKeyInfo {
+  id: DemoKeyId;
+  /** The value to sign in with. */
+  key: string;
+}
+
+const MINUTE = 60;
+const HOUR = 3600;
+const DAY = 86_400;
+/** The log is rebuilt (times move up to now) on the first request an hour after the last build. */
+const DEMO_REBUILD_S = HOUR;
+/** Routed requests name an account; the panel never shows it. */
+const DEMO_ACCOUNT = "demo-account";
+
+/** How a request fails: what the log keeps, and whether the model was read first. */
+interface Failure {
+  type: RequestErrorType;
+  status: number;
+  /** false: refused before the body was read, so the row has no model. */
+  routed: boolean;
+}
+
+const FAILURES = {
+  rateLimit: { type: "rate_limit", status: 429, routed: true },
+  upstream: { type: "upstream", status: 500, routed: true },
+  stream: { type: "stream", status: 502, routed: true },
+  clientClosed: { type: "client_closed", status: 499, routed: true },
+  timeout: { type: "timeout", status: 504, routed: true },
+  invalidRequest: { type: "invalid_request", status: 400, routed: true },
+  // The key's own refusals (proxy/auth.go, apikey_controls.go), before any model is read.
+  keyLimit: { type: "api_key_limit", status: 429, routed: false },
+  keyRefused: { type: "auth", status: 401, routed: false },
+  keyRpm: { type: "rate_limit", status: 429, routed: false },
+} satisfies Record<string, Failure>;
+
+type Size = "small" | "medium" | "huge";
+
+/** Log-normal centres and caps of a request's input and output tokens. */
+const SIZES: Record<Size, { inMu: number; outMu: number; inMax: number; outMax: number }> = {
+  small: { inMu: 7.8, outMu: 5.6, inMax: 40_000, outMax: 4_000 },
+  medium: { inMu: 9.4, outMu: 6.6, inMax: 200_000, outMax: 16_000 },
+  huge: { inMu: 12.4, outMu: 8.4, inMax: 960_000, outMax: 64_000 },
+};
+
+/** What a stretch of traffic looks like. */
+interface Mix {
+  models: ReadonlyArray<readonly [string, number]>;
+  size: Size;
+  /** Share of requests that fail, with one of `failures`. */
+  failRate: number;
+  failures: readonly Failure[];
+}
+
+const EVERYDAY_FAILURES: readonly Failure[] = [
+  FAILURES.rateLimit,
+  FAILURES.upstream,
+  FAILURES.stream,
+  FAILURES.clientClosed,
+  FAILURES.timeout,
+  FAILURES.invalidRequest,
+];
+
+const TYPICAL: Mix = {
+  models: [
+    ["claude-sonnet-5", 40],
+    ["claude-haiku-4.5", 22],
+    ["claude-sonnet-4.6", 14],
+    ["claude-opus-5", 12],
+    ["auto", 8],
+    ["claude-sonnet-5-thinking", 4],
+  ],
+  size: "medium",
+  failRate: 0.04,
+  failures: EVERYDAY_FAILURES,
+};
+
+const LIGHT: Mix = { ...TYPICAL, size: "small", failRate: 0.02 };
+
+const MOBILE: Mix = {
+  models: [
+    ["claude-haiku-4.5", 65],
+    ["claude-sonnet-5", 35],
+  ],
+  size: "small",
+  failRate: 0.01,
+  failures: [FAILURES.stream, FAILURES.clientClosed],
+};
+
+const HEAVY: Mix = {
+  models: [
+    ["claude-sonnet-5", 30],
+    ["claude-haiku-4.5", 18],
+    ["us.anthropic.claude-opus-4-5-20251101-v1:0", 16],
+    ["claude-sonnet-4-5-20250929-thinking-1m-context-extended-output", 14],
+    ["claude-opus-5-thinking", 12],
+    ["anthropic/claude-3-7-sonnet-20250219:thinking-extended-output-128k", 10],
+  ],
+  size: "huge",
+  failRate: 0.03,
+  failures: EVERYDAY_FAILURES,
+};
+
+const ENDPOINT_WEIGHTS: ReadonlyArray<readonly [RequestEndpoint, number]> = [
+  ["claude", 55],
+  ["openai", 28],
+  ["responses", 17],
+];
+
+interface LogBuilder {
+  /** `count` requests at random times between `newest` and `oldest` seconds ago. */
+  traffic(count: number, newest: number, oldest: number, mix: Mix): void;
+  /** `count` requests refused with `failure`, spread the same way. */
+  refused(count: number, newest: number, oldest: number, failure: Failure, mix: Mix): void;
+}
+
+/** A stored key's settings; counters left out are the sums of its log. */
+type DemoSettings = Partial<Omit<StoredKey, "id" | "key" | "keyMasked">> & { createdAt: number };
+
+interface DemoSpec extends DemoKeyInfo {
+  seed: number;
+  settings: (now: number) => DemoSettings;
+  log?: (log: LogBuilder) => void;
+  /** The server's "Require API key" as this key sees it; demo keys default to on. */
+  keysRequired?: boolean;
+  sessionTtlMs?: number;
+  /** /usage and /usage/breakdown answer 429 user_usage_busy. */
+  usageBusy?: boolean;
+  /** /requests answers 500 internal_error. */
+  requestsFail?: boolean;
+}
+
+function hourStart(ts: number): number {
+  return Math.floor(ts / HOUR) * HOUR;
+}
+
+function hourEnd(ts: number): number {
+  return Math.ceil(ts / HOUR) * HOUR;
+}
+
+const DEMO_SPECS: readonly DemoSpec[] = [
+  {
+    id: "active",
+    key: "sk-demo-active",
+    seed: 7101,
+    settings: (now) => ({
+      name: "Web app",
+      createdAt: now - 45 * DAY,
+      tokenLimit: 50_000_000,
+      creditLimit: 1_500,
+    }),
+    log: (log) => {
+      log.traffic(42, 2 * MINUTE, DAY, TYPICAL);
+      log.traffic(140, DAY, 7 * DAY, TYPICAL);
+      log.traffic(210, 7 * DAY, 30 * DAY, TYPICAL);
+      log.traffic(60, 30 * DAY, 45 * DAY, TYPICAL);
+    },
+  },
+  {
+    id: "nearLimit",
+    key: "sk-demo-near-limit",
+    seed: 7102,
+    settings: (now) => ({
+      name: "Staging",
+      createdAt: now - 21 * DAY,
+      tokenLimit: 2_000_000,
+      tokensUsed: 1_903_640,
+      creditLimit: 40,
+      creditsUsed: 39.27,
+      callLimit: 500,
+      successfulCalls: 451,
+      requestsCount: 468,
+    }),
+    log: (log) => {
+      log.traffic(18, 4 * MINUTE, DAY, LIGHT);
+      log.traffic(70, DAY, 7 * DAY, LIGHT);
+      log.traffic(110, 7 * DAY, 21 * DAY, LIGHT);
+    },
+  },
+  {
+    id: "overLimit",
+    key: "sk-demo-over-limit",
+    seed: 7103,
+    settings: (now) => ({
+      name: "Hackathon bot",
+      createdAt: now - 12 * DAY,
+      tokenLimit: 1_000_000,
+      tokensUsed: 1_041_377,
+      requestsCount: 171,
+      successfulCalls: 158,
+    }),
+    log: (log) => {
+      log.refused(9, 2 * MINUTE, 3 * HOUR, FAILURES.keyLimit, LIGHT);
+      log.traffic(150, 3 * HOUR, 12 * DAY, LIGHT);
+    },
+  },
+  {
+    id: "off",
+    key: "sk-demo-off",
+    seed: 7104,
+    settings: (now) => ({ name: "Old CI runner", enabled: false, createdAt: now - 60 * DAY }),
+    log: (log) => {
+      log.refused(7, 6 * MINUTE, 2 * DAY, FAILURES.keyRefused, LIGHT);
+      log.traffic(120, 2 * DAY, 40 * DAY, LIGHT);
+    },
+  },
+  {
+    id: "expired",
+    key: "sk-demo-expired",
+    seed: 7105,
+    settings: (now) => ({
+      name: "Contractor — Q3",
+      createdAt: now - 95 * DAY,
+      expiresAt: hourStart(now - 3 * DAY),
+      creditLimit: 200,
+    }),
+    log: (log) => {
+      // The expiry is on the hour three days ago: refusals after it, traffic before.
+      log.refused(5, 12 * MINUTE, 3 * DAY - HOUR, FAILURES.keyRefused, LIGHT);
+      log.traffic(160, 3 * DAY + HOUR, 90 * DAY, TYPICAL);
+    },
+  },
+  {
+    id: "expiring",
+    key: "sk-demo-expiring",
+    seed: 7106,
+    settings: (now) => ({
+      name: "Trial — Northwind",
+      createdAt: now - 12 * DAY,
+      expiresAt: hourEnd(now + 2 * DAY),
+      creditLimit: 25,
+    }),
+    log: (log) => log.traffic(110, 8 * MINUTE, 12 * DAY, LIGHT),
+  },
+  {
+    id: "restricted",
+    key: "sk-demo-restricted",
+    seed: 7107,
+    settings: (now) => ({
+      name: "Mobile app",
+      createdAt: now - 30 * DAY,
+      allowedModels: ["claude-haiku-4.5", "claude-sonnet-5"],
+      rpmLimit: 30,
+    }),
+    log: (log) => {
+      log.traffic(260, MINUTE, 30 * DAY, MOBILE);
+      log.refused(8, 10 * MINUTE, 5 * DAY, FAILURES.keyRpm, MOBILE);
+    },
+  },
+  {
+    id: "new",
+    key: "sk-demo-new",
+    seed: 7108,
+    settings: (now) => ({ createdAt: now - 12 * MINUTE }),
+  },
+  {
+    id: "heavy",
+    key: "sk-demo-heavy",
+    seed: 7109,
+    settings: (now) => ({
+      name: "Nightly evaluation fleet 🚀 — 東京 & São Paulo batch runners, shared by research, platform and data (do not delete)",
+      createdAt: now - 410 * DAY,
+      tokenLimit: 5_000_000_000,
+      tokensUsed: 2_948_120_553,
+      creditLimit: 100_000,
+      creditsUsed: 48_211.37,
+      callLimit: 2_000_000,
+      successfulCalls: 1_271_904,
+      requestsCount: 1_284_551,
+      rpmLimit: 600,
+    }),
+    log: (log) => {
+      log.traffic(30, 5, HOUR, HEAVY);
+      log.traffic(150, HOUR, DAY, HEAVY);
+      log.traffic(220, DAY, 7 * DAY, HEAVY);
+      log.traffic(160, 7 * DAY, 30 * DAY, HEAVY);
+      log.traffic(120, 30 * DAY, 200 * DAY, HEAVY);
+    },
+  },
+  {
+    id: "usageBusy",
+    key: "sk-demo-usage-busy",
+    seed: 7110,
+    usageBusy: true,
+    settings: (now) => ({
+      name: "Shared notebook",
+      createdAt: now - 20 * DAY,
+      tokenLimit: 10_000_000,
+    }),
+    log: (log) => log.traffic(90, 3 * MINUTE, 20 * DAY, TYPICAL),
+  },
+  {
+    id: "requestsError",
+    key: "sk-demo-requests-error",
+    seed: 7111,
+    requestsFail: true,
+    settings: (now) => ({ name: "Reporting job", createdAt: now - 15 * DAY, creditLimit: 300 }),
+    log: (log) => log.traffic(80, 9 * MINUTE, 15 * DAY, TYPICAL),
+  },
+  {
+    id: "openServer",
+    key: "sk-demo-open-server",
+    seed: 7112,
+    keysRequired: false,
+    settings: (now) => ({ name: "LAN tools", createdAt: now - 25 * DAY }),
+    log: (log) => log.traffic(70, 15 * MINUTE, 25 * DAY, LIGHT),
+  },
+  {
+    id: "shortSession",
+    key: "sk-demo-short-session",
+    seed: 7113,
+    sessionTtlMs: 30_000,
+    settings: (now) => ({ name: "Kiosk", createdAt: now - 8 * DAY }),
+    log: (log) => log.traffic(40, 20 * MINUTE, 8 * DAY, LIGHT),
+  },
+];
+
+/** Every demo key, in the order the mock sign-in page lists them. */
+export const DEMO_KEYS: readonly DemoKeyInfo[] = DEMO_SPECS.map(({ id, key }) => ({ id, key }));
+
+/** Log-normal draw clamped to [min, max]. */
+function logNormal(rng: Rng, mu: number, sigma: number, min: number, max: number): number {
+  const u = Math.max(rng(), 1e-12);
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
+  return Math.min(max, Math.max(min, Math.round(Math.exp(mu + sigma * z))));
+}
+
+function modelRate(model: string): number {
+  if (model.includes("opus")) return 2.2;
+  if (model.includes("haiku")) return 0.4;
+  if (model.includes("sonnet-5")) return 1.3;
+  return 1;
+}
+
+/** The full dataset's credit formula (fixtures-full.ts): cache reads cost a tenth. */
+function credits(model: string, inTokens: number, outTokens: number, read = 0, write = 0): number {
+  const value =
+    ((inTokens - read * 0.9 + write * 0.25) / 100_000 + outTokens / 20_000) * modelRate(model);
+  return Math.max(0.0001, round(value, 4));
+}
+
+function demoRecord(
+  rng: Rng,
+  key: Pick<StoredKey, "id" | "keyMasked">,
+  ts: number,
+  mix: Mix,
+  failure: Failure | null,
+): RequestRecord {
+  const model = weighted(rng, mix.models);
+  const size = SIZES[mix.size];
+  const base = {
+    ts,
+    apiKeyId: key.id,
+    apiKeyMasked: key.keyMasked,
+    endpoint: weighted(rng, ENDPOINT_WEIGHTS),
+    requestId: `req_${hex(rng, 24)}`,
+  };
+  if (failure) {
+    // A cut stream or a client that left mid-answer is billed for what it got.
+    const partial = failure.type === "stream" || failure.type === "client_closed";
+    const inTokens = partial ? logNormal(rng, size.inMu, 0.8, 1, size.inMax) : 0;
+    const outTokens = partial ? logNormal(rng, size.outMu - 1, 0.8, 1, size.outMax) : 0;
+    return {
+      ...base,
+      accountId: failure.routed ? DEMO_ACCOUNT : "",
+      model: failure.routed ? model : "",
+      inTokens,
+      outTokens,
+      totalTokens: inTokens + outTokens,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      credits: partial ? credits(model, inTokens, outTokens) : 0,
+      success: false,
+      status: failure.status,
+      errorType: failure.type,
+      durationMs: failure.routed ? int(rng, 900, 45_000) : int(rng, 1, 40),
+    };
+  }
+  const inTokens = logNormal(rng, size.inMu, 1, 200, size.inMax);
+  const outTokens = logNormal(rng, size.outMu, 0.9, 12, size.outMax);
+  // Cache reads and writes are part of the input.
+  const cacheReadTokens = rng() < 0.55 ? Math.floor(inTokens * (0.3 + rng() * 0.6)) : 0;
+  const cacheWriteTokens =
+    rng() < 0.2 ? Math.floor((inTokens - cacheReadTokens) * (0.2 + rng() * 0.6)) : 0;
+  return {
+    ...base,
+    accountId: DEMO_ACCOUNT,
+    model,
+    inTokens,
+    outTokens,
+    totalTokens: inTokens + outTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    credits: credits(model, inTokens, outTokens, cacheReadTokens, cacheWriteTokens),
+    success: true,
+    status: 200,
+    // Time to first token, then 80-250 output tokens a second.
+    durationMs: Math.round(400 + rng() * 1100 + outTokens * (4 + rng() * 8)),
+  };
+}
+
+interface DemoKey {
+  spec: DemoSpec;
+  key: StoredKey;
+  /** Newest first, like the mock DB's log. */
+  records: RequestRecord[];
+}
+
+function buildDemoKey(spec: DemoSpec, now: number): DemoKey {
+  const rng = createRng(spec.seed);
+  const id = uuid(rng);
+  const keyMasked = maskKey(spec.key);
+  const records: RequestRecord[] = [];
+  const at = (newest: number, oldest: number) =>
+    now - newest - Math.floor(rng() * Math.max(1, oldest - newest));
+  spec.log?.({
+    traffic(count, newest, oldest, mix) {
+      for (let i = 0; i < count; i++) {
+        const failure = rng() < mix.failRate ? pick(rng, mix.failures) : null;
+        records.push(demoRecord(rng, { id, keyMasked }, at(newest, oldest), mix, failure));
+      }
+    },
+    refused(count, newest, oldest, failure, mix) {
+      for (let i = 0; i < count; i++) {
+        records.push(demoRecord(rng, { id, keyMasked }, at(newest, oldest), mix, failure));
+      }
+    },
+  });
+  records.sort((a, b) => b.ts - a.ts);
+  // Persisted ids, oldest first.
+  for (const [index, record] of records.entries()) record.id = records.length - index;
+  const succeeded = records.filter((record) => record.success);
+  const settings = spec.settings(now);
+  const key: StoredKey = {
+    id,
+    key: spec.key,
+    keyMasked,
+    enabled: true,
+    tokensUsed: records.reduce((sum, record) => sum + record.totalTokens, 0),
+    creditsUsed: round(
+      records.reduce((sum, record) => sum + record.credits, 0),
+      4,
+    ),
+    requestsCount: records.length,
+    successfulCalls: succeeded.length,
+    ...(succeeded[0] ? { lastUsedAt: succeeded[0].ts } : {}),
+    ...settings,
+  };
+  return { spec, key, records };
+}
+
+let demoCache: { builtAt: number; byValue: Map<string, DemoKey> } | null = null;
+
+/** The demo keys by value, built on first use and again an hour later. */
+function demoKeys(): Map<string, DemoKey> {
+  const now = mockNowUnix();
+  if (!demoCache || now - demoCache.builtAt >= DEMO_REBUILD_S) {
+    demoCache = {
+      builtAt: now,
+      byValue: new Map(DEMO_SPECS.map((spec) => [spec.key, buildDemoKey(spec, now)])),
+    };
+  }
+  return demoCache.byValue;
+}
+
+function demoKeyById(id: string): DemoKey | undefined {
+  for (const demo of demoKeys().values()) if (demo.key.id === id) return demo;
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+/** The signed-in key and the log its routes read: the mock DB's, or a demo key's own. */
+interface Holder {
+  key: StoredKey;
+  log: readonly RequestRecord[];
+  keysRequired: boolean;
+  demo?: DemoSpec;
+}
+
+function holderFor(keyId: string): Holder | undefined {
+  const stored = mockDb.apiKeys.find((k) => k.id === keyId);
+  if (stored) {
+    return { key: stored, log: mockDb.requests, keysRequired: mockDb.settings.requireApiKey };
+  }
+  const demo = demoKeyById(keyId);
+  if (!demo) return undefined;
+  return {
+    key: demo.key,
+    log: demo.records,
+    keysRequired: demo.spec.keysRequired ?? true,
+    demo: demo.spec,
+  };
 }
 
 /** '/user/api' + path (USER_API_BASE, not imported so the mocks stay free of the query client). */
@@ -120,22 +675,22 @@ function sessionExpired(): Response {
  * The key behind X-User-Token, or a 401 for a missing, unknown or expired token, a deleted key
  * or a key whose value changed since the sign-in.
  */
-function requireUser(request: Request): { key: StoredKey } | { denied: Response } {
+function requireUser(request: Request): { holder: Holder } | { denied: Response } {
   const token = request.headers.get("X-User-Token") ?? "";
   const session = token ? sessions.get(token) : undefined;
-  const key = session ? mockDb.apiKeys.find((k) => k.id === session.keyId) : undefined;
-  if (!session || !key || key.key !== session.key || Date.now() >= session.expiresAt) {
+  const holder = session ? holderFor(session.keyId) : undefined;
+  if (!session || !holder || holder.key.key !== session.key || Date.now() >= session.expiresAt) {
     if (session) {
       sessions.delete(token);
       saveSessions();
     }
     return { denied: sessionExpired() };
   }
-  return { key };
+  return { holder };
 }
 
 /** The admin apiKeyView's fields a holder may see; zeros and [] instead of omitted fields. */
-function keyView(stored: StoredKey): UserKey {
+function keyView({ key: stored, keysRequired }: Holder): UserKey {
   const expiresAt = stored.expiresAt ?? 0;
   return {
     id: stored.id,
@@ -155,7 +710,7 @@ function keyView(stored: StoredKey): UserKey {
     requestsCount: stored.requestsCount,
     rpmLimit: stored.rpmLimit ?? 0,
     allowedModels: [...(stored.allowedModels ?? [])],
-    keysRequired: mockDb.settings.requireApiKey,
+    keysRequired,
   };
 }
 
@@ -190,6 +745,16 @@ function usageParams(request: Request): { range: string; tzOffset: number } | { 
   return { range, tzOffset };
 }
 
+/** A key over its usage queries for the minute, as proxy/user_api.go answers it. */
+function usageBusy(): Response {
+  return jsonError(
+    429,
+    "Too many usage requests; try again in a minute",
+    { code: "user_usage_busy" },
+    { "Retry-After": "60" },
+  );
+}
+
 function zeroUsage(): ApiKeyUsageTotals {
   return { requests: 0, succeeded: 0, failed: 0, inTokens: 0, outTokens: 0, tokens: 0, credits: 0 };
 }
@@ -208,11 +773,11 @@ function addUsage(totals: ApiKeyUsageTotals, record: RequestRecord): void {
  * The admin usage response with only this key in `keys` (absent when it has no traffic in the
  * range, as there). The grid is the admin one: All time starts at the log's oldest record.
  */
-function buildUsage(key: StoredKey, range: string, tzOffset: number): ApiKeyUsageResponse {
+function buildUsage({ key, log }: Holder, range: string, tzOffset: number): ApiKeyUsageResponse {
   const nowUnix = mockNowUnix();
   const spec = USAGE_RANGES[range];
   const off = tzOffset * 60;
-  const oldest = mockDb.requests.reduce<number | undefined>(
+  const oldest = log.reduce<number | undefined>(
     (min, record) => (min === undefined || record.ts < min ? record.ts : min),
     undefined,
   );
@@ -232,7 +797,7 @@ function buildUsage(key: StoredKey, range: string, tzOffset: number): ApiKeyUsag
     totals: zeroUsage(),
     series: Array.from({ length: buckets.length }, zeroUsage),
   };
-  for (const record of mockDb.requests) {
+  for (const record of log) {
     if (record.apiKeyId !== key.id || record.ts < from || record.ts >= to) continue;
     const index = grid ? grid.index(record.ts) : Math.floor((record.ts + off) / seconds) - first;
     if (index < 0) continue;
@@ -255,10 +820,11 @@ function buildUsage(key: StoredKey, range: string, tzOffset: number): ApiKeyUsag
 }
 
 /** The admin breakdown for ref key:<id>, by model only. */
-function buildBreakdown(key: StoredKey, range: string, tzOffset: number): UserUsageBreakdown {
-  const usage = buildUsage(key, range, tzOffset);
+function buildBreakdown(holder: Holder, range: string, tzOffset: number): UserUsageBreakdown {
+  const { key, log } = holder;
+  const usage = buildUsage(holder, range, tzOffset);
   const models = new Map<string, ApiKeyUsageBreakdownItem>();
-  for (const record of mockDb.requests) {
+  for (const record of log) {
     if (record.apiKeyId !== key.id || record.ts < usage.from || record.ts >= usage.to) continue;
     const item = models.get(record.model) ?? {
       id: record.model,
@@ -325,14 +891,14 @@ function positiveInt(raw: string | null, fallback: number): number {
   return Number.isFinite(value) && value >= 1 ? value : fallback;
 }
 
-function listRequests(key: StoredKey, url: URL): UserRequestPage {
+function listRequests({ key, log }: Holder, url: URL): UserRequestPage {
   const page = positiveInt(url.searchParams.get("page"), 1);
   const pageSize = Math.min(
     MAX_PAGE_SIZE,
     positiveInt(url.searchParams.get("pageSize"), PAGE_SIZE),
   );
   const status = url.searchParams.get("status") ?? "all";
-  const rows = mockDb.requests
+  const rows = log
     .filter(
       (record) =>
         record.apiKeyId === key.id &&
@@ -361,14 +927,15 @@ export const handlers: HttpHandler[] = [
     if (limited) return limited;
     const value = await readKey(request);
     if (!value) return jsonError(400, "API key is required", { code: "user_key_required" });
-    const key = mockDb.apiKeys.find((k) => k.key === value);
+    const demo = demoKeys().get(value);
+    const key = mockDb.apiKeys.find((k) => k.key === value) ?? demo?.key;
     if (!key) {
       wrongGuess();
       return jsonError(401, "Invalid API key", { code: "user_key_invalid" });
     }
     failedLogins = 0;
     const token = randomHex(64);
-    const expiresAt = Date.now() + SESSION_TTL_MS;
+    const expiresAt = Date.now() + (demo?.spec.sessionTtlMs ?? SESSION_TTL_MS);
     sessions.set(token, { keyId: key.id, key: key.key, expiresAt });
     saveSessions();
     return HttpResponse.json({ token, expiresAt: Math.floor(expiresAt / 1000) });
@@ -387,7 +954,7 @@ export const handlers: HttpHandler[] = [
     const user = requireUser(request);
     if ("denied" in user) return user.denied;
     await mockDelay();
-    return HttpResponse.json(keyView(user.key));
+    return HttpResponse.json(keyView(user.holder));
   }),
 
   http.get(userUrl("/usage/breakdown"), async ({ request }) => {
@@ -396,7 +963,8 @@ export const handlers: HttpHandler[] = [
     await mockDelay();
     const params = usageParams(request);
     if ("error" in params) return params.error;
-    return HttpResponse.json(buildBreakdown(user.key, params.range, params.tzOffset));
+    if (user.holder.demo?.usageBusy) return usageBusy();
+    return HttpResponse.json(buildBreakdown(user.holder, params.range, params.tzOffset));
   }),
 
   http.get(userUrl("/usage"), async ({ request }) => {
@@ -405,13 +973,17 @@ export const handlers: HttpHandler[] = [
     await mockDelay();
     const params = usageParams(request);
     if ("error" in params) return params.error;
-    return HttpResponse.json(buildUsage(user.key, params.range, params.tzOffset));
+    if (user.holder.demo?.usageBusy) return usageBusy();
+    return HttpResponse.json(buildUsage(user.holder, params.range, params.tzOffset));
   }),
 
   http.get(userUrl("/requests"), async ({ request }) => {
     const user = requireUser(request);
     if ("denied" in user) return user.denied;
     await mockDelay();
-    return HttpResponse.json(listRequests(user.key, new URL(request.url)));
+    if (user.holder.demo?.requestsFail) {
+      return jsonError(500, "Internal error", { code: "internal_error" });
+    }
+    return HttpResponse.json(listRequests(user.holder, new URL(request.url)));
   }),
 ];

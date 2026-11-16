@@ -3,6 +3,7 @@ package proxy
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -227,6 +228,85 @@ func (s *userSessionStore) revoke(token string) {
 	delete(s.sessions, token)
 }
 
+// userSessionHandoff is one key holder's session carried across a restart into an update.
+type userSessionHandoff struct {
+	Token   string    `json:"token"`
+	KeyID   string    `json:"keyId"`
+	KeyHash string    `json:"keyHash"`
+	Expires time.Time `json:"expires"`
+}
+
+// Export returns the unexpired sessions as JSON, or nil when there are none, so the process a
+// self-update restarts into keeps key holders signed in as it keeps the admin.
+func (s *userSessionStore) Export() []byte {
+	now := time.Now()
+	s.mu.Lock()
+	s.pruneLocked(now)
+	list := make([]userSessionHandoff, 0, len(s.sessions))
+	for token, session := range s.sessions {
+		list = append(list, userSessionHandoff{
+			Token:   token,
+			KeyID:   session.keyID,
+			KeyHash: hex.EncodeToString(session.keyHash[:]),
+			Expires: session.expiry,
+		})
+	}
+	s.mu.Unlock()
+	if len(list) == 0 {
+		return nil
+	}
+	data, err := json.Marshal(list)
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+// Import adds the sessions Export wrote and returns how many it kept: unexpired ones, none
+// outliving the TTL it was issued with, within both caps. A session whose key was deleted or
+// changed in the meantime ends on its next request, as any other.
+func (s *userSessionStore) Import(data []byte) int {
+	var list []userSessionHandoff
+	if err := json.Unmarshal(data, &list); err != nil {
+		return 0
+	}
+	now := time.Now()
+	latest := now.Add(userSessionTTL)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sessions == nil {
+		s.sessions = make(map[string]userSession)
+	}
+	s.pruneLocked(now)
+	perKey := make(map[string]int)
+	for _, session := range s.sessions {
+		perKey[session.keyID]++
+	}
+	kept := 0
+	for _, entry := range list {
+		hash, err := hex.DecodeString(entry.KeyHash)
+		if err != nil || len(hash) != sha256.Size || entry.KeyID == "" || entry.Token == "" ||
+			len(entry.Token) > maxHandoffTokenLen || !entry.Expires.After(now) {
+			continue
+		}
+		if len(s.sessions) >= maxUserSessions {
+			break
+		}
+		if perKey[entry.KeyID] >= maxUserSessionsPerKey {
+			continue
+		}
+		session := userSession{keyID: entry.KeyID, expiry: entry.Expires}
+		if session.expiry.After(latest) {
+			session.expiry = latest
+		}
+		copy(session.keyHash[:], hash)
+		s.sessions[entry.Token] = session
+		perKey[entry.KeyID]++
+		kept++
+	}
+	return kept
+}
+
 // findUserKey returns the configured key whose value is value. It compares the hashes of every
 // key's value in constant time, so the time taken says nothing about how close a guess came.
 func findUserKey(value string) (config.ApiKeyEntry, bool) {
@@ -240,6 +320,12 @@ func findUserKey(value string) (config.ApiKeyEntry, bool) {
 		}
 	}
 	return match, found
+}
+
+// isUserAPIPath reports whether path belongs to the user panel's API. The bare root is one of
+// its routes too, so it answers JSON without the inference API's CORS headers.
+func isUserAPIPath(path string) bool {
+	return path == "/user/api" || strings.HasPrefix(path, "/user/api/")
 }
 
 // handleUserAPI serves /user/api/*: the self-service panel of one API key's holder. It shows

@@ -16,6 +16,7 @@ import { signInWithKey } from "@/lib/api/user-panel";
 import { getUserStaySignedIn } from "@/lib/auth/user-session";
 import { formatDuration } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
+import { MockDemoKeys } from "./mock-demo-keys";
 import { userRedirectTarget } from "./redirect";
 
 /**
@@ -59,12 +60,11 @@ function UserSignInForm({ redirect }: { redirect?: string }): JSX.Element {
   const retryNotice = t("auth:rateLimited", { time: formatDuration(retry.seconds, lang) });
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const signIn = async (typed: string) => {
     if (pending || locked) return;
     setFormError(null);
     // A pasted key often brings a space or line break along.
-    const value = key.trim();
+    const value = typed.trim();
     if (!value) {
       setFieldError(t("errors:serverError.userKeyRequired"));
       return;
@@ -107,62 +107,77 @@ function UserSignInForm({ redirect }: { redirect?: string }): JSX.Element {
       setPending(false);
     }
   };
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void signIn(key);
+  };
+  // Mock mode only: a demo key fills the field and signs in, as typing it and pressing Enter.
+  const pickDemoKey = (demo: string) => {
+    setKey(demo);
+    void signIn(demo);
+  };
 
   return (
-    <form autoComplete="off" className="flex flex-col gap-4" noValidate onSubmit={onSubmit}>
-      <Field className="w-full items-stretch" invalid={Boolean(fieldError)}>
-        <FieldLabel className="sr-only">{t("key")}</FieldLabel>
-        <PasswordInput
-          autoCapitalize="off"
-          autoComplete="off"
-          autoCorrect="off"
-          autoFocus
-          hideLabel={t("hideKey")}
-          invalid={Boolean(fieldError)}
-          lockIcon
-          name="apiKey"
-          onChange={(next) => {
-            setKey(next);
-            if (fieldError) setFieldError(null);
-          }}
-          placeholder={t("keyPlaceholder")}
-          ref={inputRef}
-          showLabel={t("showKey")}
-          size="lg"
-          value={key}
-        />
-        {fieldError ? <FieldError match>{fieldError}</FieldError> : null}
-      </Field>
-      {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
-      <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
-        {locked ? (
-          <Alert role="none" variant="warning">
-            <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
-            <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
+    <>
+      <form autoComplete="off" className="flex flex-col gap-4" noValidate onSubmit={onSubmit}>
+        <Field className="w-full items-stretch" invalid={Boolean(fieldError)}>
+          <FieldLabel className="sr-only">{t("key")}</FieldLabel>
+          <PasswordInput
+            autoCapitalize="off"
+            autoComplete="off"
+            autoCorrect="off"
+            autoFocus
+            hideLabel={t("hideKey")}
+            invalid={Boolean(fieldError)}
+            lockIcon
+            name="apiKey"
+            onChange={(next) => {
+              setKey(next);
+              if (fieldError) setFieldError(null);
+            }}
+            placeholder={t("keyPlaceholder")}
+            ref={inputRef}
+            showLabel={t("showKey")}
+            size="lg"
+            value={key}
+          />
+          {fieldError ? <FieldError match>{fieldError}</FieldError> : null}
+        </Field>
+        {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
+        <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
+          {locked ? (
+            <Alert role="none" variant="warning">
+              <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
+              <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
+        {formError ? (
+          <Alert variant="error">
+            <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
+            <AlertDescription>{formError}</AlertDescription>
           </Alert>
         ) : null}
-      </div>
-      {formError ? (
-        <Alert variant="error">
-          <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
-          <AlertDescription>{formError}</AlertDescription>
-        </Alert>
-      ) : null}
-      <Button
-        aria-disabled={locked || undefined}
-        className="w-full"
-        loading={pending}
-        loadingText={t("auth:signingIn")}
-        size="lg"
-        type="submit"
-      >
-        {pending ? null : <AnimatedIcon icon={LogInIcon} aria-hidden="true" />}
-        {t("auth:submit")}
-      </Button>
-      <Label className="-mt-3 self-start" variant="option">
-        <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} />
-        {t("auth:remember")}
-      </Label>
-    </form>
+        <Button
+          aria-disabled={locked || undefined}
+          className="w-full"
+          loading={pending}
+          loadingText={t("auth:signingIn")}
+          size="lg"
+          type="submit"
+        >
+          {pending ? null : <AnimatedIcon icon={LogInIcon} aria-hidden="true" />}
+          {t("auth:submit")}
+        </Button>
+        <Label className="-mt-3 self-start" variant="option">
+          <Checkbox
+            checked={remember}
+            onCheckedChange={(checked) => setRemember(checked === true)}
+          />
+          {t("auth:remember")}
+        </Label>
+      </form>
+      <MockDemoKeys onPick={pickDemoKey} />
+    </>
   );
 }

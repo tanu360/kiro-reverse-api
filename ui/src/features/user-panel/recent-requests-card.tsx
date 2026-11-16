@@ -6,7 +6,7 @@ import {
   SearchXIcon,
 } from "@hugeicons/core-free-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { type JSX, useMemo, useState } from "react";
+import { Fragment, type JSX, useMemo, useState } from "react";
 import { CreditAmount } from "@/components/shared/credit-amount";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -17,7 +17,6 @@ import { SectionCard } from "@/components/shared/section-card";
 import { StatusDot } from "@/components/shared/status-dot";
 import { StatusTabs } from "@/components/shared/table-toolbar";
 import { TokenCell } from "@/components/shared/token-cell";
-import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorTypeLabel } from "@/features/requests/error-type-badge";
@@ -52,6 +51,8 @@ function rowId(row: UserRequest, index: number): string {
 
 /** Time over date, as the Requests table; `inline` puts both on one line (a card's title). */
 function TimeCell({ ts, lang, inline = false }: { ts: number; lang: Lang; inline?: boolean }) {
+  //! A row without a time read as midnight on 1 January 1970; it is a dash.
+  if (!ts) return <Muted />;
   const dateTime = unixToDate(ts).toISOString();
   if (inline) {
     return (
@@ -107,7 +108,8 @@ function ModelCell({ row }: { row: UserRequest }): JSX.Element {
   const endpoint = endpointLabel(row.endpoint || undefined, t);
   return (
     <span className="flex min-w-0 flex-col items-start gap-1">
-      {row.model ? <TruncatedText className="max-w-56">{row.model}</TruncatedText> : <Muted />}
+      {/* Wraps rather than cuts: a hover tooltip is out of reach by keyboard and touch. */}
+      {row.model ? <span className="whitespace-normal wrap-anywhere">{row.model}</span> : <Muted />}
       {endpoint === EMPTY ? null : (
         <span className="text-meta text-muted-foreground">{endpoint}</span>
       )}
@@ -139,14 +141,20 @@ function RequestRow({ row }: { row: UserRequest }): JSX.Element {
       variant="row"
     >
       <div className="flex min-w-0 items-baseline gap-2 text-sm">
-        {row.model ? <span className="min-w-0 truncate">{row.model}</span> : <Muted />}
+        {row.model ? <span className="min-w-0 wrap-anywhere">{row.model}</span> : <Muted />}
         {endpoint === EMPTY ? null : (
           <span className="shrink-0 text-meta text-muted-foreground">{endpoint}</span>
         )}
       </div>
       {figures.length > 0 ? (
-        <p className="truncate text-meta text-muted-foreground tabular-nums">
-          {figures.join(" · ")}
+        // Breaks only between figures, so a long one never splits from its unit.
+        <p className="text-meta text-muted-foreground tabular-nums">
+          {figures.map((figure, index) => (
+            <Fragment key={figure}>
+              {index > 0 ? " · " : null}
+              <span className="whitespace-nowrap">{figure}</span>
+            </Fragment>
+          ))}
         </p>
       ) : null}
       {failed && row.errorType ? (

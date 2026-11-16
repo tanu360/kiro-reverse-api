@@ -22,5 +22,7 @@ function UserPanelRoute(): JSX.Element | null {
   // page at once keeps them from refetching without a token.
   const token = useUserToken();
   if (!token) return null;
-  return <UserPanelPage />;
+  // Keyed by the session: a sign-in with another key in another tab starts the page over, so
+  // no range, filter or page of the previous key carries across.
+  return <UserPanelPage key={token} />;
 }

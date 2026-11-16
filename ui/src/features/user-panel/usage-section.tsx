@@ -1,6 +1,7 @@
 import { ChartColumnIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
+import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { UsageBreakdownCard } from "@/features/api/key-usage-breakdown";
 import {
@@ -36,9 +37,13 @@ export function UsageSection(): JSX.Element {
         slim
         title={t("usage.title")}
       >
-        {/* As in the usage sheet, the numbers stay bars until the range loads; a failure shows
-            in the chart card below, with its Retry. */}
-        <UsageTotalsStrip loading={!data} totals={entry?.totals ?? data?.totals} />
+        {/* As in the usage sheet, the numbers stay bars until the range loads. A failure shows
+            in the chart card below, with its Retry; here the bars give way to "Not loaded". */}
+        {usage.isError && !data ? (
+          <ErrorState notLoaded />
+        ) : (
+          <UsageTotalsStrip loading={!data} totals={entry?.totals ?? data?.totals} />
+        )}
       </SectionCard>
       <div className="grid min-w-0 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
         <UsageChartCard

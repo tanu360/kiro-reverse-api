@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { UserKey } from "@/lib/api/user-panel";
 import {
   dateTimeFormat,
+  EMPTY,
   formatDateTime,
   formatItems,
   formatNumber,
@@ -26,6 +27,10 @@ import {
 } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
 import { userKeyStatus } from "./key-status";
+
+function Muted(): JSX.Element {
+  return <span className="text-muted-foreground">{EMPTY}</span>;
+}
 
 /** The expiry date alone (no time), short enough for a badge: "Nov 30, 2026". */
 function formatDay(unixSec: number, lang: Lang): string {
@@ -65,27 +70,36 @@ export function KeyStatusBadges({ apiKey }: { apiKey: UserKey }): JSX.Element {
 
 /**
  * The page heading: the key's name (or "API key"), its masked value and status beside it, the
- * page's one line under it and Refresh at the end. While the key loads the name is a bar.
+ * page's one line under it and Refresh at the end. While the key loads the name is a bar; when
+ * it failed to load (the card below says why) the heading is the plain "API key".
  */
 export function KeyHeading({
   apiKey,
+  failed = false,
   fetching,
   onRefresh,
 }: {
   apiKey: UserKey | undefined;
+  failed?: boolean;
   fetching: boolean;
   onRefresh: () => void;
 }): JSX.Element {
   const { t } = useT("user-panel");
   const refresh = <RefreshButton fetching={fetching} onRefresh={onRefresh} />;
+  if (!apiKey && failed) {
+    return <PageHeader actions={refresh} description={t("description")} title={t("title")} />;
+  }
   if (!apiKey) {
     return (
-      // PageHeader's frame (a 36 px title row over the description), the name as a bar.
+      // PageHeader's frame (a 36 px title row over the description), with bars for the name,
+      // the masked key and the status that wrap as they do: the status takes a second line on
+      // a phone, so the cards below stay put when the key arrives.
       <div aria-busy="true" className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div className="flex min-w-48 grow basis-0 flex-col gap-1.5">
-          <div className="flex min-h-9 items-center gap-2.5 pointer-coarse:min-h-10">
-            <Skeleton className="h-6 w-44" />
-            <Skeleton className="h-6 w-20 rounded-full" />
+          <div className="flex min-h-9 flex-wrap items-center gap-x-2.5 gap-y-1 pointer-coarse:min-h-10">
+            <Skeleton className="h-7 w-28" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-6 w-18 rounded-full" />
           </div>
           <p className="text-pretty text-muted-foreground text-sm leading-relaxed">
             {t("description")}
@@ -176,11 +190,15 @@ export function KeyDetailsCard({ apiKey }: { apiKey: UserKey | undefined }): JSX
               : formatDateTime(apiKey.expiresAt, lang)
             : t("details.never"),
         },
-        { label: t("details.created"), value: formatDateTime(apiKey.createdAt, lang) },
+        {
+          label: t("details.created"),
+          value: apiKey.createdAt ? formatDateTime(apiKey.createdAt, lang) : <Muted />,
+        },
         {
           label: t("details.lastUsed"),
+          //! A server clock ahead of this browser's read as "in 2 minutes".
           value: apiKey.lastUsedAt ? (
-            <RelativeTime value={apiKey.lastUsedAt} />
+            <RelativeTime value={Math.min(apiKey.lastUsedAt, Math.floor(Date.now() / 1000))} />
           ) : (
             t("details.neverUsed")
           ),

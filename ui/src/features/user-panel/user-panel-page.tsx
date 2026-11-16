@@ -9,6 +9,7 @@ import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { ExampleRequestCard, UserEndpointsCard } from "./connect-cards";
 import { KeyDetailsCard, KeyHeading, KeyNotice } from "./key-overview";
+import { useRerenderAtExpiry } from "./key-status";
 import { RecentRequestsCard } from "./recent-requests-card";
 import { UsageSection } from "./usage-section";
 import { UserShell } from "./user-shell";
@@ -41,12 +42,15 @@ export function UserPanelPage(): JSX.Element {
   const key = useQuery(userKeyQuery());
   const { signOut, signingOut } = useUserSignOut();
   const apiKey = key.data;
+  // The badge, notice and details read the clock: they turn to Expired when the expiry passes.
+  useRerenderAtExpiry(apiKey?.expiresAt ?? 0);
   const refreshing = queryClient.isFetching({ queryKey: queryKeys.userPanel.all }) > 0;
 
   return (
     <UserShell onSignOut={() => void signOut()} signingOut={signingOut}>
       <KeyHeading
         apiKey={apiKey}
+        failed={key.isError}
         fetching={key.isFetching || refreshing}
         onRefresh={() => void queryClient.refetchQueries({ queryKey: queryKeys.userPanel.all })}
       />

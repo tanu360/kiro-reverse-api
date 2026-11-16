@@ -19,10 +19,12 @@ import (
 )
 
 // restartSessionsFile carries the admin's sign-ins from a server that restarts into an update to
-// the new process, in the data folder. restartHandoffMaxAge is how fresh it must be to count.
+// the new process, in the data folder; restartUserSessionsFile carries the key holders'.
+// restartHandoffMaxAge is how fresh each must be to count.
 const (
-	restartSessionsFile  = ".restart-sessions.json"
-	restartHandoffMaxAge = 2 * time.Minute
+	restartSessionsFile     = ".restart-sessions.json"
+	restartUserSessionsFile = ".restart-user-sessions.json"
+	restartHandoffMaxAge    = 2 * time.Minute
 )
 
 // restartGrace is how long a restart waits for open requests; longer streams are cut off.
@@ -62,6 +64,12 @@ func main() {
 			logger.Infof("[Update] Kept %d admin sign-in(s) across the restart", n)
 		}
 	}
+	userHandoff := filepath.Join(dataDir, restartUserSessionsFile)
+	if data := updater.TakeHandoff(userHandoff, restartHandoffMaxAge); data != nil {
+		if n := handler.ImportUserSessions(data); n > 0 {
+			logger.Infof("[Update] Kept %d key holder sign-in(s) across the restart", n)
+		}
+	}
 
 	tunnelManager := tunnel.New(tunnel.Options{
 		DataDir:  dataDir,
@@ -83,7 +91,7 @@ func main() {
 	srv := &http.Server{Addr: addr, Handler: handler}
 	srv.RegisterOnShutdown(handler.CloseEventStreams)
 	handler.SetUpdater(upd, func() {
-		restartIntoUpdate(srv, tunnelManager, handler, upd, handoff)
+		restartIntoUpdate(srv, tunnelManager, handler, upd, handoff, userHandoff)
 	})
 
 	if raw, ignored := config.IgnoredPortEnv(); ignored {
@@ -109,7 +117,7 @@ func main() {
 // restartIntoUpdate stops this server and runs the installed update in its place. It does not
 // return: the process becomes the new version, or exits with an error for a supervisor to
 // restart it (the new program is already at the executable's path).
-func restartIntoUpdate(srv *http.Server, tun *tunnel.Manager, handler *proxy.Handler, upd *updater.Manager, handoff string) {
+func restartIntoUpdate(srv *http.Server, tun *tunnel.Manager, handler *proxy.Handler, upd *updater.Manager, handoff, userHandoff string) {
 	logger.Infof("[Update] Restarting: waiting up to %s for open requests", restartGrace)
 	ctx, cancel := context.WithTimeout(context.Background(), restartGrace)
 	if err := srv.Shutdown(ctx); err != nil {
@@ -121,6 +129,11 @@ func restartIntoUpdate(srv *http.Server, tun *tunnel.Manager, handler *proxy.Han
 	if data := handler.ExportAdminSessions(); data != nil {
 		if err := updater.SaveHandoff(handoff, data); err != nil {
 			logger.Warnf("[Update] Could not keep the admin sign-ins: %v", err)
+		}
+	}
+	if data := handler.ExportUserSessions(); data != nil {
+		if err := updater.SaveHandoff(userHandoff, data); err != nil {
+			logger.Warnf("[Update] Could not keep the key holders' sign-ins: %v", err)
 		}
 	}
 	if err := db.Close(); err != nil {

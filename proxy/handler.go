@@ -400,7 +400,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//! The wildcard belongs to the inference API, which any client may call.
 	//! The admin API holds account credentials, so no origin may read it cross-site.
 	//! The user panel's API shows a key's own usage, so it is kept same-origin too.
-	isAdminPath := strings.HasPrefix(path, "/admin/") || strings.HasPrefix(path, "/user/api/")
+	isAdminPath := strings.HasPrefix(path, "/admin/") || isUserAPIPath(path)
 	if !isAdminPath {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -508,7 +508,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleAdminAPI(w, r)
 	case path == "/admin" || strings.HasPrefix(path, "/admin/"):
 		redirectLegacyAdminPath(w, r)
-	case strings.HasPrefix(path, "/user/api/"):
+	case isUserAPIPath(path):
 		h.handleUserAPI(w, r)
 
 	//! A browser opening the root gets the admin UI; API clients and monitors that probe "/"
