@@ -37,6 +37,7 @@ import {
 } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { flooredShare } from "./api-key-form";
 import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
 import { entryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
@@ -102,18 +103,28 @@ function sortValue(row: Row, column: SortColumn): number {
   }
 }
 
-/** The key's first limit that is set, in the order the key form lists them: credits, tokens, calls. */
-function firstLimit(
-  apiKey: ApiKey,
-): { kind: "credits" | "tokens" | "calls"; used: number; limit: number } | null {
-  if (apiKey.creditLimit)
-    return { kind: "credits", used: apiKey.creditsUsed, limit: apiKey.creditLimit };
-  if (apiKey.tokenLimit)
-    return { kind: "tokens", used: apiKey.tokensUsed, limit: apiKey.tokenLimit };
-  if (apiKey.callLimit) {
-    return { kind: "calls", used: apiKey.successfulCalls ?? 0, limit: apiKey.callLimit };
+interface KeyLimit {
+  kind: "credits" | "tokens" | "calls";
+  used: number;
+  limit: number;
+}
+
+/**
+ * The key's set limit with the largest used share, the one that stops the key first; a tie keeps
+ * the order the key form lists them: credits, tokens, calls.
+ */
+function closestLimit(apiKey: ApiKey): KeyLimit | null {
+  const limits: KeyLimit[] = [
+    { kind: "credits", used: apiKey.creditsUsed, limit: apiKey.creditLimit ?? 0 },
+    { kind: "tokens", used: apiKey.tokensUsed, limit: apiKey.tokenLimit ?? 0 },
+    { kind: "calls", used: apiKey.successfulCalls ?? 0, limit: apiKey.callLimit ?? 0 },
+  ];
+  let closest: KeyLimit | null = null;
+  for (const entry of limits) {
+    if (entry.limit <= 0) continue;
+    if (!closest || entry.used / entry.limit > closest.used / closest.limit) closest = entry;
   }
-  return null;
+  return closest;
 }
 
 /**
@@ -260,7 +271,7 @@ export function KeyUsageCard(): JSX.Element {
   // One plain line, as the API keys table: the measure, used / limit and the share, no bar.
   const limitCell = (row: Row): ReactNode => {
     if (!row.apiKey) return <span className="text-muted-foreground">{EMPTY}</span>;
-    const limit = firstLimit(row.apiKey);
+    const limit = closestLimit(row.apiKey);
     if (!limit)
       return (
         <span className="text-muted-foreground text-xs">
@@ -302,7 +313,7 @@ export function KeyUsageCard(): JSX.Element {
           </span>{" "}
           <span className={cn("ms-1 font-medium", tone ?? "text-info-foreground")}>
             {/* Floored, so a key short of its limit never reads 100%. */}
-            {formatFraction(share >= 1 ? 1 : Math.floor(share * 100) / 100, 0, lang)}
+            {formatFraction(flooredShare(limit.used, limit.limit), 0, lang)}
           </span>
         </span>
       </span>
@@ -385,7 +396,7 @@ export function KeyUsageCard(): JSX.Element {
       }
       title={nameCell(row)}
     >
-      {row.apiKey && firstLimit(row.apiKey) ? limitCell(row) : null}
+      {row.apiKey && closestLimit(row.apiKey) ? limitCell(row) : null}
     </ListCard>
   );
 

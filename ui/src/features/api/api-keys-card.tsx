@@ -63,7 +63,12 @@ import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { isKeyExpired, limitReachedReason, wouldLockOutClients } from "./api-key-form";
+import {
+  flooredShare,
+  isKeyExpired,
+  limitReachedReason,
+  wouldLockOutClients,
+} from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
 import { CreatedKeyPanel } from "./created-key-panel";
 import { keyEntryRef } from "./key-usage-model";
@@ -77,11 +82,12 @@ import { ApiKeyUsageSheet } from "./key-usage-sheet";
 const CARDS_BELOW_PX = 896;
 /**
  * Narrower tables drop the columns the usage sheet also shows, as the accounts table drops Last
- * used first: Last used below FULL_TABLE_PX, Successful requests too below NO_LAST_USED_PX. The
- * name keeps about 180 px either way.
+ * used first: Last used shows from a 1190 px table (74.375rem), Successful requests from 1100 px
+ * (68.75rem). Container queries, not a measured width, so the first paint already has the right
+ * columns. The name keeps about 180 px either way.
  */
-const FULL_TABLE_PX = 1190;
-const NO_LAST_USED_PX = 1100;
+const LAST_USED_CELL = "hidden @[74.375rem]/data-table:table-cell";
+const REQUESTS_CELL = "hidden @[68.75rem]/data-table:table-cell";
 const CARD_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE = 10;
 
@@ -390,11 +396,15 @@ export function ApiKeysCard(): JSX.Element {
       id: "requests",
       header: t("keys.requests"),
       align: "end",
+      className: REQUESTS_CELL,
+      headerClassName: REQUESTS_CELL,
       cell: (apiKey) => formatNumber(apiKey.requestsCount, lang),
     },
     {
       id: "lastUsed",
       header: t("keys.lastUsed"),
+      className: LAST_USED_CELL,
+      headerClassName: LAST_USED_CELL,
       // Muted and short ("5m ago"), as in the accounts table; the full date is a tooltip.
       cell: (apiKey) => (
         <span className="text-muted-foreground">
@@ -412,11 +422,6 @@ export function ApiKeysCard(): JSX.Element {
       cell: actions,
     },
   ];
-
-  const hidden = new Set<string>();
-  if (width > 0 && width < FULL_TABLE_PX) hidden.add("lastUsed");
-  if (width > 0 && width < NO_LAST_USED_PX) hidden.add("requests");
-  const visibleColumns = columns.filter((column) => !hidden.has(column.id));
 
   const renderCard = (apiKey: ApiKey) => (
     <ListCard
@@ -541,7 +546,7 @@ export function ApiKeysCard(): JSX.Element {
             caption={t("keys.caption")}
             cardLayout="grid"
             cardsBelow="4xl"
-            columns={visibleColumns}
+            columns={columns}
             data={pageRows}
             emptyState={emptyState}
             getRowId={(apiKey) => apiKey.id}
@@ -728,11 +733,18 @@ function KeyAccessLine({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
 }
 
 /**
- * The table's one status pill: Limit reached while a limit holds the key (it explains, and the
- * proxy disabled the key or answers 429), else Enabled, Disabled or Expired.
+ * The table's one status pill, naming what blocks the key in the order the proxy checks it:
+ * disabled, expired, then a limit. A disabled key reads Limit reached only when a token or credit
+ * limit turned it off (an admin's switch or a used-up call limit keep Disabled); an expired key
+ * reads Expired whatever its limits; an enabled key at a limit reads Limit reached (the proxy
+ * answers 429), else Enabled.
  */
 function KeyStatePill({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const reason = limitReachedReason(apiKey);
+  if (!apiKey.enabled) {
+    return reason === "disabled" ? <LimitBadge reason={reason} /> : <StatusBadge apiKey={apiKey} />;
+  }
+  if (isKeyExpired(apiKey)) return <StatusBadge apiKey={apiKey} />;
   return reason ? <LimitBadge reason={reason} /> : <StatusBadge apiKey={apiKey} />;
 }
 
@@ -923,7 +935,7 @@ function KeyMeasure({
           {" "}
           <span className={cn("ms-1 font-medium", !reached && "text-info-foreground")}>
             {/* Floored, so a key short of its limit never reads 100%. */}
-            {formatFraction(reached ? 1 : Math.floor((used / limit) * 100) / 100, 0)}
+            {formatFraction(reached ? 1 : flooredShare(used, limit), 0)}
           </span>
         </>
       ) : null}

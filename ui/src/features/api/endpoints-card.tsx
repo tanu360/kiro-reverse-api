@@ -113,10 +113,10 @@ export function EndpointsCard({
   const settings = useQuery({ ...settingsQuery(), enabled: !keyHolder });
   const origin = window.location.origin;
   const required = requireApiKey ?? settings.data?.requireApiKey ?? false;
+  // A key holder reads the same line either way: with keys not required the proxy ignores a key
+  // sent to it, and the user panel already says so above this card.
   const authHint = keyHolder
-    ? required
-      ? t("endpoints.holderAuthRequired")
-      : t("endpoints.holderAuthOptional")
+    ? t("endpoints.holderAuthRequired")
     : required
       ? t("endpoints.authRequired")
       : t("endpoints.authOptional");

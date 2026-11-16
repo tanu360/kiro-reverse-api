@@ -420,6 +420,30 @@ describe("ApiPage", () => {
     expect(within(teamRow).queryByText("Disabled")).not.toBeInTheDocument();
   });
 
+  it("names what blocks a key in the proxy's order: disabled, expired, then a limit", async () => {
+    const teamA = mockDb.apiKeys[0];
+    const localDev = mockDb.apiKeys[3];
+    if (!teamA || !localDev) throw new Error("missing seeded keys");
+    // Switched off by the admin with its call limit used up: the switch blocks it first.
+    teamA.enabled = false;
+    teamA.callLimit = 20;
+    teamA.successfulCalls = 20;
+    // Past its expiry with its call limit used up: clients get 401 before any limit check.
+    localDev.expiresAt = Math.floor(Date.now() / 1000) - 60;
+    localDev.callLimit = 5;
+    localDev.successfulCalls = 5;
+    await renderPage();
+
+    const teamRow = row("team-a");
+    expect(within(teamRow).getByText("Disabled")).toBeInTheDocument();
+    expect(within(teamRow).queryByText("Limit reached")).not.toBeInTheDocument();
+    const localRow = row("local-dev");
+    expect(within(localRow).getByText("Expired")).toBeInTheDocument();
+    expect(within(localRow).queryByText("Limit reached")).not.toBeInTheDocument();
+    // A token limit that turned the key off still says so.
+    expect(within(row("ci-runner")).getByText("Limit reached")).toBeInTheDocument();
+  });
+
   it("deletes a key only after the confirm", async () => {
     const { user } = await renderPage();
     const teamA = mockDb.apiKeys[0];
@@ -628,11 +652,11 @@ describe("Endpoints and Client setup given Require API key (the key holder's pag
     expect(requests.filter((r) => r.path.startsWith("/admin/api"))).toEqual([]);
   });
 
-  it("says a key is optional on this address, and asks for the given model", async () => {
+  it("gives the same key hint when keys are not required, and asks for the given model", async () => {
     mockDb.settings.requireApiKey = true;
     const { user } = await renderCards(false, "claude-haiku-4.5");
     expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
-      "This server's own address doesn't ask for one now, but calls without it don't count here.",
+      /^Send your API key as Authorization: Bearer <key> or X-Api-Key: <key>\.$/,
     );
     expect(screen.getByRole("note")).toHaveTextContent(
       "API keys are not required now, so any value works.",

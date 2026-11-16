@@ -5,6 +5,7 @@ import {
   buildCreateRequest,
   buildUpdateRequest,
   EMPTY_API_KEY_FORM,
+  flooredShare,
   formValuesFromKey,
   fromLocalDateTimeInput,
   isKeyExpired,
@@ -242,6 +243,23 @@ describe("isLimitReached", () => {
       limitReachedReason(key({ tokenLimit: 1, tokensUsed: 1, callLimit: 1, successfulCalls: 1 })),
     ).toBe("disabled");
     expect(isLimitReached(key({ callLimit: 1, successfulCalls: 1 }))).toBe(true);
+  });
+});
+
+describe("flooredShare", () => {
+  it("floors without losing a whole percent to float error", () => {
+    // 29 / 100 * 100 is 28.999999999999996 in floating point.
+    expect(flooredShare(29, 100)).toBe(0.29);
+    expect(flooredShare(57, 100)).toBe(0.57);
+    expect(flooredShare(299, 1000, 1)).toBe(0.299);
+  });
+
+  it("never reads a whole limit before it is used up", () => {
+    expect(flooredShare(999_999, 1_000_000)).toBe(0.99);
+    expect(flooredShare(999_999_999_999, 1_000_000_000_000)).toBe(0.99);
+    expect(flooredShare(9_999_998, 10_000_000, 1)).toBe(0.999);
+    expect(flooredShare(100, 100)).toBe(1);
+    expect(flooredShare(5, 0)).toBe(0);
   });
 });
 

@@ -278,6 +278,18 @@ export function isLimitReached(apiKey: ApiKey): boolean {
   return limitReachedReason(apiKey) !== null;
 }
 
+/**
+ * The used share of a limit, floored to `digits` decimals of a percent, so a key short of its
+ * limit never reads 100 %. The small epsilon absorbs float error: 29 / 100 * 100 is
+ * 28.999999999999996, which plain flooring would show as 28 %.
+ */
+export function flooredShare(used: number, limit: number, digits = 0): number {
+  if (limit <= 0) return 0;
+  if (used >= limit) return 1;
+  const steps = 100 * 10 ** digits;
+  return Math.min(steps - 1, Math.floor((used / limit) * steps + 1e-9)) / steps;
+}
+
 export function countEnabledKeys(keys: readonly ApiKey[]): number {
   return keys.filter((k) => k.enabled).length;
 }
