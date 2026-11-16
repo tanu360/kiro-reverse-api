@@ -266,7 +266,7 @@ func TestUserRequestsOnlyOwnKey(t *testing.T) {
 	mine := addUsageKey(t, "mine", "sk-user-mine-0123456789abcdef", true)
 	other := addUsageKey(t, "other", "sk-user-other-0123456789abcdef", true)
 	s := getObserveStore()
-	s.RecordRequestWithAPIKey("acc-secret", mine.ID, mine.Key, "owner@example.com", "model-a", 10, 5, 0.1, true, 200, "")
+	s.RecordTracedRequest(&requestTrace{client: requestClientCodex}, "acc-secret", mine.ID, mine.Key, "owner@example.com", "model-a", 10, 5, 0.1, true, 200, "")
 	s.RecordRequestWithAPIKey("acc-secret", mine.ID, mine.Key, "owner@example.com", "model-a", 3, 0, 0, false, 429, "upstream secret message")
 	s.RecordRequestWithAPIKey("acc-secret", other.ID, other.Key, "owner@example.com", "model-b", 1, 1, 0.01, true, 200, "")
 	s.RecordRequest("acc-secret", "owner@example.com", "model-c", 1, 1, 0.01, true, 200, "")
@@ -292,11 +292,14 @@ func TestUserRequestsOnlyOwnKey(t *testing.T) {
 	}
 	for _, row := range rows {
 		assertKeySet(t, "request", row.(map[string]any),
-			"ts", "model", "endpoint", "inTokens", "outTokens", "totalTokens", "cacheReadTokens",
+			"ts", "model", "endpoint", "client", "inTokens", "outTokens", "totalTokens", "cacheReadTokens",
 			"cacheWriteTokens", "credits", "success", "status", "durationMs", "errorType", "requestId")
 	}
 	if first := rows[0].(map[string]any); first["success"] != false || first["status"] != float64(429) {
 		t.Fatalf("newest first: %v", rows)
+	}
+	if first, second := rows[0].(map[string]any), rows[1].(map[string]any); first["client"] != "" || second["client"] != requestClientCodex {
+		t.Fatalf("clients %v, %v; want \"\" then %q", first["client"], second["client"], requestClientCodex)
 	}
 
 	for status, want := range map[string]float64{"error": 1, "success": 1, "all": 2} {

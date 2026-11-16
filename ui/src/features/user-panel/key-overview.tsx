@@ -3,37 +3,21 @@ import {
   CircleSlashIcon,
   Clock01Icon,
   InformationCircleIcon,
-  KeyRoundIcon,
   TriangleAlertIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
-import { KeyValueGrid, type KeyValueItem } from "@/components/shared/key-value-grid";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
-import { RelativeTime } from "@/components/shared/relative-time";
-import { SectionCard } from "@/components/shared/section-card";
-import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { UserKey } from "@/lib/api/user-panel";
-import {
-  dateTimeFormat,
-  EMPTY,
-  formatDateTime,
-  formatItems,
-  formatNumber,
-  unixToDate,
-} from "@/lib/format";
+import { dateTimeFormat, formatDateTime, unixToDate } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
 import { userKeyStatus } from "./key-status";
 
-function Muted(): JSX.Element {
-  return <span className="text-muted-foreground">{EMPTY}</span>;
-}
-
-/** The expiry date alone (no time), short enough for a badge: "Nov 30, 2026". */
-function formatDay(unixSec: number, lang: Lang): string {
+/** A date alone (no time), short enough for a badge: "Nov 30, 2026". */
+export function formatDay(unixSec: number, lang: Lang): string {
   return dateTimeFormat(lang, { dateStyle: "medium" }).format(unixToDate(unixSec));
 }
 
@@ -154,68 +138,5 @@ export function KeyNotice({ apiKey }: { apiKey: UserKey }): JSX.Element | null {
         </Alert>
       )}
     </>
-  );
-}
-
-/**
- * The key's own settings as the usage sheet lists them: the rate limit, the models it may call,
- * its expiry, and when it was created and last used. Label over value, three across on a wide
- * card.
- */
-export function KeyDetailsCard({ apiKey }: { apiKey: UserKey | undefined }): JSX.Element {
-  const { t, lang } = useT("user-panel");
-  const bar = <Skeleton className="my-0.5 h-4 w-28" />;
-  const models = apiKey?.allowedModels ?? [];
-  const items: KeyValueItem[] = apiKey
-    ? [
-        {
-          label: t("details.rpm"),
-          value: apiKey.rpmLimit ? (
-            t("details.rpmValue", { n: formatNumber(apiKey.rpmLimit, lang) })
-          ) : (
-            <UnlimitedMark />
-          ),
-        },
-        {
-          label: t("details.models"),
-          value: models.length ? formatItems(models, lang) : t("details.allModels"),
-          // A list of models takes two columns; "All models" pairs up.
-          span: models.length ? 2 : 1,
-        },
-        {
-          label: t("details.expires"),
-          value: apiKey.expiresAt
-            ? userKeyStatus(apiKey) === "expired"
-              ? t("details.expiredAt", { time: formatDateTime(apiKey.expiresAt, lang) })
-              : formatDateTime(apiKey.expiresAt, lang)
-            : t("details.never"),
-        },
-        {
-          label: t("details.created"),
-          value: apiKey.createdAt ? formatDateTime(apiKey.createdAt, lang) : <Muted />,
-        },
-        {
-          label: t("details.lastUsed"),
-          //! A server clock ahead of this browser's read as "in 2 minutes".
-          value: apiKey.lastUsedAt ? (
-            <RelativeTime value={Math.min(apiKey.lastUsedAt, Math.floor(Date.now() / 1000))} />
-          ) : (
-            t("details.neverUsed")
-          ),
-        },
-      ]
-    : [
-        { label: t("details.rpm"), value: bar },
-        { label: t("details.models"), value: bar },
-        { label: t("details.expires"), value: bar },
-        { label: t("details.created"), value: bar },
-        { label: t("details.lastUsed"), value: bar },
-      ];
-  return (
-    <SectionCard icon={KeyRoundIcon} slim title={t("details.title")}>
-      <div className="px-4 py-4 sm:px-6">
-        <KeyValueGrid columns={3} items={items} />
-      </div>
-    </SectionCard>
   );
 }

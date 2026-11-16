@@ -193,6 +193,49 @@ describe("user panel mock demo keys", () => {
       const ts = rows.requests.map((row) => row.ts);
       expect(ts).toEqual([...ts].sort((a, b) => b - a));
       expect(JSON.stringify(rows)).not.toMatch(/accountId|demo-account|email|message/);
+      if (rows.total >= 40) {
+        // A busy key's requests come from a mix of coding tools, and some from none.
+        const clients = new Set(rows.requests.map((row) => row.client));
+        expect(clients).toContain("claude-code");
+        expect(clients).toContain("");
+        expect(clients.size).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it("gives each one the stretch before every range but the lifetime", async () => {
+    for (const { id, key } of DEMO_KEYS) {
+      if (id === "usageBusy") continue;
+      await signInWithKey(key, false);
+      for (const range of ["24h", "7d", "30d"] as const) {
+        const { previous } = await getUserUsage(range, 0);
+        expect(previous).toBeDefined();
+        expect(previous?.tokens).toBe((previous?.inTokens ?? 0) + (previous?.outTokens ?? 0));
+        expect(previous?.failed).toBe((previous?.requests ?? 0) - (previous?.succeeded ?? 0));
+        if (id === "new") expect(previous?.requests).toBe(0);
+        if (id === "active") expect(previous?.requests).toBeGreaterThan(0);
+      }
+      expect(await getUserUsage("all", 0)).not.toHaveProperty("previous");
+    }
+  });
+
+  it("counts the stretch before a range as long as the part of it that has passed", async () => {
+    const stored = mockDb.apiKeys[0];
+    await signInWithKey(stored.key, false);
+    for (const [range, span] of [
+      ["24h", 86_400],
+      ["7d", 7 * 86_400],
+      ["30d", 30 * 86_400],
+    ] as const) {
+      const usage = await getUserUsage(range, 330);
+      const inStretch = mockDb.requests.filter(
+        (row) =>
+          row.apiKeyId === stored.id &&
+          row.ts >= usage.from - span &&
+          row.ts <= usage.nowUnix - span,
+      );
+      expect(usage.previous?.requests).toBe(inStretch.length);
+      expect(usage.previous?.succeeded).toBe(inStretch.filter((row) => row.success).length);
     }
   });
 

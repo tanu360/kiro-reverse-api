@@ -4,12 +4,11 @@ import { ErrorState } from "@/components/shared/error-state";
 import { Card } from "@/components/ui/card";
 import { ClientSnippetsCard } from "@/features/api/client-snippets";
 import { EndpointsCard } from "@/features/api/endpoints-card";
-import { KeyLimitsCard } from "@/features/api/key-usage-limits";
 import { queryKeys } from "@/lib/api/query-keys";
 import { signOutUser, userKeyQuery } from "@/lib/api/user-panel";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { KeyDetailsCard, KeyHeading, KeyNotice } from "./key-overview";
+import { KeyHeading, KeyNotice } from "./key-overview";
 import { useRerenderAtExpiry } from "./key-status";
 import { RecentRequestsCard } from "./recent-requests-card";
 import { UsageSection } from "./usage-section";
@@ -33,8 +32,8 @@ function useUserSignOut(): { signOut: () => Promise<void>; signingOut: boolean }
 
 /**
  * /user: everything about the signed-in API key and nothing else. Its status and why requests
- * fail when it is off or expired, its limits and settings, usage over time and by model, its
- * own recent requests, and how to connect. Built from the admin pages' cards; it calls only
+ * fail when it is off or expired, its usage against its limits, its settings, usage over time
+ * and by model, its own recent requests, and how to connect. Built from the admin pages' cards; it calls only
  * /user/api.
  */
 export function UserPanelPage(): JSX.Element {
@@ -43,7 +42,7 @@ export function UserPanelPage(): JSX.Element {
   const key = useQuery(userKeyQuery());
   const { signOut, signingOut } = useUserSignOut();
   const apiKey = key.data;
-  // The badge, notice and details read the clock: they turn to Expired when the expiry passes.
+  // The badge, notice and key facts read the clock: they turn to Expired when the expiry passes.
   useRerenderAtExpiry(apiKey?.expiresAt ?? 0);
   const refreshing = queryClient.isFetching({ queryKey: queryKeys.userPanel.all }) > 0;
 
@@ -67,9 +66,7 @@ export function UserPanelPage(): JSX.Element {
       ) : (
         <>
           {apiKey ? <KeyNotice apiKey={apiKey} /> : null}
-          <KeyLimitsCard apiKey={apiKey} />
-          <KeyDetailsCard apiKey={apiKey} />
-          <UsageSection />
+          <UsageSection apiKey={apiKey} />
           <RecentRequestsCard />
           {/* The admin API page's two cards, fed from the key: they never read /admin/api.
               Until the key loads they assume keys are required, as the key's own default. */}

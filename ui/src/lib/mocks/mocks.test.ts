@@ -12,6 +12,7 @@ import {
   makeAccount,
   makeObserveError,
   makeRequestRecord,
+  mockClient,
   seedAccounts,
   seedRequests,
 } from "./fixtures";
@@ -52,6 +53,7 @@ describe("mock database", () => {
   it("seeds the same data every time", () => {
     const now = mockNowUnix();
     expect(seedRequests(now, 320)).toEqual(seedRequests(now, 320));
+    expect(mockClient("claude", 41)).toBe(mockClient("claude", 41));
     expect(seedAccounts().map((a) => a.id)).toEqual(seedAccounts().map((a) => a.id));
   });
 
@@ -385,6 +387,22 @@ describe("request error classifier", () => {
   });
 });
 
+describe("mock clients", () => {
+  it("puts Claude Code and Codex on their own APIs, and no tool on a row without an endpoint", () => {
+    const seeded = seedRequests(mockNowUnix(), 320);
+    const clients = new Set(seeded.map((r) => r.client));
+    expect(clients).toEqual(
+      new Set(["claude-code", "codex", "opencode", "cline", "roo-code", "kilo-code", undefined]),
+    );
+    for (const row of seeded) {
+      if (row.client === "claude-code") expect(row.endpoint).toBe("claude");
+      if (row.client === "codex") expect(row.endpoint).toBe("responses");
+      if (!row.endpoint) expect(row.client).toBeUndefined();
+    }
+    expect(mockClient(undefined, 7)).toBeUndefined();
+  });
+});
+
 describe("full dataset (the browser default, polished for screenshots)", () => {
   const now = mockNowUnix();
   const started = performance.now();
@@ -405,6 +423,26 @@ describe("full dataset (the browser default, polished for screenshots)", () => {
     expect(again.accounts.map((a) => a.id)).toEqual(full.accounts.map((a) => a.id));
     expect(again.requests.slice(0, 50)).toEqual(full.requests.slice(0, 50));
     expect(new Set(full.accounts.map((a) => a.id)).size).toBe(full.accounts.length);
+  });
+
+  it("names a realistic mix of coding tools, each on the API it calls", () => {
+    const clients = values(full.requests, (r) => r.client);
+    for (const client of ["claude-code", "codex", "opencode", "cline", "roo-code", "kilo-code"]) {
+      expect(clients).toContain(client);
+    }
+    // Some calls come from no tool the server knows (an SDK script).
+    expect(clients).toContain(undefined);
+    const of = (client: string) =>
+      values(
+        full.requests.filter((r) => r.client === client),
+        (r) => r.endpoint,
+      );
+    expect(of("claude-code")).toEqual(new Set(["claude"]));
+    expect(of("codex")).toEqual(new Set(["responses"]));
+    const claude = full.requests.filter((r) => r.endpoint === "claude");
+    const share = claude.filter((r) => r.client === "claude-code").length / claude.length;
+    expect(share).toBeGreaterThan(0.45);
+    expect(share).toBeLessThan(0.75);
   });
 
   it("covers every account state", () => {

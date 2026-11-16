@@ -3,10 +3,12 @@ package proxy
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 	"kiro-proxy/logger"
 )
 
@@ -483,11 +486,23 @@ func apiUserUsage(w http.ResponseWriter, r *http.Request, entry config.ApiKeyEnt
 	_, _ = w.Write(body)
 }
 
-// userUsage is the admin usage response for rng with only entry's row in it.
-func userUsage(rng usageRange, tz int, entry config.ApiKeyEntry) (apiKeyUsageResponse, error) {
-	resp, err := queryApiKeyUsage(observeNow(), rng, tz, config.ListApiKeys())
+// userUsageResponse is the admin usage response for one key, with the stretch before its window
+// to compare against.
+type userUsageResponse struct {
+	apiKeyUsageResponse
+	// Previous is the key's usage over the stretch before the window (userUsagePrevious); nil
+	// for all time, which has nothing before it.
+	Previous *apiKeyUsageTotals `json:"previous,omitempty"`
+}
+
+// userUsage is the admin usage response for rng with only entry's row in it, and the stretch
+// before it.
+func userUsage(rng usageRange, tz int, entry config.ApiKeyEntry) (userUsageResponse, error) {
+	now := observeNow()
+	keys := config.ListApiKeys()
+	resp, err := queryApiKeyUsage(now, rng, tz, keys)
 	if err != nil {
-		return resp, err
+		return userUsageResponse{apiKeyUsageResponse: resp}, err
 	}
 	own := apiKeyUsageEntry{
 		ID:        entry.ID,
@@ -504,7 +519,114 @@ func userUsage(rng usageRange, tz int, entry config.ApiKeyEntry) (apiKeyUsageRes
 	resp.Keys = []apiKeyUsageEntry{own}
 	resp.Totals = own.Totals
 	resp.Earlier = own.Earlier
-	return resp, nil
+	previous, err := userUsagePrevious(now, rng, tz, keys, entry)
+	return userUsageResponse{apiKeyUsageResponse: resp, Previous: previous}, err
+}
+
+// userUsagePrevious is entry's usage over the stretch just before rng's window, as long as the
+// part of the window that has passed: the window runs from its first bucket to now, so the
+// stretch is [from-span, now-span] for a window of span seconds. Equal stretches, as the Overview
+// compares the last hour with the hour before, keep a window whose last bucket has just begun from
+// reading as a fall. Rows log retention pruned count from their day's totals, in proportion to the
+// part of that day the stretch covers. All time has no stretch before it: nil.
+func userUsagePrevious(now time.Time, rng usageRange, tz int, keys []config.ApiKeyEntry, entry config.ApiKeyEntry) (*apiKeyUsageTotals, error) {
+	if rng.name == usageRangeAll {
+		return nil, nil
+	}
+	span := rng.bucketSec * int64(rng.buckets)
+	off := int64(tz) * 60
+	from := ((now.Unix()+off)/rng.bucketSec-int64(rng.buckets)+1)*rng.bucketSec - off
+	start, end := from-span, now.Unix()+1-span
+
+	d, err := db.Get()
+	if err != nil {
+		return nil, err
+	}
+	//! One transaction: a prune between the log and the rollup reads would count a row twice or
+	//! miss it.
+	tx, err := d.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	c := newUsageCollector(keys, 1)
+	slot, slotArgs := usageSlotSQL(keys)
+	rows, err := tx.Query(`SELECT
+api_key_id,
+`+slot+` AS slot,
+COUNT(*),
+COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0),
+COALESCE(SUM(in_tokens), 0),
+COALESCE(SUM(out_tokens), 0),
+COALESCE(SUM(credits), 0)
+FROM requests
+WHERE ts >= ? AND ts < ?
+GROUP BY api_key_id, slot`, append(slotArgs, start, end)...)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var (
+			keyID string
+			slot  int
+			t     apiKeyUsageTotals
+		)
+		if err := rows.Scan(&keyID, &slot, &t.Requests, &t.Succeeded, &t.InTokens, &t.OutTokens, &t.Credits); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		c.add(c.entry(keyID, slot), 0, t)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Retention prunes the oldest rows first, so every pruned row is older than the oldest one
+	// left: a stretch that starts at or after it has nothing pruned in it.
+	var oldest sql.NullInt64
+	if err := tx.QueryRow(`SELECT MIN(ts) FROM requests`).Scan(&oldest); err != nil {
+		return nil, err
+	}
+	if !oldest.Valid || oldest.Int64 > start {
+		err := scanRollupUsageDays(tx, floorDiv(start, daySeconds), floorDiv(end-1, daySeconds), func(day int64, keyID string, keyless bool, t apiKeyUsageTotals) {
+			// A pruned day's rows lie in its UTC day, before the oldest row the log still has.
+			dayStart, dayEnd := day*daySeconds, (day+1)*daySeconds
+			if oldest.Valid && oldest.Int64 > dayStart && oldest.Int64 < dayEnd {
+				dayEnd = oldest.Int64
+			}
+			covered := min(end, dayEnd) - max(start, dayStart)
+			if covered <= 0 {
+				return
+			}
+			c.add(c.entry(keyID, rollupUsageSlot(keyID, keyless)), 0, scaleUsageTotals(t, float64(covered)/float64(dayEnd-dayStart)))
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	previous := apiKeyUsageTotals{}
+	if e, ok := c.entries[usageKindKey+":"+entry.ID]; ok {
+		previous = e.Totals
+	}
+	return &previous, nil
+}
+
+// scaleUsageTotals is share of t, counts rounded; a share of 1 or more is t itself.
+func scaleUsageTotals(t apiKeyUsageTotals, share float64) apiKeyUsageTotals {
+	if share >= 1 {
+		return t
+	}
+	scale := func(n int64) int64 { return int64(math.Round(float64(n) * share)) }
+	return apiKeyUsageTotals{
+		Requests:  scale(t.Requests),
+		Succeeded: scale(t.Succeeded),
+		InTokens:  scale(t.InTokens),
+		OutTokens: scale(t.OutTokens),
+		Credits:   t.Credits * share,
+	}
 }
 
 // apiUserUsageBreakdown serves GET /user/api/usage/breakdown: this key's usage by model. The
@@ -532,6 +654,7 @@ type userRequestView struct {
 	TS               int64   `json:"ts"`
 	Model            string  `json:"model"`
 	Endpoint         string  `json:"endpoint"`
+	Client           string  `json:"client"`
 	InTokens         int     `json:"inTokens"`
 	OutTokens        int     `json:"outTokens"`
 	TotalTokens      int     `json:"totalTokens"`
@@ -610,6 +733,7 @@ func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKey
 			TS:               rec.TS,
 			Model:            rec.Model,
 			Endpoint:         rec.Endpoint,
+			Client:           rec.Client,
 			InTokens:         rec.InTokens,
 			OutTokens:        rec.OutTokens,
 			TotalTokens:      rec.TotalTokens,

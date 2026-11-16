@@ -168,7 +168,7 @@ describe("data at the edges", () => {
     await renderPanel("API key");
   });
 
-  it("shows counters in the billions in full in the limits and compact in the totals", async () => {
+  it("shows counters in the billions in full on the meters and compact on the cards", async () => {
     serve({
       key: keyBody({ tokensUsed: 4_999_999_999, tokenLimit: 10_000_000_000 }),
       usage: usageBody(
@@ -176,10 +176,12 @@ describe("data at the edges", () => {
       ),
     });
     await renderPanel();
-    const limits = region("Limits");
-    expect(within(limits).getByText("4,999,999,999 / 10,000,000,000")).toBeInTheDocument();
-    expect(within(limits).getByText("49.9%")).toBeInTheDocument();
     const usage = region("Usage");
+    expect(
+      within(usage).getByRole("meter", { name: "Tokens used: 4,999,999,999 of 10,000,000,000" }),
+    ).toBeInTheDocument();
+    expect(within(usage).getByText("5B of 10B")).toBeInTheDocument();
+    expect(within(usage).getByText("50% of key limit")).toBeInTheDocument();
     expect(await within(usage).findByText("1,234,567,890")).toBeInTheDocument();
     expect(within(usage).getByText("2.5B")).toBeInTheDocument();
   });
@@ -196,15 +198,17 @@ describe("data at the edges", () => {
       }),
     });
     await renderPanel();
-    const limits = region("Limits");
-    expect(within(limits).getByText("12 used")).toBeInTheDocument();
-    expect(within(limits).getByText("50.00 / 50.00")).toBeInTheDocument();
-    expect(within(limits).getByText("15 / 10")).toBeInTheDocument();
-    expect(within(limits).getAllByText("Limit reached")).toHaveLength(2);
-    expect(within(limits).getAllByText("100.0%")).toHaveLength(2);
-    // The overrun meter stops at full instead of drawing past its track.
-    const meters = within(limits).getAllByRole("meter");
-    expect(meters.at(-1)).toHaveAttribute("aria-valuenow", "10");
+    const usage = region("Usage");
+    expect(within(usage).getByText("12 since created")).toBeInTheDocument();
+    expect(within(usage).getByText("No key limit")).toBeInTheDocument();
+    expect(within(usage).getByText("50.00 of 50.00")).toBeInTheDocument();
+    expect(within(usage).getByText("Limit reached · 100%")).toBeInTheDocument();
+    expect(within(usage).getByText("15 of 10")).toBeInTheDocument();
+    expect(within(usage).getByText("Limit reached · 150%")).toBeInTheDocument();
+    // The overrun meter (calls, under Requests) stops at full instead of drawing past its track.
+    const meters = within(usage).getAllByRole("meter");
+    expect(meters).toHaveLength(2);
+    expect(meters[0]).toHaveAttribute("aria-valuenow", "10");
   });
 
   it.each([
@@ -221,9 +225,14 @@ describe("data at the edges", () => {
     const models = [long, ...Array.from({ length: 39 }, (_, index) => `model-${index}`)];
     serve({ key: keyBody({ allowedModels: models }) });
     await renderPanel();
-    const value = within(region("Key details")).getByText(new RegExp(`^${long}`));
-    for (const model of models) expect(value).toHaveTextContent(model);
-    expect(value).toHaveClass("wrap-anywhere");
+    const list = within(region("Key details")).getByRole("list", { name: "Allowed models" });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(models);
+    // A long ID is cut to the strip, with the whole of it as a tooltip.
+    expect(within(list).getByText(long)).toHaveClass("truncate");
     const code = region("Client setup").querySelector("pre")?.textContent ?? "";
     expect(code).toContain(`"model": "${long}"`);
   });
@@ -234,7 +243,7 @@ describe("data at the edges", () => {
       usage: usageBody(totals({ requests: 3, succeeded: 3, credits: 123_456.789 })),
     });
     await renderPanel();
-    expect(within(region("Limits")).getByText("<0.01 used")).toBeInTheDocument();
+    expect(within(region("Usage")).getByText("<0.01 since created")).toBeInTheDocument();
     expect(await within(region("Usage")).findByText("123,456.79")).toBeInTheDocument();
   });
 
@@ -280,21 +289,23 @@ describe("data at the edges", () => {
     await renderPanel();
     const body = await tableRows();
     const cells = (index: number) => within(body[index] as HTMLElement);
-    // As on Requests, the duration, endpoint and error type each sit in their own column and,
-    // for a narrower card, under the credits, model and status: two copies each.
+    // As on Requests, the duration sits in its own column and, for a narrower card, under the
+    // credits: two copies. The caller (here the endpoint's API) rides under the model.
     expect(cells(0).getAllByText("0ms")).toHaveLength(2);
     expect(cells(1).getAllByText("999ms")).toHaveLength(2);
-    expect(cells(1).getAllByText("OpenAI")).toHaveLength(2);
+    expect(cells(1).getByText("OpenAI Chat")).toBeInTheDocument();
     expect(cells(2).getAllByText("59.9s")).toHaveLength(2);
-    expect(cells(2).getAllByText("Responses")).toHaveLength(2);
+    expect(cells(2).getByText("Responses")).toBeInTheDocument();
     expect(cells(3).getAllByText("2h")).toHaveLength(2);
     // An endpoint this UI does not know shows nothing rather than a raw value.
     expect(cells(3).queryByText("grpc")).not.toBeInTheDocument();
     // No model and no endpoint (a row logged before either was): dashes, no "0ms".
     expect(cells(4).getAllByText("—").length).toBeGreaterThanOrEqual(2);
     errorTypes.forEach(([, label], index) => {
-      expect(cells(5 + index).getByText(`Failed ${400 + index}`)).toBeInTheDocument();
-      expect(cells(5 + index).getAllByText(label)).toHaveLength(2);
+      expect(cells(5 + index).getByText(`Failed ${400 + index}`)).toHaveClass("sr-only");
+      // Under the time for a narrower card; in the Error column's pill with the status.
+      expect(cells(5 + index).getByText(label)).toBeInTheDocument();
+      expect(cells(5 + index).getByText(`${label} · ${400 + index}`)).toBeInTheDocument();
     });
   });
 
@@ -341,11 +352,17 @@ describe("empty and partial data", () => {
     expect(await screen.findAllByText("No usage in this range")).not.toHaveLength(0);
   });
 
-  it("shows a dash for the failed share of a range whose entry is all zeros", async () => {
-    serve({ usage: usageBody(totals()) });
+  it("compares a quiet range with the busy stretch before it, with no failure rate", async () => {
+    serve({ usage: { ...usageBody(totals()), previous: totals({ requests: 4, succeeded: 4 }) } });
     await renderPanel();
     const usage = region("Usage");
-    await waitFor(() => expect(within(usage).getByText("—")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(usage).getByText(/vs previous 24 hours/).parentElement).toHaveTextContent(
+        "−100% vs previous 24 hours",
+      ),
+    );
+    expect(within(usage).getByText("Nothing failed")).toBeInTheDocument();
+    expect(within(usage).queryByText(/\d failed$/)).not.toBeInTheDocument();
   });
 
   it("says a breakdown without models has no usage", async () => {
@@ -464,8 +481,8 @@ describe("one request failing", () => {
         expect(await screen.findByRole("heading", { level: 1, name: "edge" })).toBeInTheDocument();
       }
       if (route === "usage") {
-        // The headline numbers say they did not load instead of staying loading bars.
-        expect(within(region("Usage")).getByText("Not loaded")).toBeInTheDocument();
+        // The four cards say they did not load instead of staying loading bars.
+        expect(within(region("Usage")).getAllByText("Not loaded")).toHaveLength(4);
       }
       fail = false;
       await user.click(within(alert).getByRole("button", { name: "Try again" }));
@@ -513,7 +530,11 @@ describe("one request failing", () => {
     await renderApp("/user", { authed: false });
     const busyHeader = document.querySelector("[aria-busy=true]");
     expect(busyHeader).not.toBeNull();
-    expect(within(region("Limits")).getAllByText(/Tokens|Credits|Calls/)).toHaveLength(3);
+    // The usage cards and the key facts keep their places, as bars.
+    expect(within(region("Usage")).getAllByText(/^(Requests|Failed|Credits|Tokens)$/)).toHaveLength(
+      4,
+    );
+    expect(within(region("Key details")).getAllByRole("term")).toHaveLength(5);
     await screen.findByRole("heading", { level: 1, name: "edge" });
   });
 

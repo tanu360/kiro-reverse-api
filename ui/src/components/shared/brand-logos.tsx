@@ -58,6 +58,72 @@ export function CodexLogo(props: LogoProps): JSX.Element {
   );
 }
 
+/**
+ * Claude Code's mascot, Clawd (the orange pixel crab). Source: LobeHub icons,
+ * `@lobehub/icons-static-svg` 1.102.0 `claudecode-color.svg`; MIT.
+ */
+export function ClaudeCodeLogo(props: LogoProps): JSX.Element {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" {...props}>
+      <path
+        clipRule="evenodd"
+        d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"
+        fill="#D97757"
+        fillRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+/*
+ * Coding tools that call the proxy, for the Requests table's client line. Source: LobeHub icons,
+ * `@lobehub/icons-static-svg` 1.102.0 (`opencode.svg`, `cline.svg`, `roocode.svg`,
+ * `kilocode.svg`); MIT. One colour each: they fill with `currentColor`, so they follow the text.
+ */
+
+export function OpencodeLogo(props: LogoProps): JSX.Element {
+  return (
+    <svg aria-hidden="true" fill="currentColor" focusable="false" viewBox="0 0 24 24" {...props}>
+      <path d="M16 6H8v12h8V6zm4 16H4V2h16v20z" fillRule="evenodd" />
+    </svg>
+  );
+}
+
+export function ClineLogo(props: LogoProps): JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="currentColor"
+      fillRule="evenodd"
+      focusable="false"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <path d="M17.035 3.991c2.75 0 4.98 2.24 4.98 5.003v1.667l1.45 2.896a1.01 1.01 0 01-.002.909l-1.448 2.864v1.668c0 2.762-2.23 5.002-4.98 5.002H7.074c-2.751 0-4.98-2.24-4.98-5.002V17.33l-1.48-2.855a1.01 1.01 0 01-.003-.927l1.482-2.887V8.994c0-2.763 2.23-5.003 4.98-5.003h9.962zM8.265 9.6a2.274 2.274 0 00-2.274 2.274v4.042a2.274 2.274 0 004.547 0v-4.042A2.274 2.274 0 008.265 9.6zm7.326 0a2.274 2.274 0 00-2.274 2.274v4.042a2.274 2.274 0 104.548 0v-4.042A2.274 2.274 0 0015.59 9.6z" />
+      <path d="M12.054 5.558a2.779 2.779 0 100-5.558 2.779 2.779 0 000 5.558z" />
+    </svg>
+  );
+}
+
+export function RooCodeLogo(props: LogoProps): JSX.Element {
+  return (
+    <svg aria-hidden="true" fill="currentColor" focusable="false" viewBox="0 0 24 24" {...props}>
+      <path d="M20.113 5.5l-.442 1.557a.157.157 0 01-.196.106l-7.414-2.157a.16.16 0 00-.143.028l-7.342 5.74a.159.159 0 01-.074.032l-4.37.656a.154.154 0 00-.132.162l.02.245c.005.078.071.14.152.141l5.074.128.058.002 3.75-1.953a.16.16 0 01.164.01l2.657 1.847a.152.152 0 01.066.125l-.023 2.45c0 .032.01.063.028.089l3.737 5.227c.03.04.077.065.129.065h1.182a.153.153 0 00.14-.224l-2.664-4.919a.15.15 0 01.005-.152l1.389-2.169a.156.156 0 01.062-.055l4.965-2.456a.16.16 0 01.158.01l1.418.921a.16.16 0 00.087.026h1.289c.125 0 .2-.136.13-.237l-3.578-5.29c-.074-.109-.246-.082-.282.044z" />
+    </svg>
+  );
+}
+
+export function KiloCodeLogo(props: LogoProps): JSX.Element {
+  return (
+    <svg aria-hidden="true" fill="currentColor" focusable="false" viewBox="0 0 24 24" {...props}>
+      <path
+        d="M0 0v24h24V0H0zm22.222 22.222H1.778V1.778h20.444v20.444zm-7.555-4.964h2.222v1.778h-2.794L12.89 17.83v-2.794h1.778v2.222zm4 0h-1.778v-2.222h-2.222v-1.778h2.793l1.207 1.207v2.793zm-7.556-2.591H9.333v-1.778h1.778v1.778zm-5.778-1.778h1.778v4h4v1.778H6.54L5.333 17.46V12.89zm13.334-3.556v1.778h-5.778V9.333h1.987V7.111h-1.987V5.333h2.558l1.206 1.207v2.793h2.014zm-11.556-2h2.222l1.778 1.778v2H9.333v-2H7.111v2H5.333V5.333h1.778v2zm4 0H9.333v-2h1.778v2z"
+        fillRule="evenodd"
+      />
+    </svg>
+  );
+}
+
 /** Kiro. Source: LobeHub icons, `@lobehub/icons-static-svg` 1.102.0 `kiro-color.svg`; MIT. */
 export function KiroLogo({ className, ...props }: LogoProps): JSX.Element {
   // The mark is a tile: it rounds its own box (rounded-xs), so callers do not round it.

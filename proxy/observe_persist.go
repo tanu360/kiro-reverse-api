@@ -20,11 +20,11 @@ func persistRequestRecord(rec requestRecord) (int64, error) {
 		success = 1
 	}
 	res, err := d.Exec(`INSERT INTO requests
-(ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash, conversation_id, replay_of)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+(ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash, conversation_id, replay_of, client)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.TS, rec.AccountID, rec.APIKeyID, rec.APIKey, rec.Email, rec.Model, rec.InTokens, rec.OutTokens, rec.TotalTokens,
 		rec.Credits, success, rec.Status, rec.Message, rec.Endpoint, rec.DurationMs, rec.ErrorType, rec.CacheRead, rec.CacheWrite, encodeAttempts(rec.Attempts), rec.RequestID, rec.APIKeyHash,
-		rec.ConversationID, rec.ReplayOf)
+		rec.ConversationID, rec.ReplayOf, rec.Client)
 	if err != nil {
 		return 0, err
 	}
@@ -132,7 +132,7 @@ func enqueuePersistRequestRecord(rec requestRecord) int64 {
 }
 
 // requestColumns is the SELECT list scanRequestRow reads, in its order.
-const requestColumns = `id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash, conversation_id, replay_of, EXISTS(SELECT 1 FROM request_bodies b WHERE b.request_id = requests.id)`
+const requestColumns = `id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash, conversation_id, replay_of, client, EXISTS(SELECT 1 FROM request_bodies b WHERE b.request_id = requests.id)`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -141,7 +141,7 @@ func scanRequestRow(rows rowScanner) (requestRecord, error) {
 	var rec requestRecord
 	var success, hasBody int
 	var attemptsJSON string
-	if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType, &rec.CacheRead, &rec.CacheWrite, &attemptsJSON, &rec.RequestID, &rec.APIKeyHash, &rec.ConversationID, &rec.ReplayOf, &hasBody); err != nil {
+	if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType, &rec.CacheRead, &rec.CacheWrite, &attemptsJSON, &rec.RequestID, &rec.APIKeyHash, &rec.ConversationID, &rec.ReplayOf, &rec.Client, &hasBody); err != nil {
 		return rec, err
 	}
 	rec.Success = success == 1

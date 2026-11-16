@@ -1,46 +1,48 @@
 import { CircleXIcon } from "@hugeicons/core-free-icons";
 import { type JSX, useMemo } from "react";
-import { CreditAmount } from "@/components/shared/credit-amount";
 import type { DataTableColumn } from "@/components/shared/data-table";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { ListCard } from "@/components/shared/list-card";
+import { ModelLogo } from "@/components/shared/model-logo";
 import { StatusDot } from "@/components/shared/status-dot";
-import { TokenCell } from "@/components/shared/token-cell";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RequestRecord } from "@/lib/api/types";
-import {
-  EMPTY,
-  formatCompact,
-  formatCredits,
-  formatDateTime,
-  formatDurationMs,
-  formatTime,
-  unixToDate,
-} from "@/lib/format";
-import { type Lang, type TFunction, useT } from "@/lib/i18n";
-import { useMaskText } from "@/lib/privacy";
+import { EMPTY, formatDateTime } from "@/lib/format";
+import { type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ErrorTypeLabel } from "./error-type-badge";
-import { requestProxyText } from "./proxy-failure";
-import { formatRowDate, isKnownEndpoint, normalizeApiKeyMask } from "./request-model";
+import {
+  CreditsChip,
+  DurationChip,
+  ErrorMessage,
+  ErrorPill,
+  Muted,
+  Rail,
+  StatusNode,
+  TokenFigures,
+  TokenTotalBar,
+  TokenUsage,
+  usedNoTokens,
+  WhenInline,
+  WhenStack,
+} from "./request-cells";
+import { CallerLabel, requestCaller } from "./request-client";
+import { isKnownEndpoint, normalizeApiKeyMask } from "./request-model";
 
 /*
  * Width caps that keep the table inside a 1024 px desktop with the sidebar open (and a 768-820 px
- * tablet): names and the token breakdown cut with an ellipsis (tooltips carry the full text) until
+ * tablet): names and the token figures cut with an ellipsis (tooltips carry the full text) until
  * the 7xl container step has room for them.
  */
 const NAME_CAP = "max-w-28 @5xl/requests:max-w-32 @7xl/requests:max-w-40";
 // Model IDs differ only in their version suffix, so the model gets more room than the token line.
 // No 112 px step: at 1024 px with the sidebar open it cut every claude-sonnet-* to the same text.
 const MODEL_CAP = "max-w-32 @5xl/requests:max-w-40 @7xl/requests:max-w-48";
-const TOKENS_CAP =
-  "max-w-30 @3xl/requests:max-w-36 @5xl/requests:max-w-44 @7xl/requests:max-w-none";
-
-function Muted({ children = EMPTY }: { children?: string }): JSX.Element {
-  return <span className="text-muted-foreground">{children}</span>;
-}
+// Without the Account and API key columns (a key holder's table) the model has their room.
+const MODEL_CAP_WIDE = "max-w-40 @5xl/requests:max-w-56 @7xl/requests:max-w-72";
+// One width per step, so every row's bar has the same length (each scaled to its own total).
+const TOKENS_WIDTH = "w-40 @5xl/requests:w-44 @7xl/requests:w-52";
 
 /** What the rows show beyond the request itself; both default to true (the Requests page). */
 export interface RequestViewOptions {
@@ -103,71 +105,6 @@ export function endpointLabel(endpoint: string | undefined, t: TFunction): strin
 }
 
 /**
- * A failure's message: for a Proxy error the plain sentence its Attempts show, otherwise the
- * error the client got. `raw` is always the client's error, for the tooltip.
- */
-function useErrorMessage(record: RequestRecord): { text: string; raw: string } {
-  const { t } = useT("requests");
-  const maskText = useMaskText();
-  const raw = maskText(record.message) || t("noErrorMessage");
-  return { text: requestProxyText(record, t) ?? raw, raw };
-}
-
-/**
- * The category over a two-line message; the tooltip holds the whole message (for a Proxy error,
- * the error the client got behind the plain sentence).
- */
-function ErrorCell({
-  record,
-  showMessage,
-}: {
-  record: RequestRecord;
-  showMessage: boolean;
-}): JSX.Element {
-  const { text: message, raw } = useErrorMessage(record);
-  if (record.success) return <Muted />;
-  return (
-    <div className="flex min-w-32 max-w-72 flex-col items-start gap-1">
-      <ErrorTypeLabel className="text-meta" type={record.errorType} />
-      {showMessage ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              // `wrap-anywhere`, not `wrap-break-word`: an unbroken token (a JSON body, a URL) would
-              // otherwise set the column's minimum width and scroll the table sideways at 1440 px.
-              <span className="line-clamp-2 whitespace-normal text-meta text-muted-foreground leading-snug wrap-anywhere" />
-            }
-          >
-            {message}
-          </TooltipTrigger>
-          <TooltipPopup className="max-w-sm whitespace-pre-wrap wrap-break-word">
-            {raw}
-          </TooltipPopup>
-        </Tooltip>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * The status pill; below a 64rem container (where the Error column is hidden) the error
- * category rides under it.
- */
-function StatusCell({ record }: { record: RequestRecord }): JSX.Element {
-  return (
-    <span className="flex flex-col items-start gap-1">
-      <StatusBadge record={record} />
-      {!record.success && record.errorType ? (
-        <ErrorTypeLabel
-          className="max-w-28 text-meta text-muted-foreground @5xl/requests:hidden"
-          type={record.errorType}
-        />
-      ) : null}
-    </span>
-  );
-}
-
-/**
  * Account over API key. The key has its own column from a 68rem (1088 px) container up; below it
  * the key rides here as a meta line.
  */
@@ -187,79 +124,82 @@ function AccountCell({ record }: { record: RequestRecord }): JSX.Element {
 }
 
 /**
- * Model over endpoint. The endpoint has its own column from the 7xl container width up; below
- * it the endpoint rides here as a meta line, like the date under the time.
+ * The status node on the time rail, beside the age over the clock time. Below a 56rem container
+ * (where the Error column is hidden) a failure's category rides under them.
  */
-function ModelCell({ record }: { record: RequestRecord }): JSX.Element {
-  const { t } = useT("requests");
-  const endpoint = endpointLabel(record.endpoint, t);
+function TimeCell({ record }: { record: RequestRecord }): JSX.Element {
   return (
-    <span className="flex min-w-0 flex-col items-start gap-1">
+    <>
+      <Rail variant="table" />
+      <span className="flex items-center gap-3">
+        <StatusNode record={record} />
+        <WhenStack record={record}>
+          {!record.success && record.errorType ? (
+            <ErrorTypeLabel
+              className="max-w-24 text-meta text-muted-foreground @4xl/requests:hidden"
+              type={record.errorType}
+            />
+          ) : null}
+        </WhenStack>
+      </span>
+    </>
+  );
+}
+
+/** The model's mark and name over the caller: the coding tool, else the client API. */
+function ModelCell({ record, cap }: { record: RequestRecord; cap: string }): JSX.Element {
+  return (
+    <span className="flex min-w-0 flex-col gap-1">
       {record.model ? (
-        <TruncatedText className={MODEL_CAP}>{record.model}</TruncatedText>
+        <span className="flex min-w-0 items-center gap-2">
+          <ModelLogo model={record.model} />
+          <TruncatedText className={cn("font-medium", cap)}>{record.model}</TruncatedText>
+        </span>
       ) : (
         <Muted />
       )}
-      {endpoint === EMPTY ? null : (
-        <span className="text-meta text-muted-foreground @7xl/requests:hidden">{endpoint}</span>
-      )}
+      <CallerLabel
+        className={cn("text-meta text-muted-foreground", record.model && "ps-6")}
+        record={record}
+      />
     </span>
   );
 }
 
-/** Credits; below a 64rem container (no Duration column) the duration rides under them. */
+/** The credits chip; below a 56rem container (no Duration column) the duration chip under it. */
 function CreditsCell({ record }: { record: RequestRecord }): JSX.Element {
-  const { lang } = useT("requests");
-  const duration = formatDurationMs(record.durationMs, Boolean(record.endpoint), lang);
   return (
-    <span className="flex flex-col items-end gap-1">
-      {!record.success && record.credits === 0 ? (
-        <Muted />
-      ) : (
-        <CreditAmount value={record.credits} />
-      )}
-      <span className="text-meta text-muted-foreground @5xl/requests:hidden">{duration}</span>
+    <span className="flex flex-col items-start gap-1">
+      <CreditsChip record={record} />
+      <span className="@4xl/requests:hidden">
+        <DurationChip record={record} />
+      </span>
+    </span>
+  );
+}
+
+/** The category pill over the message (the message on the admin table only, from 64rem). */
+function ErrorCell({
+  record,
+  showMessage,
+}: {
+  record: RequestRecord;
+  showMessage: boolean;
+}): JSX.Element {
+  if (record.success) return <Muted />;
+  return (
+    <span className="flex min-w-0 max-w-40 flex-col items-start gap-1 @7xl/requests:max-w-64">
+      <ErrorPill record={record} />
+      {showMessage ? <ErrorMessage className="hidden @5xl/requests:block" record={record} /> : null}
     </span>
   );
 }
 
 /**
- * Time over date: two short lines keep the column narrow. `inline` puts them on one line (a
- * card's title). The year shows on older rows, so no tooltip is needed.
- */
-function TimeCell({
-  ts,
-  lang,
-  inline = false,
-}: {
-  ts: number;
-  lang: Lang;
-  inline?: boolean;
-}): JSX.Element {
-  //! A row without a time (a key holder's API sends 0 for none) read as 1 January 1970.
-  if (!ts) return <Muted />;
-  const dateTime = unixToDate(ts).toISOString();
-  if (inline) {
-    return (
-      <time className="tabular-nums" dateTime={dateTime}>
-        {formatTime(ts, lang)}{" "}
-        <span className="font-normal text-muted-foreground">{formatRowDate(ts, lang)}</span>
-      </time>
-    );
-  }
-  return (
-    <time className="flex flex-col gap-1 tabular-nums" dateTime={dateTime}>
-      <span>{formatTime(ts, lang)}</span>
-      <span className="text-meta text-muted-foreground">{formatRowDate(ts, lang)}</span>
-    </time>
-  );
-}
-
-/**
- * A request as a list row, for narrow containers: time and status, the account, the model and
- * endpoint, then tokens, credits and duration on one muted line. A failure adds its category and
- * a two-line message. With `onOpen` the whole row opens the detail sheet; without it the row is
- * plain text.
+ * A request as a list row, for narrow containers: the status node and the age, then (indented
+ * past the node) the model and caller, the token bar with the credits and duration chips, the
+ * four token counts, the account, and a failure's category and message. With `onOpen` the whole
+ * row opens the detail sheet; without it the row is plain text.
  */
 export function RequestCard({
   record,
@@ -271,61 +211,76 @@ export function RequestCard({
   onOpen?: () => void;
 } & RequestViewOptions): JSX.Element {
   const { t, lang } = useT("requests");
-  const { text: message } = useErrorMessage(record);
-  const endpoint = endpointLabel(record.endpoint, t);
-  const failed = !record.success;
-  const total = record.inTokens + record.outTokens;
-  const duration = formatDurationMs(record.durationMs, Boolean(record.endpoint), lang);
-  const figures = [
-    failed && total === 0
-      ? null
-      : t("card.tokens", { count: total, value: formatCompact(total, lang) }),
-    failed && record.credits === 0
-      ? null
-      : t("card.credits", { value: formatCredits(record.credits, 2, lang) }),
-    duration === EMPTY ? null : duration,
-  ].filter((part): part is string => part !== null);
-
+  const tokens = !usedNoTokens(record);
   return (
     <ListCard
-      badge={<StatusBadge record={record} />}
-      meta={accounts ? <DisplayEmail email={record.email} id={record.accountId} /> : undefined}
+      leading={<StatusNode record={record} />}
       onOpen={onOpen}
       openLabel={onOpen ? t("detail.open", { time: formatDateTime(record.ts, lang) }) : undefined}
-      title={<TimeCell inline lang={lang} ts={record.ts} />}
+      title={<WhenInline record={record} />}
       variant="row"
     >
-      <div className="flex min-w-0 items-baseline gap-2 text-sm">
-        {record.model ? <span className="min-w-0 truncate">{record.model}</span> : <Muted />}
-        {endpoint === EMPTY ? null : (
-          <span className="shrink-0 text-meta text-muted-foreground">{endpoint}</span>
-        )}
-      </div>
-      {figures.length > 0 ? (
-        <p className="truncate text-meta text-muted-foreground tabular-nums">
-          {figures.join(" · ")}
-        </p>
-      ) : null}
-      {failed ? (
-        <div className="flex min-w-0 flex-col items-start gap-1">
-          <ErrorTypeLabel className="text-meta" type={record.errorType} />
-          {messages ? (
-            <p className="line-clamp-2 text-meta text-muted-foreground wrap-anywhere">{message}</p>
+      <Rail variant="card" />
+      {/* Past the node (20 px and the header's 8 px gap), so the rail runs clear of the text. */}
+      <div className="flex min-w-0 flex-col gap-2 ps-7">
+        <div className="flex min-w-0 items-center gap-1.5 text-meta text-muted-foreground">
+          {record.model ? (
+            <>
+              <ModelLogo className="size-3.5" model={record.model} />
+              <span className="min-w-0 truncate font-medium text-foreground">{record.model}</span>
+            </>
+          ) : (
+            <Muted />
+          )}
+          {requestCaller(record) ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <CallerLabel className="shrink-0" record={record} />
+            </>
           ) : null}
         </div>
-      ) : null}
+        <div className="flex min-w-0 items-center gap-2 text-sm">
+          {tokens ? <TokenTotalBar className="flex-1" record={record} /> : null}
+          <div className={cn("flex shrink-0 items-center gap-1", !tokens && "flex-1")}>
+            {record.success || record.credits > 0 ? <CreditsChip record={record} /> : null}
+            <DurationChip record={record} />
+          </div>
+        </div>
+        {tokens ? <TokenFigures record={record} /> : null}
+        {accounts ? (
+          <DisplayEmail
+            className="text-meta text-muted-foreground"
+            email={record.email}
+            id={record.accountId}
+          />
+        ) : null}
+        {record.success ? null : (
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <ErrorPill record={record} />
+            {messages ? (
+              <ErrorMessage
+                className="line-clamp-2 whitespace-normal wrap-anywhere"
+                record={record}
+              />
+            ) : null}
+          </div>
+        )}
+      </div>
     </ListCard>
   );
 }
 
-// Tighter cell padding than the table default for the middle columns, so the ten columns fit a
-// 1440 px desktop with the sidebar open; the first and last cells take the card's side padding
+// Tighter cell padding than the table default for the middle columns, so the eight columns fit
+// a 1440 px desktop with the sidebar open; the first and last cells take the card's side padding
 // (DataTableCard insets them), and wide containers get the default padding back.
 const COMPACT_PADDING = "px-2 @7xl/requests:px-2.5";
-// Below a 64rem container Credits is the last column shown (Duration and Error are hidden), so it
+// Below a 56rem container Credits is the last column shown (Duration and Error are hidden), so it
 // takes the card's end padding, as the inset gives the real last cell.
-const CREDITS_END = "pe-4 sm:pe-6 @5xl/requests:pe-2 @7xl/requests:pe-2.5";
-const WIDE_ONLY = "hidden @5xl/requests:table-cell";
+const CREDITS_END = "pe-4 sm:pe-6 @4xl/requests:pe-2 @7xl/requests:pe-2.5";
+const FROM_4XL = "hidden @4xl/requests:table-cell";
+// Two-line cells with air. No column rules in the body: the time rail is the row's one line
+// (the header keeps its rules).
+const BODY_CELL = "py-3 shadow-none!";
 // What `accounts: false` leaves out: middle columns, so dropping them after withCompactPadding
 // keeps the first and last cells' padding.
 const ACCOUNT_COLUMNS = new Set(["account", "api_key"]);
@@ -334,27 +289,30 @@ function withCompactPadding(
   columns: DataTableColumn<RequestRecord>[],
 ): DataTableColumn<RequestRecord>[] {
   const last = columns.length - 1;
-  return columns.map((column, index) =>
-    index === 0 || index === last
-      ? column
-      : {
-          ...column,
-          className: cn(COMPACT_PADDING, column.className),
-          headerClassName: cn(COMPACT_PADDING, column.headerClassName),
-        },
-  );
+  return columns.map((column, index) => ({
+    ...column,
+    // The first cell keeps the table's own edge (the pinned column's divider while it scrolls).
+    className: cn(
+      index === 0 ? "py-3" : BODY_CELL,
+      index !== 0 && index !== last && COMPACT_PADDING,
+      column.className,
+    ),
+    headerClassName: cn(index !== 0 && index !== last && COMPACT_PADDING, column.headerClassName),
+  }));
 }
 
 /**
- * The ten Requests columns; ids match the server sort names where a column sorts. Without
- * `accounts` the Account and API key columns are left out; without `messages` the Error column
- * shows only the category.
+ * The eight Requests columns; ids match the server sort names where a column sorts. The status
+ * has no column of its own: the node on the time rail shows it (and says it to screen readers),
+ * a failure's category is the Error column, and "Sort by" still sorts by it. Without `accounts`
+ * the Account and API key columns are left out; without `messages` the Error column shows only
+ * the category.
  */
 export function useRequestColumns({
   accounts = true,
   messages = true,
 }: RequestViewOptions = {}): DataTableColumn<RequestRecord>[] {
-  const { t, lang } = useT("requests");
+  const { t } = useT("requests");
   return useMemo<DataTableColumn<RequestRecord>[]>(
     () =>
       withCompactPadding([
@@ -363,15 +321,14 @@ export function useRequestColumns({
           header: t("time"),
           sortable: true,
           sticky: true,
-          width: "5.5rem",
-          cell: (row) => <TimeCell lang={lang} ts={row.ts} />,
+          width: "7.5rem",
+          cell: (row) => <TimeCell record={row} />,
         },
         {
-          id: "status",
-          header: t("status"),
+          id: "model",
+          header: t("model"),
           sortable: true,
-          width: "7.5rem",
-          cell: (row) => <StatusCell record={row} />,
+          cell: (row) => <ModelCell cap={accounts ? MODEL_CAP : MODEL_CAP_WIDE} record={row} />,
         },
         {
           id: "account",
@@ -390,43 +347,15 @@ export function useRequestColumns({
           cell: (row) => <ApiKeyCode value={row.apiKeyMasked} />,
         },
         {
-          id: "endpoint",
-          header: t("endpoint"),
-          // Below the 7xl container width the endpoint shows under the model instead.
-          className: "hidden @7xl/requests:table-cell",
-          headerClassName: "hidden @7xl/requests:table-cell",
-          cell: (row) => {
-            const label = endpointLabel(row.endpoint, t);
-            return label === EMPTY ? <Muted /> : label;
-          },
-        },
-        {
-          id: "model",
-          header: t("model"),
-          sortable: true,
-          cell: (row) => <ModelCell record={row} />,
-        },
-        {
           id: "tokens",
           header: t("tokens"),
           sortable: true,
-          cell: (row) => (
-            <TokenCell
-              cacheReadTokens={row.cacheReadTokens}
-              cacheWriteTokens={row.cacheWriteTokens}
-              detailClassName={TOKENS_CAP}
-              inTokens={row.inTokens}
-              muteZero={!row.success}
-              outTokens={row.outTokens}
-            />
-          ),
+          cell: (row) => <TokenUsage className={TOKENS_WIDTH} record={row} />,
         },
         {
           id: "credits",
           header: t("credits"),
           sortable: true,
-          align: "end",
-          width: "5rem",
           className: CREDITS_END,
           headerClassName: CREDITS_END,
           cell: (row) => <CreditsCell record={row} />,
@@ -435,22 +364,20 @@ export function useRequestColumns({
           id: "duration",
           header: t("duration"),
           sortable: true,
-          align: "end",
-          width: "5.5rem",
-          // Below a 64rem container the duration shows under the credits instead.
-          className: WIDE_ONLY,
-          headerClassName: WIDE_ONLY,
-          cell: (row) => formatDurationMs(row.durationMs, Boolean(row.endpoint), lang),
+          // Below a 56rem container the duration shows under the credits instead.
+          className: FROM_4XL,
+          headerClassName: FROM_4XL,
+          cell: (row) => <DurationChip record={row} />,
         },
         {
           id: "error",
           header: t("error"),
-          // Below a 64rem container the category shows under the status instead.
-          className: WIDE_ONLY,
-          headerClassName: WIDE_ONLY,
+          // Below a 56rem container the category shows under the time instead.
+          className: FROM_4XL,
+          headerClassName: FROM_4XL,
           cell: (row) => <ErrorCell record={row} showMessage={messages} />,
         },
       ]).filter((column) => accounts || !ACCOUNT_COLUMNS.has(column.id)),
-    [t, lang, accounts, messages],
+    [t, accounts, messages],
   );
 }

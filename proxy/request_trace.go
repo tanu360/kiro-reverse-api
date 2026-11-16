@@ -19,6 +19,8 @@ type requestTrace struct {
 	endpoint  string
 	attempts  attemptChain
 	requestID string
+	// client is the coding tool that sent the request (classifyRequestClient), "" when unknown.
+	client string
 
 	// conversationID is the session affinity key of the request's payload.
 	conversationID string
@@ -43,7 +45,12 @@ type requestTraceKey struct{}
 
 func withRequestTrace(r *http.Request, endpoint string) *http.Request {
 	//! The clock starts before auth, so the logged duration is what the client waited.
-	trace := &requestTrace{startedAt: time.Now(), endpoint: endpoint, requestID: requestIDFromContext(r.Context())}
+	trace := &requestTrace{
+		startedAt: time.Now(),
+		endpoint:  endpoint,
+		requestID: requestIDFromContext(r.Context()),
+		client:    classifyRequestClient(r.Header),
+	}
 	return r.WithContext(context.WithValue(r.Context(), requestTraceKey{}, trace))
 }
 
@@ -67,6 +74,13 @@ func (t *requestTrace) endpointName() string {
 		return ""
 	}
 	return t.endpoint
+}
+
+func (t *requestTrace) clientName() string {
+	if t == nil {
+		return ""
+	}
+	return t.client
 }
 
 func (t *requestTrace) conversation() string {

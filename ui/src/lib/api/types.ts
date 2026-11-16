@@ -951,6 +951,19 @@ export type RequestErrorType =
   | "unknown";
 /** Every RequestEndpoint, for checking a server value; the Requests page and the user panel share it. */
 export const REQUEST_ENDPOINTS: readonly RequestEndpoint[] = ["claude", "openai", "responses"];
+/**
+ * The coding tools the server tells apart by their User-Agent (proxy/request_client.go). A
+ * request from anything else has no client, and the table names its endpoint instead.
+ */
+export const REQUEST_CLIENTS = [
+  "claude-code",
+  "codex",
+  "opencode",
+  "cline",
+  "roo-code",
+  "kilo-code",
+] as const;
+export type RequestClient = (typeof REQUEST_CLIENTS)[number];
 /** Every RequestErrorType, in the Requests page's order; a value outside it reads as "unknown". */
 export const REQUEST_ERROR_TYPES: readonly RequestErrorType[] = [
   "client_closed",
@@ -1042,6 +1055,11 @@ export interface RequestRecord {
   /** <= 500 chars */
   message?: string;
   endpoint?: RequestEndpoint;
+  /**
+   * The coding tool that sent it, from its User-Agent; absent when none the server knows (and on
+   * rows logged before clients were). An id this UI does not know reads as absent.
+   */
+  client?: string;
   durationMs?: number;
   /** only when !success */
   errorType?: RequestErrorType;

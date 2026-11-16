@@ -16,6 +16,7 @@ import type {
   ObserveOverview,
   OverageResponse,
   PromptFilterConfig,
+  RequestClient,
   RequestEndpoint,
   RequestErrorType,
   RequestRecord,
@@ -637,6 +638,37 @@ const ENDPOINT_WEIGHTS: ReadonlyArray<readonly [RequestEndpoint, number]> = [
   ["responses", 2],
 ];
 
+/**
+ * The coding tool a mock request came from, hashed from its own seed (the row's index, id or
+ * time) so the seeded streams draw exactly as before: Claude Code on most Claude API calls, Codex
+ * on most Responses calls, the other tools now and then, and some calls from no tool the server
+ * knows (an SDK script).
+ */
+export function mockClient(
+  endpoint: RequestEndpoint | undefined,
+  seed: number,
+): RequestClient | undefined {
+  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  const slot = (h >>> 0) % 20;
+  switch (endpoint) {
+    case "claude":
+      if (slot < 12) return "claude-code";
+      if (slot < 14) return "kilo-code";
+      return slot < 15 ? "opencode" : undefined;
+    case "responses":
+      return slot < 15 ? "codex" : undefined;
+    case "openai":
+      if (slot < 4) return "cline";
+      if (slot < 7) return "opencode";
+      return slot < 9 ? "roo-code" : undefined;
+    default:
+      return undefined;
+  }
+}
+
 const ERROR_TYPES: readonly RequestErrorType[] = [
   "client_closed",
   "api_key_limit",
@@ -724,7 +756,7 @@ export function seedRequests(nowUnix: number, count: number): RequestRecord[] {
     const endpoint = weighted(rng, ENDPOINT_WEIGHTS);
     const key = rng() < 0.85 ? keys[int(rng, 0, 1)] : undefined;
     const keyFields = key ? { apiKeyId: key.id, apiKeyMasked: key.keyMasked } : {};
-    const base = { id: count - i, ts, endpoint };
+    const base = { id: count - i, ts, endpoint, client: mockClient(endpoint, i) };
 
     const authFailure = AUTH_FAILURE_ROWS.get(i);
     if (authFailure) {
@@ -794,6 +826,8 @@ export function seedRequests(nowUnix: number, count: number): RequestRecord[] {
         ...routed,
         ...successTokens(rng, model),
         endpoint: rowEndpoint,
+        // Logged before endpoints were, so before clients were too.
+        ...(rowEndpoint ? {} : { client: undefined }),
         durationMs,
       }),
     );

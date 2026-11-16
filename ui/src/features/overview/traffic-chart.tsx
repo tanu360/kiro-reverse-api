@@ -252,7 +252,12 @@ export default function TrafficChart({
       xDataKey="name"
     >
       {series.map((part, index) => (
-        <HatchPattern color={part.color} id={`${partKey(index)}-${id}`} key={partKey(index)} />
+        // Siblings of the Bars below, which take partKey: a key of its own, or React warns.
+        <HatchPattern
+          color={part.color}
+          id={`${partKey(index)}-${id}`}
+          key={`hatch-${partKey(index)}`}
+        />
       ))}
       {/*
         An empty chart keeps only its time axis: no columns (their stripes ran through the "No

@@ -56,6 +56,7 @@ function toRecord(row: UserRequest): RequestRecord {
     status: row.status,
     message: "",
     endpoint: row.endpoint || undefined,
+    client: row.client || undefined,
     durationMs: row.durationMs,
     errorType: row.errorType || undefined,
     requestId: row.requestId || undefined,

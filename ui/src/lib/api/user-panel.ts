@@ -22,8 +22,10 @@ import { apiRequest } from "./client";
 import { ApiError, isApiError } from "./errors";
 import { queryKeys } from "./query-keys";
 import {
+  REQUEST_CLIENTS,
   REQUEST_ENDPOINTS,
   REQUEST_ERROR_TYPES,
+  type RequestClient,
   type RequestEndpoint,
   type RequestErrorType,
 } from "./types";
@@ -73,7 +75,13 @@ export interface UserKey {
 }
 
 /** GET /usage: the admin usage response, with only this key in `keys`. */
-export type UserUsage = ApiKeyUsageResponse;
+export interface UserUsage extends ApiKeyUsageResponse {
+  /**
+   * The key's usage over the stretch before the range, as long as the part of the range that has
+   * passed: the 24 hours, 7 or 30 days before. Absent for the lifetime and from older servers.
+   */
+  previous?: ApiKeyUsageTotals;
+}
 /** GET /usage/breakdown: by model; `accounts` is always empty. */
 export type UserUsageBreakdown = ApiKeyUsageBreakdown;
 export type UserUsageRange = ApiKeyUsageRange;
@@ -89,6 +97,8 @@ export interface UserRequest {
   model: string;
   /** "" on rows logged before endpoints were. */
   endpoint: RequestEndpoint | "";
+  /** The coding tool that sent it; "" when the server knew none (or this UI does not). */
+  client: RequestClient | "";
   inTokens: number;
   outTokens: number;
   /** in + out (cache is a subset of in) */
@@ -259,8 +269,11 @@ export function normalizeUserUsage(value: unknown, range: UserUsageRange = "24h"
   const res = record(value);
   const buckets = list(res.buckets).map(num);
   const earlier = optionalTotals(res.earlier);
+  const shownRange = oneOf(res.range, API_KEY_USAGE_RANGES, range);
+  // The lifetime has nothing before it, whatever a server sends.
+  const previous = shownRange === "all" ? undefined : optionalTotals(res.previous);
   return {
-    range: oneOf(res.range, API_KEY_USAGE_RANGES, range),
+    range: shownRange,
     bucket: oneOf(res.bucket, TIME_BUCKETS, "day"),
     bucketSeconds: count(res.bucketSeconds),
     tzOffset: Math.round(num(res.tzOffset)),
@@ -271,6 +284,7 @@ export function normalizeUserUsage(value: unknown, range: UserUsageRange = "24h"
     totals: normalizeTotals(res.totals),
     keys: list(res.keys).map((entry) => normalizeEntry(entry, buckets.length)),
     ...(earlier ? { earlier } : {}),
+    ...(previous ? { previous } : {}),
   };
 }
 
@@ -312,6 +326,7 @@ export function normalizeUserRequest(value: unknown): UserRequest {
     ts: count(res.ts),
     model: str(res.model),
     endpoint: oneOf<RequestEndpoint | "">(res.endpoint, REQUEST_ENDPOINTS, ""),
+    client: oneOf<RequestClient | "">(res.client, REQUEST_CLIENTS, ""),
     inTokens,
     outTokens,
     totalTokens:

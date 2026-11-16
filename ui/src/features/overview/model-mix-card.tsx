@@ -193,12 +193,16 @@ export function ModelMixPanel({
               <ShareBar className="max-w-40" color={row.color} value={row.share} />
             </>,
           ),
-        className: "w-2/5 max-w-64",
+        // The name takes whatever the figures leave (w-full), and max-w-0 lets it give way: a
+        // long model ID truncates instead of widening the table past its card.
+        className: "w-full max-w-0",
       },
       {
         id: "reqs",
         header: t("modelMix.requests"),
         align: "end",
+        // w-px + nowrap: the figure columns shrink to their content and leave the rest to the name.
+        className: "w-px whitespace-nowrap",
         cell: (row, index) =>
           focus(index, "text-muted-foreground", formatNumber(row.item.reqs, lang)),
       },
@@ -206,14 +210,17 @@ export function ModelMixPanel({
         id: "tokens",
         header: t("modelMix.tokens"),
         // The narrowest tables (a phone, the half-width card) keep model, requests and credits.
-        className: "hidden @md/data-table:table-cell",
-        headerClassName: "hidden @md/data-table:table-cell",
+        //! From 28rem the four columns overflowed by up to 50 px beside the ring (the key holder's
+        //! page, which has no sidebar, at 1280-1440 px): tokens join at 32rem.
+        className: "hidden w-px whitespace-nowrap @lg/data-table:table-cell",
+        headerClassName: "hidden @lg/data-table:table-cell",
         cell: (row, index) => focus(index, undefined, <Tokens tokens={row.item.tokens} />),
       },
       {
         id: "credits",
         header: t("modelMix.credits"),
         align: "end",
+        className: "w-px whitespace-nowrap",
         cell: (row, index) => focus(index, "font-medium", formatCredits(row.item.credits)),
       },
     ];

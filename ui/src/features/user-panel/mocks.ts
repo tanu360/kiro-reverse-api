@@ -5,13 +5,20 @@ import type {
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
-import type { RequestEndpoint, RequestErrorType, RequestRecord } from "@/lib/api/types";
+import {
+  REQUEST_CLIENTS,
+  type RequestClient,
+  type RequestEndpoint,
+  type RequestErrorType,
+  type RequestRecord,
+} from "@/lib/api/types";
 import {
   USER_REQUEST_SORTS,
   type UserKey,
   type UserRequest,
   type UserRequestPage,
   type UserRequestSort,
+  type UserUsage,
   type UserUsageBreakdown,
 } from "@/lib/api/user-panel";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
@@ -20,6 +27,7 @@ import {
   hex,
   int,
   maskKey,
+  mockClient,
   pick,
   type Rng,
   round,
@@ -492,11 +500,14 @@ function demoRecord(
 ): RequestRecord {
   const model = weighted(rng, mix.models);
   const size = SIZES[mix.size];
+  const endpoint = weighted(rng, ENDPOINT_WEIGHTS);
   const base = {
     ts,
     apiKeyId: key.id,
     apiKeyMasked: key.keyMasked,
-    endpoint: weighted(rng, ENDPOINT_WEIGHTS),
+    endpoint,
+    // Hashed from the time, so the seeded draws stay as they were.
+    client: mockClient(endpoint, ts),
     requestId: `req_${hex(rng, 24)}`,
   };
   if (failure) {
@@ -775,7 +786,7 @@ function addUsage(totals: ApiKeyUsageTotals, record: RequestRecord): void {
  * The admin usage response with only this key in `keys` (absent when it has no traffic in the
  * range, as there). The grid is the admin one: All time starts at the log's oldest record.
  */
-function buildUsage({ key, log }: Holder, range: string, tzOffset: number): ApiKeyUsageResponse {
+function buildUsage({ key, log }: Holder, range: string, tzOffset: number): UserUsage {
   const nowUnix = mockNowUnix();
   const spec = USAGE_RANGES[range];
   const off = tzOffset * 60;
@@ -806,6 +817,20 @@ function buildUsage({ key, log }: Holder, range: string, tzOffset: number): ApiK
     addUsage(entry.totals, record);
     addUsage(entry.series[index], record);
   }
+  // The stretch before the range, as long as the part of it that has passed (user_api.go's
+  // userUsagePrevious); the lifetime has none.
+  let previous: ApiKeyUsageTotals | undefined;
+  if (spec) {
+    const span = spec.seconds * spec.count;
+    const before = zeroUsage();
+    for (const record of log) {
+      if (record.apiKeyId !== key.id || record.ts < from - span || record.ts > nowUnix - span) {
+        continue;
+      }
+      addUsage(before, record);
+    }
+    previous = before;
+  }
   return {
     range: range as ApiKeyUsageResponse["range"],
     bucket: grid?.bucket ?? spec?.bucket ?? "day",
@@ -818,6 +843,7 @@ function buildUsage({ key, log }: Holder, range: string, tzOffset: number): ApiK
     // As the server: the key's own entry always, with zeros when it has no traffic.
     totals: { ...entry.totals },
     keys: [entry],
+    ...(previous ? { previous } : {}),
   };
 }
 
@@ -868,12 +894,17 @@ function requestIdFor(record: RequestRecord): string {
   return `req_${hex(createRng(seed), 24)}`;
 }
 
+function isClient(value: string | undefined): value is RequestClient {
+  return (REQUEST_CLIENTS as readonly (string | undefined)[]).includes(value);
+}
+
 /** Only the fields a key holder may see: no account, email, message, attempts or body. */
 function requestView(record: RequestRecord): UserRequest {
   return {
     ts: record.ts,
     model: record.model,
     endpoint: record.endpoint ?? "",
+    client: isClient(record.client) ? record.client : "",
     inTokens: record.inTokens,
     outTokens: record.outTokens,
     totalTokens: record.totalTokens,

@@ -33,6 +33,7 @@ import {
   makeRequestRecord,
   manualNote,
   maskKey,
+  mockClient,
   nextResetDate,
   pick,
   type Rng,
@@ -1502,6 +1503,7 @@ function makeRequest(
     return makeRequestRecord({
       ts,
       endpoint,
+      client: mockClient(endpoint, ts),
       ...keyFields,
       accountId: account.id,
       email: account.email || undefined,
@@ -1530,6 +1532,8 @@ function makeRequest(
   return makeRequestRecord({
     ts,
     endpoint,
+    // A key scanner sends no key and names no tool.
+    client: noKey ? undefined : mockClient(endpoint, ts),
     ...(noKey ? {} : keyFields),
     accountId: routed && account ? account.id : "",
     email: routed && account ? account.email || undefined : undefined,
@@ -1569,6 +1573,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       ...of(firehose),
       ...keyOf(prod),
       endpoint: "claude",
+      client: "claude-code",
       model: "claude-opus-5-thinking",
       inTokens: 998_412,
       outTokens: 128_000,
@@ -1593,6 +1598,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       ...of(firehose),
       ...keyOf(prod),
       endpoint: "responses",
+      client: "codex",
       model: "claude-sonnet-5",
       inTokens: 0,
       outTokens: 0,
@@ -1660,6 +1666,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       ...of(firehose),
       ...keyOf(keys[11]),
       endpoint: "responses",
+      client: "codex",
       model: LONG_MODEL,
       inTokens: 402_118,
       outTokens: 22_104,
@@ -1672,6 +1679,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       ...of(firehose),
       ...keyOf(keys[12]),
       endpoint: "responses",
+      client: "codex",
       model: "claude-sonnet-5-thinking",
       inTokens: 61_004,
       outTokens: 3_310,
@@ -1699,6 +1707,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       ts: edgeNow - 640,
       ...of(longEmail),
       endpoint: "claude",
+      client: "claude-code",
       model: "claude-opus-4.8",
       inTokens: 44_120,
       outTokens: 2_204,
@@ -2099,5 +2108,7 @@ export function makeLiveRequest(
     keyFits: () => true,
     keyNeeded: live.length > 0 ? 0.93 : 0,
   };
-  return { ...makeRequest(ctx, now, 0, null), id };
+  const record = makeRequest(ctx, now, 0, null);
+  // By id: requests made in the same second come from different tools.
+  return { ...record, id, client: record.client && mockClient(record.endpoint, id) };
 }

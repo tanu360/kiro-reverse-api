@@ -147,7 +147,30 @@ describe("normalisers", () => {
     expect(usage.keys[0].series[0].requests).toBe(1);
     expect(usage.keys[1].kind).toBe("key");
     expect(usage).not.toHaveProperty("earlier");
+    expect(usage).not.toHaveProperty("previous");
     expect(normalizeUserUsage(undefined)).toMatchObject({ range: "24h", buckets: [], keys: [] });
+  });
+
+  it("reads the stretch before the range, except for the lifetime", () => {
+    const previous = {
+      requests: 4,
+      succeeded: 3,
+      failed: 1,
+      inTokens: 8,
+      outTokens: 2,
+      credits: -1,
+    };
+    expect(normalizeUserUsage({ range: "7d", previous }).previous).toEqual({
+      requests: 4,
+      succeeded: 3,
+      failed: 1,
+      inTokens: 8,
+      outTokens: 2,
+      tokens: 10,
+      credits: 0,
+    });
+    expect(normalizeUserUsage({ range: "7d", previous: [1, 2] })).not.toHaveProperty("previous");
+    expect(normalizeUserUsage({ range: "all", previous })).not.toHaveProperty("previous");
   });
 
   it("never passes accounts through a breakdown", () => {
@@ -196,6 +219,13 @@ describe("normalisers", () => {
     expect(row).not.toHaveProperty("email");
     expect(row).not.toHaveProperty("message");
     expect(normalizeUserRequest({ success: true, errorType: "timeout" }).errorType).toBe("");
+  });
+
+  it("keeps a known client and drops one this UI does not know", () => {
+    expect(normalizeUserRequest({ client: "claude-code" }).client).toBe("claude-code");
+    expect(normalizeUserRequest({ client: "codex" }).client).toBe("codex");
+    expect(normalizeUserRequest({ client: "claude-cli/2.1.3 (external, cli)" }).client).toBe("");
+    expect(normalizeUserRequest({}).client).toBe("");
   });
 
   it("fills a page's paging and sort from the request when the answer lacks it", () => {

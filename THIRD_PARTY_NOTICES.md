@@ -176,7 +176,7 @@ SOFTWARE.
 - Copyright (c) 2023 LobeHub
 - License: MIT
 
-The AI model makers' marks in `ui/src/components/shared/model-logos.tsx` and the Codex, Kiro and AWS marks in `ui/src/components/shared/brand-logos.tsx` are taken from its SVG files. The marks name the companies whose models the proxy maps; the brands belong to their owners.
+The AI model makers' marks in `ui/src/components/shared/model-logos.tsx` and the Codex, Kiro, AWS, Claude Code (Clawd), opencode, Cline, Roo Code and Kilo Code marks in `ui/src/components/shared/brand-logos.tsx` are taken from its SVG files. The marks name the companies whose models the proxy maps and the coding tools that call it; the brands belong to their owners.
 
 ```text
 MIT License

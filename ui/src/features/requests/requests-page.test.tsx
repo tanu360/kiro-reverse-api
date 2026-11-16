@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatTime, unixToDate } from "@/lib/format";
+import { formatRelativeTime, formatTime, unixToDate } from "@/lib/format";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
@@ -13,7 +13,6 @@ import { inMemoryRequestsHandler } from "./mocks";
 // lazy import resolve from the module cache: a cold import of the account sheet's whole module tree
 // took over 5 s on a busy CI runner and failed the test that opens it.
 import "@/features/accounts/account-detail-sheet";
-import { formatRowDate } from "./request-model";
 
 const RECENT_REQUESTS = apiUrl("/observe/recent-requests");
 
@@ -273,37 +272,63 @@ describe("RequestsPage", () => {
     );
     if (!row) throw new Error("auth failure row missing");
     const cells = within(row).getAllByRole("cell");
-    expect(cells[1]).toHaveTextContent(/^Failed 401/);
+    // The status is the node on the time rail, in words for screen readers.
+    expect(within(cells[0]).getByText("Failed 401")).toHaveClass("sr-only");
+    // The model cell's first line; the caller rides under it as a meta line (ModelCell).
+    expect(cells[1]).toHaveTextContent(/^—/);
     expect(cells[2]).toHaveTextContent(/^—$/);
-    // The model cell's first line; the endpoint rides under it as a meta line (ModelCell).
-    expect(within(cells[5]).getByText("—")).toBeInTheDocument();
-    expect(cells[5]).toHaveTextContent(/^—/);
-    expect(within(cells[9]).getByText("Authentication")).toBeInTheDocument();
+    expect(within(cells[7]).getByText("Authentication · 401")).toBeInTheDocument();
   });
 
-  it("folds the API key and endpoint columns into their neighbours on narrower lists", async () => {
+  it("drops the Status and Endpoint columns, and still sorts by status", async () => {
+    const seen = recordRequests();
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers).toEqual([
+      "Time",
+      "Model",
+      "Account",
+      "API key",
+      "Tokens",
+      "Credits",
+      "Duration",
+      "Error",
+    ]);
+    // Every row says its status to screen readers, beside its time.
+    for (const [index, row] of bodyRows().entries()) {
+      const node = row.querySelector("[data-slot=request-status]");
+      expect(node).toHaveTextContent(mockDb.requests[index].success ? "Succeeded" : /^Failed/);
+    }
+    await user.click(screen.getByRole("button", { name: "Sort by: Time" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "Status" }));
+    await waitFor(() => expect(last(seen).get("sort")).toBe("status"));
+  });
+
+  it("folds the API key and the narrow columns into their neighbours on narrower lists", async () => {
     await renderApp("/requests");
     await waitForRows();
-    // Ten columns overflowed a 1440 px desktop: the key moves under the account below a 68rem
-    // container, the endpoint under the model below a 7xl one, and Duration and Error fold under
-    // Credits and Status below a 5xl one.
+    // Eight columns overflowed a 1440 px desktop: the key moves under the account below a 68rem
+    // container, and Duration and Error fold under Credits and the time below a 4xl one.
     const header = (name: string) => screen.getByRole("columnheader", { name: new RegExp(name) });
     expect(header("API key")).toHaveClass("hidden", "@[68rem]/requests:table-cell");
-    expect(header("Endpoint")).toHaveClass("hidden", "@7xl/requests:table-cell");
-    expect(header("Duration")).toHaveClass("hidden", "@5xl/requests:table-cell");
-    expect(header("Error")).toHaveClass("hidden", "@5xl/requests:table-cell");
+    expect(header("Duration")).toHaveClass("hidden", "@4xl/requests:table-cell");
+    expect(header("Error")).toHaveClass("hidden", "@4xl/requests:table-cell");
     const row = bodyRows().find((candidate) => within(candidate).queryAllByText(/^sk-/).length);
     if (!row) throw new Error("no row with an API key");
     const cells = within(row).getAllByRole("cell");
     expect(within(cells[2]).getByText(/^sk-/)).toHaveClass("@[68rem]/requests:hidden");
+    expect(cells[5].querySelector("[data-speed]")?.parentElement).toHaveClass(
+      "@4xl/requests:hidden",
+    );
 
     const failed = mockDb.requests
       .slice(0, 25)
       .find((record) => !record.success && record.errorType);
     if (!failed) throw new Error("no failed row with a category");
     const failedRow = bodyRows()[mockDb.requests.indexOf(failed)];
-    const status = within(failedRow).getAllByRole("cell")[1];
-    expect(status.querySelector("[data-slot=error-type]")).toHaveClass("@5xl/requests:hidden");
+    const time = within(failedRow).getAllByRole("cell")[0];
+    expect(time.querySelector("[data-slot=error-type]")).toHaveClass("@4xl/requests:hidden");
   });
 
   it("renders each request as a list row for narrow containers", async () => {
@@ -317,11 +342,14 @@ describe("RequestsPage", () => {
     if (!failed?.message) throw new Error("no failed row with a message");
     const item = within(list).getAllByRole("listitem")[mockDb.requests.indexOf(failed)];
     expect(item).toHaveTextContent(maskEmailsInText(failed.message));
-    expect(item).not.toHaveTextContent(/\btokens?\b/);
+    expect(item.querySelector("[data-slot=token-figures]")).toBeNull();
+    expect(within(item).getByText(/^Failed/)).toHaveClass("sr-only");
     const success = mockDb.requests.slice(0, 25).findIndex((record) => record.success);
-    expect(within(list).getAllByRole("listitem")[success]).toHaveTextContent(
-      /\S+ tokens · \S+ credits/,
-    );
+    const card = within(list).getAllByRole("listitem")[success];
+    expect(card.querySelector("[data-slot=token-bar]")).not.toBeNull();
+    expect(within(card).getByText("Cache write")).toHaveClass("sr-only");
+    expect(within(card).getByText("Credits")).toHaveClass("sr-only");
+    expect(within(card).getByText("Succeeded")).toHaveClass("sr-only");
   });
 
   it("opens the detail sheet with the full message on row click", async () => {
@@ -473,17 +501,17 @@ describe("RequestsPage", () => {
     expect(await screen.findByText(/Search also matches the full API key/)).toBeVisible();
   });
 
-  it("shows the time over a short date in a machine-readable time element", async () => {
+  it("shows the age over the clock time in a machine-readable time element", async () => {
     await renderApp("/requests");
     await waitForRows();
     const record = mockDb.requests[0];
     const timeCell = within(bodyRows()[0]).getAllByRole("cell")[0];
+    // The age as the narrow relative time reads it ("5s ago"), from a clock that moves on.
+    const age = timeCell.querySelector("time");
+    expect(age?.textContent).toMatch(/^(now|\d+[smhd] ago)$/);
+    expect(formatRelativeTime(record.ts, "en", Date.now(), "narrow")).toMatch(/ago|now/);
     expect(timeCell).toHaveTextContent(formatTime(record.ts, "en"));
-    expect(timeCell).toHaveTextContent(formatRowDate(record.ts, "en"));
-    expect(timeCell.querySelector("time")).toHaveAttribute(
-      "datetime",
-      unixToDate(record.ts).toISOString(),
-    );
+    expect(age).toHaveAttribute("datetime", unixToDate(record.ts).toISOString());
     expect(timeCell.querySelector("[title]")).toBeNull();
   });
 

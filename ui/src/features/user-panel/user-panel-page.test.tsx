@@ -53,6 +53,7 @@ function request(index: number): UserRequest {
     ts: mockNowUnix() - index * 60,
     model: failed ? "claude-failing" : `claude-model-${index}`,
     endpoint: "claude",
+    client: index % 2 === 0 ? "claude-code" : "",
     inTokens: 1200,
     outTokens: 300,
     totalTokens: 1500,
@@ -187,15 +188,31 @@ describe("/user", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/^This key expired on .+\. The proxy/);
   });
 
-  it("shows the key's limits, rate limit, models and dates", async () => {
+  it("shows the usage cards with the key's limits, and its rate limit, models and dates", async () => {
     await signIn({ rpmLimit: 60, allowedModels: ["claude-sonnet-4.5", "claude-opus-4.8"] });
     await renderPanel();
-    const limits = screen.getByRole("region", { name: "Limits" });
-    expect(within(limits).getByText("1,874,210 / 2,000,000")).toBeInTheDocument();
-    expect(within(limits).getByText("46.20 / 50.00")).toBeInTheDocument();
+    const usage = screen.getByRole("region", { name: "Usage" });
+    // Each limit sits under the card of its measure, amber past 75%.
+    expect(
+      within(usage).getByRole("meter", { name: "Tokens used: 1,874,210 of 2,000,000" }),
+    ).toBeInTheDocument();
+    expect(within(usage).getByText("1.9M of 2M")).toBeInTheDocument();
+    expect(within(usage).getByText("94% of key limit")).toHaveClass("text-warning-foreground");
+    expect(within(usage).getByText("46.20 of 50.00")).toBeInTheDocument();
+    // The range's figures load with their comparison to the 24 hours before.
+    await waitFor(() =>
+      expect(usage.querySelector('[data-slot="usage-kpis"]')).not.toHaveAttribute("aria-busy"),
+    );
+    expect(
+      within(usage).getAllByText(/vs previous 24 hours|the 24 hours before/).length,
+    ).toBeGreaterThanOrEqual(3);
     const details = screen.getByRole("region", { name: "Key details" });
     expect(within(details).getByText("60/min")).toBeInTheDocument();
-    expect(within(details).getByText(/claude-sonnet-4\.5.+claude-opus-4\.8/)).toBeInTheDocument();
+    expect(
+      within(within(details).getByRole("list", { name: "Allowed models" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["claude-sonnet-4.5", "claude-opus-4.8"]);
     expect(within(details).getByText("Never")).toBeInTheDocument();
     // A key limited to models asks for the first of them in the client setup request.
     const setup = screen.getByRole("region", { name: "Client setup" });
@@ -266,16 +283,11 @@ describe("/user", () => {
     const headers = within(table)
       .getAllByRole("columnheader")
       .map((header) => header.textContent);
-    expect(headers).toEqual([
-      "Time",
-      "Status",
-      "Endpoint",
-      "Model",
-      "Tokens",
-      "Credits",
-      "Duration",
-      "Error",
-    ]);
+    // The status rides on the time rail and the caller under the model, as on Requests.
+    expect(headers).toEqual(["Time", "Model", "Tokens", "Credits", "Duration", "Error"]);
+    const rows = bodyRows(table);
+    expect(within(rows[0]).getByText("Claude Code")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Claude API")).toBeInTheDocument();
     const tabs = within(screen.getByRole("tablist", { name: "Status" }));
     expect(tabs.getByRole("tab", { name: /^All/ })).toHaveTextContent("All23");
     expect(tabs.getByRole("tab", { name: /^Succeeded/ })).toHaveTextContent("Succeeded19");
@@ -307,9 +319,11 @@ describe("/user", () => {
     expect(seen.at(-1)?.get("status")).toBe("error");
     expect(seen.at(-1)?.get("page")).toBe("1");
     for (const row of bodyRows(table)) {
-      expect(within(row).getByText("Failed 429")).toBeInTheDocument();
-      // Under the status below a 64rem card, in the Error column above it; never a message.
-      expect(within(row).getAllByText("Rate limited")).toHaveLength(2);
+      expect(within(row).getByText("Failed 429")).toHaveClass("sr-only");
+      // Under the time below a 56rem card, in the Error column above it; never a message.
+      expect(within(row).getByText("Rate limited")).toBeInTheDocument();
+      expect(within(row).getByText("Rate limited · 429")).toBeInTheDocument();
+      expect(row.querySelector("[data-slot=error-message]")).toBeNull();
     }
     // Four requests fit one page: no pager.
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();

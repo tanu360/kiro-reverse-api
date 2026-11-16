@@ -302,6 +302,9 @@ var requestColumnMigrations = []struct{ name, definition string }{
 	{"conversation_id", "TEXT NOT NULL DEFAULT ''"},
 	// replay_of is the id of the request an admin replayed to make this row; 0 for none.
 	{"replay_of", "INTEGER NOT NULL DEFAULT 0"},
+	// client is the coding tool that sent the request ("claude-code", "codex"), classified from
+	// its User-Agent; the User-Agent itself is never kept.
+	{"client", "TEXT NOT NULL DEFAULT ''"},
 }
 
 // cooldownColumnMigrations lists cooldowns columns added after the first

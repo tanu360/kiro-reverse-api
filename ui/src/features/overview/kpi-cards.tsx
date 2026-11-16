@@ -33,11 +33,15 @@ const SPARK_BUCKET_MIN = 2;
 const PILL_BUCKET_MIN = 4;
 const SPARK_HEIGHT = 52;
 
+/** The row of KPI cards: one column, two from 48rem of main, four from 64rem. */
+export const KPI_GRID_CLASS =
+  "grid min-w-0 grid-cols-1 gap-4 @3xl/main:grid-cols-2 @5xl/main:grid-cols-4";
+
 // ---------------------------------------------------------------------------
 // Building blocks
 // ---------------------------------------------------------------------------
 
-interface Part {
+export interface Part {
   key: string;
   label: string;
   /** Formatted value shown in the legend. */
@@ -49,10 +53,21 @@ interface Part {
 }
 
 /** A row of rounded segments, each as wide as its share; an empty pool is one grey track. */
-function SegmentBar({ parts }: { parts: readonly Part[] }): JSX.Element {
+export function SegmentBar({
+  parts,
+  className,
+}: {
+  parts: readonly Part[];
+  /** Layout only; the bar sits 14 px under the figures by default. */
+  className?: string;
+}): JSX.Element {
   const visible = parts.filter((part) => part.value > 0);
   return (
-    <div aria-hidden="true" className="mt-3.5 flex h-1.5 gap-0.75" data-slot="kpi-bar">
+    <div
+      aria-hidden="true"
+      className={cn("mt-3.5 flex h-1.5 gap-0.75", className)}
+      data-slot="kpi-bar"
+    >
       {visible.length === 0 ? (
         <span className="flex-1 rounded-full bg-border" />
       ) : (
@@ -90,7 +105,7 @@ function PartLegend({ parts }: { parts: readonly Part[] }): JSX.Element {
  * the comparison with a {delta} placeholder, so each language puts the change where it reads
  * naturally ("+107.1% vs last hour", "较上一小时 +107.1%").
  */
-function Delta({
+export function Delta({
   value,
   goodWhen,
   template,
@@ -124,10 +139,21 @@ function Delta({
 }
 
 /** Pills over the last hour, tallest for the bucket with the most failures; the newest is solid. */
-function FailurePills({ values }: { values: readonly number[] }): JSX.Element {
+export function FailurePills({
+  values,
+  className,
+}: {
+  values: readonly number[];
+  /** Layout only. */
+  className?: string;
+}): JSX.Element {
   const peak = Math.max(0, ...values);
   return (
-    <div aria-hidden="true" className="mt-3.5 flex h-13 gap-1" data-slot="kpi-pills">
+    <div
+      aria-hidden="true"
+      className={cn("mt-3.5 flex h-13 gap-1", className)}
+      data-slot="kpi-pills"
+    >
       {values.map((value, index) => {
         const last = index === values.length - 1;
         const share = peak > 0 && value > 0 ? Math.max(0.14, value / peak) : 0;
@@ -152,11 +178,33 @@ function FailurePills({ values }: { values: readonly number[] }): JSX.Element {
   );
 }
 
+/** A KPI card's trend: the stat tiles' area sparkline, from zero, under the figures. */
+export function KpiSparkline({
+  data,
+  color,
+}: {
+  /** Oldest first. */
+  data: readonly { value: number }[];
+  /** The area's colour (default the series purple). */
+  color?: string;
+}): JSX.Element {
+  const animate = !usePrefersReducedMotion();
+  return (
+    <div aria-hidden="true" className="mt-3.5" style={{ height: SPARK_HEIGHT }}>
+      <LazySparkline animate={animate} color={color} data={data} height={SPARK_HEIGHT} />
+    </div>
+  );
+}
+
+/** A KPI card's footer: a link to the page behind the number, or any content of its own. */
+type KpiFooter = { link: LinkProps; linkLabel: string; footer?: never } | { footer: ReactNode };
+
 /**
  * One KPI card: icon and label with its period on the right, the figure, a muted line (often a
- * delta), a visual, and a footer link to the page behind the number.
+ * delta), a visual, and a footer: a link to the page behind the number, or `footer` (a
+ * CardFooter) in its place.
  */
-function KpiCard({
+export function KpiCard({
   icon,
   label,
   period,
@@ -164,9 +212,8 @@ function KpiCard({
   suffix,
   sub,
   visual,
-  link,
-  linkLabel,
   loading = false,
+  ...footer
 }: {
   icon: IconSvgElement;
   label: string;
@@ -175,10 +222,8 @@ function KpiCard({
   suffix?: ReactNode;
   sub?: ReactNode;
   visual?: ReactNode;
-  link: LinkProps;
-  linkLabel: string;
   loading?: boolean;
-}): JSX.Element {
+} & KpiFooter): JSX.Element {
   return (
     <Card className="min-w-0" data-slot="kpi-card">
       <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-6">
@@ -208,15 +253,23 @@ function KpiCard({
           </>
         )}
       </div>
-      <CardFooter className="p-0 sm:p-0">
-        <Link
-          {...link}
-          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-4 py-2.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline sm:px-6"
-        >
-          <span className="min-w-0 truncate">{linkLabel}</span>
-          <HugeiconsIcon aria-hidden="true" className="size-4 shrink-0" icon={ArrowUpRight01Icon} />
-        </Link>
-      </CardFooter>
+      {"link" in footer ? (
+        <CardFooter className="p-0 sm:p-0">
+          <Link
+            {...footer.link}
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 px-4 py-2.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline sm:px-6"
+          >
+            <span className="min-w-0 truncate">{footer.linkLabel}</span>
+            <HugeiconsIcon
+              aria-hidden="true"
+              className="size-4 shrink-0"
+              icon={ArrowUpRight01Icon}
+            />
+          </Link>
+        </CardFooter>
+      ) : (
+        footer.footer
+      )}
     </Card>
   );
 }
@@ -266,7 +319,6 @@ function bannedToday(count: number, t: TFunction): ReactNode {
  */
 export function KpiCards(): JSX.Element {
   const { t, lang } = useT("overview");
-  const animate = !usePrefersReducedMotion();
   const status = useQuery(statusQuery());
   // The two-hour global heatmap the traffic card's 1 h view reads too (same key).
   const heatmap = useQuery(heatmapQuery(HOUR_PAIR_WINDOW, { scope: "global" }));
@@ -379,7 +431,7 @@ export function KpiCards(): JSX.Element {
     <section
       aria-busy={statusLoading || hourLoading ? true : undefined}
       aria-label={t("kpi.label")}
-      className="grid min-w-0 grid-cols-1 gap-4 @3xl/main:grid-cols-2 @5xl/main:grid-cols-4"
+      className={KPI_GRID_CLASS}
       data-slot="kpi-cards"
     >
       <KpiCard
@@ -448,9 +500,7 @@ export function KpiCards(): JSX.Element {
         value={hour ? formatNumber(current, lang) : EMPTY}
         visual={
           hour ? (
-            <div aria-hidden="true" className="mt-3.5" style={{ height: SPARK_HEIGHT }}>
-              <LazySparkline animate={animate} data={hour.spark} height={SPARK_HEIGHT} />
-            </div>
+            <KpiSparkline data={hour.spark} />
           ) : heatmap.isError ? null : (
             <div className="mt-3.5" style={{ height: SPARK_HEIGHT }}>
               <TrendPlaceholder />

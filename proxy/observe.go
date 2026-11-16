@@ -93,6 +93,9 @@ type requestRecord struct {
 	DurationMs   int64   `json:"durationMs,omitempty"`
 	ErrorType    string  `json:"errorType,omitempty"`
 	RequestID    string  `json:"requestId,omitempty"`
+	// Client is the coding tool that sent the request ("claude-code", "codex", ...); "" when
+	// its User-Agent named none the proxy knows.
+	Client string `json:"client,omitempty"`
 	// ConversationID groups the turns of one conversation; "" when the request never got that far.
 	ConversationID string `json:"conversationId,omitempty"`
 	// ReplayOf is the request an admin replayed to make this one.
@@ -370,6 +373,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		Status:       status,
 		Message:      message,
 		Endpoint:     trace.endpointName(),
+		Client:       trace.clientName(),
 		DurationMs:   trace.durationMs(),
 		ErrorType:    errorType,
 		Attempts:     attempts,
