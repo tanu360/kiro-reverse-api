@@ -51,8 +51,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/overview-dark.webp">
-    <img alt="概要" src="screenshots/en/overview-light.webp" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/ja/overview-dark.webp">
+    <img alt="概要" src="screenshots/ja/overview-light.webp" width="100%">
   </picture>
   <br><sub><b>概要</b> — 全アカウントのリアルタイムのトラフィック、クレジット、エラー</sub>
 </p>
