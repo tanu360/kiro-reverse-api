@@ -299,7 +299,7 @@ describe("/user", () => {
     ]);
     const rows = bodyRows(table);
     expect(within(rows[0]).getByText("Claude Code")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("Claude API")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Anthropic API")).toBeInTheDocument();
     // 300 output tokens in 2 s; no cache read of the 1,200 input; the ID to quote; no HTTP status.
     expect(rows[1].querySelector("[data-output-speed]")).toHaveTextContent(/^150 tok\/s$/);
     expect(rows[1].querySelector("[data-slot=cache-hit]")).toHaveTextContent("0%");

@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import {
+  AnthropicLogo,
   ClaudeCodeLogo,
-  ClaudeLogo,
   ClineLogo,
   CodexLogo,
   KiloCodeLogo,
@@ -36,9 +36,11 @@ const CLIENT_MARKS: Record<RequestClient, Mark> = {
  * (it follows the theme) and Codex for Responses.
  */
 const ENDPOINT_MARKS: Record<RequestEndpoint, Mark> = {
-  claude: ClaudeLogo,
+  // The company behind each API, by its mark: Anthropic for the Messages API, OpenAI for both
+  // of OpenAI's.
+  claude: AnthropicLogo,
   openai: ({ className }) => <MakerLogo className={className} maker="openai" />,
-  responses: CodexLogo,
+  responses: ({ className }) => <MakerLogo className={className} maker="openai" />,
 };
 
 export function isKnownClient(client: string | undefined): client is RequestClient {

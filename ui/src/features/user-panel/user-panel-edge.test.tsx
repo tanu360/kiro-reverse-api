@@ -293,9 +293,9 @@ describe("data at the edges", () => {
     // credits: two copies. The caller (here the endpoint's API) rides under the model.
     expect(cells(0).getAllByText("0ms")).toHaveLength(2);
     expect(cells(1).getAllByText("999ms")).toHaveLength(2);
-    expect(cells(1).getByText("OpenAI Chat")).toBeInTheDocument();
+    expect(cells(1).getByText("OpenAI API")).toBeInTheDocument();
     expect(cells(2).getAllByText("59.9s")).toHaveLength(2);
-    expect(cells(2).getByText("Responses")).toBeInTheDocument();
+    expect(cells(2).getByText("OpenAI Responses")).toBeInTheDocument();
     expect(cells(3).getAllByText("2h")).toHaveLength(2);
     // An endpoint this UI does not know shows nothing rather than a raw value.
     expect(cells(3).queryByText("grpc")).not.toBeInTheDocument();

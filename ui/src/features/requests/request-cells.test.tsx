@@ -70,17 +70,26 @@ describe("the caller line", () => {
     [{ client: "cline", endpoint: "openai" }, "Cline"],
     [{ client: "roo-code", endpoint: "openai" }, "Roo Code"],
     [{ client: "kilo-code", endpoint: "claude" }, "Kilo Code"],
-    // No tool the server knew: the client API instead, as variant 5 named it.
-    [{ endpoint: "claude" }, "Claude API"],
-    [{ endpoint: "openai" }, "OpenAI Chat"],
-    [{ endpoint: "responses" }, "Responses"],
+    // No tool the server knew: the company behind the API instead.
+    [{ endpoint: "claude" }, "Anthropic API"],
+    [{ endpoint: "openai" }, "OpenAI API"],
+    [{ endpoint: "responses" }, "OpenAI Responses"],
     // An id from a newer server reads as no tool.
-    [{ client: "zed", endpoint: "claude" }, "Claude API"],
+    [{ client: "zed", endpoint: "claude" }, "Anthropic API"],
   ] as const)("names %o as %s, with its mark", (fields, name) => {
     const { container } = renderWithProviders(<CallerLabel record={fields} />);
     expect(screen.getByText(name)).toBeInTheDocument();
     const mark = container.querySelector("svg");
     expect(mark).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("marks both of OpenAI's APIs with the OpenAI mark, not Codex's", () => {
+    const mark = (record: Parameters<typeof CallerLabel>[0]["record"]) =>
+      renderWithProviders(<CallerLabel record={record} />).container.querySelector("svg")
+        ?.innerHTML;
+    const openai = mark({ endpoint: "openai" });
+    expect(mark({ endpoint: "responses" })).toBe(openai);
+    expect(mark({ client: "codex", endpoint: "responses" })).not.toBe(openai);
   });
 
   it("draws Clawd, Claude Code's orange crab, for Claude Code", () => {
@@ -170,23 +179,31 @@ describe("the token usage", () => {
 
 describe("the duration and credits", () => {
   it.each([
-    [900, "fast", "900ms"],
-    [2_999, "fast", "3.00s"],
-    [3_000, "normal", "3.00s"],
-    [19_999, "normal", "20.0s"],
-    [20_000, "slow", "20.0s"],
-    [89_999, "slow", "1m 30s"],
-    [90_000, "crawl", "1m 30s"],
-  ] as const)("marks a %i ms duration %s, in plain muted text", (durationMs, speed, text) => {
+    [900, "fast", "900ms", "text-success-foreground"],
+    [2_999, "fast", "3.00s", "text-success-foreground"],
+    [3_000, "normal", "3.00s", "text-muted-foreground"],
+    [19_999, "normal", "20.0s", "text-muted-foreground"],
+    [20_000, "slow", "20.0s", "text-warning-foreground"],
+    [89_999, "slow", "1m 30s", "text-warning-foreground"],
+    [90_000, "crawl", "1m 30s", "text-destructive-foreground"],
+  ] as const)("marks a %i ms duration %s, in its tone", (durationMs, speed, text, tone) => {
     expect(speedTone(durationMs)).toBe(speed);
     const { container } = renderWithProviders(<DurationChip record={record({ durationMs })} />);
     const duration = container.querySelector("[data-speed]");
     expect(duration).toHaveAttribute("data-speed", speed);
-    expect(duration).toHaveClass("text-muted-foreground");
+    expect(duration).toHaveClass(tone);
     expect(container).toHaveTextContent(new RegExp(`^${text}$`));
     // No chip, no mark and no screen-reader label: the column header names it.
     expect(container.querySelector("svg")).toBeNull();
     expect(screen.queryByText("Duration")).not.toBeInTheDocument();
+  });
+
+  it("shows the exact milliseconds on hover", async () => {
+    const { container, user } = renderWithProviders(
+      <DurationChip record={record({ durationMs: 89_999 })} />,
+    );
+    await user.hover(container.querySelector("[data-speed]") as HTMLElement);
+    expect(await screen.findByText("89,999 ms")).toBeInTheDocument();
   });
 
   it("shows a dash for a row logged before durations were", () => {
@@ -199,7 +216,7 @@ describe("the duration and credits", () => {
   it("shows the credits in semibold with a muted cr, and a dash for a failure that cost nothing", () => {
     const { container, rerender } = renderWithProviders(<CreditsChip record={record()} />);
     expect(container).toHaveTextContent(/^0\.15cr$/);
-    expect(screen.getByText("0.15").parentElement).toHaveClass("font-semibold");
+    expect(screen.getByText("0.15")).toHaveClass("font-semibold");
     expect(screen.getByText("cr")).toHaveClass("text-muted-foreground");
     expect(container.querySelector("svg")).toBeNull();
     expect(screen.queryByText("Credits")).not.toBeInTheDocument();
@@ -208,6 +225,12 @@ describe("the duration and credits", () => {
     // A failure that still cost something shows it.
     rerender(<CreditsChip record={{ ...FAILED, credits: 0.04 }} />);
     expect(container).toHaveTextContent(/^0\.04cr$/);
+  });
+
+  it("shows the exact credits on hover", async () => {
+    const { user } = renderWithProviders(<CreditsChip record={record({ credits: 0.0567891 })} />);
+    await user.hover(screen.getByText("0.06"));
+    expect(await screen.findByText("0.0567891 cr")).toBeInTheDocument();
   });
 });
 
@@ -230,16 +253,16 @@ describe("the error pill", () => {
 describe("the speed", () => {
   it.each([
     // 1,600 output tokens over the whole request.
-    [8_000, "200 tok/s", "fast"],
-    [20_000, "80 tok/s", "fast"],
-    [32_000, "50 tok/s", "normal"],
-    [80_000, "20 tok/s", "normal"],
-    [200_000, "8.0 tok/s", "slow"],
-  ] as const)("reads 1.6K tokens over %i ms as %s (%s)", (durationMs, text, speed) => {
+    [8_000, "200 tok/s", "fast", "text-success-foreground"],
+    [20_000, "80 tok/s", "fast", "text-success-foreground"],
+    [32_000, "50 tok/s", "normal", "text-muted-foreground"],
+    [80_000, "20 tok/s", "normal", "text-muted-foreground"],
+    [200_000, "8.0 tok/s", "slow", "text-warning-foreground"],
+  ] as const)("reads 1.6K tokens over %i ms as %s (%s)", (durationMs, text, speed, tone) => {
     const { container } = renderWithProviders(<SpeedChip record={record({ durationMs })} />);
     const figure = container.querySelector("[data-output-speed]");
     expect(figure).toHaveAttribute("data-output-speed", speed);
-    expect(figure).toHaveClass("text-muted-foreground");
+    expect(figure).toHaveClass(tone);
     expect(container).toHaveTextContent(new RegExp(`^${text}$`));
     expect(container.querySelector("svg")).toBeNull();
     expect(screen.queryByText("Speed")).not.toBeInTheDocument();
@@ -408,7 +431,7 @@ describe("RequestCard", () => {
   it("puts the token bar beside the credits and the duration on a success", () => {
     const { container } = renderWithProviders(<RequestCard record={record()} />);
     expect(container.querySelector("[data-slot=token-bar]")).not.toBeNull();
-    expect(screen.getByText("0.15").parentElement).toHaveClass("font-semibold");
+    expect(screen.getByText("0.15")).toHaveClass("font-semibold");
     expect(screen.getByText("cr")).toHaveClass("text-muted-foreground");
     expect(container.querySelector("[data-speed]")).toHaveAttribute("data-speed", "fast");
     expect(container.querySelector("[data-speed]")).toHaveTextContent(/^1\.84s$/);

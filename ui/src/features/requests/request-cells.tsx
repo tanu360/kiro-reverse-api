@@ -18,6 +18,8 @@ import {
   belowStep,
   EMPTY,
   formatCompact,
+  formatCredits,
+  formatCreditsExact,
   formatDecimal,
   formatDurationMs,
   formatFraction,
@@ -336,17 +338,39 @@ export function TokenUsage({
   );
 }
 
-/** The credits as plain text: the figure in semibold and a muted "cr"; a dash for a failure that cost nothing. */
+/**
+ * The credits as plain text: the figure in semibold and a muted "cr", the exact amount on hover;
+ * a dash for a failure that cost nothing.
+ */
 export function CreditsChip({ record }: { record: RequestRecord }): JSX.Element {
-  const { t } = useT("requests");
+  const { t, lang } = useT("requests");
   if (!record.success && record.credits === 0) return <Muted />;
-  return (
-    <span className="inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums">
-      <span className="font-semibold">
-        <CreditAmount value={record.credits} />
+  const unit = <span className="text-meta text-muted-foreground">{t("creditsUnit")}</span>;
+  // An amount under 0.01 already explains itself on hover (CreditAmount's "less than" tip).
+  if (roundsToZero(record.credits, 2)) {
+    return (
+      <span className="inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums">
+        <span className="font-semibold">
+          <CreditAmount value={record.credits} />
+        </span>
+        {unit}
       </span>
-      <span className="text-meta text-muted-foreground">{t("creditsUnit")}</span>
-    </span>
+    );
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className="inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums" />
+        }
+      >
+        <span className="font-semibold">{formatCredits(record.credits, 2, lang)}</span>
+        {unit}
+      </TooltipTrigger>
+      <TooltipPopup>
+        {formatCreditsExact(record.credits, lang)} {t("creditsUnit")}
+      </TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -361,18 +385,39 @@ export function speedTone(ms: number | undefined): SpeedTone {
   return "crawl";
 }
 
-/** The duration as plain muted text; a dash on rows logged before durations were. */
+// Plain text in the speed's colour: a fast or slow request stands out, a normal one stays muted.
+const DURATION_TEXT: Record<SpeedTone, string> = {
+  fast: "text-success-foreground",
+  normal: "text-muted-foreground",
+  slow: "text-warning-foreground",
+  crawl: "text-destructive-foreground",
+};
+
+/**
+ * The duration as plain text tinted by speed, the exact milliseconds on hover; a dash on rows
+ * logged before durations were.
+ */
 export function DurationChip({ record }: { record: RequestRecord }): JSX.Element {
-  const { lang } = useT("requests");
+  const { t, lang } = useT("requests");
   const text = formatDurationMs(record.durationMs, Boolean(record.endpoint), lang);
   if (text === EMPTY) return <Muted />;
+  const tone = speedTone(record.durationMs);
   return (
-    <span
-      className="whitespace-nowrap text-muted-foreground tabular-nums"
-      data-speed={speedTone(record.durationMs)}
-    >
-      {text}
-    </span>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className={cn("whitespace-nowrap tabular-nums", DURATION_TEXT[tone])}
+            data-speed={tone}
+          />
+        }
+      >
+        {text}
+      </TooltipTrigger>
+      <TooltipPopup>
+        {t("durationExact", { n: formatNumber(Math.round(record.durationMs ?? 0), lang) })}
+      </TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -403,7 +448,7 @@ export function outputSpeedTone(tokensPerSecond: number): OutputSpeedTone {
   return "normal";
 }
 
-/** "52 tok/s" as plain muted text, as the duration; a dash when it cannot be worked out. */
+/** "52 tok/s" as plain text tinted by speed, as the duration; a dash when it cannot be worked out. */
 export function SpeedChip({ record }: { record: RequestRecord }): JSX.Element {
   const { t, lang } = useT("requests");
   const speed = outputSpeed(record);
@@ -417,11 +462,21 @@ export function SpeedChip({ record }: { record: RequestRecord }): JSX.Element {
         ? belowStep(1, lang)
         : formatDecimal(speed, 1, lang);
   return (
-    <span className="whitespace-nowrap text-muted-foreground tabular-nums" data-output-speed={tone}>
+    <span
+      className={cn("whitespace-nowrap tabular-nums", SPEED_TEXT[tone])}
+      data-output-speed={tone}
+    >
       {t("speed.value", { n: value })}
     </span>
   );
 }
+
+// As the duration's: fast and slow stand out, normal stays muted.
+const SPEED_TEXT: Record<OutputSpeedTone, string> = {
+  fast: "text-success-foreground",
+  normal: "text-muted-foreground",
+  slow: "text-warning-foreground",
+};
 
 /**
  * The share of the input read from the cache, 0 to 1; undefined without input. The cache read
