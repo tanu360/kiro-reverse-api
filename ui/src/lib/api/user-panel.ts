@@ -115,6 +115,11 @@ export interface UserRequest {
   errorType: RequestErrorType | "";
   /** "req_" + 24 hex, the {request_id} the client got; "" when absent. */
   requestId: string;
+  /**
+   * Upstream attempts the request took (failovers and retries included); 0 when it was refused
+   * before any, or was logged before attempts were. Never which accounts served them.
+   */
+  tries: number;
 }
 
 /** The admin Requests sorts a key holder may use: no account or API key. */
@@ -339,6 +344,7 @@ export function normalizeUserRequest(value: unknown): UserRequest {
     durationMs: count(res.durationMs),
     errorType: success || !errorType ? "" : oneOf(errorType, REQUEST_ERROR_TYPES, "unknown"),
     requestId: str(res.requestId),
+    tries: count(res.tries),
   };
 }
 

@@ -1065,6 +1065,11 @@ export interface RequestRecord {
   errorType?: RequestErrorType;
   /** upstream attempts in order; absent on rows logged before the chain existed */
   attempts?: RequestAttempt[];
+  /**
+   * How many upstream attempts the request took, where the attempts themselves are not sent (a
+   * key holder's own rows); 0 when it was refused before any. The admin rows carry `attempts`.
+   */
+  tries?: number;
   /** "req_" + 24 hex, the {request_id} the client got; absent on rows logged before it */
   requestId?: string;
   /** The conversation the request belongs to (the session affinity key); absent before routing */

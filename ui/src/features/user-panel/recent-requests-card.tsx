@@ -27,8 +27,12 @@ const DEFAULT_SORT: UserRequestSort = "time";
 /** The Requests toolbar's status: undefined is All. */
 type Status = "success" | "failed" | undefined;
 
-/** What a key holder sees, as the shared Requests pieces take it: no account, key or message. */
-const HOLDER_VIEW = { accounts: false, messages: false } as const;
+/**
+ * What a key holder sees, as the shared Requests pieces take it: no account, key or message, and
+ * the detail columns (speed, cache hit, HTTP status and tries, request ID) their rows open no
+ * sheet for.
+ */
+const HOLDER_VIEW = { accounts: false, messages: false, details: true } as const;
 
 function isUserSort(value: string): value is UserRequestSort {
   return (USER_REQUEST_SORTS as readonly string[]).includes(value);
@@ -60,6 +64,7 @@ function toRecord(row: UserRequest): RequestRecord {
     durationMs: row.durationMs,
     errorType: row.errorType || undefined,
     requestId: row.requestId || undefined,
+    tries: row.tries,
   };
 }
 
@@ -72,8 +77,9 @@ function rowId(record: RequestRecord, index: number): string {
 /**
  * The key's own requests, composed as the Requests page composes them: DataTableCard with the
  * Requests toolbar (status tabs with counts, sort, Rows; no search), the Requests columns
- * without Account, API key and error messages (a row per request below a 42rem card), and the
- * pager under the card. Rows open nothing: the detail sheet shows accounts and attempts.
+ * without Account, API key and error messages but with the detail columns (a row per request
+ * below a 56rem card, where the ten columns stop fitting), and the pager under the card. Rows open
+ * nothing: the detail sheet shows accounts and attempts.
  */
 export function RecentRequestsCard(): JSX.Element {
   const { t } = useT("user-panel");
@@ -220,7 +226,7 @@ export function RecentRequestsCard(): JSX.Element {
             <DataTable<RequestRecord>
               caption={t("requests.caption")}
               cardLayout="divided"
-              cardsBelow="2xl"
+              cardsBelow="4xl"
               columns={columns}
               data={rows}
               defaultSortDesc={defaultSortDesc}

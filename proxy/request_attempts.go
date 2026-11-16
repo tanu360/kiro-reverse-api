@@ -401,6 +401,16 @@ func truncateUTF8(s string, n int) string {
 	return s[:cut]
 }
 
+// attemptCount is how many upstream attempts a request took: the chain kept on its row plus the
+// ones the cap dropped (Skipped, on the last attempt). 0 when nothing was tried, such as a request
+// refused before routing, or a row logged before the chain existed.
+func attemptCount(attempts []requestAttempt) int {
+	if len(attempts) == 0 {
+		return 0
+	}
+	return len(attempts) + max(attempts[len(attempts)-1].Skipped, 0)
+}
+
 // encodeAttempts is the attempts_json column value: "" for no attempts.
 func encodeAttempts(attempts []requestAttempt) string {
 	if len(attempts) == 0 {

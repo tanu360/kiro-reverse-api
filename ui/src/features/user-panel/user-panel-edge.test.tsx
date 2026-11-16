@@ -303,9 +303,13 @@ describe("data at the edges", () => {
     expect(cells(4).getAllByText("—").length).toBeGreaterThanOrEqual(2);
     errorTypes.forEach(([, label], index) => {
       expect(cells(5 + index).getByText(`Failed ${400 + index}`)).toHaveClass("sr-only");
-      // Under the time for a narrower card; in the Error column's pill with the status.
-      expect(cells(5 + index).getByText(label)).toBeInTheDocument();
-      expect(cells(5 + index).getByText(`${label} · ${400 + index}`)).toBeInTheDocument();
+      // Under the time for a narrower card, and in the Error column's pill; the status is the
+      // HTTP column's, with no tries for a server that sends none.
+      expect(cells(5 + index).getAllByText(label)).toHaveLength(2);
+      expect(cells(5 + index).queryByText(`${label} · ${400 + index}`)).not.toBeInTheDocument();
+      expect(body[5 + index].querySelector("[data-slot=http-status]")).toHaveTextContent(
+        new RegExp(`^HTTP ${400 + index}$`),
+      );
     });
   });
 

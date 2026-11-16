@@ -44,6 +44,17 @@ export function errorTypeTone(type: string | undefined): ErrorTone {
   return "destructive";
 }
 
+/**
+ * How many upstream attempts a request took: the count a key holder's row carries, else the
+ * admin row's chain plus the attempts the 10-attempt cap dropped (`skipped`, on the last one).
+ * 0 when nothing was tried (refused before routing) or the row predates the chain.
+ */
+export function requestTries(record: RequestRecord): number {
+  if (record.tries !== undefined) return record.tries;
+  const attempts = record.attempts ?? [];
+  return attempts.length + (attempts.at(-1)?.skipped ?? 0);
+}
+
 export function isKnownErrorType(type: string | undefined): type is RequestErrorType {
   return type !== undefined && (ERROR_TYPES as readonly string[]).includes(type);
 }

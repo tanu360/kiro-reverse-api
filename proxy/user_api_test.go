@@ -293,7 +293,7 @@ func TestUserRequestsOnlyOwnKey(t *testing.T) {
 	for _, row := range rows {
 		assertKeySet(t, "request", row.(map[string]any),
 			"ts", "model", "endpoint", "client", "inTokens", "outTokens", "totalTokens", "cacheReadTokens",
-			"cacheWriteTokens", "credits", "success", "status", "durationMs", "errorType", "requestId")
+			"cacheWriteTokens", "credits", "success", "status", "durationMs", "errorType", "requestId", "tries")
 	}
 	if first := rows[0].(map[string]any); first["success"] != false || first["status"] != float64(429) {
 		t.Fatalf("newest first: %v", rows)
@@ -323,6 +323,60 @@ func TestUserRequestsOnlyOwnKey(t *testing.T) {
 	for _, rec := range memory.Requests {
 		if rec.APIKeyID != mine.ID {
 			t.Fatalf("memory page holds key %q", rec.APIKeyID)
+		}
+	}
+}
+
+// A holder sees how many upstream attempts each request took, counted the same from the
+// persisted rows and the in-memory log: the kept chain plus the attempts the cap dropped, 0 for a
+// request refused before any attempt. Which accounts served them never shows.
+func TestUserRequestsTries(t *testing.T) {
+	h := newUserAPITestHandler(t)
+	key := addUsageKey(t, "mine", "sk-user-tries-0123456789abcdef", true)
+	s := getObserveStore()
+	record := func(model string, attempts int, success bool, status int) {
+		ctx, trace := traceContextForTest()
+		for i := 0; i < attempts; i++ {
+			account := &config.Account{ID: fmt.Sprintf("acc-tries-%s-%02d", model, i)}
+			traceAttemptStart(ctx, account, "")
+			if i < attempts-1 {
+				traceAttemptFailed(ctx, account, http.StatusTooManyRequests, fmt.Errorf("HTTP 429 throttled"))
+			}
+		}
+		s.RecordTracedRequest(trace, "acc-tries-final", key.ID, key.Key, "", model, 10, 5, 0.1, success, status, "")
+	}
+	record("once", 1, true, http.StatusOK)
+	record("retried", 3, true, http.StatusOK)
+	record("capped", maxRequestAttempts+4, false, http.StatusTooManyRequests)
+	s.RecordRequestWithAPIKey("", key.ID, key.Key, "", "refused", 0, 0, 0, false, http.StatusUnauthorized, "")
+	want := map[string]int{"once": 1, "retried": 3, "capped": maxRequestAttempts + 4, "refused": 0}
+	token := userSignIn(t, h, key.Key)
+
+	if page, err := queryPersistedRequests(requestQuery{APIKeyID: key.ID}); err != nil || !page.Persistent {
+		t.Fatalf("persisted page: %v, persistent %v", err, page.Persistent)
+	}
+	rec := userCall(h, http.MethodGet, "/user/api/requests", token, "")
+	if strings.Contains(rec.Body.String(), "acc-tries") || strings.Contains(rec.Body.String(), "attempts") {
+		t.Fatalf("requests leak the attempts: %s", rec.Body.String())
+	}
+	rows := userJSON(t, rec)["requests"].([]any)
+	if len(rows) != len(want) {
+		t.Fatalf("rows %v", rows)
+	}
+	for _, raw := range rows {
+		row := raw.(map[string]any)
+		if model := row["model"].(string); row["tries"] != float64(want[model]) {
+			t.Fatalf("persisted %s: tries %v, want %d", model, row["tries"], want[model])
+		}
+	}
+
+	memory := s.memoryRequestPage(normalizeRequestQuery(requestQuery{APIKeyID: key.ID}))
+	if len(memory.Requests) != len(want) {
+		t.Fatalf("memory rows %d", len(memory.Requests))
+	}
+	for _, rec := range memory.Requests {
+		if got := userRequestFromRecord(rec).Tries; got != want[rec.Model] {
+			t.Fatalf("memory %s: tries %d, want %d", rec.Model, got, want[rec.Model])
 		}
 	}
 }

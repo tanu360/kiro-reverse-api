@@ -66,6 +66,7 @@ function request(index: number): UserRequest {
     durationMs: index === 0 ? 4_500_000 : 2_000,
     errorType: failed ? "rate_limit" : "",
     requestId: `req_${index}`,
+    tries: failed ? 3 : 1,
   };
 }
 
@@ -283,11 +284,30 @@ describe("/user", () => {
     const headers = within(table)
       .getAllByRole("columnheader")
       .map((header) => header.textContent);
-    // The status rides on the time rail and the caller under the model, as on Requests.
-    expect(headers).toEqual(["Time", "Model", "Tokens", "Credits", "Duration", "Error"]);
+    // The status rides on the time rail and the caller under the model, as on Requests; the
+    // detail columns are the key holder's own.
+    expect(headers).toEqual([
+      "Time",
+      "Model",
+      "Tokens",
+      "Cache hit",
+      "Credits",
+      "Duration",
+      "Speed",
+      "HTTP",
+      "Error",
+      "Request ID",
+    ]);
     const rows = bodyRows(table);
     expect(within(rows[0]).getByText("Claude Code")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Claude API")).toBeInTheDocument();
+    // 300 output tokens in 2 s; no cache read of the 1,200 input; one try; the ID to quote.
+    expect(rows[1].querySelector("[data-output-speed]")).toHaveTextContent("150 tok/s");
+    expect(rows[1].querySelector("[data-slot=cache-hit]")).toHaveTextContent("0%");
+    expect(rows[1].querySelector("[data-slot=http-status]")).toHaveTextContent("HTTP 2001 try");
+    expect(rows[1].querySelector("[data-slot=request-id]")).toHaveTextContent("req_1");
+    expect(within(rows[1]).getByRole("button", { name: "Copy request ID" })).toBeInTheDocument();
+    expect(rows[4].querySelector("[data-slot=http-status]")).toHaveTextContent("HTTP 4293 tries");
     const tabs = within(screen.getByRole("tablist", { name: "Status" }));
     expect(tabs.getByRole("tab", { name: /^All/ })).toHaveTextContent("All23");
     expect(tabs.getByRole("tab", { name: /^Succeeded/ })).toHaveTextContent("Succeeded19");
@@ -320,9 +340,11 @@ describe("/user", () => {
     expect(seen.at(-1)?.get("page")).toBe("1");
     for (const row of bodyRows(table)) {
       expect(within(row).getByText("Failed 429")).toHaveClass("sr-only");
-      // Under the time below a 56rem card, in the Error column above it; never a message.
-      expect(within(row).getByText("Rate limited")).toBeInTheDocument();
-      expect(within(row).getByText("Rate limited · 429")).toBeInTheDocument();
+      // Under the time below a 72rem card, in the Error column above it, without the status the
+      // HTTP column shows; never a message.
+      expect(within(row).getAllByText("Rate limited")).toHaveLength(2);
+      expect(within(row).queryByText("Rate limited · 429")).not.toBeInTheDocument();
+      expect(row.querySelector("[data-slot=http-status]")).toHaveTextContent("HTTP 4293 tries");
       expect(row.querySelector("[data-slot=error-message]")).toBeNull();
     }
     // Four requests fit one page: no pager.

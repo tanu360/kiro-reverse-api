@@ -649,7 +649,7 @@ func apiUserUsageBreakdown(w http.ResponseWriter, r *http.Request, entry config.
 }
 
 // userRequestView is one request log row as its key's holder sees it: no account, message,
-// attempts, conversation or body.
+// conversation or body, and of the attempts only how many there were.
 type userRequestView struct {
 	TS               int64   `json:"ts"`
 	Model            string  `json:"model"`
@@ -666,6 +666,32 @@ type userRequestView struct {
 	DurationMs       int64   `json:"durationMs"`
 	ErrorType        string  `json:"errorType"`
 	RequestID        string  `json:"requestId"`
+	// Tries is the number of upstream attempts the request took (0 when it was refused before
+	// one); never which accounts served them.
+	Tries int `json:"tries"`
+}
+
+// userRequestFromRecord is rec as its key's holder may see it. The persisted and in-memory logs
+// both keep the attempt chain on the record, so either gives the same count.
+func userRequestFromRecord(rec requestRecord) userRequestView {
+	return userRequestView{
+		TS:               rec.TS,
+		Model:            rec.Model,
+		Endpoint:         rec.Endpoint,
+		Client:           rec.Client,
+		InTokens:         rec.InTokens,
+		OutTokens:        rec.OutTokens,
+		TotalTokens:      rec.TotalTokens,
+		CacheReadTokens:  rec.CacheRead,
+		CacheWriteTokens: rec.CacheWrite,
+		Credits:          rec.Credits,
+		Success:          rec.Success,
+		Status:           rec.Status,
+		DurationMs:       rec.DurationMs,
+		ErrorType:        rec.ErrorType,
+		RequestID:        rec.RequestID,
+		Tries:            attemptCount(rec.Attempts),
+	}
 }
 
 // userRequestSorts are the admin Requests sorts a key's holder may use. Account and API key are
@@ -729,23 +755,7 @@ func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKey
 	counts.All = counts.Succeeded + counts.Failed
 	requests := make([]userRequestView, len(data.Requests))
 	for i, rec := range data.Requests {
-		requests[i] = userRequestView{
-			TS:               rec.TS,
-			Model:            rec.Model,
-			Endpoint:         rec.Endpoint,
-			Client:           rec.Client,
-			InTokens:         rec.InTokens,
-			OutTokens:        rec.OutTokens,
-			TotalTokens:      rec.TotalTokens,
-			CacheReadTokens:  rec.CacheRead,
-			CacheWriteTokens: rec.CacheWrite,
-			Credits:          rec.Credits,
-			Success:          rec.Success,
-			Status:           rec.Status,
-			DurationMs:       rec.DurationMs,
-			ErrorType:        rec.ErrorType,
-			RequestID:        rec.RequestID,
-		}
+		requests[i] = userRequestFromRecord(rec)
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"requests": requests,

@@ -13,12 +13,17 @@ import { type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ErrorTypeLabel } from "./error-type-badge";
 import {
+  CacheHit,
   CreditsChip,
   DurationChip,
   ErrorMessage,
   ErrorPill,
+  HttpStatus,
   Muted,
+  outputSpeed,
   Rail,
+  RequestIdCopy,
+  SpeedChip,
   StatusNode,
   TokenFigures,
   TokenTotalBar,
@@ -44,7 +49,10 @@ const MODEL_CAP_WIDE = "max-w-40 @5xl/requests:max-w-56 @7xl/requests:max-w-72";
 // One width per step, so every row's bar has the same length (each scaled to its own total).
 const TOKENS_WIDTH = "w-40 @5xl/requests:w-44 @7xl/requests:w-52";
 
-/** What the rows show beyond the request itself; both default to true (the Requests page). */
+/**
+ * What the rows show beyond the request itself; `accounts` and `messages` default to true and
+ * `details` to false (the Requests page).
+ */
 export interface RequestViewOptions {
   /**
    * The Account and API key columns and a card's account line. Off for a key holder's own
@@ -56,6 +64,12 @@ export interface RequestViewOptions {
    * category.
    */
   messages?: boolean;
+  /**
+   * The Speed, Cache hit, HTTP (status and tries) and Request ID columns, and their line on a
+   * card. On for a key holder, whose rows open no detail sheet; the Requests page shows these in
+   * its sheet. The HTTP column carries the status, so the error pill leaves it out.
+   */
+  details?: boolean;
 }
 
 /**
@@ -124,10 +138,17 @@ function AccountCell({ record }: { record: RequestRecord }): JSX.Element {
 }
 
 /**
- * The status node on the time rail, beside the age over the clock time. Below a 56rem container
- * (where the Error column is hidden) a failure's category rides under them.
+ * The status node on the time rail, beside the age over the clock time. Where the Error column is
+ * hidden (below a 56rem container, or 72rem with the detail columns) a failure's category rides
+ * under them; `errorShown` is the class that hides it again once the column shows.
  */
-function TimeCell({ record }: { record: RequestRecord }): JSX.Element {
+function TimeCell({
+  record,
+  errorShown,
+}: {
+  record: RequestRecord;
+  errorShown: string;
+}): JSX.Element {
   return (
     <>
       <Rail variant="table" />
@@ -136,7 +157,7 @@ function TimeCell({ record }: { record: RequestRecord }): JSX.Element {
         <WhenStack record={record}>
           {!record.success && record.errorType ? (
             <ErrorTypeLabel
-              className="max-w-24 text-meta text-muted-foreground @4xl/requests:hidden"
+              className={cn("max-w-24 text-meta text-muted-foreground", errorShown)}
               type={record.errorType}
             />
           ) : null}
@@ -178,18 +199,42 @@ function CreditsCell({ record }: { record: RequestRecord }): JSX.Element {
   );
 }
 
+/**
+ * The duration chip; with the detail columns, below a 72rem container (no Speed column) the
+ * speed chip under it.
+ */
+function DurationCell({
+  record,
+  details,
+}: {
+  record: RequestRecord;
+  details: boolean;
+}): JSX.Element {
+  if (!details || outputSpeed(record) === undefined) return <DurationChip record={record} />;
+  return (
+    <span className="flex flex-col items-start gap-1">
+      <DurationChip record={record} />
+      <span className="@6xl/requests:hidden">
+        <SpeedChip record={record} />
+      </span>
+    </span>
+  );
+}
+
 /** The category pill over the message (the message on the admin table only, from 64rem). */
 function ErrorCell({
   record,
   showMessage,
+  showStatus,
 }: {
   record: RequestRecord;
   showMessage: boolean;
+  showStatus: boolean;
 }): JSX.Element {
   if (record.success) return <Muted />;
   return (
     <span className="flex min-w-0 max-w-40 flex-col items-start gap-1 @7xl/requests:max-w-64">
-      <ErrorPill record={record} />
+      <ErrorPill record={record} status={showStatus} />
       {showMessage ? <ErrorMessage className="hidden @5xl/requests:block" record={record} /> : null}
     </span>
   );
@@ -198,14 +243,17 @@ function ErrorCell({
 /**
  * A request as a list row, for narrow containers: the status node and the age, then (indented
  * past the node) the model and caller, the token bar with the credits and duration chips, the
- * four token counts, the account, and a failure's category and message. With `onOpen` the whole
- * row opens the detail sheet; without it the row is plain text.
+ * four token counts, the account, and a failure's category and message. With `details` the
+ * request ID and its copy button sit at the header's end, and the HTTP status with its tries,
+ * the speed and the cache hit get a line under the token counts. With `onOpen` the whole row
+ * opens the detail sheet; without it the row is plain text.
  */
 export function RequestCard({
   record,
   onOpen,
   accounts = true,
   messages = true,
+  details = false,
 }: {
   record: RequestRecord;
   onOpen?: () => void;
@@ -214,6 +262,7 @@ export function RequestCard({
   const tokens = !usedNoTokens(record);
   return (
     <ListCard
+      action={details && record.requestId ? <RequestIdCopy record={record} /> : undefined}
       leading={<StatusNode record={record} />}
       onOpen={onOpen}
       openLabel={onOpen ? t("detail.open", { time: formatDateTime(record.ts, lang) }) : undefined}
@@ -247,6 +296,13 @@ export function RequestCard({
           </div>
         </div>
         {tokens ? <TokenFigures record={record} /> : null}
+        {details ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+            <HttpStatus inline record={record} />
+            {outputSpeed(record) === undefined ? null : <SpeedChip record={record} />}
+            {record.inTokens > 0 ? <CacheHit labelled record={record} /> : null}
+          </div>
+        ) : null}
         {accounts ? (
           <DisplayEmail
             className="text-meta text-muted-foreground"
@@ -256,7 +312,7 @@ export function RequestCard({
         ) : null}
         {record.success ? null : (
           <div className="flex min-w-0 flex-col items-start gap-1">
-            <ErrorPill record={record} />
+            <ErrorPill record={record} status={!details} />
             {messages ? (
               <ErrorMessage
                 className="line-clamp-2 whitespace-normal wrap-anywhere"
@@ -271,19 +327,26 @@ export function RequestCard({
 }
 
 // Tighter cell padding than the table default for the middle columns, so the eight columns fit
-// a 1440 px desktop with the sidebar open; the first and last cells take the card's side padding
-// (DataTableCard insets them), and wide containers get the default padding back.
+// a 1440 px desktop with the sidebar open (and a key holder's ten a 1280 px window); the first and
+// last cells take the card's side padding (DataTableCard insets them), and wide containers get the
+// default padding back.
 const COMPACT_PADDING = "px-2 @7xl/requests:px-2.5";
 // Below a 56rem container Credits is the last column shown (Duration and Error are hidden), so it
 // takes the card's end padding, as the inset gives the real last cell.
 const CREDITS_END = "pe-4 sm:pe-6 @4xl/requests:pe-2 @7xl/requests:pe-2.5";
 const FROM_4XL = "hidden @4xl/requests:table-cell";
-// Two-line cells with air. No column rules in the body: the time rail is the row's one line
-// (the header keeps its rules).
-const BODY_CELL = "py-3 shadow-none!";
+// With the detail columns the table needs a 72rem container for Speed and Error: below it the
+// speed rides under the duration and a failure's category under the time.
+const FROM_6XL = "hidden @6xl/requests:table-cell";
+// Two-line cells with air, and the table's column rules, as on Accounts: they sit on the cells'
+// start edges, clear of the time rail in the first cell.
+const BODY_CELL = "py-3";
 // What `accounts: false` leaves out: middle columns, so dropping them after withCompactPadding
 // keeps the first and last cells' padding.
 const ACCOUNT_COLUMNS = new Set(["account", "api_key"]);
+// What `details: false` leaves out, before withCompactPadding: Request ID is the last column
+// when shown, so without it Error keeps the last cell's padding.
+const DETAIL_COLUMNS = new Set(["cache_hit", "speed", "http", "request_id"]);
 
 function withCompactPadding(
   columns: DataTableColumn<RequestRecord>[],
@@ -306,78 +369,113 @@ function withCompactPadding(
  * has no column of its own: the node on the time rail shows it (and says it to screen readers),
  * a failure's category is the Error column, and "Sort by" still sorts by it. Without `accounts`
  * the Account and API key columns are left out; without `messages` the Error column shows only
- * the category.
+ * the category. `details` adds Cache hit after Tokens, Speed after Duration, HTTP before Error and
+ * Request ID last; none of them sorts.
  */
 export function useRequestColumns({
   accounts = true,
   messages = true,
+  details = false,
 }: RequestViewOptions = {}): DataTableColumn<RequestRecord>[] {
   const { t } = useT("requests");
-  return useMemo<DataTableColumn<RequestRecord>[]>(
-    () =>
-      withCompactPadding([
-        {
-          id: "time",
-          header: t("time"),
-          sortable: true,
-          sticky: true,
-          width: "7.5rem",
-          cell: (row) => <TimeCell record={row} />,
-        },
-        {
-          id: "model",
-          header: t("model"),
-          sortable: true,
-          cell: (row) => <ModelCell cap={accounts ? MODEL_CAP : MODEL_CAP_WIDE} record={row} />,
-        },
-        {
-          id: "account",
-          header: t("account"),
-          sortable: true,
-          cell: (row) => <AccountCell record={row} />,
-        },
-        {
-          id: "api_key",
-          header: t("apiKey"),
-          sortable: true,
-          width: "8.5rem",
-          // Below a 68rem container the key shows under the account instead.
-          className: "hidden @[68rem]/requests:table-cell",
-          headerClassName: "hidden @[68rem]/requests:table-cell",
-          cell: (row) => <ApiKeyCode value={row.apiKeyMasked} />,
-        },
-        {
-          id: "tokens",
-          header: t("tokens"),
-          sortable: true,
-          cell: (row) => <TokenUsage className={TOKENS_WIDTH} record={row} />,
-        },
-        {
-          id: "credits",
-          header: t("credits"),
-          sortable: true,
-          className: CREDITS_END,
-          headerClassName: CREDITS_END,
-          cell: (row) => <CreditsCell record={row} />,
-        },
-        {
-          id: "duration",
-          header: t("duration"),
-          sortable: true,
-          // Below a 56rem container the duration shows under the credits instead.
-          className: FROM_4XL,
-          headerClassName: FROM_4XL,
-          cell: (row) => <DurationChip record={row} />,
-        },
-        {
-          id: "error",
-          header: t("error"),
-          // Below a 56rem container the category shows under the time instead.
-          className: FROM_4XL,
-          headerClassName: FROM_4XL,
-          cell: (row) => <ErrorCell record={row} showMessage={messages} />,
-        },
-      ]).filter((column) => accounts || !ACCOUNT_COLUMNS.has(column.id)),
-    [t, accounts, messages],
-  );
+  return useMemo<DataTableColumn<RequestRecord>[]>(() => {
+    const errorFrom = details ? FROM_6XL : FROM_4XL;
+    const columns: DataTableColumn<RequestRecord>[] = [
+      {
+        id: "time",
+        header: t("time"),
+        sortable: true,
+        sticky: true,
+        width: "7.5rem",
+        cell: (row) => (
+          <TimeCell
+            errorShown={details ? "@6xl/requests:hidden" : "@4xl/requests:hidden"}
+            record={row}
+          />
+        ),
+      },
+      {
+        id: "model",
+        header: t("model"),
+        sortable: true,
+        // The detail columns take the room the Account and API key columns leave.
+        cell: (row) => (
+          <ModelCell cap={accounts || details ? MODEL_CAP : MODEL_CAP_WIDE} record={row} />
+        ),
+      },
+      {
+        id: "account",
+        header: t("account"),
+        sortable: true,
+        cell: (row) => <AccountCell record={row} />,
+      },
+      {
+        id: "api_key",
+        header: t("apiKey"),
+        sortable: true,
+        width: "8.5rem",
+        // Below a 68rem container the key shows under the account instead.
+        className: "hidden @[68rem]/requests:table-cell",
+        headerClassName: "hidden @[68rem]/requests:table-cell",
+        cell: (row) => <ApiKeyCode value={row.apiKeyMasked} />,
+      },
+      {
+        id: "tokens",
+        header: t("tokens"),
+        sortable: true,
+        cell: (row) => <TokenUsage className={TOKENS_WIDTH} record={row} />,
+      },
+      {
+        id: "cache_hit",
+        header: t("cacheHit"),
+        cell: (row) => <CacheHit record={row} />,
+      },
+      {
+        id: "credits",
+        header: t("credits"),
+        sortable: true,
+        className: CREDITS_END,
+        headerClassName: CREDITS_END,
+        cell: (row) => <CreditsCell record={row} />,
+      },
+      {
+        id: "duration",
+        header: t("duration"),
+        sortable: true,
+        // Below a 56rem container the duration shows under the credits instead.
+        className: FROM_4XL,
+        headerClassName: FROM_4XL,
+        cell: (row) => <DurationCell details={details} record={row} />,
+      },
+      {
+        id: "speed",
+        header: t("speed"),
+        // Below a 72rem container the speed shows under the duration instead.
+        className: FROM_6XL,
+        headerClassName: FROM_6XL,
+        cell: (row) => <SpeedChip record={row} />,
+      },
+      {
+        id: "http",
+        header: t("http"),
+        cell: (row) => <HttpStatus record={row} />,
+      },
+      {
+        id: "error",
+        header: t("error"),
+        // Where it is hidden the category shows under the time instead.
+        className: errorFrom,
+        headerClassName: errorFrom,
+        cell: (row) => <ErrorCell record={row} showMessage={messages} showStatus={!details} />,
+      },
+      {
+        id: "request_id",
+        header: t("requestId"),
+        cell: (row) => <RequestIdCopy record={row} />,
+      },
+    ];
+    return withCompactPadding(
+      columns.filter((column) => details || !DETAIL_COLUMNS.has(column.id)),
+    ).filter((column) => accounts || !ACCOUNT_COLUMNS.has(column.id));
+  }, [t, accounts, messages, details]);
 }

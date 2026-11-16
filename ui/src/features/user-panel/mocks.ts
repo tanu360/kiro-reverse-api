@@ -484,6 +484,51 @@ function modelRate(model: string): number {
   return 1;
 }
 
+/**
+ * Milliseconds per output token once a reply streams, before a ±30% spread: Haiku about 125
+ * tokens a second, Opus about 40 and the rest (Sonnet, auto) about 70, as Claude writes them.
+ */
+function msPerOutputToken(model: string): number {
+  if (model.includes("haiku")) return 8;
+  if (model.includes("opus")) return 25;
+  return 14;
+}
+
+/**
+ * Extra draws for one row, seeded from text of its own (its request ID), so the log's seeded
+ * draws stay as they were.
+ */
+function sideRng(text: string): Rng {
+  let seed = 2166136261;
+  for (const char of text) seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
+  return createRng(seed);
+}
+
+/** Upstream attempts of a request that succeeded: 90% first time, the rest after a failover. */
+function successTries(rng: Rng): number {
+  const roll = rng();
+  if (roll < 0.03) return 3;
+  return roll < 0.1 ? 2 : 1;
+}
+
+/**
+ * Attempts before a routed failure: a rate limit fails over across the accounts, a server error
+ * is tried again, a bad request or a client that left is not.
+ */
+function failureTries(rng: Rng, type: RequestErrorType | undefined): number {
+  switch (type) {
+    case "rate_limit":
+      return int(rng, 2, 5);
+    case "upstream":
+      return int(rng, 2, 3);
+    case "stream":
+    case "timeout":
+      return int(rng, 1, 2);
+    default:
+      return 1;
+  }
+}
+
 /** The full dataset's credit formula (fixtures-full.ts): cache reads cost a tenth. */
 function credits(model: string, inTokens: number, outTokens: number, read = 0, write = 0): number {
   const value =
@@ -510,6 +555,8 @@ function demoRecord(
     client: mockClient(endpoint, ts),
     requestId: `req_${hex(rng, 24)}`,
   };
+  // How many upstream attempts it took: none for a request the key refused before routing.
+  const side = sideRng(base.requestId);
   if (failure) {
     // A cut stream or a client that left mid-answer is billed for what it got.
     const partial = failure.type === "stream" || failure.type === "client_closed";
@@ -529,8 +576,10 @@ function demoRecord(
       status: failure.status,
       errorType: failure.type,
       durationMs: failure.routed ? int(rng, 900, 45_000) : int(rng, 1, 40),
+      tries: failure.routed ? failureTries(side, failure.type) : 0,
     };
   }
+  const tries = successTries(side);
   const inTokens = logNormal(rng, size.inMu, 1, 200, size.inMax);
   const outTokens = logNormal(rng, size.outMu, 0.9, 12, size.outMax);
   // Cache reads and writes are part of the input.
@@ -549,8 +598,14 @@ function demoRecord(
     credits: credits(model, inTokens, outTokens, cacheReadTokens, cacheWriteTokens),
     success: true,
     status: 200,
-    // Time to first token, then 80-250 output tokens a second.
-    durationMs: Math.round(400 + rng() * 1100 + outTokens * (4 + rng() * 8)),
+    // Time to first token, then the model's output speed, plus a wait for each extra try.
+    durationMs: Math.round(
+      400 +
+        rng() * 1100 +
+        outTokens * msPerOutputToken(model) * (0.7 + rng() * 0.6) +
+        (tries - 1) * int(side, 800, 6_000),
+    ),
+    tries,
   };
 }
 
@@ -887,18 +942,32 @@ function buildBreakdown(holder: Holder, range: string, tzOffset: number): UserUs
 
 /** The mock log carries no request IDs: a stable one per row, like "req_" + 24 hex. */
 function requestIdFor(record: RequestRecord): string {
-  let seed = 2166136261;
-  for (const char of `${record.id ?? 0}:${record.ts}:${record.apiKeyId ?? ""}`) {
-    seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
-  }
-  return `req_${hex(createRng(seed), 24)}`;
+  return `req_${hex(sideRng(`${record.id ?? 0}:${record.ts}:${record.apiKeyId ?? ""}`), 24)}`;
+}
+
+/**
+ * The upstream attempts a row took, as the server counts them (proxy/request_attempts.go
+ * attemptCount): a demo row's own count, else its chain plus the attempts the cap dropped, else
+ * (the mock DB keeps no chain) a draw seeded from the row; none for a request refused before
+ * routing.
+ */
+function recordTries(record: RequestRecord): number {
+  if (record.tries !== undefined) return record.tries;
+  const attempts = record.attempts ?? [];
+  if (attempts.length > 0) return attempts.length + (attempts.at(-1)?.skipped ?? 0);
+  if (!record.accountId) return 0;
+  const rng = sideRng(`tries:${record.requestId ?? requestIdFor(record)}`);
+  return record.success ? successTries(rng) : failureTries(rng, record.errorType);
 }
 
 function isClient(value: string | undefined): value is RequestClient {
   return (REQUEST_CLIENTS as readonly (string | undefined)[]).includes(value);
 }
 
-/** Only the fields a key holder may see: no account, email, message, attempts or body. */
+/**
+ * Only the fields a key holder may see: no account, email, message or body, and of the attempts
+ * only their count.
+ */
 function requestView(record: RequestRecord): UserRequest {
   return {
     ts: record.ts,
@@ -916,6 +985,7 @@ function requestView(record: RequestRecord): UserRequest {
     durationMs: record.durationMs ?? 0,
     errorType: record.success ? "" : (record.errorType ?? "unknown"),
     requestId: record.requestId ?? requestIdFor(record),
+    tries: recordTries(record),
   };
 }
 

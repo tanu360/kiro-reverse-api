@@ -131,6 +131,13 @@ describe("user panel mock", () => {
     // Every tab's answer counts the key's whole log, as the server does.
     const counts = { all: mine.length, succeeded: ok.total, failed: failed.total };
     for (const page of [first, failed, ok]) expect(page.counts).toEqual(counts);
+    // The admin log keeps no try count: a stable one per row, none for a refusal.
+    for (const row of first.requests) {
+      expect(row.tries).toBe(row.model === "" ? 0 : Math.max(1, row.tries));
+    }
+    expect((await getUserRequests({ page: 1, pageSize: 10 })).requests.map((r) => r.tries)).toEqual(
+      first.requests.map((row) => row.tries),
+    );
   });
 });
 
@@ -309,6 +316,35 @@ describe("user panel mock demo keys", () => {
     for (const row of all.requests) {
       expect(row.cacheReadTokens + row.cacheWriteTokens).toBeLessThanOrEqual(row.inTokens);
     }
+  });
+
+  it("counts each request's upstream tries: one mostly, more for some, none for a refusal", async () => {
+    let retriedSuccesses = 0;
+    let retriedFailures = 0;
+    for (const { id, key } of DEMO_KEYS) {
+      if (id === "requestsError") continue;
+      await signInWithKey(key, false);
+      const page = await getUserRequests({ pageSize: 100 });
+      for (const row of page.requests) {
+        // A row without a model was refused by the key before any attempt.
+        if (row.model === "") expect(row.tries).toBe(0);
+        else expect(row.tries).toBeGreaterThanOrEqual(1);
+        expect(row.tries).toBeLessThanOrEqual(5);
+        // A bad request or a client that left is never tried again.
+        if (row.errorType === "invalid_request" || row.errorType === "client_closed") {
+          expect(row.tries).toBe(1);
+        }
+        if (row.tries > 1 && row.success) retriedSuccesses++;
+        if (row.tries > 1 && !row.success) retriedFailures++;
+      }
+      const tried = page.requests.filter((row) => row.tries > 0);
+      if (tried.length >= 50) {
+        // Most requests take one try.
+        expect(tried.filter((row) => row.tries === 1).length / tried.length).toBeGreaterThan(0.7);
+      }
+    }
+    expect(retriedSuccesses).toBeGreaterThan(3);
+    expect(retriedFailures).toBeGreaterThan(0);
   });
 
   it("near and over limits", async () => {

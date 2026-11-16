@@ -221,6 +221,19 @@ describe("normalisers", () => {
     expect(normalizeUserRequest({ success: true, errorType: "timeout" }).errorType).toBe("");
   });
 
+  it("keeps the try count and never an attempt's account", () => {
+    const row = normalizeUserRequest({
+      tries: 3,
+      attempts: [{ accountId: "acc-1", email: "someone@example.com" }],
+    });
+    expect(row.tries).toBe(3);
+    expect(row).not.toHaveProperty("attempts");
+    // An older server sends none; a damaged count reads as none.
+    expect(normalizeUserRequest({}).tries).toBe(0);
+    expect(normalizeUserRequest({ tries: -2 }).tries).toBe(0);
+    expect(normalizeUserRequest({ tries: "3" }).tries).toBe(0);
+  });
+
   it("keeps a known client and drops one this UI does not know", () => {
     expect(normalizeUserRequest({ client: "claude-code" }).client).toBe("claude-code");
     expect(normalizeUserRequest({ client: "codex" }).client).toBe("codex");
