@@ -3,6 +3,7 @@ package proxy
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -15,6 +16,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"kiro-proxy/config"
@@ -476,6 +478,67 @@ func TestUserUsageIsCachedAndBudgeted(t *testing.T) {
 	}
 }
 
+// A loop over request pages runs out of the key's own budget and is answered as the usage
+// routes answer one; the usage routes and other keys keep their own budgets.
+func TestUserRequestsAreBudgeted(t *testing.T) {
+	h := newUserAPITestHandler(t)
+	key := addUsageKey(t, "loop", "sk-user-pages-loop-0123456789", true)
+	other := addUsageKey(t, "calm", "sk-user-pages-calm-0123456789", true)
+	token := userSignIn(t, h, key.Key)
+
+	for n := 1; n <= userRequestPagesPerMinute; n++ {
+		if rec := userCall(h, http.MethodGet, "/user/api/requests?sort=tokens&pageSize=100&page="+strconv.Itoa(n), token, ""); rec.Code != http.StatusOK {
+			t.Fatalf("page %d: %d %s", n, rec.Code, rec.Body.String())
+		}
+	}
+	busy := userCall(h, http.MethodGet, "/user/api/requests", token, "")
+	assertUserError(t, busy, http.StatusTooManyRequests, codeUserUsageBusy)
+	if busy.Header().Get("Retry-After") != "60" {
+		t.Fatalf("Retry-After %q", busy.Header().Get("Retry-After"))
+	}
+	if rec := userCall(h, http.MethodGet, "/user/api/usage?range=24h&tzOffset=0", token, ""); rec.Code != http.StatusOK {
+		t.Fatalf("usage while the request pages are spent: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := userCall(h, http.MethodGet, "/user/api/requests", userSignIn(t, h, other.Key), ""); rec.Code != http.StatusOK {
+		t.Fatalf("other key: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// The request-page budget starts again each minute, spent usage queries do not draw on it, and
+// a key's new minute drops the other keys' spent budgets.
+func TestUserRequestPageBudgetRenewsEachMinute(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var c userUsageCache
+		build := func() (any, error) { return 1, nil }
+		for i := range userUsageBuildsPerMinute {
+			if _, err := c.get("k", fmt.Sprintf("usage|k|%d", i), build); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := c.get("k", "usage|k|spent", build); !errors.Is(err, errUserUsageBusy) {
+			t.Fatalf("usage past the budget: %v", err)
+		}
+		for range userRequestPagesPerMinute {
+			if err := c.spendRequestPage("k"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := c.spendRequestPage("k"); !errors.Is(err, errUserUsageBusy) {
+			t.Fatalf("page past the budget: %v", err)
+		}
+		if err := c.spendRequestPage("other"); err != nil {
+			t.Fatalf("other key: %v", err)
+		}
+		time.Sleep(time.Minute)
+		if err := c.spendRequestPage("k"); err != nil {
+			t.Fatalf("a minute later: %v", err)
+		}
+		if _, ok := c.pageBudgets["other"]; ok || len(c.pageBudgets) != 1 {
+			t.Fatalf("spent budgets kept: %v", c.pageBudgets)
+		}
+	})
+}
+
 func TestUserUsageCacheBuildsOnceForConcurrentCalls(t *testing.T) {
 	var c userUsageCache
 	var builds atomic.Int32
@@ -859,6 +922,9 @@ func TestUserRequestsPagingEdges(t *testing.T) {
 		{"?pageSize=1", 1, 1, 1, "mine-29"},
 		{"?page=4&pageSize=10", 4, 10, 0, ""},
 		{"?page=31&pageSize=1", 31, 1, 0, ""},
+		// A page past maxUserRequestsRows is the last page within it.
+		{"?sort=tokens&pageSize=100&page=999999", maxUserRequestsRows / 100, 100, 0, ""},
+		{"?page=999999&pageSize=7", maxUserRequestsRows / 7, 7, 0, ""},
 	} {
 		p := get(token, c.query)
 		first := ""
@@ -874,7 +940,7 @@ func TestUserRequestsPagingEdges(t *testing.T) {
 		"?page=9223372036854775807", "?page=9223372036854775807&pageSize=100", "?page=4611686018427387905&pageSize=4",
 		"?page=99999999999999999999", "?page=2147483648&pageSize=100",
 	} {
-		if p := get(token, query); p.Total != 30 || len(p.Requests) != 0 || p.Page < 2 {
+		if p := get(token, query); p.Total != 30 || len(p.Requests) != 0 || p.Page < 2 || p.Page*p.PageSize > maxUserRequestsRows {
 			t.Fatalf("%s: total %d page %d rows %s", query, p.Total, p.Page, ids(p))
 		}
 	}

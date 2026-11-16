@@ -35,19 +35,31 @@ const (
 	// userUsageBuildsPerMinute caps the usage queries one key may run past the cache: another
 	// range or time zone is another answer, so the cache alone cannot bound a loop.
 	userUsageBuildsPerMinute = 20
+	// userRequestPagesPerMinute caps the request pages one key may read in a minute. Pages are not
+	// cached, so a poll sees new requests at once; the panel polls the page in view every 30 s
+	// and a person pages and sorts by hand, both far below this.
+	userRequestPagesPerMinute = 60
+	// maxUserRequestsRows is how deep GET /user/api/requests reads: page*pageSize stays at most
+	// this, so no page has the database sort and step over more of the key's rows than that.
+	maxUserRequestsRows = 10000
 )
 
-// errUserUsageBusy is a key over userUsageBuildsPerMinute; it is answered 429.
+// errUserUsageBusy is a key over userUsageBuildsPerMinute or userRequestPagesPerMinute; it is
+// answered 429.
 var errUserUsageBusy = errors.New("too many usage queries for this key")
 
 // userUsageCache keeps each key's recent usage answers, by key, route and window, runs one query
-// per answer at a time, and holds each key to userUsageBuildsPerMinute queries. The zero value
-// is ready to use.
+// per answer at a time, and holds each key to userUsageBuildsPerMinute queries. It also holds
+// each key to userRequestPagesPerMinute request pages (spendRequestPage). The zero value is
+// ready to use.
 type userUsageCache struct {
 	mu       sync.Mutex
 	entries  map[string]userUsageCacheEntry
 	inflight map[string]chan struct{}
 	budgets  map[string]adminGuessBucket
+	// pageBudgets are the request pages' budgets, apart from the usage queries' so that paging
+	// through requests never holds back the usage charts, nor the other way round.
+	pageBudgets map[string]adminGuessBucket
 }
 
 type userUsageCacheEntry struct {
@@ -76,21 +88,54 @@ func (c *userUsageCache) get(keyID, id string, build func() (any, error)) ([]byt
 			c.budgets = make(map[string]adminGuessBucket)
 			c.entries = make(map[string]userUsageCacheEntry)
 		}
-		budget := c.budgets[keyID]
-		if !now.Before(budget.until) {
-			budget = adminGuessBucket{until: now.Add(time.Minute)}
-		}
-		if budget.count >= userUsageBuildsPerMinute {
+		if !spendBudgetLocked(c.budgets, keyID, userUsageBuildsPerMinute, now) {
 			c.mu.Unlock()
 			return nil, errUserUsageBusy
 		}
-		budget.count++
-		c.budgets[keyID] = budget
 		done := make(chan struct{})
 		c.inflight[id] = done
 		c.mu.Unlock()
 		return c.build(id, done, now, build)
 	}
+}
+
+// spendBudgetLocked counts one query against keyID's bucket in budgets, a fresh bucket each
+// minute, and reports false, counting nothing, once the key has run limit queries in its
+// minute. The cache's mu must be held.
+func spendBudgetLocked(budgets map[string]adminGuessBucket, keyID string, limit int, now time.Time) bool {
+	budget := budgets[keyID]
+	if !now.Before(budget.until) {
+		budget = adminGuessBucket{until: now.Add(time.Minute)}
+	}
+	if budget.count >= limit {
+		return false
+	}
+	budget.count++
+	budgets[keyID] = budget
+	return true
+}
+
+// spendRequestPage counts one GET /user/api/requests against keyID's userRequestPagesPerMinute
+// and answers errUserUsageBusy once they are spent. Spent budgets are dropped whenever a key
+// starts a new minute, so the map stays small.
+func (c *userUsageCache) spendRequestPage(keyID string) error {
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.pageBudgets == nil {
+		c.pageBudgets = make(map[string]adminGuessBucket)
+	}
+	if !now.Before(c.pageBudgets[keyID].until) {
+		for k, b := range c.pageBudgets {
+			if !now.Before(b.until) {
+				delete(c.pageBudgets, k)
+			}
+		}
+	}
+	if !spendBudgetLocked(c.pageBudgets, keyID, userRequestPagesPerMinute, now) {
+		return errUserUsageBusy
+	}
+	return nil
 }
 
 // build runs one query for id and stores its answer. The waiters are released even if the
@@ -124,8 +169,8 @@ func (c *userUsageCache) build(id string, done chan struct{}, now time.Time, bui
 }
 
 // writeUserInternalError logs err and answers 500 without its text: a database or I/O error can
-// name files and internals a key holder has no business seeing. A key over its usage budget gets
-// 429 with a minute to wait.
+// name files and internals a key holder has no business seeing. A key over its usage or request
+// page budget gets 429 with a minute to wait.
 func writeUserInternalError(w http.ResponseWriter, err error) {
 	if errors.Is(err, errUserUsageBusy) {
 		w.Header().Set("Retry-After", "60")
@@ -358,7 +403,7 @@ func (h *Handler) handleUserAPI(w http.ResponseWriter, r *http.Request) {
 	case path == "/usage/breakdown" && r.Method == http.MethodGet:
 		apiUserUsageBreakdown(w, r, entry, &h.userUsage)
 	case path == "/requests" && r.Method == http.MethodGet:
-		apiUserRequests(w, r, entry)
+		apiUserRequests(w, r, entry, &h.userUsage)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})
@@ -722,7 +767,15 @@ func countUserRequests(keyID, status string) int {
 // apiUserRequests serves GET /user/api/requests?page=&pageSize=&status=all|success|error
 // &sort=&order=asc|desc: this key's requests from the same log as the admin Requests page,
 // newest first by default, with the key's count per status. An unknown or account sort is time.
-func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKeyEntry) {
+// A page past maxUserRequestsRows is the last page within it.
+func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKeyEntry, cache *userUsageCache) {
+	//! Every page runs three queries that read and sort all of the key's rows on the database's
+	//! one connection, and a disabled or expired key still signs in: an unbudgeted loop over
+	//! pages would stall request logging and the admin pages.
+	if err := cache.spendRequestPage(entry.ID); err != nil {
+		writeUserInternalError(w, err)
+		return
+	}
 	q := r.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
 	pageSize, err := strconv.Atoi(q.Get("pageSize"))
@@ -730,6 +783,8 @@ func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKey
 		pageSize = 25
 	}
 	pageSize = min(pageSize, maxUserRequestsPageSize)
+	// Clamped as normalizeRequestQuery clamps a page whose offset would overflow.
+	page = min(page, maxUserRequestsRows/pageSize)
 	status := ""
 	switch q.Get("status") {
 	case "success":
