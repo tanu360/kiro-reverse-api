@@ -27,7 +27,7 @@
   "demoKeys.new.description": "Sem nome e sem requisições ainda",
   "demoKeys.heavy.label": "Uso intenso",
   "demoKeys.heavy.description": "Nome longo, números enormes, 680 requisições",
-  "demoKeys.usageBusy.label": "Uso ocupado",
+  "demoKeys.usageBusy.label": "Uso sobrecarregado",
   "demoKeys.usageBusy.description": "O uso não carrega: consultas demais",
   "demoKeys.requestsError.label": "Requisições com erro",
   "demoKeys.requestsError.description": "As requisições recentes não carregam: erro no servidor",

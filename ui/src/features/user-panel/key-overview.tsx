@@ -1,4 +1,5 @@
 import {
+  AlertCircleIcon,
   CircleCheckIcon,
   CircleSlashIcon,
   Clock01Icon,
@@ -14,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { UserKey } from "@/lib/api/user-panel";
 import { dateTimeFormat, formatDateTime, unixToDate } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
-import { userKeyStatus } from "./key-status";
+import { type UserKeyStatus, userKeyStatus } from "./key-status";
 
 /** A date alone (no time), short enough for a badge: "Nov 30, 2026". */
 export function formatDay(unixSec: number, lang: Lang): string {
@@ -22,8 +23,9 @@ export function formatDay(unixSec: number, lang: Lang): string {
 }
 
 /**
- * The key's state in the API keys table's tones: Active (green), Turned off (grey) or Expired
- * (amber); an active key with an expiry also carries "Expires {date}".
+ * The key's state in the API keys table's tones: Active (green), Turned off (grey), Expired
+ * (amber) or Limit reached (amber) for a token, credit or call limit; an active key with an
+ * expiry also carries "Expires {date}".
  */
 export function KeyStatusBadges({ apiKey }: { apiKey: UserKey }): JSX.Element {
   const { t, lang } = useT("user-panel");
@@ -37,6 +39,10 @@ export function KeyStatusBadges({ apiKey }: { apiKey: UserKey }): JSX.Element {
       ) : status === "expired" ? (
         <Badge icon={Clock01Icon} tone="warning">
           {t("status.expired")}
+        </Badge>
+      ) : status !== "active" ? (
+        <Badge icon={AlertCircleIcon} tone="warning">
+          {t("status.limitReached")}
         </Badge>
       ) : (
         <Badge icon={CircleCheckIcon} tone="success">
@@ -110,10 +116,18 @@ export function KeyHeading({
   );
 }
 
+/** Why the proxy refuses the key's requests, and what the admin must do about it. */
+const REFUSED_ALERT = {
+  off: "alert.off",
+  tokenLimit: "alert.tokenLimit",
+  creditLimit: "alert.creditLimit",
+  callLimit: "alert.callLimit",
+} as const satisfies Record<Exclude<UserKeyStatus, "active" | "expired">, string>;
+
 /**
- * What the page says first: a key that is off or expired has every request refused; a server
- * that does not require API keys counts calls to its own address for no key, so they are
- * missing here.
+ * What the page says first: a key that is off, expired or at a limit has every request refused;
+ * a server that does not require API keys counts calls to its own address for no key, so they
+ * are missing here.
  */
 export function KeyNotice({ apiKey }: { apiKey: UserKey }): JSX.Element | null {
   const { t, lang } = useT("user-panel");
@@ -125,9 +139,9 @@ export function KeyNotice({ apiKey }: { apiKey: UserKey }): JSX.Element | null {
         <Alert data-status={status} variant="warning">
           <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
           <AlertDescription>
-            {status === "off"
-              ? t("alert.off")
-              : t("alert.expired", { date: formatDateTime(apiKey.expiresAt, lang) })}
+            {status === "expired"
+              ? t("alert.expired", { date: formatDateTime(apiKey.expiresAt, lang) })
+              : t(REFUSED_ALERT[status])}
           </AlertDescription>
         </Alert>
       )}

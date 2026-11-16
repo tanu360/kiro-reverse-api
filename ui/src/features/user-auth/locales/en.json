@@ -28,11 +28,11 @@
   "demoKeys.heavy.label": "Heavy use",
   "demoKeys.heavy.description": "Long name, huge numbers, 680 requests",
   "demoKeys.usageBusy.label": "Usage busy",
-  "demoKeys.usageBusy.description": "Usage can't load: too many queries",
+  "demoKeys.usageBusy.description": "Usage cannot load: too many queries",
   "demoKeys.requestsError.label": "Requests fail",
-  "demoKeys.requestsError.description": "Recent requests can't load: server error",
+  "demoKeys.requestsError.description": "Recent requests cannot load: server error",
   "demoKeys.openServer.label": "Keys not required",
-  "demoKeys.openServer.description": "The server doesn't ask for keys",
+  "demoKeys.openServer.description": "The server does not ask for keys",
   "demoKeys.shortSession.label": "Short session",
   "demoKeys.shortSession.description": "The session ends after 30 seconds"
 }

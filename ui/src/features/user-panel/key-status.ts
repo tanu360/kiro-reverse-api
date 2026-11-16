@@ -1,22 +1,39 @@
 import { useEffect, useState } from "react";
+import { limitReachedReason } from "@/features/api/api-key-form";
 import type { UserKey } from "@/lib/api/user-panel";
 
-/** `off` and `expired` keys get every request refused; the page says so prominently. */
-export type UserKeyStatus = "active" | "off" | "expired";
+/**
+ * Every state but `active` gets the key's requests refused; the page says so prominently.
+ * `tokenLimit` / `creditLimit`: it reached that limit, so the proxy turned it off. `callLimit`: it
+ * used its successful calls; it stays on, but clients get 429 until the limit is raised or usage
+ * is reset.
+ */
+export type UserKeyStatus =
+  | "active"
+  | "off"
+  | "expired"
+  | "tokenLimit"
+  | "creditLimit"
+  | "callLimit";
 
 /** setTimeout's longest delay (about 24.8 days); a later expiry waits for a poll instead. */
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
 /**
- * The key's state, in the admin table's order: a key that is turned off reads as off even when
- * it has also expired. An expiry that passed since the last poll counts as expired already.
+ * The key's state, in the order the proxy refuses a request (proxy/auth.go): turned off, then
+ * expired, then the token limit, the credit limit and the call limit. A key off because it
+ * reached its token or credit limit (config/apikeys.go turns it off then) reads as that limit, as
+ * on the admin's API keys table. An expiry that passed since the last poll counts as expired
+ * already.
  */
-export function userKeyStatus(
-  key: Pick<UserKey, "enabled" | "expired" | "expiresAt">,
-  nowSec: number = Date.now() / 1000,
-): UserKeyStatus {
-  if (!key.enabled) return "off";
+export function userKeyStatus(key: UserKey, nowSec: number = Date.now() / 1000): UserKeyStatus {
+  const limit = limitReachedReason(key);
+  if (!key.enabled && limit !== "disabled") return "off";
   if (key.expired || (key.expiresAt > 0 && key.expiresAt <= nowSec)) return "expired";
+  if (limit === "disabled") {
+    return key.tokenLimit > 0 && key.tokensUsed >= key.tokenLimit ? "tokenLimit" : "creditLimit";
+  }
+  if (limit === "calls") return "callLimit";
   return "active";
 }
 

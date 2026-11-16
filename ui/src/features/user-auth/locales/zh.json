@@ -27,7 +27,7 @@
   "demoKeys.new.description": "没有名称，也还没有请求",
   "demoKeys.heavy.label": "大量使用",
   "demoKeys.heavy.description": "长名称、超大数值、680 条请求",
-  "demoKeys.usageBusy.label": "用量繁忙",
+  "demoKeys.usageBusy.label": "用量查询繁忙",
   "demoKeys.usageBusy.description": "用量无法加载：查询过多",
   "demoKeys.requestsError.label": "请求加载失败",
   "demoKeys.requestsError.description": "最近请求无法加载：服务器错误",

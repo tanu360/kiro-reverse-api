@@ -467,6 +467,59 @@ describe("empty and partial data", () => {
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(/^This key expired on /);
   });
+
+  // The proxy turns a key off at its token or credit limit (config/apikeys.go) and answers 429
+  // at its call limit with the key still on (proxy/auth.go).
+  it.each([
+    [
+      "token",
+      { enabled: false, tokenLimit: 1_000, tokensUsed: 1_040 },
+      "This key reached its token limit, so the proxy turned it off. Its requests are refused until the admin raises the limit or resets usage, then turns the key on again.",
+    ],
+    [
+      "credit",
+      { enabled: false, creditLimit: 5, creditsUsed: 5 },
+      "This key reached its credit limit, so the proxy turned it off. Its requests are refused until the admin raises the limit or resets usage, then turns the key on again.",
+    ],
+    [
+      "call",
+      { callLimit: 10, successfulCalls: 10 },
+      "This key reached its call limit. The proxy refuses its requests with a 429 error until the admin raises the limit or resets usage.",
+    ],
+  ])(
+    "says a key at its %s limit gets its requests refused, not that it is off or active",
+    async (_, patch, notice) => {
+      serve({ key: keyBody(patch) });
+      await renderPanel();
+      expect(document.querySelector("[data-slot=key-status]")).toHaveTextContent(/^Limit reached$/);
+      expect(screen.getByRole("alert")).toHaveTextContent(notice);
+    },
+  );
+
+  it("says a key turned off at its call limit is turned off: the limit alone leaves it on", async () => {
+    serve({ key: keyBody({ enabled: false, callLimit: 10, successfulCalls: 10 }) });
+    await renderPanel();
+    expect(document.querySelector("[data-slot=key-status]")).toHaveTextContent(/^Turned off$/);
+    expect(screen.getByRole("alert")).toHaveTextContent(/^This key is turned off\./);
+  });
+
+  it("stops Refresh spinning once every panel query settles, the slow usage included", async () => {
+    serve({
+      usage: async () => {
+        await delay(150);
+        return HttpResponse.json(usageBody());
+      },
+    });
+    const { user } = await renderPanel();
+    const refresh = screen.getByRole("button", { name: "Refresh" });
+    // The key answers first; the page must still hear when the usage settles after it.
+    await waitFor(() => expect(refresh).not.toHaveAttribute("aria-busy"));
+    expect(refresh).not.toHaveAttribute("aria-disabled");
+    await user.click(refresh);
+    await waitFor(() => expect(refresh).toHaveAttribute("aria-busy", "true"));
+    await waitFor(() => expect(refresh).not.toHaveAttribute("aria-busy"));
+    expect(refresh).not.toHaveAttribute("aria-disabled");
+  });
 });
 
 describe("one request failing", () => {

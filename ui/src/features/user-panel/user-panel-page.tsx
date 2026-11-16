@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { ErrorState } from "@/components/shared/error-state";
 import { Card } from "@/components/ui/card";
@@ -44,7 +44,9 @@ export function UserPanelPage(): JSX.Element {
   const apiKey = key.data;
   // The badge, notice and key facts read the clock: they turn to Expired when the expiry passes.
   useRerenderAtExpiry(apiKey?.expiresAt ?? 0);
-  const refreshing = queryClient.isFetching({ queryKey: queryKeys.userPanel.all }) > 0;
+  // Subscribed, so Refresh stops spinning when the last panel query settles, not at the next
+  // render something else happens to cause.
+  const refreshing = useIsFetching({ queryKey: queryKeys.userPanel.all }) > 0;
 
   return (
     <UserShell onSignOut={() => void signOut()} signingOut={signingOut}>
@@ -52,7 +54,11 @@ export function UserPanelPage(): JSX.Element {
         apiKey={apiKey}
         failed={key.isError}
         fetching={key.isFetching || refreshing}
-        onRefresh={() => void queryClient.refetchQueries({ queryKey: queryKeys.userPanel.all })}
+        // Only the queries on screen: a cached range or page would spend the key's usage budget
+        // (20 builds a minute) too, and it loads again when shown once stale.
+        onRefresh={() =>
+          void queryClient.refetchQueries({ queryKey: queryKeys.userPanel.all, type: "active" })
+        }
       />
       {key.isError && !apiKey ? (
         <Card>

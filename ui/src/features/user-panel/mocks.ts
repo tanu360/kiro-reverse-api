@@ -60,8 +60,9 @@ import { lifetimeGrid } from "@/lib/mocks/lifetime";
 //                           (rate limit, upstream, stream, client closed, timeout, bad request),
 //                           cache reads and writes; token and credit limits well under way.
 //   sk-demo-near-limit      "Staging": tokens 95%, credits 98% and calls 90% of their limits.
-//   sk-demo-over-limit      "Hackathon bot": tokens 104% of the limit; the last few requests
-//                           were refused 429 (API key limit).
+//   sk-demo-over-limit      "Hackathon bot": tokens 104% of the limit, so the proxy turned it off
+//                           (config/apikeys.go) and refused 401 since; a few 429s (API key
+//                           limit) before, for requests that would have passed the limit.
 //   sk-demo-off             "Old CI runner": turned off; refused 401 since the admin did so.
 //   sk-demo-expired         "Contractor — Q3": expired three days ago; refused 401 since.
 //   sk-demo-expiring        "Trial — Northwind": expires in two days, with a credit limit.
@@ -388,6 +389,8 @@ const DEMO_SPECS: readonly DemoSpec[] = [
     seed: 7103,
     settings: (now) => ({
       name: "Hackathon bot",
+      // A reached token or credit limit turns the key off, as on the real server.
+      enabled: false,
       createdAt: now - 12 * DAY,
       tokenLimit: 1_000_000,
       tokensUsed: 1_041_377,
@@ -401,8 +404,11 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       [CALLERS.anthropicApi, 16],
     ],
     log: (log) => {
-      log.refused(9, 2 * MINUTE, 3 * HOUR, FAILURES.keyLimit, LIGHT);
-      log.traffic(150, 3 * HOUR, 12 * DAY, LIGHT);
+      // Turned off since its last success: "API key disabled" (401). Near the limit, the token
+      // reservation refused the requests that would have passed it (429) and let smaller ones by.
+      log.refused(6, 2 * MINUTE, 2 * HOUR, FAILURES.keyRefused, LIGHT);
+      log.refused(3, 2 * HOUR, 5 * HOUR, FAILURES.keyLimit, LIGHT);
+      log.traffic(150, 2 * HOUR, 12 * DAY, LIGHT);
     },
   },
   {

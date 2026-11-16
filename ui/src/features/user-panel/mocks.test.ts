@@ -404,15 +404,18 @@ describe("user panel mock demo keys", () => {
     expect(near.creditsUsed / near.creditLimit).toBeCloseTo(0.98, 2);
     expect(near.successfulCalls / near.callLimit).toBeCloseTo(0.9, 2);
 
+    // As on the real server, the reached token limit turned the key off: refused 401 since,
+    // after 429s for the requests that would have passed the limit.
     const over = await demo("overLimit");
     expect(over.tokensUsed).toBeGreaterThan(over.tokenLimit);
-    const [latest] = (await getUserRequests({ pageSize: 10 })).requests;
-    expect(latest).toMatchObject({
-      success: false,
-      status: 429,
-      errorType: "api_key_limit",
-      model: "",
-    });
+    expect(over.enabled).toBe(false);
+    const rows = (await getUserRequests({ pageSize: 100 })).requests;
+    expect(rows[0]).toMatchObject({ success: false, status: 401, errorType: "auth", model: "" });
+    const lastSuccess = rows.find((row) => row.success)?.ts ?? 0;
+    const refused = rows.filter((row) => row.status === 401);
+    expect(refused).toHaveLength(6);
+    for (const row of refused) expect(row.ts).toBeGreaterThan(lastSuccess);
+    expect(rows.filter((row) => row.errorType === "api_key_limit")).toHaveLength(3);
   });
 
   it("turned off, expired and expiring soon", async () => {

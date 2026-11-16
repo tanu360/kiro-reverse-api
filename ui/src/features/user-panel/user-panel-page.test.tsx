@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { signInWithKey, USER_API_BASE, type UserRequest } from "@/lib/api/user-panel";
+import { signInWithKey, USER_API_BASE, type UserKey, type UserRequest } from "@/lib/api/user-panel";
 import { getUserToken } from "@/lib/auth/user-session";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { jsonError } from "@/lib/mocks/http";
@@ -121,17 +121,61 @@ function bodyRows(table: HTMLElement): HTMLElement[] {
   return within(table).getAllByRole("row").slice(1);
 }
 
+/** A key view with no limits, turned on and never expiring, changed by `patch`. */
+function userKey(patch: Partial<UserKey> = {}): UserKey {
+  return {
+    id: "key-1",
+    name: "",
+    keyMasked: "sk-abc****wxyz",
+    enabled: true,
+    expired: false,
+    createdAt: 0,
+    lastUsedAt: 0,
+    expiresAt: 0,
+    tokenLimit: 0,
+    tokensUsed: 0,
+    creditLimit: 0,
+    creditsUsed: 0,
+    callLimit: 0,
+    successfulCalls: 0,
+    requestsCount: 0,
+    rpmLimit: 0,
+    allowedModels: [],
+    keysRequired: true,
+    ...patch,
+  };
+}
+
 describe("userKeyStatus", () => {
+  const now = 1_800_000_000;
+  const status = (patch: Partial<UserKey>) => userKeyStatus(userKey(patch), now);
+  /** Off, as the proxy leaves a key that reached its token or credit limit. */
+  const tokensOut = { enabled: false, tokenLimit: 100, tokensUsed: 100 };
+  const creditsOut = { enabled: false, creditLimit: 5, creditsUsed: 5.2 };
+  const callsOut = { callLimit: 10, successfulCalls: 10 };
+
   it("reads off before expired, and a passed expiry as expired", () => {
-    const now = 1_800_000_000;
-    expect(userKeyStatus({ enabled: true, expired: false, expiresAt: 0 }, now)).toBe("active");
-    expect(userKeyStatus({ enabled: false, expired: true, expiresAt: now - 1 }, now)).toBe("off");
-    expect(userKeyStatus({ enabled: true, expired: true, expiresAt: now - 1 }, now)).toBe(
-      "expired",
+    expect(status({})).toBe("active");
+    expect(status({ enabled: false, expired: true, expiresAt: now - 1 })).toBe("off");
+    expect(status({ expired: true, expiresAt: now - 1 })).toBe("expired");
+    expect(status({ expiresAt: now - 1 })).toBe("expired");
+  });
+
+  it("reads a reached limit in the proxy's order: off, expired, tokens, credits, calls", () => {
+    expect(status(tokensOut)).toBe("tokenLimit");
+    expect(status(creditsOut)).toBe("creditLimit");
+    expect(status(callsOut)).toBe("callLimit");
+    expect(status({ ...tokensOut, ...creditsOut, ...callsOut })).toBe("tokenLimit");
+    expect(status({ ...creditsOut, ...callsOut })).toBe("creditLimit");
+    // A call limit leaves the key on: off is the admin's doing.
+    expect(status({ ...callsOut, enabled: false })).toBe("off");
+    expect(status({ ...tokensOut, expired: true, expiresAt: now - 1 })).toBe("expired");
+    expect(status({ ...callsOut, expiresAt: now - 1 })).toBe("expired");
+    // Short of a limit, or no limit at all.
+    expect(status({ tokenLimit: 100, tokensUsed: 99, callLimit: 10, successfulCalls: 9 })).toBe(
+      "active",
     );
-    expect(userKeyStatus({ enabled: true, expired: false, expiresAt: now - 1 }, now)).toBe(
-      "expired",
-    );
+    expect(status({ tokensUsed: 5_000, creditsUsed: 50, successfulCalls: 500 })).toBe("active");
   });
 });
 
@@ -178,7 +222,7 @@ describe("/user", () => {
     await signIn();
     await renderPanel();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "This server doesn't ask for API keys on its own address, so calls made there don't count here. Calls through its public link always do.",
+      "This server does not ask for API keys on its own address, so calls made there do not count here. Calls through its public link always do.",
     );
   });
 
@@ -254,13 +298,12 @@ describe("/user", () => {
     expect(adminCalls).toEqual([]);
   });
 
-  it("says in both cards that this server takes calls without a key when keys are not required", async () => {
+  it("keeps the endpoints hint to how to send the key when keys are not required", async () => {
     mockDb.settings.requireApiKey = false;
     await signIn();
     await renderPanel();
-    expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
-      "This server's own address doesn't ask for one now, but calls without it don't count here.",
-    );
+    // The panel's own alert says keys are not required; the card only says how to send one.
+    expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(/^Send your API key as /);
     const setup = screen.getByRole("region", { name: "Client setup" });
     expect(within(setup).getByRole("note")).toHaveTextContent(
       "API keys are not required now, so any value works.",
