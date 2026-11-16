@@ -148,20 +148,35 @@ export function RequestsToolbar({
         value={status ?? ALL}
       />
 
-      {/* Below a 64rem bar the search and Rows share a line over the controls, which never wrap. */}
+      {/* Below a 64rem bar the search and Rows share a line over the controls, which never wrap.
+          Clear and the count stay out of the scrolling controls, so they are always in view. */}
       <div className="min-w-0" ref={rowRef}>
         <FilterBar
           end={
-            refined && shown !== undefined && tabTotal !== undefined ? (
-              <span
-                aria-live="polite"
-                className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
-              >
-                {t("filter.results", {
-                  shown: formatNumber(shown, lang),
-                  total: formatNumber(tabTotal, lang),
-                })}
-              </span>
+            refined && (onClear || (shown !== undefined && tabTotal !== undefined)) ? (
+              <>
+                {onClear ? (
+                  <Button
+                    aria-label={tc("actions.clearFilters")}
+                    onClick={onClear}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    {t("filter.clear")}
+                  </Button>
+                ) : null}
+                {shown !== undefined && tabTotal !== undefined ? (
+                  <span
+                    aria-live="polite"
+                    className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
+                  >
+                    {t("filter.results", {
+                      shown: formatNumber(shown, lang),
+                      total: formatNumber(tabTotal, lang),
+                    })}
+                  </span>
+                ) : null}
+              </>
             ) : undefined
           }
           pageSize={
@@ -226,17 +241,6 @@ export function RequestsToolbar({
             options={sortOptions}
             sort={sort}
           />
-
-          {refined && onClear ? (
-            <Button
-              aria-label={tc("actions.clearFilters")}
-              onClick={onClear}
-              size="sm"
-              variant="ghost"
-            >
-              {t("filter.clear")}
-            </Button>
-          ) : null}
         </FilterBar>
       </div>
     </div>

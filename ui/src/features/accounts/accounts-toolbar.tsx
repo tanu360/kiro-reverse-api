@@ -269,19 +269,30 @@ export function AccountsToolbar({
         />
       ) : null}
 
-      {/* Below a 64rem bar the search and Rows share a line over the filters, which never wrap. */}
+      {/* Below a 64rem bar the search and Rows share a line over the filters, which never wrap.
+          Clear and the count stay out of the scrolling filters, so a long row never hides them. */}
       <FilterBar
         end={
           !loading && refined ? (
-            <span
-              aria-live="polite"
-              className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
-            >
-              {t("filter.results", {
-                shown: formatNumber(shown, lang),
-                total: formatNumber(accounts.length, lang),
-              })}
-            </span>
+            <>
+              <Button
+                aria-label={tc("actions.clearFilters")}
+                onClick={onClearFilters}
+                size="sm"
+                variant="ghost"
+              >
+                {t("filter.clear")}
+              </Button>
+              <span
+                aria-live="polite"
+                className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
+              >
+                {t("filter.results", {
+                  shown: formatNumber(shown, lang),
+                  total: formatNumber(accounts.length, lang),
+                })}
+              </span>
+            </>
           ) : undefined
         }
         pageSize={pageSizeControl ?? undefined}
@@ -344,17 +355,6 @@ export function AccountsToolbar({
                 value={dimension === "tag" ? filters.tag?.toLowerCase() : filters[dimension]}
               />
             ))}
-
-            {refined ? (
-              <Button
-                aria-label={tc("actions.clearFilters")}
-                onClick={onClearFilters}
-                size="sm"
-                variant="ghost"
-              >
-                {t("filter.clear")}
-              </Button>
-            ) : null}
           </>
         )}
       </FilterBar>

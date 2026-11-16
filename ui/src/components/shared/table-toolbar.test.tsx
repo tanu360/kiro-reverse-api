@@ -1,12 +1,8 @@
 import { UsersIcon } from "@hugeicons/core-free-icons";
 import { screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { FilterBar, PageSizeSelect, StatusTabs } from "./table-toolbar";
-
-// The filter bar's measured width; jsdom lays nothing out.
-const barWidth = vi.hoisted(() => ({ value: 0 }));
-vi.mock("@/hooks/use-element-width", () => ({ useElementWidth: () => barWidth.value }));
 
 describe("StatusTabs", () => {
   it("draws a tab's icon before its label from sm up, kept out of its name", () => {
@@ -33,11 +29,15 @@ describe("StatusTabs", () => {
 });
 
 describe("FilterBar", () => {
-  function renderBar(width: number) {
-    barWidth.value = width;
+  function renderBar() {
     return renderWithProviders(
       <FilterBar
-        end={<span>3 of 9</span>}
+        end={
+          <>
+            <button type="button">Clear</button>
+            <span>3 of 9</span>
+          </>
+        }
         pageSize={<PageSizeSelect onChange={() => {}} options={[10, 25]} value={25} />}
         search={<input aria-label="Search" />}
       >
@@ -46,20 +46,22 @@ describe("FilterBar", () => {
     );
   }
 
-  it("scrolls the controls and the count on one line, never the search or Rows", () => {
-    const { container } = renderBar(1200);
+  it("scrolls only the controls: the search, Clear, the count and Rows stay in view", () => {
+    const { container } = renderBar();
     const line = container.querySelector("[data-slot=scroll-area-viewport]");
     expect(line).toContainElement(screen.getByRole("button", { name: "Plan" }));
-    expect(line).toContainElement(screen.getByText("3 of 9"));
+    expect(line).not.toContainElement(screen.getByRole("button", { name: "Clear" }));
+    expect(line).not.toContainElement(screen.getByText("3 of 9"));
     expect(line).not.toContainElement(screen.getByRole("textbox", { name: "Search" }));
     expect(line).not.toContainElement(screen.getByRole("button", { name: "Rows: 25" }));
-    // From 64rem Rows keeps its label.
-    expect(screen.getByText("Rows")).toBeInTheDocument();
   });
 
-  it("drops the Rows label in a narrow bar, its name still saying Rows", () => {
-    renderBar(600);
-    expect(screen.getByRole("button", { name: "Rows: 25" })).toHaveTextContent(/^25$/);
-    expect(screen.queryByText("Rows")).not.toBeInTheDocument();
+  it("drops the Rows label below a 64rem bar by container query, its name still saying Rows", () => {
+    renderBar();
+    // jsdom runs no container queries: the class decides, so the first paint is already right.
+    expect(screen.getByText("Rows")).toHaveClass("@max-5xl/filter-bar:hidden");
+    const rows = screen.getByRole("button", { name: "Rows: 25" });
+    expect(rows).toHaveTextContent(/^25$/);
+    expect(rows).toHaveClass("@max-5xl/filter-bar:rounded-s-lg!");
   });
 });

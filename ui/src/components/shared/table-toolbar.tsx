@@ -1,6 +1,6 @@
 import { ArrowDown02Icon, ArrowUp02Icon, ChevronDownIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { createContext, type JSX, type ReactNode, useContext, useEffect, useRef } from "react";
+import { type JSX, type ReactNode, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
@@ -16,7 +16,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { selectTriggerIconClassName } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
-import { useElementWidth } from "@/hooks/use-element-width";
 import { prefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -25,19 +24,23 @@ import { cn } from "@/lib/utils";
 // The pieces a list page's DataTableCard toolbar is built from (Accounts, Requests): status tabs
 // with counts, the filter bar, "Label: Value" selects, "Sort by" and "Rows".
 
-/** The filter bar's width (64rem) from which the search, the controls and Rows share one line. */
-const FILTER_BAR_WIDE_PX = 1024;
-
-/** True inside a narrow filter bar: Rows drops its label (the menu still names it). */
-const FilterBarCompactContext = createContext(false);
+/**
+ * Below a 64rem FilterBar (where the search and Rows share a line over the controls), Rows shows
+ * its value alone. A container query rather than a measured width, so the first paint is already
+ * right. The label segment is hidden, and the button takes back the rounded start and hairline
+ * the Group gives up beside it (important, as the Group's sibling selectors outrank a utility).
+ */
+const NARROW_BAR_LABEL = "@max-5xl/filter-bar:hidden";
+const NARROW_BAR_BUTTON =
+  "@max-5xl/filter-bar:rounded-s-lg! @max-5xl/filter-bar:border-s! @max-5xl/filter-bar:before:inset-s-0! @max-5xl/filter-bar:before:rounded-s-[calc(var(--radius-lg)-1px)]!";
 
 /**
- * A table toolbar's filter row. From a 64rem bar it is one line: the search, the controls and
- * `pageSize` at the end. Narrower, the search and `pageSize` (its label dropped, "25") share the
- * first line and the controls take the second. The controls never wrap: past the bar's width
- * they scroll sideways, fading at the edge with more past it. `end` (the result count) closes
- * the controls, pushed to the right while there is room. Without a search, the controls and
- * `pageSize` share one line at every width.
+ * A table toolbar's filter row. From a 64rem bar it is one line: the search, the controls, `end`
+ * and `pageSize`. Narrower, the search and `pageSize` (its label dropped, "25") share the first
+ * line and the controls and `end` take the second. The controls never wrap: past their room they
+ * scroll sideways, fading at the edge with more past it. `end` (Clear and the result count) stays
+ * out of the scrolling line, at its right, so it is always in view. Without a search, the
+ * controls, `end` and `pageSize` share one line at every width.
  */
 export function FilterBar({
   search,
@@ -48,37 +51,31 @@ export function FilterBar({
   /** The search field; its 64rem-up width goes in `@5xl/filter-bar:` classes. */
   search?: ReactNode;
   children?: ReactNode;
+  /** Clear and the result count, kept out of the scrolling line so they are always in view. */
   end?: ReactNode;
   /** PageSizeSelect, kept out of the scrolling line so it is always in view. */
   pageSize?: ReactNode;
 }): JSX.Element {
-  const ref = useRef<HTMLDivElement>(null);
-  const width = useElementWidth(ref);
-  const compact = width > 0 && width < FILTER_BAR_WIDE_PX;
   return (
-    <div className="@container/filter-bar min-w-0" data-slot="filter-bar" ref={ref}>
+    <div className="@container/filter-bar min-w-0" data-slot="filter-bar">
       <div className="flex min-w-0 flex-wrap items-center gap-2 @5xl/filter-bar:flex-nowrap">
         {search ? <div className="min-w-0 flex-1 @5xl/filter-bar:flex-none">{search}</div> : null}
         {pageSize ? (
-          <div className="flex shrink-0 items-center @5xl/filter-bar:order-last">
-            <FilterBarCompactContext.Provider value={compact}>
-              {pageSize}
-            </FilterBarCompactContext.Provider>
-          </div>
+          <div className="flex shrink-0 items-center @5xl/filter-bar:order-last">{pageSize}</div>
         ) : null}
-        {/* The 4 px bleed (-m-1 with p-1 inside) keeps the controls' focus outline unclipped. */}
-        <ScrollArea
+        {/* The controls take what `end` leaves; from 64rem `end` sits right before Rows. */}
+        <div
           className={cn(
-            "-m-1 h-auto w-auto min-w-0 flex-1",
+            "flex min-w-0 flex-1 items-center gap-2",
             search ? "basis-full @5xl/filter-bar:basis-0" : "order-first",
           )}
-          scrollFade
         >
-          <div className="flex w-max min-w-full items-center gap-2 p-1">
-            {children}
-            {end ? <div className="ms-auto flex shrink-0 items-center gap-2">{end}</div> : null}
-          </div>
-        </ScrollArea>
+          {/* The 4 px bleed (-m-1 with p-1 inside) keeps the controls' focus outline unclipped. */}
+          <ScrollArea className="-m-1 h-auto w-auto min-w-0 flex-1" scrollFade>
+            <div className="flex w-max items-center gap-2 p-1">{children}</div>
+          </ScrollArea>
+          {end ? <div className="flex shrink-0 items-center gap-2">{end}</div> : null}
+        </div>
       </div>
     </div>
   );
@@ -100,29 +97,36 @@ export function FilterTrigger({
   label: string;
   value: string;
   after?: ReactNode;
-  /** The value button alone, without the label segment (its name still spells the label). */
+  /**
+   * Below a 64rem FilterBar, the value button alone, without the label segment (its name still
+   * spells the label). Elsewhere the label shows.
+   */
   compact?: boolean;
 }): JSX.Element {
   const { t } = useT();
-  const trigger = (
-    <MenuTrigger
-      render={<Button aria-label={t("table.filterTrigger", { label, value })} variant="outline" />}
-    >
-      <span className="max-w-36 truncate">{value}</span>
-      {after}
-      <HugeiconsIcon
-        aria-hidden="true"
-        className={selectTriggerIconClassName}
-        icon={ChevronDownIcon}
-      />
-    </MenuTrigger>
-  );
-  if (compact) return trigger;
   return (
     <Group>
-      <GroupText aria-hidden="true">{label}</GroupText>
-      <GroupSeparator />
-      {trigger}
+      <GroupText aria-hidden="true" className={cn(compact && NARROW_BAR_LABEL)}>
+        {label}
+      </GroupText>
+      <GroupSeparator className={cn(compact && NARROW_BAR_LABEL)} />
+      <MenuTrigger
+        render={
+          <Button
+            aria-label={t("table.filterTrigger", { label, value })}
+            className={cn(compact && NARROW_BAR_BUTTON)}
+            variant="outline"
+          />
+        }
+      >
+        <span className="max-w-36 truncate">{value}</span>
+        {after}
+        <HugeiconsIcon
+          aria-hidden="true"
+          className={selectTriggerIconClassName}
+          icon={ChevronDownIcon}
+        />
+      </MenuTrigger>
     </Group>
   );
 }
@@ -223,14 +227,9 @@ export function PageSizeSelect({
   onChange: (size: number) => void;
 }): JSX.Element {
   const { t, lang } = useT();
-  const compact = useContext(FilterBarCompactContext);
   return (
     <Menu>
-      <FilterTrigger
-        compact={compact}
-        label={t("table.rowsShort")}
-        value={formatNumber(value, lang)}
-      />
+      <FilterTrigger compact label={t("table.rowsShort")} value={formatNumber(value, lang)} />
       {/* Short numbers: the list fits them (the trigger is past the 3rem icon cut-off), not 11rem. */}
       <MenuPopup align="end">
         <MenuRadioGroup onValueChange={(next) => onChange(Number(next))} value={String(value)}>

@@ -29,8 +29,18 @@ const RING_MODELS = MODEL_COLORS.length;
 /** The mix card's footer: 48 px (56 from sm) with the "N more" count at its end. */
 export const MIX_FOOTER = "min-h-12 justify-end sm:min-h-14";
 
-/** Rows the mix table shows; the card's footer counts the rest. */
-export const MIX_TABLE_ROWS = RING_MODELS;
+/** Rows the mix table shows; the card's footer counts the rest (mixHiddenCount). */
+const MIX_TABLE_ROWS = RING_MODELS;
+
+/**
+ * The items the mix table leaves out, for the card's "N more" footer. A rest item (ModelMixPanel's
+ * `restId`) takes a sixth row while at most five others are named, so then nothing is left out.
+ */
+export function mixHiddenCount(items: readonly MixItem[], restId?: string): number {
+  const hasRest = restId !== undefined && items.some((item) => item.id === restId);
+  const shown = hasRest && items.length - 1 <= RING_MODELS ? items.length : MIX_TABLE_ROWS;
+  return Math.max(0, items.length - shown);
+}
 
 /**
  * One row of the mix: a model on the Overview; a model or an account of one API key in its usage
@@ -383,7 +393,7 @@ export function ModelMixCard(): JSX.Element {
   const totalsFailed = useTotalsFailed();
   const models = query.data;
   const items = useMemo(() => models?.map(mixItem), [models]);
-  const rest = Math.max(0, (models?.length ?? 0) - MIX_TABLE_ROWS);
+  const rest = items ? mixHiddenCount(items) : 0;
 
   let body: JSX.Element;
   let slim = false;

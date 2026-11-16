@@ -97,6 +97,37 @@ describe("UsageBreakdownCard by client", () => {
     expect(screen.getByText("2 more clients")).toBeInTheDocument();
   });
 
+  it("counts nothing more when Other takes a sixth row beside five callers", async () => {
+    const { user } = renderWithProviders(
+      <UsageBreakdownCard
+        clients={[
+          item("other", 40),
+          item("claude-code", 30),
+          item("codex", 20),
+          item("claude", 10),
+          item("openai", 8),
+          item("opencode", 6),
+        ]}
+        loading={false}
+        models={MODELS}
+        showAccounts={false}
+        showClients
+        title="Usage by model"
+      />,
+    );
+    await user.click(screen.getByRole("radio", { name: "By client" }));
+    const table = screen.getByRole("table", { name: "Usage by client" });
+    expect(names(table)).toEqual([
+      "Claude Code",
+      "Codex",
+      "Anthropic API",
+      "OpenAI API",
+      "opencode",
+      "Other",
+    ]);
+    expect(screen.queryByText(/more client/)).toBeNull();
+  });
+
   it.each([
     ["loads until the clients come", undefined, true],
     ["says so when the range has no traffic", [], false],

@@ -8,10 +8,10 @@ import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
   MIX_FOOTER,
-  MIX_TABLE_ROWS,
   type MixItem,
   ModelMixPanel,
   ModelMixSkeleton,
+  mixHiddenCount,
 } from "@/features/overview/model-mix-card";
 import { CallerLabel, isKnownClient, requestCaller } from "@/features/requests/request-client";
 import { isKnownEndpoint } from "@/features/requests/request-model";
@@ -153,7 +153,9 @@ export function UsageBreakdownCard({
     }));
   }, [source, kind, t, tRequests, displayEmail]);
   const total = items?.reduce((sum, item) => sum + item.reqs, 0) ?? 0;
-  const rest = Math.max(0, (items?.length ?? 0) - MIX_TABLE_ROWS);
+  const restId = kind === "clients" ? USER_USAGE_OTHER_CLIENT : undefined;
+  // What the table leaves out: "Other" gets a row of its own beside five named clients.
+  const rest = items ? mixHiddenCount(items, restId) : 0;
 
   // As the Overview's model mix: the ring and table run edge to edge (a slim card) only once
   // there is a mix to show; loading, failing and empty sit in the padded panel.
@@ -198,7 +200,7 @@ export function UsageBreakdownCard({
           items={items}
           nameHeader={view.header}
           renderName={kind === "clients" ? renderClient : undefined}
-          restId={kind === "clients" ? USER_USAGE_OTHER_CLIENT : undefined}
+          restId={restId}
         />
       </>
     );
