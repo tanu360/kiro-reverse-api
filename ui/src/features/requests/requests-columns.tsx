@@ -105,11 +105,20 @@ export function StatusBadge({
   );
 }
 
-/** A masked API key in mono, cut with an ellipsis (the full mask as a tooltip when cut). */
-function ApiKeyCode({ value, className }: { value?: string; className?: string }): JSX.Element {
+/**
+ * A masked API key in mono, cut with an ellipsis (the full mask as a tooltip when cut): 14 px in
+ * its own column, 12 px as the meta line under the account.
+ */
+function ApiKeyCode({
+  value,
+  className = "text-sm",
+}: {
+  value?: string;
+  className?: string;
+}): JSX.Element {
   const masked = normalizeApiKeyMask(value);
   if (!masked) return <Muted />;
-  return <TruncatedText className={cn("font-mono text-meta", className)}>{masked}</TruncatedText>;
+  return <TruncatedText className={cn("font-mono", className)}>{masked}</TruncatedText>;
 }
 
 export function endpointLabel(endpoint: string | undefined, t: TFunction): string {
@@ -127,7 +136,7 @@ function AccountCell({ record }: { record: RequestRecord }): JSX.Element {
       <DisplayEmail className={NAME_CAP} email={record.email} id={record.accountId} />
       {key ? (
         <ApiKeyCode
-          className={cn(NAME_CAP, "text-muted-foreground @[68rem]/requests:hidden")}
+          className={cn(NAME_CAP, "text-meta text-muted-foreground @[68rem]/requests:hidden")}
           value={key}
         />
       ) : null}

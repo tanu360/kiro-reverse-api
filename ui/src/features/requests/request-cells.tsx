@@ -385,30 +385,21 @@ export function speedTone(ms: number | undefined): SpeedTone {
   return "crawl";
 }
 
-// Plain text in the speed's colour: a fast or slow request stands out, a normal one stays muted.
-const DURATION_TEXT: Record<SpeedTone, string> = {
-  fast: "text-success-foreground",
-  normal: "text-muted-foreground",
-  slow: "text-warning-foreground",
-  crawl: "text-destructive-foreground",
-};
-
 /**
- * The duration as plain text tinted by speed, the exact milliseconds on hover; a dash on rows
- * logged before durations were.
+ * The duration as plain muted text, the exact milliseconds on hover; a dash on rows logged before
+ * durations were. data-speed carries the tone for tests and styling hooks, not a colour.
  */
 export function DurationChip({ record }: { record: RequestRecord }): JSX.Element {
   const { t, lang } = useT("requests");
   const text = formatDurationMs(record.durationMs, Boolean(record.endpoint), lang);
   if (text === EMPTY) return <Muted />;
-  const tone = speedTone(record.durationMs);
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <span
-            className={cn("whitespace-nowrap tabular-nums", DURATION_TEXT[tone])}
-            data-speed={tone}
+            className="whitespace-nowrap text-muted-foreground tabular-nums"
+            data-speed={speedTone(record.durationMs)}
           />
         }
       >
@@ -448,12 +439,11 @@ export function outputSpeedTone(tokensPerSecond: number): OutputSpeedTone {
   return "normal";
 }
 
-/** "52 tok/s" as plain text tinted by speed, as the duration; a dash when it cannot be worked out. */
+/** "52 tok/s" as plain muted text, as the duration; a dash when it cannot be worked out. */
 export function SpeedChip({ record }: { record: RequestRecord }): JSX.Element {
   const { t, lang } = useT("requests");
   const speed = outputSpeed(record);
   if (speed === undefined) return <Muted />;
-  const tone = outputSpeedTone(speed);
   // One decimal under 10 tok/s, so a slow trickle never reads 0.
   const value =
     speed >= 10
@@ -463,20 +453,13 @@ export function SpeedChip({ record }: { record: RequestRecord }): JSX.Element {
         : formatDecimal(speed, 1, lang);
   return (
     <span
-      className={cn("whitespace-nowrap tabular-nums", SPEED_TEXT[tone])}
-      data-output-speed={tone}
+      className="whitespace-nowrap text-muted-foreground tabular-nums"
+      data-output-speed={outputSpeedTone(speed)}
     >
       {t("speed.value", { n: value })}
     </span>
   );
 }
-
-// As the duration's: fast and slow stand out, normal stays muted.
-const SPEED_TEXT: Record<OutputSpeedTone, string> = {
-  fast: "text-success-foreground",
-  normal: "text-muted-foreground",
-  slow: "text-warning-foreground",
-};
 
 /**
  * The share of the input read from the cache, 0 to 1; undefined without input. The cache read

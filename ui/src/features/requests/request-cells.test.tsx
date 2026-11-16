@@ -179,14 +179,14 @@ describe("the token usage", () => {
 
 describe("the duration and credits", () => {
   it.each([
-    [900, "fast", "900ms", "text-success-foreground"],
-    [2_999, "fast", "3.00s", "text-success-foreground"],
+    [900, "fast", "900ms", "text-muted-foreground"],
+    [2_999, "fast", "3.00s", "text-muted-foreground"],
     [3_000, "normal", "3.00s", "text-muted-foreground"],
     [19_999, "normal", "20.0s", "text-muted-foreground"],
-    [20_000, "slow", "20.0s", "text-warning-foreground"],
-    [89_999, "slow", "1m 30s", "text-warning-foreground"],
-    [90_000, "crawl", "1m 30s", "text-destructive-foreground"],
-  ] as const)("marks a %i ms duration %s, in its tone", (durationMs, speed, text, tone) => {
+    [20_000, "slow", "20.0s", "text-muted-foreground"],
+    [89_999, "slow", "1m 30s", "text-muted-foreground"],
+    [90_000, "crawl", "1m 30s", "text-muted-foreground"],
+  ] as const)("marks a %i ms duration %s, always muted", (durationMs, speed, text, tone) => {
     expect(speedTone(durationMs)).toBe(speed);
     const { container } = renderWithProviders(<DurationChip record={record({ durationMs })} />);
     const duration = container.querySelector("[data-speed]");
@@ -253,11 +253,11 @@ describe("the error pill", () => {
 describe("the speed", () => {
   it.each([
     // 1,600 output tokens over the whole request.
-    [8_000, "200 tok/s", "fast", "text-success-foreground"],
-    [20_000, "80 tok/s", "fast", "text-success-foreground"],
+    [8_000, "200 tok/s", "fast", "text-muted-foreground"],
+    [20_000, "80 tok/s", "fast", "text-muted-foreground"],
     [32_000, "50 tok/s", "normal", "text-muted-foreground"],
     [80_000, "20 tok/s", "normal", "text-muted-foreground"],
-    [200_000, "8.0 tok/s", "slow", "text-warning-foreground"],
+    [200_000, "8.0 tok/s", "slow", "text-muted-foreground"],
   ] as const)("reads 1.6K tokens over %i ms as %s (%s)", (durationMs, text, speed, tone) => {
     const { container } = renderWithProviders(<SpeedChip record={record({ durationMs })} />);
     const figure = container.querySelector("[data-output-speed]");
