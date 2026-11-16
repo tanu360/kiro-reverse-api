@@ -34,6 +34,7 @@ type tunnel struct {
 	status *statusWriter
 	target *url.URL
 	secret string
+	probe  *prober
 }
 
 // run walks the node from start to serving: sign-in, device approval, the tailnet's HTTPS and
@@ -60,7 +61,7 @@ func (t *tunnel) run(ctx context.Context) error {
 		return fmt.Errorf("open the Funnel listener: %w", err)
 	}
 	server := &http.Server{
-		Handler:           newForwarder(t.target, t.secret),
+		Handler:           probeHandler(t.probe.token, newForwarder(t.target, t.secret)),
 		ConnContext:       connContext,
 		ReadHeaderTimeout: 30 * time.Second,
 		IdleTimeout:       2 * time.Minute,
@@ -80,7 +81,17 @@ func (t *tunnel) run(ctx context.Context) error {
 	_, _, _ = lc.CertPair(certCtx, domain)
 	cancel()
 	publicURL := "https://" + domain
-	t.status.emit(runningStatus(publicURL, st))
+
+	// The link goes out once it answers from the internet. Until then "running" with Publishing
+	// says Tailscale is still putting it online.
+	t.status.emit(Status{State: stateRunning, Publishing: true})
+	published := make(chan struct{})
+	go func() {
+		if t.probe.waitPublished(ctx, domain) {
+			close(published)
+		}
+	}()
+	live := false
 
 	for {
 		select {
@@ -91,16 +102,22 @@ func (t *tunnel) run(ctx context.Context) error {
 				return nil
 			}
 			return fmt.Errorf("serve: %w", err)
+		case <-published:
+			live, published = true, nil
 		case <-time.After(healthPoll):
 		}
-		cur, err := lc.StatusWithoutPeers(ctx)
-		if err != nil {
+		if cur, err := lc.StatusWithoutPeers(ctx); err == nil {
+			st = cur
+		} else if !live {
 			continue
 		}
-		if s, ok := loginStatus(cur); ok {
+		switch s, ok := loginStatus(st); {
+		case ok:
 			t.status.emit(s)
-		} else {
-			t.status.emit(runningStatus(publicURL, cur))
+		case live:
+			t.status.emit(runningStatus(publicURL, st))
+		default:
+			t.status.emit(Status{State: stateRunning, Publishing: true})
 		}
 	}
 }

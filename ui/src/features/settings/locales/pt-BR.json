@@ -189,6 +189,8 @@
   "publicLink.stepDone": "(concluído)",
   "publicLink.downloadedOf": "{downloaded} de {total} · {percent}%",
   "publicLink.certificate": "Obtendo o certificado HTTPS…",
+  "publicLink.publishing": "Aguardando o Tailscale colocar o link no ar…",
+  "publicLink.publishingHint": "Isso pode levar alguns minutos. O link aparece aqui assim que abrir pela internet.",
   "publicLink.starting": "Conectando ao Tailscale…",
   "publicLink.needsLogin": "Entre no Tailscale para receber seu link.",
   "publicLink.signIn": "Entrar no Tailscale",

@@ -182,6 +182,8 @@
   "publicLink.stepDone": "（完了）",
   "publicLink.downloadedOf": "{downloaded} / {total} · {percent}%",
   "publicLink.certificate": "HTTPS 証明書を取得中…",
+  "publicLink.publishing": "Tailscale がリンクを公開するのを待っています…",
+  "publicLink.publishingHint": "数分かかることがあります。インターネットから開けるようになると、ここにリンクが表示されます。",
   "publicLink.starting": "Tailscale に接続中…",
   "publicLink.needsLogin": "リンクを取得するには Tailscale にサインインしてください。",
   "publicLink.signIn": "Tailscale にサインイン",

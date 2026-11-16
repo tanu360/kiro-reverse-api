@@ -78,6 +78,17 @@ describe("PublicLinkCard", () => {
     expect(steps[4]).toHaveAttribute("aria-current", "step");
   });
 
+  it("waits for the link to open from the internet before showing it", async () => {
+    mockDb.tunnel.pinned = { enabled: true, signedIn: true, state: "running", publishing: true };
+    renderWithProviders(<PublicLinkCard />);
+    expect(await screen.findByText("Waiting for Tailscale to put the link online…")).toBeVisible();
+    expect(screen.getByText(/This can take a few minutes/)).toBeVisible();
+    expect(screen.queryByText("Getting the HTTPS certificate…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Link")).not.toBeInTheDocument();
+    const steps = within(screen.getByRole("list", { name: "Setup" })).getAllByRole("listitem");
+    expect(steps[4]).toHaveAttribute("aria-current", "step");
+  });
+
   it("links to Tailscale's sign-in page while it waits for a sign-in", async () => {
     mockDb.tunnel.pinned = {
       enabled: true,

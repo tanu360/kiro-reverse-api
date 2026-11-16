@@ -69,6 +69,9 @@ type Status struct {
 	// device's page in the admin console, where that is done.
 	KeyExpiry  string `json:"keyExpiry,omitempty"`
 	MachineURL string `json:"machineURL,omitempty"`
+	// Publishing is set while running without a URL: the certificate is in, and the helper waits
+	// for the link to answer from the internet, which can take Tailscale a few minutes.
+	Publishing bool `json:"publishing,omitempty"`
 }
 
 // Codes in Status.ErrorCode. A code never changes once shipped.
@@ -479,6 +482,8 @@ type helperLine struct {
 	// Helpers from before key expiry was reported leave both empty.
 	KeyExpiry  string `json:"keyExpiry"`
 	MachineURL string `json:"machineURL"`
+	// Helpers from before the reachability check never set it.
+	Publishing bool `json:"publishing"`
 }
 
 var errProtocol = errors.New("the Tailscale helper does not match this version of Kiro Proxy")
@@ -587,6 +592,7 @@ func (m *Manager) statusFromHelper(line helperLine) (Status, bool) {
 		return Status{State: StateNeedsFunnel, EnableURL: line.EnableURL}, true
 	case StateRunning:
 		st := Status{State: StateRunning, URL: line.URL, MachineURL: line.MachineURL}
+		st.Publishing = line.Publishing && line.URL == ""
 		if _, err := time.Parse(time.RFC3339, line.KeyExpiry); err == nil {
 			st.KeyExpiry = line.KeyExpiry
 		}

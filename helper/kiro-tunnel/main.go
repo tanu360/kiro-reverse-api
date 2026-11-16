@@ -119,7 +119,7 @@ func runServe(args []string) error {
 	go watchParent(os.Stdin, cancel, logout)
 	go watchSignals(cancel)
 
-	tunnel := &tunnel{srv: srv, status: status, target: targetURL, secret: secret}
+	tunnel := &tunnel{srv: srv, status: status, target: targetURL, secret: secret, probe: newProber()}
 	errc := make(chan error, 1)
 	go func() { errc <- tunnel.run(ctx) }()
 

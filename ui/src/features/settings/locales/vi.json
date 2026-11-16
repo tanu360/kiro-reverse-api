@@ -182,6 +182,8 @@
   "publicLink.stepDone": "(xong)",
   "publicLink.downloadedOf": "{downloaded} / {total} · {percent}%",
   "publicLink.certificate": "Đang lấy chứng chỉ HTTPS…",
+  "publicLink.publishing": "Đang chờ Tailscale đưa liên kết lên mạng…",
+  "publicLink.publishingHint": "Việc này có thể mất vài phút. Liên kết sẽ hiện ở đây khi mở được từ internet.",
   "publicLink.starting": "Đang kết nối Tailscale…",
   "publicLink.needsLogin": "Đăng nhập Tailscale để lấy liên kết.",
   "publicLink.signIn": "Đăng nhập Tailscale",

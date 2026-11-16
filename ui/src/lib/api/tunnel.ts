@@ -53,6 +53,11 @@ export interface TunnelStatus {
   keyExpiry?: string;
   /** This device's page in the Tailscale admin console, where key expiry is turned off. */
   machineURL?: string;
+  /**
+   * While running without a link: Funnel is on and the certificate is in, and the server waits
+   * for the link to open from the internet. Tailscale can take a few minutes to put it online.
+   */
+  publishing?: boolean;
   /** A Tailscale sign-in is saved on this server. */
   signedIn: boolean;
   /** An earlier version's helper runs, because this version's could not be downloaded. */
@@ -146,6 +151,7 @@ function normalize(res: Partial<Record<keyof TunnelStatus, unknown>>): TunnelSta
     errorDetail: optionalString(res.errorDetail),
     keyExpiry: dateString(res.keyExpiry),
     machineURL: httpsURL(res.machineURL),
+    publishing: res.publishing === true,
     signedIn: res.signedIn === true,
     fallbackHelper: res.fallbackHelper === true,
     twoFactor: res.twoFactor === true,

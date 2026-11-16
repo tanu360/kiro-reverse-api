@@ -291,7 +291,7 @@ function setupStep(status: TunnelStatus): number {
     case "needs-funnel":
       return 3;
     case "running":
-      // Funnel is on and the HTTPS certificate is on its way.
+      // Funnel is on; the HTTPS certificate is on its way, or the link is going online.
       return 4;
     default:
       return 1;
@@ -434,7 +434,19 @@ function SetupDetail({ status }: { status: TunnelStatus }): JSX.Element {
         ) : undefined,
       );
     case "running":
-      return busy(t("publicLink.certificate"));
+      // The link shows once it opens from the internet; a Tailscale relay that has not heard of
+      // the device yet drops visitors, sometimes for minutes.
+      return status.publishing ? (
+        <div className="flex flex-col gap-1 text-muted-foreground text-xs">
+          <p>
+            <Busy>{t("publicLink.publishing")}</Busy>
+          </p>
+          {/* Under the text, clear of the spinner (size-3 plus Busy's gap-1.5). */}
+          <p className="ps-4.5">{t("publicLink.publishingHint")}</p>
+        </div>
+      ) : (
+        busy(t("publicLink.certificate"))
+      );
     default:
       return busy(t("publicLink.starting"));
   }

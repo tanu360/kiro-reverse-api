@@ -44,6 +44,9 @@ type Status struct {
 	// admin console, where that is done. Older proxies ignore both.
 	KeyExpiry  string `json:"keyExpiry,omitempty"`
 	MachineURL string `json:"machineURL,omitempty"`
+	// Publishing is set while running without a URL once the certificate is in: Funnel is on, and
+	// the helper waits for the link to answer from the internet. Older proxies ignore it.
+	Publishing bool `json:"publishing,omitempty"`
 }
 
 // statusWriter writes a line only when the status changed, so a polling loop can call emit every

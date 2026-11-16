@@ -348,8 +348,9 @@ const KEY_EXPIRY_MS = 180 * 86_400_000;
 /**
  * GET /tunnel. A pinned status (tests) shows as is; otherwise the link walks the real first-time
  * flow by time: download 6 s, connect 1.5 s, Tailscale's sign-in until 20 s (the mock "signs in"
- * on its own), connect again 1 s, Funnel's switch for 8 s, the certificate for 3 s, then live. A
- * device already signed in connects for 1.5 s and goes live.
+ * on its own), connect again 1 s, Funnel's switch for 8 s, the certificate for 3 s, the link going
+ * online for 5 s, then live. A device already signed in connects for 1.5 s, waits 3 s for the link
+ * to go online and goes live.
  */
 function tunnelStatus(): TunnelStatus {
   const tunnel = mockDb.tunnel;
@@ -391,9 +392,14 @@ function tunnelStatus(): TunnelStatus {
       };
     }
     if (elapsed < 32_000) return { ...base, signedIn: true, state: "running" };
+    if (elapsed < 37_000) {
+      return { ...base, signedIn: true, state: "running", publishing: true };
+    }
     tunnel.signedIn = true;
   } else if (elapsed < 1500) {
     return { ...base, state: "starting" };
+  } else if (elapsed < 4500) {
+    return { ...base, state: "running", publishing: true };
   }
   return {
     ...base,
