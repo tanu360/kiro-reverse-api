@@ -112,9 +112,8 @@ export function PropertyRow({
 }
 
 /**
- * A card's editable fields as InlineEditRow elements. The rows sit 8 px (12 px from sm) inside
- * the card, so a row's hover fill clears the card's edge while its text keeps the card's 16 px
- * (24 px) inset.
+ * A card's editable fields as InlineEditRow elements. The rows sit 8 px inside the card, so a
+ * row's hover fill clears the card's edge while its text keeps the card's 16 px inset.
  */
 export function InlineEditList({
   className,
@@ -124,11 +123,7 @@ export function InlineEditList({
   /** InlineEditRow elements (or components that render one). */
   children: ReactNode;
 }): JSX.Element {
-  return (
-    <dl className={cn("flex min-w-0 flex-col px-2 py-1.5 text-sm sm:px-3", className)}>
-      {children}
-    </dl>
-  );
+  return <dl className={cn("flex min-w-0 flex-col px-2 py-1.5 text-sm", className)}>{children}</dl>;
 }
 
 /*
@@ -137,7 +132,7 @@ export function InlineEditList({
  * row's whole width instead of what a label column would leave.
  */
 const ROW_GRID =
-  "grid grid-cols-1 gap-x-4 rounded-lg px-2 sm:grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] sm:px-3";
+  "grid grid-cols-1 gap-x-4 rounded-lg px-2 sm:grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)]";
 const ROW_LABEL = "text-muted-foreground max-sm:text-meta";
 
 export interface InlineEditRowProps {
