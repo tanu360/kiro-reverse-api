@@ -1,8 +1,7 @@
-import { Link, useSearch } from "@tanstack/react-router";
+import { useSearch } from "@tanstack/react-router";
 import type { JSX } from "react";
-import { Button } from "@/components/ui/button";
-import { fillNodes, useT } from "@/lib/i18n";
-import { AuthHeader, AuthLayout } from "./auth-layout";
+import { useT } from "@/lib/i18n";
+import { AuthHeader, AuthLayout, AuthSwitchLink } from "./auth-layout";
 import { SignInForm } from "./sign-in-form";
 
 /** /login. A pending first run never shows here: its route sends the visit to /setup. */
@@ -15,15 +14,7 @@ export function LoginPage(): JSX.Element {
       <AuthHeader description={t("subtitle")} title={t("title")} />
       <SignInForm redirect={redirect} />
       {/* An API key holder signs in on /user/login instead, to see that key's usage. */}
-      <p className="text-center text-muted-foreground text-sm">
-        {fillNodes(t("apiKeyPrompt"), {
-          link: (
-            <Button render={<Link to="/user/login" />} variant="link-inline">
-              {t("apiKeyLink")}
-            </Button>
-          ),
-        })}
-      </p>
+      <AuthSwitchLink label={t("apiKeyLink")} prompt={t("apiKeyPrompt")} to="/user/login" />
     </AuthLayout>
   );
 }

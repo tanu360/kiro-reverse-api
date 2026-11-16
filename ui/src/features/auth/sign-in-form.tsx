@@ -244,6 +244,15 @@ export function SignInForm({
         ref={inputRef}
         value={password}
       />
+      {/*
+       * A quiet option between the field and the button (the Label's option look). -my-3 takes
+       * back its row's spare height, so the box sits about 16 px from the field and from the
+       * button, while the row keeps its 40 px target.
+       */}
+      <Label className="-my-3 self-start" variant="option">
+        <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} />
+        {t("remember")}
+      </Label>
       {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
       <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
         {locked ? (
@@ -278,14 +287,6 @@ export function SignInForm({
         {pending ? null : <AnimatedIcon icon={LogInIcon} aria-hidden="true" />}
         {t("submit")}
       </Button>
-      {/*
-       * A quiet option under the button (the Label's option look). -mt-3 pulls it up so the box
-       * sits about 16 px under the button, while the row keeps its 40 px target.
-       */}
-      <Label className="-mt-3 self-start" variant="option">
-        <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} />
-        {t("remember")}
-      </Label>
     </form>
   );
 }

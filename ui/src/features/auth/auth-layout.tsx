@@ -1,8 +1,13 @@
+import { ArrowRight02Icon } from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import type { JSX, ReactNode } from "react";
 import { LanguageSwitch } from "@/components/layout/language-switch";
 import { ThemeSwitch } from "@/components/layout/theme-switch";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { AppIcon } from "@/components/shared/app-icon";
-import { useT } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { fillNodes, useT } from "@/lib/i18n";
 import { AuthShowcase } from "./auth-showcase";
 
 /**
@@ -83,6 +88,37 @@ function Disclaimer(): JSX.Element {
   const { t } = useT("auth");
   return (
     <p className="text-balance text-center text-muted-foreground text-xs">{t("disclaimer")}</p>
+  );
+}
+
+/**
+ * Under a sign-in form, the way to the other sign-in page: a hairline that fades out at both
+ * ends, then the locale's sentence (`prompt`, e.g. "Have an API key? {link}") centred, with the
+ * link and its arrow a little apart from the question.
+ */
+export function AuthSwitchLink({
+  prompt,
+  label,
+  to,
+}: {
+  prompt: string;
+  label: string;
+  to: "/login" | "/user/login";
+}): JSX.Element {
+  return (
+    <div className="flex flex-col gap-6">
+      <Separator fade />
+      <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-muted-foreground text-sm">
+        {fillNodes(prompt, {
+          link: (
+            <Button render={<Link to={to} />} variant="link-action">
+              {label}
+              <AnimatedIcon icon={ArrowRight02Icon} aria-hidden="true" />
+            </Button>
+          ),
+        })}
+      </p>
+    </div>
   );
 }
 

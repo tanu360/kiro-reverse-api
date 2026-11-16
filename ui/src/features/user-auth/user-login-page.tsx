@@ -1,6 +1,6 @@
 import { CircleXIcon, Clock01Icon, LogInIcon } from "@hugeicons/core-free-icons";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { type FormEvent, type JSX, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { type FormEvent, type JSX, type ReactNode, useRef, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { PasswordInput } from "@/components/shared/password-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
-import { AuthHeader, AuthLayout } from "@/features/auth/auth-layout";
+import { AuthHeader, AuthLayout, AuthSwitchLink } from "@/features/auth/auth-layout";
 import { retrySeconds, useRetryCountdown } from "@/features/auth/rate-limit";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
 import { signInWithKey } from "@/lib/api/user-panel";
 import { getUserStaySignedIn } from "@/lib/auth/user-session";
 import { formatDuration } from "@/lib/format";
-import { fillNodes, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { MockDemoKeys } from "./mock-demo-keys";
 import { userRedirectTarget } from "./redirect";
 
@@ -28,16 +28,10 @@ export function UserLoginPage({ redirect }: { redirect?: string }): JSX.Element 
   return (
     <AuthLayout>
       <AuthHeader description={t("subtitle")} title={t("title")} />
-      <UserSignInForm redirect={redirect} />
-      <p className="text-center text-muted-foreground text-sm">
-        {fillNodes(t("adminPrompt"), {
-          link: (
-            <Button render={<Link to="/login" />} variant="link-inline">
-              {t("adminLink")}
-            </Button>
-          ),
-        })}
-      </p>
+      <UserSignInForm
+        footer={<AuthSwitchLink label={t("adminLink")} prompt={t("adminPrompt")} to="/login" />}
+        redirect={redirect}
+      />
     </AuthLayout>
   );
 }
@@ -45,9 +39,16 @@ export function UserLoginPage({ redirect }: { redirect?: string }): JSX.Element 
 /**
  * The admin sign-in form (features/auth/sign-in-form.tsx) for an API key: one field, the same
  * rate-limit countdown, server errors and "Stay signed in". The key lives only in this
- * component's state; signInWithKey stores the session token, never the key.
+ * component's state; signInWithKey stores the session token, never the key. `footer` (the link
+ * to the admin sign-in) sits right under the form, above the mock demo keys.
  */
-function UserSignInForm({ redirect }: { redirect?: string }): JSX.Element {
+function UserSignInForm({
+  redirect,
+  footer,
+}: {
+  redirect?: string;
+  footer: ReactNode;
+}): JSX.Element {
   const { t, lang } = useT("user-auth");
   const navigate = useNavigate();
   const [key, setKey] = useState("");
@@ -143,6 +144,13 @@ function UserSignInForm({ redirect }: { redirect?: string }): JSX.Element {
           />
           {fieldError ? <FieldError match>{fieldError}</FieldError> : null}
         </Field>
+        <Label className="-my-3 self-start" variant="option">
+          <Checkbox
+            checked={remember}
+            onCheckedChange={(checked) => setRemember(checked === true)}
+          />
+          {t("auth:remember")}
+        </Label>
         {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
         <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
           {locked ? (
@@ -169,14 +177,8 @@ function UserSignInForm({ redirect }: { redirect?: string }): JSX.Element {
           {pending ? null : <AnimatedIcon icon={LogInIcon} aria-hidden="true" />}
           {t("auth:submit")}
         </Button>
-        <Label className="-mt-3 self-start" variant="option">
-          <Checkbox
-            checked={remember}
-            onCheckedChange={(checked) => setRemember(checked === true)}
-          />
-          {t("auth:remember")}
-        </Label>
       </form>
+      {footer}
       <MockDemoKeys onPick={pickDemoKey} />
     </>
   );
