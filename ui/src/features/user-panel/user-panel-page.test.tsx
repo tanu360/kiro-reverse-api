@@ -294,20 +294,18 @@ describe("/user", () => {
       "Credits",
       "Duration",
       "Speed",
-      "HTTP",
-      "Error",
       "Request ID",
+      "Error",
     ]);
     const rows = bodyRows(table);
     expect(within(rows[0]).getByText("Claude Code")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Claude API")).toBeInTheDocument();
-    // 300 output tokens in 2 s; no cache read of the 1,200 input; one try; the ID to quote.
-    expect(rows[1].querySelector("[data-output-speed]")).toHaveTextContent("150 tok/s");
+    // 300 output tokens in 2 s; no cache read of the 1,200 input; the ID to quote; no HTTP status.
+    expect(rows[1].querySelector("[data-output-speed]")).toHaveTextContent(/^150 tok\/s$/);
     expect(rows[1].querySelector("[data-slot=cache-hit]")).toHaveTextContent("0%");
-    expect(rows[1].querySelector("[data-slot=http-status]")).toHaveTextContent("HTTP 2001 try");
     expect(rows[1].querySelector("[data-slot=request-id]")).toHaveTextContent("req_1");
     expect(within(rows[1]).getByRole("button", { name: "Copy request ID" })).toBeInTheDocument();
-    expect(rows[4].querySelector("[data-slot=http-status]")).toHaveTextContent("HTTP 4293 tries");
+    expect(table.querySelector("[data-slot=http-status]")).toBeNull();
     const tabs = within(screen.getByRole("tablist", { name: "Status" }));
     expect(tabs.getByRole("tab", { name: /^All/ })).toHaveTextContent("All23");
     expect(tabs.getByRole("tab", { name: /^Succeeded/ })).toHaveTextContent("Succeeded19");
@@ -340,11 +338,11 @@ describe("/user", () => {
     expect(seen.at(-1)?.get("page")).toBe("1");
     for (const row of bodyRows(table)) {
       expect(within(row).getByText("Failed 429")).toHaveClass("sr-only");
-      // Under the time below a 72rem card, in the Error column above it, without the status the
-      // HTTP column shows; never a message.
-      expect(within(row).getAllByText("Rate limited")).toHaveLength(2);
-      expect(within(row).queryByText("Rate limited · 429")).not.toBeInTheDocument();
-      expect(row.querySelector("[data-slot=http-status]")).toHaveTextContent("HTTP 4293 tries");
+      // Under the time below a 72rem card, and in the Error column's pill above it with the
+      // status (there is no HTTP column); never a message.
+      expect(within(row).getByText("Rate limited")).toBeInTheDocument();
+      expect(within(row).getByText("Rate limited · 429")).toBeInTheDocument();
+      expect(row.querySelector("[data-slot=http-status]")).toBeNull();
       expect(row.querySelector("[data-slot=error-message]")).toBeNull();
     }
     // Four requests fit one page: no pager.

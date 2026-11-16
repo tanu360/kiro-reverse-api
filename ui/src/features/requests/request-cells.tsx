@@ -1,12 +1,9 @@
 import {
   ArrowRight02Icon,
   Cancel01Icon,
-  Coins01Icon,
-  DashboardSpeed01Icon,
   DatabaseAddIcon,
   DatabaseIcon,
   Tick02Icon,
-  Timer01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
@@ -339,52 +336,17 @@ export function TokenUsage({
   );
 }
 
-type ChipTone = "neutral" | "primary" | "success" | "warning" | "destructive";
-
-const CHIP_TONE: Record<ChipTone, string> = {
-  neutral: "border-border-subtle bg-surface-2 text-foreground",
-  primary: "border-transparent bg-info-surface font-medium text-info-foreground",
-  success: "border-transparent bg-success-surface text-success-foreground",
-  warning: "border-transparent bg-warning-surface text-warning-foreground",
-  destructive: "border-transparent bg-error-surface text-destructive-foreground",
-};
-
-/** A figure on a small square chip with its mark; the mark's name is for screen readers. */
-function FigureChip({
-  icon,
-  label,
-  tone = "neutral",
-  children,
-}: {
-  icon: IconSvgElement;
-  label: string;
-  tone?: ChipTone;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 shrink-0 items-center gap-1 rounded-md border px-1.5 text-xs tabular-nums leading-none",
-        CHIP_TONE[tone],
-      )}
-      data-slot="figure-chip"
-      data-tone={tone}
-    >
-      <HugeiconsIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" icon={icon} />
-      <span className="sr-only">{label}</span>
-      {children}
-    </span>
-  );
-}
-
-/** The credits on the brand-tinted chip; a dash for a failure that cost nothing. */
+/** The credits as plain text: the figure in semibold and a muted "cr"; a dash for a failure that cost nothing. */
 export function CreditsChip({ record }: { record: RequestRecord }): JSX.Element {
   const { t } = useT("requests");
   if (!record.success && record.credits === 0) return <Muted />;
   return (
-    <FigureChip icon={Coins01Icon} label={t("credits")} tone="primary">
-      <CreditAmount value={record.credits} />
-    </FigureChip>
+    <span className="inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums">
+      <span className="font-semibold">
+        <CreditAmount value={record.credits} />
+      </span>
+      <span className="text-meta text-muted-foreground">{t("creditsUnit")}</span>
+    </span>
   );
 }
 
@@ -399,24 +361,17 @@ export function speedTone(ms: number | undefined): SpeedTone {
   return "crawl";
 }
 
-const SPEED_CHIP: Record<SpeedTone, ChipTone> = {
-  fast: "success",
-  normal: "neutral",
-  slow: "warning",
-  crawl: "destructive",
-};
-
-/** The duration on a chip tinted by speed; a dash on rows logged before durations were. */
+/** The duration as plain muted text; a dash on rows logged before durations were. */
 export function DurationChip({ record }: { record: RequestRecord }): JSX.Element {
-  const { t, lang } = useT("requests");
+  const { lang } = useT("requests");
   const text = formatDurationMs(record.durationMs, Boolean(record.endpoint), lang);
   if (text === EMPTY) return <Muted />;
-  const tone = speedTone(record.durationMs);
   return (
-    <span className="inline-flex" data-speed={tone}>
-      <FigureChip icon={Timer01Icon} label={t("duration")} tone={SPEED_CHIP[tone]}>
-        {text}
-      </FigureChip>
+    <span
+      className="whitespace-nowrap text-muted-foreground tabular-nums"
+      data-speed={speedTone(record.durationMs)}
+    >
+      {text}
     </span>
   );
 }
@@ -448,13 +403,7 @@ export function outputSpeedTone(tokensPerSecond: number): OutputSpeedTone {
   return "normal";
 }
 
-const OUTPUT_SPEED_CHIP: Record<OutputSpeedTone, ChipTone> = {
-  fast: "success",
-  normal: "neutral",
-  slow: "warning",
-};
-
-/** "52 tok/s" on a chip tinted by speed, as the duration's; a dash when it cannot be worked out. */
+/** "52 tok/s" as plain muted text, as the duration; a dash when it cannot be worked out. */
 export function SpeedChip({ record }: { record: RequestRecord }): JSX.Element {
   const { t, lang } = useT("requests");
   const speed = outputSpeed(record);
@@ -468,10 +417,8 @@ export function SpeedChip({ record }: { record: RequestRecord }): JSX.Element {
         ? belowStep(1, lang)
         : formatDecimal(speed, 1, lang);
   return (
-    <span className="inline-flex" data-output-speed={tone}>
-      <FigureChip icon={DashboardSpeed01Icon} label={t("speed")} tone={OUTPUT_SPEED_CHIP[tone]}>
-        <span className="whitespace-nowrap">{t("speed.value", { n: value })}</span>
-      </FigureChip>
+    <span className="whitespace-nowrap text-muted-foreground tabular-nums" data-output-speed={tone}>
+      {t("speed.value", { n: value })}
     </span>
   );
 }

@@ -22,6 +22,7 @@
   "model": "模型",
   "tokens": "Token",
   "credits": "Credits",
+  "creditsUnit": "cr",
   "duration": "耗时",
   "error": "错误",
   "speed": "速度",

@@ -348,7 +348,9 @@ describe("RequestsPage", () => {
     const card = within(list).getAllByRole("listitem")[success];
     expect(card.querySelector("[data-slot=token-bar]")).not.toBeNull();
     expect(within(card).getByText("Cache write")).toHaveClass("sr-only");
-    expect(within(card).getByText("Credits")).toHaveClass("sr-only");
+    // The credits as plain text with a muted unit, not a labelled chip.
+    expect(within(card).getByText("cr")).toHaveClass("text-muted-foreground");
+    expect(within(card).queryByText("Credits")).not.toBeInTheDocument();
     expect(within(card).getByText("Succeeded")).toHaveClass("sr-only");
   });
 

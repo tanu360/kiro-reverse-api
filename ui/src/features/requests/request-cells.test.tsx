@@ -168,21 +168,25 @@ describe("the token usage", () => {
   });
 });
 
-describe("the figure chips", () => {
+describe("the duration and credits", () => {
   it.each([
-    [900, "fast", "success"],
-    [2_999, "fast", "success"],
-    [3_000, "normal", "neutral"],
-    [19_999, "normal", "neutral"],
-    [20_000, "slow", "warning"],
-    [89_999, "slow", "warning"],
-    [90_000, "crawl", "destructive"],
-  ] as const)("tints a %i ms duration %s", (durationMs, speed, tone) => {
+    [900, "fast", "900ms"],
+    [2_999, "fast", "3.00s"],
+    [3_000, "normal", "3.00s"],
+    [19_999, "normal", "20.0s"],
+    [20_000, "slow", "20.0s"],
+    [89_999, "slow", "1m 30s"],
+    [90_000, "crawl", "1m 30s"],
+  ] as const)("marks a %i ms duration %s, in plain muted text", (durationMs, speed, text) => {
     expect(speedTone(durationMs)).toBe(speed);
     const { container } = renderWithProviders(<DurationChip record={record({ durationMs })} />);
-    expect(container.querySelector("[data-speed]")).toHaveAttribute("data-speed", speed);
-    expect(container.querySelector("[data-slot=figure-chip]")).toHaveAttribute("data-tone", tone);
-    expect(screen.getByText("Duration")).toHaveClass("sr-only");
+    const duration = container.querySelector("[data-speed]");
+    expect(duration).toHaveAttribute("data-speed", speed);
+    expect(duration).toHaveClass("text-muted-foreground");
+    expect(container).toHaveTextContent(new RegExp(`^${text}$`));
+    // No chip, no mark and no screen-reader label: the column header names it.
+    expect(container.querySelector("svg")).toBeNull();
+    expect(screen.queryByText("Duration")).not.toBeInTheDocument();
   });
 
   it("shows a dash for a row logged before durations were", () => {
@@ -192,15 +196,18 @@ describe("the figure chips", () => {
     expect(container).toHaveTextContent(/^—$/);
   });
 
-  it("puts the credits on the brand chip, and a dash for a failure that cost nothing", () => {
+  it("shows the credits in semibold with a muted cr, and a dash for a failure that cost nothing", () => {
     const { container, rerender } = renderWithProviders(<CreditsChip record={record()} />);
-    expect(container.querySelector("[data-slot=figure-chip]")).toHaveAttribute(
-      "data-tone",
-      "primary",
-    );
-    expect(container).toHaveTextContent("Credits0.15");
+    expect(container).toHaveTextContent(/^0\.15cr$/);
+    expect(screen.getByText("0.15").parentElement).toHaveClass("font-semibold");
+    expect(screen.getByText("cr")).toHaveClass("text-muted-foreground");
+    expect(container.querySelector("svg")).toBeNull();
+    expect(screen.queryByText("Credits")).not.toBeInTheDocument();
     rerender(<CreditsChip record={FAILED} />);
     expect(container).toHaveTextContent(/^—$/);
+    // A failure that still cost something shows it.
+    rerender(<CreditsChip record={{ ...FAILED, credits: 0.04 }} />);
+    expect(container).toHaveTextContent(/^0\.04cr$/);
   });
 });
 
@@ -220,23 +227,22 @@ describe("the error pill", () => {
   });
 });
 
-describe("the speed chip", () => {
+describe("the speed", () => {
   it.each([
     // 1,600 output tokens over the whole request.
-    [8_000, "200 tok/s", "fast", "success"],
-    [20_000, "80 tok/s", "fast", "success"],
-    [32_000, "50 tok/s", "normal", "neutral"],
-    [80_000, "20 tok/s", "normal", "neutral"],
-    [200_000, "8.0 tok/s", "slow", "warning"],
-  ] as const)("reads 1.6K tokens over %i ms as %s (%s)", (durationMs, text, speed, tone) => {
+    [8_000, "200 tok/s", "fast"],
+    [20_000, "80 tok/s", "fast"],
+    [32_000, "50 tok/s", "normal"],
+    [80_000, "20 tok/s", "normal"],
+    [200_000, "8.0 tok/s", "slow"],
+  ] as const)("reads 1.6K tokens over %i ms as %s (%s)", (durationMs, text, speed) => {
     const { container } = renderWithProviders(<SpeedChip record={record({ durationMs })} />);
-    expect(container.querySelector("[data-output-speed]")).toHaveAttribute(
-      "data-output-speed",
-      speed,
-    );
-    expect(container.querySelector("[data-slot=figure-chip]")).toHaveAttribute("data-tone", tone);
-    expect(container).toHaveTextContent(`Speed${text}`);
-    expect(screen.getByText("Speed")).toHaveClass("sr-only");
+    const figure = container.querySelector("[data-output-speed]");
+    expect(figure).toHaveAttribute("data-output-speed", speed);
+    expect(figure).toHaveClass("text-muted-foreground");
+    expect(container).toHaveTextContent(new RegExp(`^${text}$`));
+    expect(container.querySelector("svg")).toBeNull();
+    expect(screen.queryByText("Speed")).not.toBeInTheDocument();
   });
 
   it("puts the slow and fast lines at 20 and 80 tok/s", () => {
@@ -250,7 +256,7 @@ describe("the speed chip", () => {
     const { container } = renderWithProviders(
       <SpeedChip record={record({ outTokens: 1, durationMs: 60_000 })} />,
     );
-    expect(container).toHaveTextContent("Speed<0.1 tok/s");
+    expect(container).toHaveTextContent(/^<0\.1 tok\/s$/);
   });
 
   it.each([
@@ -373,7 +379,7 @@ describe("RequestCard", () => {
     expect(screen.getByText("Codex")).toBeInTheDocument();
   });
 
-  it("adds the HTTP status, tries, speed, cache hit and request ID with the details", () => {
+  it("adds the speed, cache hit and request ID with the details, but no HTTP status", () => {
     const { container } = renderWithProviders(
       <RequestCard
         accounts={false}
@@ -384,26 +390,28 @@ describe("RequestCard", () => {
     );
     expect(screen.getByRole("button", { name: "Copy request ID" })).toBeInTheDocument();
     expect(container).toHaveTextContent("req_2dc2…");
-    expect(container).toHaveTextContent("HTTP 2002 tries");
-    expect(container.querySelector("[data-output-speed]")).toHaveTextContent("870 tok/s");
+    expect(container.querySelector("[data-slot=http-status]")).toBeNull();
+    expect(container.querySelector("[data-output-speed]")).toHaveTextContent(/^870 tok\/s$/);
     expect(screen.getByText("Cache hit")).not.toHaveClass("sr-only");
   });
 
-  it("leaves the status out of a failure's pill beside the HTTP status, and no speed", () => {
+  it("keeps the status in a failure's pill with the details, and no speed", () => {
     const { container } = renderWithProviders(
       <RequestCard accounts={false} details messages={false} record={{ ...FAILED, tries: 3 }} />,
     );
-    expect(screen.getByText("Rate limited")).toBeInTheDocument();
-    expect(screen.queryByText("Rate limited · 429")).not.toBeInTheDocument();
-    expect(container).toHaveTextContent("HTTP 4293 tries");
+    expect(screen.getByText("Rate limited · 429")).toBeInTheDocument();
+    expect(container.querySelector("[data-slot=http-status]")).toBeNull();
     expect(container.querySelector("[data-output-speed]")).toBeNull();
     expect(container.querySelector("[data-slot=cache-hit]")).toBeNull();
   });
 
-  it("puts the token bar beside the credits and duration chips on a success", () => {
+  it("puts the token bar beside the credits and the duration on a success", () => {
     const { container } = renderWithProviders(<RequestCard record={record()} />);
     expect(container.querySelector("[data-slot=token-bar]")).not.toBeNull();
-    expect(container.querySelectorAll("[data-slot=figure-chip]")).toHaveLength(2);
+    expect(screen.getByText("0.15").parentElement).toHaveClass("font-semibold");
+    expect(screen.getByText("cr")).toHaveClass("text-muted-foreground");
+    expect(container.querySelector("[data-speed]")).toHaveAttribute("data-speed", "fast");
+    expect(container.querySelector("[data-speed]")).toHaveTextContent(/^1\.84s$/);
     expect(container.querySelector("[data-slot=token-figures]")?.textContent).toBe(
       "In12KOut1.6KCache read5KCache write0",
     );
@@ -434,10 +442,10 @@ describe("useRequestColumns", () => {
     );
   });
 
-  it("adds the key holder's detail columns, none sortable, with Request ID last", () => {
+  it("adds the key holder's detail columns, none sortable, with Request ID before Error", () => {
     renderWithProviders(<ColumnIds accounts={false} details />);
     expect(screen.getByRole("status")).toHaveTextContent(
-      "time* model tokens cache_hit credits duration speed http error request_id*",
+      "time* model tokens cache_hit credits duration speed request_id error*",
     );
   });
 });

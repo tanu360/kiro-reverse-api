@@ -22,6 +22,7 @@
   "model": "Modelo",
   "tokens": "Tokens",
   "credits": "Créditos",
+  "creditsUnit": "cr",
   "duration": "Duração",
   "error": "Erro",
   "speed": "Velocidade",

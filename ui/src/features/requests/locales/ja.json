@@ -22,6 +22,7 @@
   "model": "モデル",
   "tokens": "トークン",
   "credits": "クレジット",
+  "creditsUnit": "cr",
   "duration": "所要時間",
   "error": "エラー",
   "speed": "速度",
