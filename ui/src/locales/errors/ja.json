@@ -159,5 +159,5 @@
   "serverError.userKeyRequired": "API キーを入力してください。",
   "serverError.userKeyInvalid": "API キーが正しくありません。",
   "serverError.userSessionExpired": "セッションの有効期限が切れました。API キーでもう一度サインインしてください。",
-  "serverError.userUsageBusy": "このキーの使用量の取得が多すぎます。1 分待ってからもう一度お試しください。"
+  "serverError.userUsageBusy": "このキーの使用量リクエストが多すぎます。1 分待ってから再試行してください。"
 }

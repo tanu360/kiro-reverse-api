@@ -159,5 +159,5 @@
   "serverError.userKeyRequired": "请输入 API Key。",
   "serverError.userKeyInvalid": "API Key 不正确。",
   "serverError.userSessionExpired": "会话已过期，请使用 API Key 重新登录。",
-  "serverError.userUsageBusy": "该密钥的用量查询过于频繁，请等待一分钟后重试。"
+  "serverError.userUsageBusy": "该 API Key 的用量查询过于频繁，请等待一分钟后重试。"
 }

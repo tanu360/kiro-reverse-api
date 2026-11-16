@@ -159,5 +159,5 @@
   "serverError.userKeyRequired": "Nhập API key.",
   "serverError.userKeyInvalid": "API key không đúng.",
   "serverError.userSessionExpired": "Phiên đã hết hạn. Hãy đăng nhập lại bằng API key.",
-  "serverError.userUsageBusy": "Khóa này đã truy vấn mức sử dụng quá nhiều lần. Hãy đợi một phút rồi thử lại."
+  "serverError.userUsageBusy": "Key này đã truy vấn mức sử dụng quá nhiều lần. Hãy đợi một phút rồi thử lại."
 }
