@@ -73,7 +73,7 @@ function isTyping(target: EventTarget | null): boolean {
 /** The line itself: the modal's side padding, 16 px above what follows. */
 function NoticeLine({ notice }: { notice: ModalNoticeData }): JSX.Element {
   return (
-    <div className="px-6 pb-4 max-sm:px-4" data-slot="modal-notice">
+    <div className="px-4 pb-4" data-slot="modal-notice">
       <Alert variant={notice.type}>
         <HugeiconsIcon
           aria-hidden="true"

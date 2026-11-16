@@ -188,6 +188,8 @@ function FooterLink(): JSX.Element {
   const { t } = useT("overview");
   return (
     <Button
+      // The arrow, not the invisible box, lines up with the card's content edge (its 8 px inset).
+      className="-me-2"
       render={<Link search={{ sort: "requests", order: "desc" }} to="/accounts" />}
       size="sm"
       variant="ghost"

@@ -100,7 +100,13 @@ function DialogViewport({
 export const DIALOG_POPUP_CLASS =
   "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 translate-y-[calc(-1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0";
 
-export const OVERLAY_CLOSE_CLASS = "absolute inset-e-4 top-4.5 z-1 sm:top-5";
+/**
+ * The close X of a dialog, sheet or drawer: centred on the 24 px title line under the 16 px top
+ * padding, its glyph on the 16 px content edge (the 36 px button 10 px down and 6 px in; 40 px on
+ * a coarse pointer, 8 and 4).
+ */
+export const OVERLAY_CLOSE_CLASS =
+  "absolute inset-e-1.5 top-2.5 z-1 pointer-coarse:inset-e-1 pointer-coarse:top-2";
 
 export function DialogPopup({
   className,
@@ -171,8 +177,8 @@ export function DialogHeader({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      // 24 px round (16 px at the sides on phones), 12 px above a panel; clear of the close X.
-      "flex flex-col gap-2 p-6 max-sm:px-4 max-sm:pb-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 max-sm:in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 in-[[data-slot=dialog-popup]:has(>[data-slot=dialog-dismiss])]:pe-14",
+      // 16 px round, 12 px above a panel; clear of the close X.
+      "flex flex-col gap-2 p-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 in-[[data-slot=dialog-popup]:has(>[data-slot=dialog-dismiss])]:pe-12",
       className,
     ),
     "data-slot": "dialog-header",
@@ -197,10 +203,10 @@ export function DialogFooter({
     className: cn(
       // Phones: Cancel and the main action share one row of two; a lone (or odd last) button
       // takes the whole row. From sm up they sit at the end.
-      "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-6 max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
+      "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
       variant === "default" && "border-t border-border-subtle bg-surface-inset py-4",
       variant === "bare" &&
-        "in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pt-3 pt-4 pb-6",
+        "in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pt-3 pt-4 pb-4",
       className,
     ),
     "data-slot": "dialog-footer",
@@ -255,7 +261,7 @@ export function DialogPanel({
 }): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "p-6 max-sm:px-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1 in-[[data-slot=dialog-popup]:has([data-slot=dialog-footer]:not(.border-t))]:pb-1",
+      "p-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1 in-[[data-slot=dialog-popup]:has([data-slot=dialog-footer]:not(.border-t))]:pb-1",
       className,
     ),
     "data-slot": "dialog-panel",

@@ -134,9 +134,9 @@ export function SheetHeader({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      // 24 px round (16 px at the sides on phones), 12 px above a panel at every width. Once the
+      // 16 px round, 12 px above a panel. Once the
       // panel scrolls, a hairline under the header marks where the content runs beneath it.
-      "flex flex-col gap-2 border-transparent border-b p-6 transition-colors max-sm:px-4 max-sm:pb-4 in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 max-sm:in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 in-[[data-slot=sheet-popup]:has([data-slot=scroll-area-content][data-overflow-y-start]>[data-slot=sheet-panel])]:border-border-subtle in-[[data-slot=sheet-popup]:has(>[data-slot=sheet-dismiss])]:pe-14",
+      "flex flex-col gap-2 border-transparent border-b p-4 transition-colors in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 in-[[data-slot=sheet-popup]:has([data-slot=scroll-area-content][data-overflow-y-start]>[data-slot=sheet-panel])]:border-border-subtle in-[[data-slot=sheet-popup]:has(>[data-slot=sheet-dismiss])]:pe-12",
       className,
     ),
     "data-slot": "sheet-header",
@@ -160,13 +160,13 @@ export function SheetFooter({
 }): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "flex gap-2 px-6 max-sm:px-4",
+      "flex gap-2 px-4",
       variant === "split"
         ? "flex-row items-center justify-between"
         : "flex-col-reverse sm:flex-row sm:justify-end",
       variant !== "bare" && "border-t border-border-subtle bg-surface-inset py-4",
       variant === "bare" &&
-        "in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pt-3 pt-4 pb-6",
+        "in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pt-3 pt-4 pb-4",
       className,
     ),
     "data-slot": "sheet-footer",
@@ -221,7 +221,7 @@ export function SheetPanel({
 }): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "p-6 max-sm:px-4 in-[[data-slot=sheet-popup]:has([data-slot=sheet-header])]:pt-1 in-[[data-slot=sheet-popup]:has([data-slot=sheet-footer]:not(.border-t))]:pb-1",
+      "p-4 in-[[data-slot=sheet-popup]:has([data-slot=sheet-header])]:pt-1 in-[[data-slot=sheet-popup]:has([data-slot=sheet-footer]:not(.border-t))]:pb-1",
       className,
     ),
     "data-slot": "sheet-panel",

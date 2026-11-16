@@ -101,12 +101,12 @@ export function AccountDetailSheet({
                 </div>
               </div>
               {/*
-                From sm up the header keeps 56 px at its end for the close button; the actions sit
-                under it, so they run out to the cards' 24 px edge instead. Phones keep 16 px.
+                The header keeps 48 px at its end for the close button; the actions sit under it, so
+                they run out to the cards' 16 px edge instead.
               */}
               <AccountSheetActions
                 account={account}
-                className="sm:-me-8"
+                className="-me-8"
                 onTest={() =>
                   setTest((current) => ({ open: true, session: (current?.session ?? 0) + 1 }))
                 }

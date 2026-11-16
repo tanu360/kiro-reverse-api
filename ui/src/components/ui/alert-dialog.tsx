@@ -85,7 +85,7 @@ export function AlertDialogHeader({
     <div
       className={cn(
         // Start-aligned at every width, as the dialogs and sheets.
-        "flex min-h-0 flex-col gap-2 p-6 text-start max-sm:px-4 max-sm:pb-4",
+        "flex min-h-0 flex-col gap-2 p-4 text-start",
         className,
       )}
       data-slot="alert-dialog-header"
@@ -108,9 +108,9 @@ export function AlertDialogFooter({
       <div
         className={cn(
           // Phones: Cancel and the action share one row of two (dialog.tsx DialogFooter).
-          "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-6 max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
+          "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
           variant === "default" && "border-t border-border-subtle bg-surface-inset py-4",
-          variant === "bare" && "pb-6",
+          variant === "bare" && "pb-4",
           className,
         )}
         data-slot="alert-dialog-footer"

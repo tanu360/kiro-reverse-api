@@ -381,10 +381,10 @@ export function RequestDetailSheet({
         </div>
         {record && actions ? (
           /*
-            From sm up the header keeps 56 px at its end for the close button; the actions sit
-            under it, so they run out to the cards' 24 px edge instead (as on the account sheet).
+            The header keeps 48 px at its end for the close button; the actions sit under it, so
+            they run out to the cards' 16 px edge instead (as on the account sheet).
           */
-          <div className="flex flex-wrap items-center gap-2 sm:-me-8">
+          <div className="flex flex-wrap items-center gap-2 -me-8">
             {canOpenAccount ? (
               <Button
                 onClick={() =>
