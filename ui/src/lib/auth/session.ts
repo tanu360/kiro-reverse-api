@@ -178,17 +178,41 @@ export async function signOut(): Promise<void> {
   clearSession("signout");
 }
 
+/** The sign-in that follows a password change, while it runs (reauthenticate). */
+let renewal: Promise<void> | null = null;
+
+/**
+ * Settles once the sign-in after a password change is done, at once when none is running. A
+ * request that met a 401 waits for it (lib/api/client.ts): its token may be the one the change
+ * revoked, and the new one is about to arrive.
+ */
+export function sessionRenewal(): Promise<void> {
+  return renewal ?? Promise.resolve();
+}
+
 /**
  * Signs in again after a password change, which revokes every session server-side. Keeps the
  * remember preference. On failure the stale session is cleared and the error rethrown.
  */
 export async function reauthenticate(password: string): Promise<void> {
+  const work = (async () => {
+    try {
+      const result = await startSession(password, getRememberPreference(), "password-changed");
+      // With two-factor sign-in on, the server kept this session through the change instead.
+      if (result.kind === "two-factor") notify(getSession(), "password-changed");
+    } catch (error) {
+      clearSession("expired");
+      throw error;
+    }
+  })();
+  const settled = work.then(
+    () => undefined,
+    () => undefined,
+  );
+  renewal = settled;
   try {
-    const result = await startSession(password, getRememberPreference(), "password-changed");
-    // With two-factor sign-in on, the server kept this session through the change instead.
-    if (result.kind === "two-factor") notify(getSession(), "password-changed");
-  } catch (error) {
-    clearSession("expired");
-    throw error;
+    await work;
+  } finally {
+    if (renewal === settled) renewal = null;
   }
 }

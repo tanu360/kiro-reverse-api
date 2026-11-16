@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   clearSession,
   getToken,
+  reauthenticate,
   type SessionChangeReason,
   setSession,
   subscribeSession,
@@ -213,7 +214,7 @@ describe("401 handling", () => {
     expect(getToken()).toBe("token-a");
   });
 
-  it("ignores a late 401 for a token that was already replaced", async () => {
+  it("sends a request again with the new token after a late 401 for the replaced one", async () => {
     signIn("token-old");
     const reasons = recordReasons();
     let answer: (response: Response) => void = () => {};
@@ -224,8 +225,12 @@ describe("401 handling", () => {
     const requestArrived = new Promise<void>((resolve) => {
       arrived = resolve;
     });
+    const tokens: (string | null)[] = [];
     mockServer.use(
-      http.get(apiUrl("/slow"), () => {
+      http.get(apiUrl("/slow"), ({ request }) => {
+        const token = request.headers.get("X-Admin-Token");
+        tokens.push(token);
+        if (token === "token-new") return HttpResponse.json({ ok: true });
         arrived();
         return pending;
       }),
@@ -234,10 +239,62 @@ describe("401 handling", () => {
     await requestArrived;
     setSession({ token: "token-new", expiresAt: Date.now() + 3_600_000, remember: false });
     answer(HttpResponse.json({ error: "Unauthorized" }, { status: 401 }));
-    const error = await rejection(request);
-    expect(error.status).toBe(401);
+    await expect(request).resolves.toEqual({ ok: true });
+    expect(tokens).toEqual(["token-old", "token-new"]);
     expect(getToken()).toBe("token-new");
     expect(reasons).not.toContain("expired");
+  });
+
+  it("waits for the sign-in after a password change instead of ending the session", async () => {
+    signIn("token-old");
+    const reasons = recordReasons();
+    let answerSession: (response: Response) => void = () => {};
+    const sessionAnswer = new Promise<Response>((resolve) => {
+      answerSession = resolve;
+    });
+    let sessionArrived: () => void = () => {};
+    const sessionAsked = new Promise<void>((resolve) => {
+      sessionArrived = resolve;
+    });
+    const tokens: (string | null)[] = [];
+    mockServer.use(
+      http.post(apiUrl("/session"), () => {
+        sessionArrived();
+        return sessionAnswer;
+      }),
+      http.get(apiUrl("/settings/two-factor"), ({ request }) => {
+        const token = request.headers.get("X-Admin-Token");
+        tokens.push(token);
+        return token === "token-new"
+          ? HttpResponse.json({ enabled: false })
+          : HttpResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }),
+    );
+    // The server has revoked token-old; the sign-in with the new password is under way.
+    const renewing = reauthenticate("new-password");
+    await sessionAsked;
+    const request = apiRequest("/settings/two-factor");
+    answerSession(HttpResponse.json({ token: "token-new", expiresAt: Date.now() + 3_600_000 }));
+    await renewing;
+    await expect(request).resolves.toEqual({ enabled: false });
+    expect(tokens).toEqual(["token-old", "token-new"]);
+    expect(reasons).toEqual(["password-changed"]);
+  });
+
+  it("still ends the session when the new token meets a 401 too", async () => {
+    signIn("token-old");
+    const reasons = recordReasons();
+    let calls = 0;
+    mockServer.use(
+      http.get(apiUrl("/gone"), () => {
+        calls += 1;
+        return HttpResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }),
+    );
+    const error = await rejection(apiRequest("/gone"));
+    expect(error.status).toBe(401);
+    expect(calls).toBe(1);
+    expect(reasons).toEqual(["expired"]);
   });
 });
 

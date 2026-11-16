@@ -1,4 +1,4 @@
-import { clearSession, getToken } from "@/lib/auth/session";
+import { clearSession, getToken, sessionRenewal } from "@/lib/auth/session";
 import { ApiError } from "./errors";
 
 export const API_BASE = "/admin/api";
@@ -72,8 +72,11 @@ function isAbort(error: unknown, signal?: AbortSignal): boolean {
   return signal?.aborted === true || (error instanceof DOMException && error.name === "AbortError");
 }
 
-/** Sends the request and returns the response once it is known to be 2xx. */
-async function send(path: string, options: RequestOptions): Promise<Response> {
+/**
+ * Sends the request and returns the response once it is known to be 2xx. `resent`: this is the
+ * one second try after a 401 for a token that has since been replaced.
+ */
+async function send(path: string, options: RequestOptions, resent = false): Promise<Response> {
   const { method = "GET", body, query, signal, auth = true, base } = options;
   const headers = new Headers(options.headers);
   // The admin password is never sent from here: only POST /session carries it, in the body.
@@ -102,11 +105,17 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     throw new ApiError({ status: 0, serverMessage: "network" });
   }
 
-  // Only the token this request sent can expire here. A late 401 for an older token (after a
-  // password change, a re-login or a restore) must not end the session that replaced it, and
-  // once the first 401 clears the token, parallel 401s for it see a different token and stop.
-  if (response.status === 401 && token && getToken() === token) {
-    clearSession("expired");
+  if (response.status === 401 && token) {
+    // A password change revokes every session, this one's token included, and signs in again
+    // at once (session.ts reauthenticate). A request that met the old token in between waits
+    // for the new one and is sent once more with it, instead of failing or ending the session.
+    await sessionRenewal();
+    const current = getToken();
+    // Only the token this request sent can expire here. A late 401 for an older token (after a
+    // password change or a re-login) must not end the session that replaced it, and once the
+    // first 401 clears the token, parallel 401s for it see a different token and stop.
+    if (current === token) clearSession("expired");
+    else if (current && !resent) return send(path, options, true);
   }
 
   if (!response.ok) throw await toApiError(response);
