@@ -320,6 +320,25 @@ func TestRefreshSchedulerClockSetBackWaitsOneIntervalAtMost(t *testing.T) {
 	})
 }
 
+func TestRefreshSchedulerClockSetBackBeforeFirstSweepWaitsOneStartDelayAtMost(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := startSchedulerRig(t, 30*time.Minute, 0)
+		defer r.close()
+
+		r.at(5 * time.Second)
+		r.sleep(-24 * time.Hour)
+		// The wake at 10s finds the first sweep a day away and counts the start delay from then.
+		r.at(20*time.Second - time.Nanosecond)
+		r.sweptAt()
+		r.at(20 * time.Second)
+		r.sweptAt(20 * time.Second)
+
+		// Back on the interval from that sweep.
+		r.at(20*time.Second + 30*time.Minute)
+		r.sweptAt(20*time.Second, 20*time.Second+30*time.Minute)
+	})
+}
+
 func TestRefreshSchedulerChangeDuringSweepNoOverlap(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := startSchedulerRig(t, 5*time.Minute, 2*time.Minute)

@@ -90,6 +90,11 @@ func (s *refreshScheduler) run(stop <-chan struct{}, startDelay time.Duration, s
 			// next sweep is at most one interval away.
 			lastEnd = now
 		}
+		if firstDue.Sub(now) > startDelay {
+			// The clock was set back before the first sweep: wait one start delay from now at
+			// most, as runModelsListing does.
+			firstDue = now.Add(startDelay)
+		}
 		due := firstDue
 		if !lastEnd.IsZero() {
 			due = lastEnd.Add(every)
