@@ -1,5 +1,5 @@
 {
-  "version": "4.0.0",
-  "changelog": "⬆️ A binary install updates itself from the admin panel: Kiro Proxy downloads the new release, checks it against the release's SHA-256 checksums, puts it in place of the running file and restarts into it when you say so, keeping you signed in. The old file stays next to it as a backup.\n🐳 The update dialog shows the changes and the steps side by side, marks the way that fits your server as recommended, and gives each method numbered steps with commands you can copy.\n🇯🇵 The admin panel now speaks Japanese (日本語). Chinese, Vietnamese and Brazilian Portuguese read better, and server errors, public link and alert failures, ban reasons and update errors now show in your language instead of English.",
+  "version": "4.0.1",
+  "changelog": "🔗 The public link shows as Live only once it opens from the internet. Tailscale can take a few minutes to put a new link online, and the settings card now says so while it waits.\n⏰ After your computer wakes from sleep, tokens and usage refresh within a minute. Before, accounts could show \"Token expired\" for up to half an hour after waking.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
