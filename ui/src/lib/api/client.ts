@@ -14,10 +14,14 @@ interface RequestOptions {
   signal?: AbortSignal;
   /** default true; false = no X-Admin-Token and no 401 handling */
   auth?: boolean;
+  /** Prefix of `path`; default API_BASE. The user panel sends its requests to /user/api. */
+  base?: string;
+  /** Extra headers, such as the user panel's X-User-Token. */
+  headers?: Record<string, string>;
 }
 
-function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const url = API_BASE + path;
+function buildUrl(path: string, query?: Record<string, QueryValue>, base = API_BASE): string {
+  const url = base + path;
   if (!query) return url;
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
@@ -70,8 +74,8 @@ function isAbort(error: unknown, signal?: AbortSignal): boolean {
 
 /** Sends the request and returns the response once it is known to be 2xx. */
 async function send(path: string, options: RequestOptions): Promise<Response> {
-  const { method = "GET", body, query, signal, auth = true } = options;
-  const headers = new Headers();
+  const { method = "GET", body, query, signal, auth = true, base } = options;
+  const headers = new Headers(options.headers);
   // The admin password is never sent from here: only POST /session carries it, in the body.
   const token = auth ? getToken() : null;
   // Without a session the server can only answer 401, so nothing is sent. This also keeps a
@@ -92,7 +96,7 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
 
   let response: Response;
   try {
-    response = await fetch(buildUrl(path, query), { method, headers, body: payload, signal });
+    response = await fetch(buildUrl(path, query, base), { method, headers, body: payload, signal });
   } catch (error) {
     if (isAbort(error, signal)) throw error;
     throw new ApiError({ status: 0, serverMessage: "network" });

@@ -64,7 +64,7 @@ function serveMockWorker(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const pathname = (req.url ?? "").split("?")[0];
         // A missing/restarting MSW client must never send mock tokens to the real backend.
-        if (pathname.startsWith("/admin/api/")) {
+        if (pathname.startsWith("/admin/api/") || pathname.startsWith("/user/api/")) {
           res.statusCode = 503;
           res.setHeader("Content-Type", "application/json");
           res.setHeader("Cache-Control", "no-store");
@@ -142,6 +142,8 @@ export default defineConfig(async ({ mode }) => {
             // Regex key: only the admin API under /admin/api/, never a page path.
             // Timeouts are off so the SSE stream at /admin/api/events is never cut or buffered.
             "^/admin/api/": { target: goTarget, proxyTimeout: 0, timeout: 0 },
+            // The key holders' panel (/user, /user/login) calls its own API under /user/api/.
+            "^/user/api/": { target: goTarget },
             "/v1": { target: goTarget },
           },
     },

@@ -36,6 +36,9 @@ export interface SuccessResponse {
  *   inside the server. Both carry the error as `detail`.
  * - account_refresh_failed, account_test_failed, models_load_failed, profiles_load_failed,
  *   microsoft_sign_in_failed, tunnel_logout: `detail` is the upstream reason.
+ * - user_key_required (400) / user_key_invalid (401): POST /user/api/session without a key, or
+ *   with one that matches no API key; user_session_expired (401): any other /user/api route
+ *   without a live user session.
  */
 export type ServerErrorCode =
   | "api_key_lockout"
@@ -167,7 +170,10 @@ export type ServerErrorCode =
   | "profiles_load_failed"
   | "microsoft_sign_in_failed"
   | "save_failed"
-  | "internal_error";
+  | "internal_error"
+  | "user_key_required"
+  | "user_key_invalid"
+  | "user_session_expired";
 
 // ---------------------------------------------------------------------------
 // Session and first run

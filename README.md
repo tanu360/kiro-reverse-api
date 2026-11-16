@@ -299,6 +299,7 @@ Require API keys from the **API** page (**API access → Require an API key**). 
 - **Allowed models** limits a key to some models. It checks the model a request resolves to after the thinking suffix and model mappings, ignoring case, not the name the client sent: `claude-haiku-4-5`, `claude-haiku-4.5-thinking` and a mapping that points to `claude-haiku-4.5` all count as `claude-haiku-4.5`, and no alias reaches a model the list leaves out. Other models get HTTP 403 (`permission_error` on the Anthropic API, code `model_not_allowed` on the OpenAI APIs), and `/v1/models` lists only the allowed models.
 - **Regenerate key** gives a key a new value, and the old value stops working at once. The name, limits, accounts and usage stay.
 - **Usage by key** charts each key's requests, tokens and credits over 24 hours, 7 days, 30 days or lifetime, split into succeeded and failed, with separate rows for requests without a key, invalid keys and deleted keys.
+- Key holders sign in at `/user` with their own API key to see its limits, usage by day and model, and recent requests; they never see accounts or other keys.
 
 ---
 

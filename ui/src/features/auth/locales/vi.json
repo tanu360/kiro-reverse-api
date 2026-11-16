@@ -42,5 +42,7 @@
   "codeWrong": "Mã không đúng. Kiểm tra giờ trên điện thoại.",
   "recoveryWrong": "Mã khôi phục không đúng hoặc đã được dùng.",
   "codeReused": "Mã này đã được dùng. Hãy đợi mã tiếp theo.",
-  "challengeExpired": "Phiên đăng nhập đã hết hạn. Hãy nhập lại mật khẩu."
+  "challengeExpired": "Phiên đăng nhập đã hết hạn. Hãy nhập lại mật khẩu.",
+  "apiKeyPrompt": "Có API key? {link}",
+  "apiKeyLink": "Xem mức sử dụng"
 }

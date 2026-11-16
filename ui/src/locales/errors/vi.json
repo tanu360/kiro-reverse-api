@@ -155,5 +155,8 @@
   "alertDelivery.network": "Không thể kết nối tới kênh.",
   "serverText.banSuspended": "AWS đã tạm ngưng tài khoản này vì phát hiện hoạt động bất thường.",
   "serverText.banAuthFailed": "Đăng nhập thất bại: token không hợp lệ hoặc đã hết hạn.",
-  "serverText.backupAccountsMoved": "Trước khi các tài khoản được chuyển sang bảng riêng"
+  "serverText.backupAccountsMoved": "Trước khi các tài khoản được chuyển sang bảng riêng",
+  "serverError.userKeyRequired": "Nhập API key.",
+  "serverError.userKeyInvalid": "API key không đúng.",
+  "serverError.userSessionExpired": "Phiên đã hết hạn. Hãy đăng nhập lại bằng API key."
 }

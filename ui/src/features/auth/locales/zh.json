@@ -42,5 +42,7 @@
   "codeWrong": "验证码不正确。请确认手机时间准确。",
   "recoveryWrong": "恢复码不正确，或已经用过。",
   "codeReused": "此验证码已用过，请等待下一个。",
-  "challengeExpired": "登录已超时，请重新输入密码。"
+  "challengeExpired": "登录已超时，请重新输入密码。",
+  "apiKeyPrompt": "有 API Key？{link}",
+  "apiKeyLink": "查看其用量"
 }

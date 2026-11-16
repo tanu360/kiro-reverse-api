@@ -186,6 +186,10 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 		where = append(where, "conversation_id = ?")
 		args = append(args, q.Conversation)
 	}
+	if q.APIKeyID != "" {
+		where = append(where, "api_key_id = ?")
+		args = append(args, q.APIKeyID)
+	}
 	if q.Search != "" {
 		like := "%" + escapeSQLLike(q.Search) + "%"
 		keyClause, keyArgs := newRequestKeySearch(q.Search).sql()

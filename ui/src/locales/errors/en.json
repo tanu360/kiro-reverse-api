@@ -155,5 +155,8 @@
   "alertDelivery.network": "Could not reach the channel.",
   "serverText.banSuspended": "AWS temporarily suspended this account after detecting unusual activity.",
   "serverText.banAuthFailed": "Sign-in failed: the token is invalid or expired.",
-  "serverText.backupAccountsMoved": "Before the accounts moved to their own table"
+  "serverText.backupAccountsMoved": "Before the accounts moved to their own table",
+  "serverError.userKeyRequired": "Enter an API key.",
+  "serverError.userKeyInvalid": "Incorrect API key.",
+  "serverError.userSessionExpired": "Your session expired. Sign in with your API key again."
 }

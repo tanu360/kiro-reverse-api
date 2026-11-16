@@ -155,5 +155,8 @@
   "alertDelivery.network": "通知先に接続できませんでした。",
   "serverText.banSuspended": "異常なアクティビティが検出されたため、AWS がこのアカウントを一時停止しました。",
   "serverText.banAuthFailed": "サインインに失敗しました：トークンが無効か期限切れです。",
-  "serverText.backupAccountsMoved": "アカウントを専用テーブルに移行する前"
+  "serverText.backupAccountsMoved": "アカウントを専用テーブルに移行する前",
+  "serverError.userKeyRequired": "API キーを入力してください。",
+  "serverError.userKeyInvalid": "API キーが正しくありません。",
+  "serverError.userSessionExpired": "セッションの有効期限が切れました。API キーでもう一度サインインしてください。"
 }

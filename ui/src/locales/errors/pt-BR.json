@@ -155,5 +155,8 @@
   "alertDelivery.network": "Não foi possível alcançar o canal.",
   "serverText.banSuspended": "A AWS suspendeu temporariamente esta conta após detectar atividade incomum.",
   "serverText.banAuthFailed": "Falha no login: o token é inválido ou expirou.",
-  "serverText.backupAccountsMoved": "Antes de as contas irem para uma tabela própria"
+  "serverText.backupAccountsMoved": "Antes de as contas irem para uma tabela própria",
+  "serverError.userKeyRequired": "Informe a chave de API.",
+  "serverError.userKeyInvalid": "Chave de API incorreta.",
+  "serverError.userSessionExpired": "Sua sessão expirou. Entre novamente com a chave de API."
 }

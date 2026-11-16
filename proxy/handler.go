@@ -32,6 +32,10 @@ const tokenRefreshSkewSeconds int64 = 120
 
 type Handler struct {
 	adminGuesses adminGuessLimiter
+	// userGuesses and userSessions guard the user panel's sign-in (user_api.go).
+	userGuesses  adminGuessLimiter
+	userSessions userSessionStore
+	userUsage    userUsageCache
 	pool         *pool.AccountPool
 	// tunnel runs the public link; nil until main attaches it (tunnel_api.go).
 	tunnel *tunnel.Manager
@@ -395,7 +399,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	//! The wildcard belongs to the inference API, which any client may call.
 	//! The admin API holds account credentials, so no origin may read it cross-site.
-	isAdminPath := strings.HasPrefix(path, "/admin/")
+	//! The user panel's API shows a key's own usage, so it is kept same-origin too.
+	isAdminPath := strings.HasPrefix(path, "/admin/") || strings.HasPrefix(path, "/user/api/")
 	if !isAdminPath {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -503,6 +508,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleAdminAPI(w, r)
 	case path == "/admin" || strings.HasPrefix(path, "/admin/"):
 		redirectLegacyAdminPath(w, r)
+	case strings.HasPrefix(path, "/user/api/"):
+		h.handleUserAPI(w, r)
 
 	//! A browser opening the root gets the admin UI; API clients and monitors that probe "/"
 	//! keep getting the health JSON they always did.

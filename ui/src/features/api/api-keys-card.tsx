@@ -59,7 +59,7 @@ import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { isKeyExpired, limitReachedReason, wouldLockOutClients } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
-import { CreatedKeyPanel } from "./created-key-panel";
+import { CreatedKeyPanel, userPanelUrl } from "./created-key-panel";
 import { keyEntryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
 
@@ -432,12 +432,30 @@ export function ApiKeysCard(): JSX.Element {
           })
         : formatNumber(list.length, lang);
 
+  const userPanel = userPanelUrl();
+
   return (
     <SectionCard
       actions={headerActions}
       // Clips the last row's hover tint to the card's rounded corners.
       className="overflow-hidden"
-      description={t("keys.description")}
+      description={
+        <>
+          {t("keys.description")}
+          <span className="block">
+            {fillNodes(t("keys.userPanel"), {
+              link: (
+                <Button
+                  render={<a href={userPanel} rel="noopener noreferrer" target="_blank" />}
+                  variant="link-inline"
+                >
+                  {userPanel}
+                </Button>
+              ),
+            })}
+          </span>
+        </>
+      }
       footer={
         list.length > pageSize ? (
           <DataTablePagination

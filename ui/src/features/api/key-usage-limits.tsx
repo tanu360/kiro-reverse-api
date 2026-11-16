@@ -4,6 +4,7 @@ import { SectionCard } from "@/components/shared/section-card";
 import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Badge } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ApiKey } from "@/lib/api/types";
 import { formatCredits, formatFraction, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -12,8 +13,16 @@ import { cn } from "@/lib/utils";
 /** A limit used past this share turns its meter amber; a spent one turns it red. */
 const LIMIT_WARNING = 0.75;
 
+/** The counters and caps the card reads: an admin ApiKey or the key holder's own key. */
+export type KeyLimitsSource = Pick<
+  ApiKey,
+  "tokensUsed" | "tokenLimit" | "creditsUsed" | "creditLimit" | "successfulCalls" | "callLimit"
+>;
+
+const LIMIT_KINDS = ["tokens", "credits", "calls"] as const;
+
 interface LimitRow {
-  kind: "tokens" | "credits" | "calls";
+  kind: (typeof LIMIT_KINDS)[number];
   used: number;
   /** 0 = no limit. */
   limit: number;
@@ -27,9 +36,42 @@ interface LimitRow {
  * phone. The counters are the key's own, since it was created or its usage last reset, not the
  * range the sheet charts.
  */
-export function KeyLimitsCard({ apiKey }: { apiKey: ApiKey }): JSX.Element {
+export function KeyLimitsCard({
+  apiKey,
+}: {
+  /** Undefined while the key loads: each limit is then a placeholder of its name and figures. */
+  apiKey: KeyLimitsSource | undefined;
+}): JSX.Element {
   const { t, lang } = useT("api");
   const count = (value: number) => formatNumber(value, lang);
+  const header = {
+    description: t("usage.limitsDescription"),
+    descriptionVariant: "inline",
+    icon: DashboardSpeed02Icon,
+    slim: true,
+    title: t("usage.limits"),
+  } as const;
+  if (!apiKey) {
+    return (
+      <SectionCard {...header}>
+        <ul
+          aria-busy="true"
+          className="grid divide-y divide-border-subtle @lg:grid-cols-3 @lg:divide-x @lg:divide-y-0"
+        >
+          {LIMIT_KINDS.map((kind) => (
+            <li className="flex min-w-0 flex-col gap-2 px-4 py-3.5 sm:px-6 @lg:px-4" key={kind}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-sm">{t(`keys.${kind}`)}</span>
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <Skeleton className="h-1.5 w-full" />
+              <Skeleton className="h-3 w-16" />
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    );
+  }
   const rows: LimitRow[] = [
     { kind: "tokens", used: apiKey.tokensUsed, limit: apiKey.tokenLimit ?? 0, format: count },
     {
@@ -47,13 +89,7 @@ export function KeyLimitsCard({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   ];
 
   return (
-    <SectionCard
-      description={t("usage.limitsDescription")}
-      descriptionVariant="inline"
-      icon={DashboardSpeed02Icon}
-      slim
-      title={t("usage.limits")}
-    >
+    <SectionCard {...header}>
       <ul className="grid divide-y divide-border-subtle @lg:grid-cols-3 @lg:divide-x @lg:divide-y-0">
         {rows.map((row) => {
           const capped = row.limit > 0;

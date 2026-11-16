@@ -1,0 +1,10 @@
+{
+  "title": "API キーを確認",
+  "subtitle": "API キーでサインインすると、使用量、上限、リクエストを確認できます。",
+  "key": "API キー",
+  "keyPlaceholder": "sk-…",
+  "showKey": "API キーを表示",
+  "hideKey": "API キーを隠す",
+  "adminPrompt": "管理者ですか？{link}",
+  "adminLink": "パスワードでサインイン"
+}

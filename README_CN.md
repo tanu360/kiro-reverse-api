@@ -299,6 +299,7 @@ curl http://localhost:8080/v1/responses \
 - 「**允许的模型**」把 Key 限制在部分模型上。检查的是请求经 Thinking 后缀与模型映射处理后实际使用的模型（不区分大小写），而不是客户端发送的名称：`claude-haiku-4-5`、`claude-haiku-4.5-thinking` 以及指向 `claude-haiku-4.5` 的映射都算作 `claude-haiku-4.5`，任何别名都无法访问列表之外的模型。其他模型返回 HTTP 403（Anthropic 接口为 `permission_error`，OpenAI 接口的 code 为 `model_not_allowed`），`/v1/models` 也只列出允许的模型。
 - 「**重新生成 API Key**」会为 Key 生成新值，旧值立即失效；名称、限额、绑定的账号与用量保持不变。
 - 「**各 API Key 用量**」以图表展示每个 Key 在 24 小时、7 天、30 天或全部时间内的请求数、Token 与 Credits，区分成功与失败，并单独列出无 API Key、无效 API Key 与已删除 API Key 的请求。
+- API Key 持有者可以用自己的 API Key 在 `/user` 登录，查看该 Key 的限额、按天与按模型的用量以及最近的请求；他们看不到账号，也看不到其他 Key。
 
 ---
 

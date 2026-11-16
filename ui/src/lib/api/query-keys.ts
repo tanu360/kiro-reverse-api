@@ -64,6 +64,16 @@ export const queryKeys = {
     metrics: () => ["settings", "metrics"] as const,
     tunnel: () => ["settings", "tunnel"] as const,
   },
+  /** The API key holder's panel (/user/api); never mixed with the admin keys above. */
+  userPanel: {
+    all: ["user-panel"] as const,
+    key: () => ["user-panel", "key"] as const,
+    usage: (range: string, tzOffset: number) => ["user-panel", "usage", range, tzOffset] as const,
+    breakdown: (range: string, tzOffset: number) =>
+      ["user-panel", "usage", "breakdown", range, tzOffset] as const,
+    requests: (params: { page: number; pageSize: number; status: string }) =>
+      ["user-panel", "requests", params] as const,
+  },
   backups: {
     all: ["backups"] as const,
     list: () => ["backups", "list"] as const,

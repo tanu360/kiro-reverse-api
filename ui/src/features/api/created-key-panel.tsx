@@ -6,6 +6,11 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 
+/** Where a key holder signs in with their own key to see that key's usage (the /user page). */
+export function userPanelUrl(): string {
+  return `${window.location.origin}/user`;
+}
+
 /**
  * The full secret from the last create or regenerate. It lives only in the parent's state: never
  * stored or cached, and gone on the next create, on edit, on Dismiss and when the page unmounts.
@@ -32,6 +37,14 @@ export function CreatedKeyPanel({
           label={t("created.title")}
           multiline
           value={apiKey}
+        />
+        <p>{t("created.userPanel")}</p>
+        <CopyField
+          copyLabel={t("created.copyUserPanel")}
+          label={t("created.userPanelLabel")}
+          multiline
+          value={userPanelUrl()}
+          variant="outline"
         />
       </AlertDescription>
       {/* Right of the text from sm, under it on phones: its edge lines up with the copy field. */}

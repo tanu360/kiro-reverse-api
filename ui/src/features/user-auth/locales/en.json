@@ -1,0 +1,10 @@
+{
+  "title": "Check your API key",
+  "subtitle": "Sign in with your API key to see its usage, limits and requests.",
+  "key": "API key",
+  "keyPlaceholder": "sk-…",
+  "showKey": "Show API key",
+  "hideKey": "Hide API key",
+  "adminPrompt": "Are you the admin? {link}",
+  "adminLink": "Sign in with the password"
+}

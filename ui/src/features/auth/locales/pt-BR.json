@@ -42,5 +42,7 @@
   "codeWrong": "Esse código não está certo. Confira se o relógio do celular está correto.",
   "recoveryWrong": "Esse código de recuperação não está certo ou já foi usado.",
   "codeReused": "Este código já foi usado. Espere o próximo.",
-  "challengeExpired": "O login expirou. Digite a senha de novo."
+  "challengeExpired": "O login expirou. Digite a senha de novo.",
+  "apiKeyPrompt": "Tem uma chave de API? {link}",
+  "apiKeyLink": "Veja o uso dela"
 }

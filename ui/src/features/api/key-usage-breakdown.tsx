@@ -37,11 +37,19 @@ function isBreakdownKind(value: unknown): value is BreakdownKind {
 
 export interface UsageBreakdownCardProps {
   models: ApiKeyUsageBreakdownItem[] | undefined;
-  accounts: ApiKeyUsageBreakdownItem[] | undefined;
+  /** Not needed with `showAccounts={false}`. */
+  accounts?: ApiKeyUsageBreakdownItem[] | undefined;
   loading: boolean;
   error?: unknown;
   onRetry?: () => void;
   retrying?: boolean;
+  /**
+   * False: the models only, without the Models / Accounts switch (the key holder's page, which
+   * never shows accounts).
+   */
+  showAccounts?: boolean;
+  /** The card's title; "Breakdown" by default. */
+  title?: string;
 }
 
 /**
@@ -57,12 +65,15 @@ export function UsageBreakdownCard({
   error,
   onRetry,
   retrying,
+  showAccounts = true,
+  title: cardTitle,
 }: UsageBreakdownCardProps): JSX.Element {
   const { t, lang } = useT("api");
   const displayEmail = useDisplayEmail();
   const reducedMotion = usePrefersReducedMotion();
   const [hovered, setHovered] = useState<number | null>(null);
-  const [kind, setKind] = useState<BreakdownKind>("models");
+  const [chosen, setKind] = useState<BreakdownKind>("models");
+  const kind: BreakdownKind = showAccounts ? chosen : "models";
   const items = kind === "models" ? models : accounts;
   const title = t(`usage.${kind}`);
   const icon = kind === "models" ? AiBrain01Icon : UsersIcon;
@@ -205,32 +216,34 @@ export function UsageBreakdownCard({
   return (
     <SectionCard
       actions={
-        <SegmentedControl
-          render={
-            <RadioGroupPrimitive
-              aria-label={t("usage.breakdown")}
-              onValueChange={(next) => {
-                if (!isBreakdownKind(next)) return;
-                setKind(next);
-                setHovered(null);
-              }}
-              value={kind}
-            />
-          }
-          size="sm"
-        >
-          {BREAKDOWN_KINDS.map((value) => (
-            <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-              {t(`usage.${value}`)}
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
+        showAccounts ? (
+          <SegmentedControl
+            render={
+              <RadioGroupPrimitive
+                aria-label={t("usage.breakdown")}
+                onValueChange={(next) => {
+                  if (!isBreakdownKind(next)) return;
+                  setKind(next);
+                  setHovered(null);
+                }}
+                value={kind}
+              />
+            }
+            size="sm"
+          >
+            {BREAKDOWN_KINDS.map((value) => (
+              <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
+                {t(`usage.${value}`)}
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
+        ) : undefined
       }
       description={t("usage.byRequests")}
       descriptionVariant="inline"
       icon={PieChart01Icon}
       slim
-      title={t("usage.breakdown")}
+      title={cardTitle ?? t("usage.breakdown")}
     >
       {body}
     </SectionCard>

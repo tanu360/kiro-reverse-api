@@ -299,6 +299,7 @@ Bắt buộc API key từ trang **API** (**Truy cập API → Bắt buộc API k
 - **Model được phép** giới hạn một key vào một số model. Hệ thống kiểm tra model mà yêu cầu dùng sau hậu tố thinking và ánh xạ model, không phân biệt hoa thường, chứ không phải tên client gửi: `claude-haiku-4-5`, `claude-haiku-4.5-thinking` và một ánh xạ trỏ tới `claude-haiku-4.5` đều được tính là `claude-haiku-4.5`, và không bí danh nào tới được model ngoài danh sách. Model khác nhận HTTP 403 (`permission_error` ở API Anthropic, mã `model_not_allowed` ở các API OpenAI), và `/v1/models` chỉ liệt kê các model được phép.
 - **Tạo lại key** cấp cho key một giá trị mới, và giá trị cũ ngừng hoạt động ngay lập tức. Tên, giới hạn, tài khoản và mức sử dụng được giữ nguyên.
 - **Mức sử dụng theo key** vẽ biểu đồ số yêu cầu, token và credit của từng key trong 24 giờ, 7 ngày, 30 ngày hoặc toàn bộ thời gian, tách riêng thành công và thất bại, với các dòng riêng cho yêu cầu không có key, key không hợp lệ và key đã xóa.
+- Người giữ key đăng nhập tại `/user` bằng chính API key của mình để xem giới hạn, mức sử dụng theo ngày và theo model, và các yêu cầu gần đây của key đó; họ không bao giờ thấy tài khoản hay key khác.
 
 ---
 

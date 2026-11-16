@@ -42,5 +42,7 @@
   "codeWrong": "That code is not right. Check that your phone's clock is correct.",
   "recoveryWrong": "That recovery code is not right, or it was used already.",
   "codeReused": "This code was used already. Wait for the next one.",
-  "challengeExpired": "The sign-in timed out. Enter the password again."
+  "challengeExpired": "The sign-in timed out. Enter the password again.",
+  "apiKeyPrompt": "Have an API key? {link}",
+  "apiKeyLink": "Check its usage"
 }

@@ -1,0 +1,10 @@
+{
+  "title": "Kiểm tra API key",
+  "subtitle": "Đăng nhập bằng API key để xem mức sử dụng, giới hạn và yêu cầu của key.",
+  "key": "API key",
+  "keyPlaceholder": "sk-…",
+  "showKey": "Hiện API key",
+  "hideKey": "Ẩn API key",
+  "adminPrompt": "Bạn là quản trị viên? {link}",
+  "adminLink": "Đăng nhập bằng mật khẩu"
+}

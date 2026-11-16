@@ -155,5 +155,8 @@
   "alertDelivery.network": "无法连接到渠道。",
   "serverText.banSuspended": "AWS 检测到异常活动，已临时暂停此账号。",
   "serverText.banAuthFailed": "登录失败：Token 无效或已过期。",
-  "serverText.backupAccountsMoved": "账号迁移到独立数据表之前"
+  "serverText.backupAccountsMoved": "账号迁移到独立数据表之前",
+  "serverError.userKeyRequired": "请输入 API Key。",
+  "serverError.userKeyInvalid": "API Key 不正确。",
+  "serverError.userSessionExpired": "会话已过期，请使用 API Key 重新登录。"
 }

@@ -83,6 +83,10 @@ const (
 	codeModelsLoadFailed        = "models_load_failed"
 	codeProfilesLoadFailed      = "profiles_load_failed"
 	codeMicrosoftSignInFailed   = "microsoft_sign_in_failed"
+	// The user panel (/user/api, user_api.go) answers with the same shape.
+	codeUserKeyRequired    = "user_key_required"
+	codeUserKeyInvalid     = "user_key_invalid"
+	codeUserSessionExpired = "user_session_expired"
 	// codeSaveFailed: the change could not be stored; detail is the storage error.
 	codeSaveFailed = "save_failed"
 	// codeInternalError: any other failure inside the server; detail is the error.

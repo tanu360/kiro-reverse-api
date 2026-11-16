@@ -299,6 +299,7 @@ Exija chaves de API na página **API** (**Acesso à API → Exigir chave de API*
 - **Modelos permitidos** limita uma chave a alguns modelos. Vale o modelo que a requisição usa depois do sufixo de thinking e dos mapeamentos de modelo, sem diferenciar maiúsculas, e não o nome que o cliente enviou: `claude-haiku-4-5`, `claude-haiku-4.5-thinking` e um mapeamento que aponta para `claude-haiku-4.5` contam todos como `claude-haiku-4.5`, e nenhum apelido alcança um modelo fora da lista. Outros modelos recebem HTTP 403 (`permission_error` na API Anthropic, código `model_not_allowed` nas APIs OpenAI), e `/v1/models` lista só os modelos permitidos.
 - **Gerar nova chave** dá um novo valor à chave, e o valor antigo para de funcionar na hora. Nome, limites, contas e uso continuam iguais.
 - **Uso por chave** mostra em gráfico as requisições, os tokens e os créditos de cada chave nas últimas 24 horas, 7 dias, 30 dias ou em todo o período, separados entre sucesso e falha, com linhas próprias para requisições sem chave, chaves inválidas e chaves excluídas.
+- Quem tem uma chave entra em `/user` com a própria chave de API para ver os limites dela, o uso por dia e por modelo e as requisições recentes; essa pessoa nunca vê as contas nem outras chaves.
 
 ---
 

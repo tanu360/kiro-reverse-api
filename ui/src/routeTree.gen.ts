@@ -17,6 +17,8 @@ import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
 import { Route as AppApiRouteImport } from './routes/_app/api'
 import { Route as AppBackupsRouteImport } from './routes/_app/backups'
 import { Route as AppRequestsRouteImport } from './routes/_app/requests'
+import { Route as UserIndexRouteImport } from './routes/user/index'
+import { Route as UserLoginRouteImport } from './routes/user/login'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsSecurityRouteImport } from './routes/_app/settings/security'
 import { Route as AppSettingsServerRouteImport } from './routes/_app/settings/server'
@@ -60,6 +62,16 @@ const AppRequestsRoute = AppRequestsRouteImport.update({
   path: '/requests',
   getParentRoute: () => AppRoute,
 } as any)
+const UserIndexRoute = UserIndexRouteImport.update({
+  id: '/user/',
+  path: '/user/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserLoginRoute = UserLoginRouteImport.update({
+  id: '/user/login',
+  path: '/user/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
@@ -84,6 +96,8 @@ export interface FileRoutesByFullPath {
   '/api': typeof AppApiRoute
   '/backups': typeof AppBackupsRoute
   '/requests': typeof AppRequestsRoute
+  '/user/login': typeof UserLoginRoute
+  '/user/': typeof UserIndexRoute
   '/settings/security': typeof AppSettingsSecurityRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -95,7 +109,9 @@ export interface FileRoutesByTo {
   '/api': typeof AppApiRoute
   '/backups': typeof AppBackupsRoute
   '/requests': typeof AppRequestsRoute
+  '/user/login': typeof UserLoginRoute
   '/': typeof AppIndexRoute
+  '/user': typeof UserIndexRoute
   '/settings/security': typeof AppSettingsSecurityRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -109,7 +125,9 @@ export interface FileRoutesById {
   '/_app/api': typeof AppApiRoute
   '/_app/backups': typeof AppBackupsRoute
   '/_app/requests': typeof AppRequestsRoute
+  '/user/login': typeof UserLoginRoute
   '/_app/': typeof AppIndexRoute
+  '/user/': typeof UserIndexRoute
   '/_app/settings/security': typeof AppSettingsSecurityRoute
   '/_app/settings/server': typeof AppSettingsServerRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -124,6 +142,8 @@ export interface FileRouteTypes {
     | '/api'
     | '/backups'
     | '/requests'
+    | '/user/login'
+    | '/user/'
     | '/settings/security'
     | '/settings/server'
     | '/settings/'
@@ -135,7 +155,9 @@ export interface FileRouteTypes {
     | '/api'
     | '/backups'
     | '/requests'
+    | '/user/login'
     | '/'
+    | '/user'
     | '/settings/security'
     | '/settings/server'
     | '/settings'
@@ -148,7 +170,9 @@ export interface FileRouteTypes {
     | '/_app/api'
     | '/_app/backups'
     | '/_app/requests'
+    | '/user/login'
     | '/_app/'
+    | '/user/'
     | '/_app/settings/security'
     | '/_app/settings/server'
     | '/_app/settings/'
@@ -158,6 +182,8 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
+  UserLoginRoute: typeof UserLoginRoute
+  UserIndexRoute: typeof UserIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -218,6 +244,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRequestsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/user/': {
+      id: '/user/'
+      path: '/user'
+      fullPath: '/user/'
+      preLoaderRoute: typeof UserIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/login': {
+      id: '/user/login'
+      path: '/user/login'
+      fullPath: '/user/login'
+      preLoaderRoute: typeof UserLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/settings'
@@ -270,6 +310,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
+  UserLoginRoute: UserLoginRoute,
+  UserIndexRoute: UserIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

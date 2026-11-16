@@ -59,6 +59,10 @@ function LoginPendingRoute(): JSX.Element {
           <Skeleton className="h-4 w-32" />
         </div>
       </div>
+      {/* The "Have an API key?" line under the form, one text-sm line. */}
+      <div aria-hidden="true" className="flex h-5 items-center justify-center">
+        <Skeleton className="h-4 w-56" />
+      </div>
     </AuthLayout>
   );
 }

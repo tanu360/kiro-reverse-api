@@ -138,6 +138,9 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   microsoft_sign_in_failed: "errors:serverError.microsoftSignInFailed",
   save_failed: "errors:serverError.saveFailed",
   internal_error: "errors:serverError.internalError",
+  user_key_required: "errors:serverError.userKeyRequired",
+  user_key_invalid: "errors:serverError.userKeyInvalid",
+  user_session_expired: "errors:serverError.userSessionExpired",
 };
 
 /**

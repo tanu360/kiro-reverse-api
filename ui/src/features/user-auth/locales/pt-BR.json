@@ -1,0 +1,10 @@
+{
+  "title": "Consulte sua chave de API",
+  "subtitle": "Entre com sua chave de API para ver o uso, os limites e as requisições dela.",
+  "key": "Chave de API",
+  "keyPlaceholder": "sk-…",
+  "showKey": "Mostrar chave de API",
+  "hideKey": "Ocultar chave de API",
+  "adminPrompt": "É o administrador? {link}",
+  "adminLink": "Entrar com a senha"
+}

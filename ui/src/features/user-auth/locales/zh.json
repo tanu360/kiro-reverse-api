@@ -1,0 +1,10 @@
+{
+  "title": "查看 API Key 用量",
+  "subtitle": "使用 API Key 登录，查看其用量、限额和请求。",
+  "key": "API Key",
+  "keyPlaceholder": "sk-…",
+  "showKey": "显示 API Key",
+  "hideKey": "隐藏 API Key",
+  "adminPrompt": "是管理员？{link}",
+  "adminLink": "使用密码登录"
+}

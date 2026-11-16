@@ -115,6 +115,8 @@ type requestQuery struct {
 	ErrorType string
 	// Conversation keeps only the turns of one conversation.
 	Conversation string
+	// APIKeyID keeps only the requests of one API key (the user panel's own requests).
+	APIKeyID string
 }
 
 type requestPage struct {
@@ -828,6 +830,7 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 	}
 	q.ErrorType = strings.TrimSpace(strings.ToLower(q.ErrorType))
 	q.Conversation = strings.TrimSpace(q.Conversation)
+	q.APIKeyID = strings.TrimSpace(q.APIKeyID)
 	return q
 }
 
@@ -857,6 +860,9 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			continue
 		}
 		if q.Conversation != "" && rec.ConversationID != q.Conversation {
+			continue
+		}
+		if q.APIKeyID != "" && rec.APIKeyID != q.APIKeyID {
 			continue
 		}
 		if search != "" {

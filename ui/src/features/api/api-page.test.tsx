@@ -92,6 +92,12 @@ describe("ApiPage", () => {
     expect(within(row("team-a")).queryByText("Limit reached")).not.toBeInTheDocument();
     expect(within(table).getAllByText("Limit reached")).toHaveLength(1);
     expect(within(table).getByText("Unnamed key")).toBeInTheDocument();
+    // The card tells admins where key holders check their own usage, in a new tab.
+    const userPanel = `${window.location.origin}/user`;
+    expect(screen.getByText(/Key holders can check their own usage at/)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: userPanel });
+    expect(link).toHaveAttribute("href", userPanel);
+    expect(link).toHaveAttribute("target", "_blank");
   });
 
   it("creates a key and shows the full key once, ready to copy", async () => {
@@ -122,6 +128,10 @@ describe("ApiPage", () => {
 
     await user.click(within(panel).getByRole("button", { name: "Copy new API key" }));
     expect(copyTextMock).toHaveBeenCalledWith(created?.key);
+    // The key also signs in to the usage page; its link copies from the panel.
+    expect(within(panel).getByText(/also sign in with it/)).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: "Copy usage page link" }));
+    expect(copyTextMock).toHaveBeenCalledWith(`${window.location.origin}/user`);
 
     await user.click(within(panel).getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByTestId("created-key-panel")).not.toBeInTheDocument();
