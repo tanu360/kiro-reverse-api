@@ -1,4 +1,4 @@
-import { Alert02Icon, Download04Icon, ReloadIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, CloudDownloadIcon, ReloadIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -221,13 +221,13 @@ export function UpdateStatusIcon({
             strokeWidth={1.5}
           />
         </svg>
-        <HugeiconsIcon className="size-4" icon={Download04Icon} />
+        <HugeiconsIcon className="size-4" icon={CloudDownloadIcon} />
       </span>
     );
   }
   return (
     <span aria-hidden="true" className="relative grid size-4 place-items-center">
-      <HugeiconsIcon className="size-4" icon={Download04Icon} />
+      <HugeiconsIcon className="size-4" icon={CloudDownloadIcon} />
       <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-warning outline-2 outline-background" />
     </span>
   );
