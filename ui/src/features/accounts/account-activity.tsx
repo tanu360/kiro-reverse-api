@@ -149,7 +149,7 @@ export function AccountActivityLine({
   const { t, lang } = useT("accounts");
   const query = useAccountActivity(accountId);
   const line = cn(
-    "flex min-w-0 items-center text-meta text-muted-foreground tabular-nums leading-tight",
+    "flex min-w-0 items-center text-meta text-muted-foreground tabular-nums",
     className,
   );
   const activity = query.data;
