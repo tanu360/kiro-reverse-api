@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
  */
 const NARROW_BAR_LABEL = "@max-5xl/filter-bar:hidden";
 const NARROW_BAR_BUTTON =
-  "@max-5xl/filter-bar:rounded-s-lg! @max-5xl/filter-bar:border-s! @max-5xl/filter-bar:before:inset-s-0! @max-5xl/filter-bar:before:rounded-s-[calc(var(--radius-lg)-1px)]!";
+  "@max-5xl/filter-bar:rounded-s-lg! @max-5xl/filter-bar:border-s! @max-5xl/filter-bar:before:inset-s-0! @max-5xl/filter-bar:before:rounded-s-lg-inner!";
 
 /**
  * A table toolbar's filter row. From a 64rem bar it is one line: the search, the controls, `end`

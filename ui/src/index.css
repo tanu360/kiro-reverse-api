@@ -970,6 +970,8 @@
   --pill-success: #3dbe5f;
   --pill-success-fg: #27793c;
   --pill-success-bg: color-mix(in srgb, var(--pill-success) 10%, transparent);
+  /* The same pill laid on the card colour: opaque, so it reads alike on any grey behind it. */
+  --pill-success-bg-solid: color-mix(in srgb, var(--pill-success) 10%, var(--card));
   --pill-warning: #ff9f4a;
   --pill-warning-fg: #ab5000;
   --pill-warning-bg: color-mix(in srgb, var(--pill-warning) 11%, transparent);
@@ -987,6 +989,8 @@
   --pill-success: #4cc96d;
   --pill-success-fg: #6fd68b;
   --pill-success-bg: color-mix(in srgb, var(--pill-success) 16%, transparent);
+  /* The dark pill already clears 4.5:1 on every surface, so it stays see-through. */
+  --pill-success-bg-solid: var(--pill-success-bg);
   --pill-warning: #ffa95e;
   --pill-warning-fg: #ffb87a;
   --pill-warning-bg: color-mix(in srgb, var(--pill-warning) 16%, transparent);
@@ -1113,6 +1117,8 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
+  /* lg one hairline in: the inner edge of a 1 px border round an lg shape (a ::before inside it). */
+  --radius-lg-inner: calc(var(--radius) - 1px);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);

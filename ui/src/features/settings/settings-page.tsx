@@ -354,11 +354,11 @@ function WideNavLink({
 function OnBadge(): JSX.Element {
   const { t } = useT("settings");
   return (
-    // In the light theme the see-through pill is laid on the card colour, so its text keeps 4.5:1
-    // on the grey of the selected row as it does on a card (the dark theme already clears it).
+    // The pill on the card colour (--pill-success-bg-solid), so its text keeps 4.5:1 on the grey
+    // of the selected row as it does on a card; the dark theme keeps the see-through pill.
     <Badge
       aria-hidden="true"
-      className="not-dark:bg-card not-dark:bg-[linear-gradient(var(--badge-bg),var(--badge-bg))]"
+      className="[--badge-bg:var(--pill-success-bg-solid)]"
       dot
       size="sm"
       tone="success"
