@@ -355,6 +355,39 @@ describe("empty and partial data", () => {
     expect(await within(models).findByText("No usage in this range")).toBeInTheDocument();
   });
 
+  it("shows the models as the Overview's model mix: five by requests, the rest counted", async () => {
+    const item = (id: string, requests: number, credits: number): Body => ({
+      id,
+      requests,
+      succeeded: requests,
+      failed: 0,
+      tokens: requests * 100,
+      credits,
+    });
+    serve({
+      breakdown: breakdownBody([
+        item("m-a", 2, 9),
+        item("m-b", 9, 1),
+        item("m-c", 7, 1),
+        item("m-d", 5, 1),
+        item("m-e", 4, 1),
+        item("m-f", 3, 1),
+        item("", 1, 0),
+      ]),
+    });
+    await renderPanel();
+    const card = await screen.findByRole("region", { name: "Usage by model" });
+    const table = await within(card).findByRole("table", { name: "Models" });
+    // Ranked by requests, not credits: m-a used the most credits but sent only two requests.
+    const names = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
+    expect(names).toEqual(["m-b", "m-c", "m-d", "m-e", "m-f"]);
+    expect(within(card).getByRole("figure", { name: "Share of requests by model" })).toBeVisible();
+    expect(within(card).getByText("2 more models")).toBeInTheDocument();
+  });
+
   it("offers the first page when a page past the end comes back empty", async () => {
     const all = Array.from({ length: 23 }, (_, index) => row({ requestId: `req_${index}` }));
     // The log is pruned after page 1 loads: page 2 is past the end by the time it is asked for.

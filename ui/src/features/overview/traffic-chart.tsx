@@ -4,7 +4,7 @@ import { dateLabelCount, rightAxisMargin } from "@/components/charts/axis-fit";
 import { Bar } from "@/components/charts/bar";
 import { BarChart } from "@/components/charts/bar-chart";
 import { BarXAxis } from "@/components/charts/bar-x-axis";
-import { useChartStable } from "@/components/charts/chart-context";
+import { useChartStable, useSettledYScale } from "@/components/charts/chart-context";
 import { ChartTooltip, TooltipContent, type TooltipRow } from "@/components/charts/tooltip";
 import { YAxis } from "@/components/charts/y-axis";
 import { useIsMobile } from "@/hooks/use-media-query";
@@ -12,13 +12,7 @@ import { formatNumber, formatTime } from "@/lib/format";
 import type { Lang } from "@/lib/i18n";
 import { bucketLabel, bucketTitle, type TimeBucket } from "@/lib/time-buckets";
 import type { TrafficPoint } from "./aggregate";
-import {
-  FAILED_COLOR,
-  PREVIOUS_COLOR,
-  RETRIED_COLOR,
-  SUCCEEDED_COLOR,
-  TRACK_COLOR,
-} from "./colors";
+import { PREVIOUS_COLOR, TRACK_COLOR } from "./colors";
 import { PLOT_HEIGHT } from "./traffic-card";
 
 // The count labels sit in the right margin (mono chart ticks). The 8 px on the left keeps the
@@ -27,18 +21,25 @@ const MARGIN = { top: 8, right: 36, bottom: 28, left: 8 };
 /** The minute views' x-axis labels: short clock times. */
 const TIME_LABELS = { base: 3, sm: 4, md: 6 };
 
-export interface TrafficChartLabels {
-  succeeded: string;
-  retried: string;
-  failed: string;
-  previous: string;
-  /** "2 min": the bucket size after the time range in the tooltip title. */
-  bucket: string;
+/** One stacked series, bottom first: its name in the tooltip and its colour. */
+export interface TrafficSeries {
+  label: string;
+  color: string;
 }
 
 /** A traffic bucket plus its retried attempts (the proxy counts those apart from requests). */
 export interface TrafficBar extends TrafficPoint {
   retried: number;
+}
+
+/**
+ * One bar as the chart draws it: its start, its parts in the order of the series (bottom first)
+ * and, in the 1 h view, the previous hour's count for the dashed curve.
+ */
+export interface StackedBar {
+  date: Date;
+  parts: readonly number[];
+  previous?: number;
 }
 
 /** All time's calendar bars: dates on the axis and a period title instead of clock times. */
@@ -69,6 +70,15 @@ function HatchPattern({ id, color }: { id: string; color: string }): JSX.Element
   );
 }
 HatchPattern.displayName = "HatchPattern";
+
+/** Count labels in whole numbers: two requests read 0, 1, 2, not 0, 0.5 … 2. */
+function WholeNumberYAxis(): JSX.Element {
+  const scale = useSettledYScale();
+  const ticks = scale.ticks(4).filter((tick) => Number.isInteger(tick));
+  return <YAxis numTicks={4} side="right" tickValues={ticks} />;
+}
+// Named as the axis it wraps, so the chart keeps it out of the series' reveal clip like YAxis.
+WholeNumberYAxis.displayName = "YAxis";
 
 /**
  * The empty column behind every bar, full plot height, so a quiet bucket still reads as a slot
@@ -129,59 +139,79 @@ function TrendLine({ dataKey }: { dataKey: string }): JSX.Element | null {
 }
 TrendLine.displayName = "TrendLine";
 
+/** The data key of the series at `index` in the chart's rows. */
+const partKey = (index: number) => `part${index}`;
+
 /**
- * Lazy-loaded Bklit bar chart for the traffic card: one stacked bar per bucket, succeeded,
- * retried and failed in hatched purple, amber and red over a faint full-height track, and (1 h)
- * the previous hour as a dashed grey curve. In the loading state BarChart draws its own
- * skeleton; with no traffic only the tracks remain.
+ * Lazy-loaded Bklit bar chart for the traffic card: one stacked bar per bucket, each series
+ * hatched in its colour over a faint full-height track (the Overview: succeeded, retried and
+ * failed in purple, amber and red), and (1 h) the previous hour as a dashed grey curve. In the
+ * loading state BarChart draws its own skeleton; with no traffic only the tracks remain. The API
+ * key usage cards draw a key's requests, tokens or credits with it.
  */
 export default function TrafficChart({
   bars,
+  series,
   bucketMin,
   period,
   lang,
-  labels,
+  previousLabel = "",
+  bucketSize,
+  formatValue,
+  wholeNumbers = false,
   reducedMotion,
   status = "ready",
   empty = false,
 }: {
-  bars: TrafficBar[];
+  bars: StackedBar[];
+  /** The stacked series, bottom first, in the order of each bar's parts. */
+  series: readonly TrafficSeries[];
   bucketMin: number;
-  /** All time: bars of a day or more, labelled by date. */
+  /** Bars of an hour or more, labelled by the server's bucket (All time, a key's usage). */
   period?: TrafficPeriod;
   lang: Lang;
-  labels: TrafficChartLabels;
+  /** The dashed series' name in the tooltip, for bars that carry `previous`. */
+  previousLabel?: string;
+  /** "2 min": the bucket size after the time range in the tooltip title, without a period. */
+  bucketSize?: string;
+  /** The tooltip's values; whole numbers in the UI language by default. */
+  formatValue?: (value: number) => string;
+  /** Counts that can be small: the axis skips fractional labels. */
+  wholeNumbers?: boolean;
   reducedMotion: boolean;
   status?: "loading" | "ready";
   empty?: boolean;
 }): JSX.Element {
   const phone = useIsMobile();
   const id = useId().replace(/:/g, "");
-  const ids = { succeeded: `ok-${id}`, retried: `rt-${id}`, failed: `bad-${id}` };
   const hasPrevious = bars.some((bar) => bar.previous !== undefined);
+  const format = formatValue ?? ((value: number) => formatNumber(value, lang));
+  // Only the count of series shapes the rows, so a new array of the same series keeps them.
+  const partCount = series.length;
   const data = useMemo(
     () =>
       bars.map((bar) => {
         const start = bar.date.getTime() / 1000;
-        const stacked = bar.succeeded + bar.retried + bar.failed;
-        return {
+        const row: { name: string } & Record<string, string | number> = {
           name: period
             ? bucketLabel(start, period.bucket, period.tzOffset, lang)
             : formatTime(start, lang),
           start,
-          succeeded: bar.succeeded,
-          retried: bar.retried,
-          failed: bar.failed,
-          ...(bar.previous === undefined
-            ? {}
-            : {
-                previous: bar.previous,
-                // An invisible cap above the stack, so the y-scale reaches the dashed line too.
-                headroom: Math.max(0, bar.previous - stacked),
-              }),
         };
+        let stacked = 0;
+        for (let index = 0; index < partCount; index++) {
+          const value = bar.parts[index] ?? 0;
+          row[partKey(index)] = value;
+          stacked += value;
+        }
+        if (bar.previous !== undefined) {
+          row.previous = bar.previous;
+          // An invisible cap above the stack, so the y-scale reaches the dashed line too.
+          row.headroom = Math.max(0, bar.previous - stacked);
+        }
+        return row;
       }),
-    [bars, lang, period],
+    [bars, partCount, lang, period],
   );
   // All time: counts past 1,000 can spell long ("1 mil"), and so can dates ("29 de set."); the
   // minute views keep their fixed margin and labels.
@@ -191,7 +221,7 @@ export default function TrafficChart({
         ? {
             ...MARGIN,
             right: rightAxisMargin(
-              Math.max(0, ...bars.map((bar) => bar.succeeded + bar.retried + bar.failed)),
+              Math.max(0, ...bars.map((bar) => bar.parts.reduce((sum, value) => sum + value, 0))),
               MARGIN.right,
               lang,
             ),
@@ -207,6 +237,9 @@ export default function TrafficChart({
   return (
     <BarChart
       animationDuration={reducedMotion ? 0 : undefined}
+      // BarChart keeps the series it first laid out: new colours (a key's usage card switching
+      // from tokens to requests) draw on a fresh chart, or the old hatching stays.
+      key={series.map((part) => part.color).join(" ")}
       aspectRatio="auto"
       // Narrower gaps on a phone, so its fewer bars read as bars, not hairlines.
       barGap={phone ? 0.22 : 0.35}
@@ -218,36 +251,25 @@ export default function TrafficChart({
       status={status}
       xDataKey="name"
     >
-      <HatchPattern color={SUCCEEDED_COLOR} id={ids.succeeded} />
-      <HatchPattern color={RETRIED_COLOR} id={ids.retried} />
-      <HatchPattern color={FAILED_COLOR} id={ids.failed} />
+      {series.map((part, index) => (
+        <HatchPattern color={part.color} id={`${partKey(index)}-${id}`} key={partKey(index)} />
+      ))}
       {/*
         An empty chart keeps only its time axis: no columns (their stripes ran through the "No
         traffic" notice), no count scale over nothing and no flat previous-hour line.
       */}
       {empty ? null : <BarColumnTrack />}
-      {empty ? null : <YAxis numTicks={4} side="right" />}
-      <Bar
-        animate={!reducedMotion}
-        dataKey="succeeded"
-        fill={`url(#${ids.succeeded})`}
-        lineCap={2}
-        stroke={SUCCEEDED_COLOR}
-      />
-      <Bar
-        animate={!reducedMotion}
-        dataKey="retried"
-        fill={`url(#${ids.retried})`}
-        lineCap={2}
-        stroke={RETRIED_COLOR}
-      />
-      <Bar
-        animate={!reducedMotion}
-        dataKey="failed"
-        fill={`url(#${ids.failed})`}
-        lineCap={2}
-        stroke={FAILED_COLOR}
-      />
+      {empty ? null : wholeNumbers ? <WholeNumberYAxis /> : <YAxis numTicks={4} side="right" />}
+      {series.map((part, index) => (
+        <Bar
+          animate={!reducedMotion}
+          dataKey={partKey(index)}
+          fill={`url(#${partKey(index)}-${id})`}
+          key={partKey(index)}
+          lineCap={2}
+          stroke={part.color}
+        />
+      ))}
       {hasPrevious ? <Bar animate={false} dataKey="headroom" fill="transparent" /> : null}
       {hasPrevious && !empty ? <TrendLine dataKey="previous" /> : null}
       <BarXAxis maxLabels={maxLabels} />
@@ -256,33 +278,21 @@ export default function TrafficChart({
         <ChartTooltip
           content={({ point }) => {
             const start = Number(point.start);
-            const rows: TooltipRow[] = [
-              {
-                color: SUCCEEDED_COLOR,
-                label: labels.succeeded,
-                value: formatNumber(Number(point.succeeded), lang),
-              },
-              {
-                color: RETRIED_COLOR,
-                label: labels.retried,
-                value: formatNumber(Number(point.retried), lang),
-              },
-              {
-                color: FAILED_COLOR,
-                label: labels.failed,
-                value: formatNumber(Number(point.failed), lang),
-              },
-            ];
+            const rows: TooltipRow[] = series.map((part, index) => ({
+              color: part.color,
+              label: part.label,
+              value: format(Number(point[partKey(index)] ?? 0)),
+            }));
             if (hasPrevious) {
               rows.push({
                 color: PREVIOUS_COLOR,
-                label: labels.previous,
-                value: formatNumber(Number(point.previous ?? 0), lang),
+                label: previousLabel,
+                value: format(Number(point.previous ?? 0)),
               });
             }
             return (
               <TooltipContent
-                meta={period ? undefined : labels.bucket}
+                meta={period ? undefined : bucketSize}
                 mono
                 rows={rows}
                 title={

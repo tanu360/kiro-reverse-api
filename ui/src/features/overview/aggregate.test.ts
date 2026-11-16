@@ -198,6 +198,17 @@ describe("modelSlices", () => {
   it("returns no slices without models", () => {
     expect(modelSlices([], 4, "Other")).toEqual({ slices: [], total: 0, metric: "reqs" });
   });
+
+  it("ranks by requests when asked, even with credits", () => {
+    // An API key's model mix reads "by requests" whatever its credits.
+    const result = modelSlices([model("m1", 50, 1), model("m2", 1, 9)], 4, "Other", "reqs");
+    expect(result.metric).toBe("reqs");
+    expect(result.total).toBe(10);
+    expect(result.slices.map((s) => [s.label, s.value])).toEqual([
+      ["m2", 9],
+      ["m1", 1],
+    ]);
+  });
 });
 
 describe("busyAccounts", () => {

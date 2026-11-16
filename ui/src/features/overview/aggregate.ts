@@ -135,18 +135,22 @@ interface ModelSlice {
   maxValue: number;
 }
 
+/** What the model mix ranks: a model, or an API key's model or account (key usage). */
+export type MixSource = Pick<ModelMixEntry, "model" | "reqs" | "credits">;
+
 /**
  * Ring slices: the top `limit` models plus "Other" for the rest. Values are credits, or
- * requests when no model has used credits yet.
+ * requests when no model has used credits yet; `by` fixes the measure instead.
  */
 export function modelSlices(
-  models: readonly ModelMixEntry[],
+  models: readonly MixSource[],
   limit: number,
   otherLabel: string,
+  by?: "credits" | "reqs",
 ): { slices: ModelSlice[]; total: number; metric: "credits" | "reqs" } {
   const totalCredits = models.reduce((sum, m) => sum + m.credits, 0);
-  const metric = totalCredits > 0 ? "credits" : "reqs";
-  const metricOf = (m: ModelMixEntry) => (metric === "credits" ? m.credits : m.reqs);
+  const metric = by ?? (totalCredits > 0 ? "credits" : "reqs");
+  const metricOf = (m: MixSource) => (metric === "credits" ? m.credits : m.reqs);
   const sorted = [...models].sort((a, b) => metricOf(b) - metricOf(a));
   const total = metric === "credits" ? totalCredits : models.reduce((sum, m) => sum + m.reqs, 0);
   const slices: ModelSlice[] = sorted

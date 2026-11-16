@@ -298,13 +298,18 @@ describe("ApiKeyUsageSheet", () => {
       />,
     );
     const sheet = await screen.findByRole("dialog", { name: "quiet key" });
-    const models = await within(sheet).findByRole("list", { name: "Models" });
-    expect(within(models).getByText("claude-sonnet-4.5")).toBeInTheDocument();
-    expect(within(models).getByText("75%")).toBeInTheDocument();
+    // The Overview's model mix, by requests: the busiest model first, with its credits.
+    const models = await within(sheet).findByRole("table", { name: "Models" });
+    const [, first, second] = within(models).getAllByRole("row");
+    expect(first).toHaveTextContent("claude-sonnet-4.5");
+    expect(first).toHaveTextContent("1.00");
+    expect(second).toHaveTextContent("claude-haiku-4.5");
+    expect(within(sheet).getByRole("figure", { name: "Share of requests by model" })).toBeVisible();
     // One card at a time: the switch swaps the models for the accounts.
     expect(within(sheet).queryByRole("list", { name: "Accounts" })).toBeNull();
     await user.click(within(sheet).getByRole("radio", { name: "Accounts" }));
-    const accounts = within(sheet).getByRole("list", { name: "Accounts" });
+    const accounts = within(sheet).getByRole("table", { name: "Accounts" });
+    expect(within(accounts).getByRole("columnheader", { name: "Account" })).toBeInTheDocument();
     // Emails follow privacy mode, which the tests start in: masked.
     expect(accounts.textContent).toContain("@ex");
     expect(accounts.textContent).not.toContain("one@example.com");

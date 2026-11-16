@@ -12,7 +12,6 @@ import {
   LegendMarker,
   LegendValue,
 } from "@/components/charts/legend";
-import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
@@ -31,6 +30,8 @@ import { Card } from "@/components/ui/card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { FAILED_COLOR, MODEL_COLORS, SUCCEEDED_COLOR } from "@/features/overview/colors";
+import { PLOT_HEIGHT } from "@/features/overview/traffic-card";
+import type { StackedBar, TrafficSeries } from "@/features/overview/traffic-chart";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import {
   API_KEY_USAGE_RANGES,
@@ -55,7 +56,6 @@ import { type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { KeyStatus } from "./api-keys-card";
 import { UsageBreakdownCard } from "./key-usage-breakdown";
-import type { UsageSeries } from "./key-usage-chart";
 import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
 import { KeyLimitsCard } from "./key-usage-limits";
 import {
@@ -64,19 +64,19 @@ import {
   isUsageMetric,
   SHEET_METRICS,
   seriesBars,
-  USAGE_PLOT_HEIGHT,
   type UsageMetric,
 } from "./key-usage-model";
 
-const KeyUsageChart = lazy(() => import("./key-usage-chart"));
+// The Overview's traffic chart: the same hatched bars, axes and tooltip.
+const TrafficChart = lazy(() => import("@/features/overview/traffic-chart"));
 
 function isRange(value: unknown): value is ApiKeyUsageRange {
   return typeof value === "string" && (API_KEY_USAGE_RANGES as readonly string[]).includes(value);
 }
 
 interface MetricSeries {
-  primary: UsageSeries;
-  secondary?: UsageSeries;
+  primary: TrafficSeries;
+  secondary?: TrafficSeries;
   values: (totals: ApiKeyUsageTotals) => [number, number?];
 }
 
@@ -225,8 +225,9 @@ export interface UsageChartCardProps {
 /**
  * One row's usage as a chart card: requests (succeeded and failed), tokens (input and output) or
  * credits per hour, day, week, month or year, behind a measure switch, with the legend's totals
- * over the chart. The loading state is the chart's own sweep; an empty range keeps the bare axis
- * under a notice.
+ * over the chart. The chart is the Overview's traffic chart (hatched stacked bars over their
+ * tracks), at its height. The loading state is the chart's own skeleton; an empty range keeps
+ * the bare axis under a notice.
  */
 export function UsageChartCard({
   data,
@@ -247,7 +248,24 @@ export function UsageChartCard({
   // All time: requests pruned before daily totals were kept count in the totals, not in a bar.
   const earlier = entry?.earlier?.requests ?? 0;
   const bucket = data?.bucket ?? (range === "24h" ? "hour" : "day");
-  const bars = useMemo(() => (data ? seriesBars(data, entry, metric) : []), [data, entry, metric]);
+  const bucketSeconds = data?.bucketSeconds ?? (range === "24h" ? 3600 : 86400);
+  const tzOffset = data?.tzOffset ?? 0;
+  // Every range has the server's buckets (hours for 24h), labelled and titled by them.
+  const period = useMemo(
+    () => ({ bucket, bucketSeconds, tzOffset }),
+    [bucket, bucketSeconds, tzOffset],
+  );
+  const stack = series.secondary ? [series.primary, series.secondary] : [series.primary];
+  const bars = useMemo(
+    (): StackedBar[] =>
+      data
+        ? seriesBars(data, entry, metric).map((bar) => ({
+            date: new Date(bar.start * 1000),
+            parts: [bar.primary, bar.secondary],
+          }))
+        : [],
+    [data, entry, metric],
+  );
   const formatValue = (value: number) =>
     metric === "credits" ? formatCredits(value, 2, lang) : formatNumber(value, lang);
 
@@ -272,7 +290,8 @@ export function UsageChartCard({
       </LegendItem>
     </Legend>
   );
-  const placeholder = <ChartSkeleton className={USAGE_PLOT_HEIGHT} />;
+  // Until the chart code arrives, an empty box of the plot's height holds the layout.
+  const placeholder = <div aria-hidden="true" className={PLOT_HEIGHT} />;
 
   const loading = !data;
   const showEmpty = !loading && empty;
@@ -298,18 +317,16 @@ export function UsageChartCard({
           {/* Empty, the bare axis recedes, so the notice over it is what reads. */}
           <div aria-hidden="true" className={cn(showEmpty && "opacity-40")}>
             <Suspense fallback={placeholder}>
-              <KeyUsageChart
+              <TrafficChart
                 bars={bars}
-                bucket={bucket}
-                bucketSeconds={data?.bucketSeconds ?? (range === "24h" ? 3600 : 86400)}
+                bucketMin={bucketSeconds / 60}
                 empty={showEmpty}
                 formatValue={formatValue}
                 lang={lang}
-                primary={series.primary}
+                period={period}
                 reducedMotion={reducedMotion}
-                secondary={series.secondary}
+                series={stack}
                 status={loading ? "loading" : "ready"}
-                tzOffset={data?.tzOffset ?? 0}
                 wholeNumbers={metric !== "credits"}
               />
             </Suspense>

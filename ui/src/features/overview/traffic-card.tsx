@@ -35,14 +35,17 @@ import {
 } from "./aggregate";
 import { FAILED_COLOR, PREVIOUS_COLOR, RETRIED_COLOR, SUCCEEDED_COLOR } from "./colors";
 import { useTotalsFailed } from "./totals";
-import type { TrafficBar } from "./traffic-chart";
+import type { StackedBar, TrafficBar, TrafficSeries } from "./traffic-chart";
 
 const TrafficChart = lazy(() => import("./traffic-chart"));
 
 const RANGES: readonly OverviewRange[] = ["1h", "6h", "24h", "all"];
 /** Bucket minutes on a phone: 15 bars for 1 h, 18 for 6 h, 24 for 24 h. */
 const PHONE_BUCKET_MIN: Readonly<Record<HeatmapRange, number>> = { "1h": 4, "6h": 20, "24h": 60 };
-/** The plot's height, sized by the card's width (SectionCard is a container), not the viewport. */
+/**
+ * The plot's height, sized by the card's width (SectionCard is a container), not the viewport.
+ * The API key usage cards draw their chart at this height too.
+ */
 export const PLOT_HEIGHT = "h-64 @2xl:h-72";
 
 function isRange(value: unknown): value is OverviewRange {
@@ -167,6 +170,21 @@ export function TrafficCard(): JSX.Element {
     previous: t("traffic.previous"),
     bucket: t("traffic.bucket", { n: formatNumber(bucketMin, lang) }),
   };
+  // The chart's stack, bottom first: each bar's parts follow this order.
+  const series: TrafficSeries[] = [
+    { label: labels.succeeded, color: SUCCEEDED_COLOR },
+    { label: labels.retried, color: RETRIED_COLOR },
+    { label: labels.failed, color: FAILED_COLOR },
+  ];
+  const stacked = useMemo(
+    (): StackedBar[] =>
+      bars.map((bar) => ({
+        date: bar.date,
+        parts: [bar.succeeded, bar.retried, bar.failed],
+        previous: bar.previous,
+      })),
+    [bars],
+  );
   // Series order, so hovering an item dims the others in the chart. The previous hour keeps its
   // slot outside 1 h (hidden), and the labels stay up while a range loads (the values follow the
   // data), so switching the range does not move the card.
@@ -192,10 +210,12 @@ export function TrafficCard(): JSX.Element {
     <TrafficChart
       bars={[]}
       bucketMin={bucketMin}
-      period={period}
-      labels={labels}
+      bucketSize={labels.bucket}
       lang={lang}
+      period={period}
+      previousLabel={labels.previous}
       reducedMotion={reducedMotion}
+      series={series}
       status="loading"
     />
   );
@@ -247,13 +267,15 @@ export function TrafficCard(): JSX.Element {
           <div aria-hidden="true" className={cn(empty && "opacity-40")}>
             <Suspense fallback={placeholder}>
               <TrafficChart
-                bars={bars}
+                bars={stacked}
                 bucketMin={bucketMin}
+                bucketSize={labels.bucket}
                 empty={empty}
-                labels={labels}
                 lang={lang}
                 period={period}
+                previousLabel={labels.previous}
                 reducedMotion={reducedMotion}
+                series={series}
               />
             </Suspense>
           </div>
