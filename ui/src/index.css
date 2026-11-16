@@ -315,8 +315,8 @@
    *                   into a field whose text is under 16 px. Set by --control-text below.
    * Weights: 400 for text, 500 for controls, names, table heads and badges, 600 only for titles
    * and KPI figures; no bold outside the sign-in showcase art.
-   * Spacing: a card pads 16 px on phones and 24 px from sm; its header 12 px tall on phones,
-   * 16 px from sm; list rows run about 64 px with 16 px icons and a 12 px gap.
+   * Spacing: a card pads 16 px on phones and 24 px from sm, its header too, on every side; its
+   * footer 12 px above and below; list rows run about 64 px with 16 px icons and a 12 px gap.
    * Line heights follow the page's 1.5 unless the step is a title; 12 px text sits on 16 px.
    * Only the large steps tighten their tracking; body text keeps Geist's own spacing.
    * lib/utils.ts lists these steps for cn(), so a new step goes there too.
@@ -530,7 +530,7 @@
 
 /*
  * Inline code in running text: Geist Mono, a touch smaller than the line but never under the
- * 11 px 2xs step, on the see-through --code-background chip.
+ * 12 px meta step, on the see-through --code-background chip.
  */
 @utility inline-code {
   border-radius: 0.25rem;
@@ -538,7 +538,7 @@
   color: var(--code-foreground);
   padding: 0.125rem 0.25rem;
   font-family: var(--font-mono);
-  font-size: max(0.85em, 0.6875rem);
+  font-size: max(0.85em, 0.75rem);
 }
 
 /* Chart axis ticks: small mono figures in the chart label grey, for SVG text (fill) and HTML. */
@@ -1415,5 +1415,77 @@
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
     transition-duration: 0.01ms;
+  }
+}
+
+/*
+ * More contrast (the OS setting, prefers-contrast: more): secondary text and the hairlines move
+ * toward the text colour; the palette keeps its hues. Both themes are set, the dark one last,
+ * since the light values here would otherwise reach the dark root too.
+ */
+@media (prefers-contrast: more) {
+  :root {
+    --muted-foreground: oklch(0.4 0.016 286);
+    --border-subtle: var(--color-zinc-300);
+    --border: var(--color-zinc-400);
+    --input: var(--color-zinc-500);
+  }
+  .dark {
+    --muted-foreground: var(--color-neutral-300);
+    --border-subtle: --alpha(var(--color-white) / 14%);
+    --border: --alpha(var(--color-white) / 22%);
+    --input: --alpha(var(--color-white) / 30%);
+  }
+}
+
+/*
+ * Forced colours (Windows contrast themes) repaint every fill with the system colours, which
+ * erases the charts, bars, meters and dots, a switch's state and the picked tab, segment or
+ * section. Data keeps its own colours (an empty round span is a dot or a bar segment); state
+ * takes the system highlight.
+ */
+@media (forced-colors: active) {
+  svg,
+  .rounded-full:empty,
+  [data-slot="account-bar"],
+  [data-slot="kpi-bar"],
+  [data-slot="kpi-pills"],
+  [data-slot="meter-track"],
+  [data-slot="share-bar"],
+  [data-slot="token-bar"] {
+    forced-color-adjust: none;
+  }
+  [data-slot="switch"] {
+    forced-color-adjust: none;
+    background-color: Canvas;
+    box-shadow: inset 0 0 0 1px ButtonText;
+  }
+  [data-slot="switch"][data-checked] {
+    background-color: Highlight;
+    box-shadow: none;
+  }
+  [data-slot="switch-thumb"] {
+    forced-color-adjust: none;
+    background-color: ButtonText;
+  }
+  [data-slot="switch"][data-checked] [data-slot="switch-thumb"] {
+    background-color: HighlightText;
+  }
+  [data-slot="switch"][data-disabled] {
+    box-shadow: inset 0 0 0 1px GrayText;
+  }
+  [data-slot="switch"][data-disabled] [data-slot="switch-thumb"] {
+    background-color: GrayText;
+  }
+  [data-slot="tab-indicator"] {
+    forced-color-adjust: none;
+    background-color: Highlight;
+  }
+  [data-slot="segmented-control-indicator"],
+  [data-slot="sidebar-menu-button"][data-active="true"],
+  [data-slot="sidebar-menu-sub-button"][data-active="true"],
+  nav a[aria-current="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }

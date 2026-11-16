@@ -167,7 +167,7 @@ function Toasts({
             <Toast.Root
               key={toast.id}
               className={cn(
-                "popup-surface absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none [--popup-shadow:none] [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
+                "popup-surface absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none [--popup-shadow:none] [transition:transform_.3s_cubic-bezier(.22,1,.36,1),opacity_.3s,height_.15s]",
                 // Base positioning using data-position
                 "data-[position*=right]:right-0 data-[position*=right]:left-auto",
                 "data-[position*=left]:right-auto data-[position*=left]:left-0",

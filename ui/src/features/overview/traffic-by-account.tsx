@@ -256,7 +256,7 @@ export function TrafficByAccount(): JSX.Element {
                   </span>
                   <span className="min-w-0 truncate">{row.label}</span>
                 </div>
-                <div aria-hidden="true" className="h-3 [grid-area:bar]">
+                <div aria-hidden="true" className="h-3 [grid-area:bar]" data-slot="account-bar">
                   <div className="flex h-full gap-0.5" style={{ width: `${width}%` }}>
                     {passed > 0 ? (
                       <span

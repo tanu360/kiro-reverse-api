@@ -397,15 +397,11 @@ export function AccountIdentity({
       </div>
       {showTags ? (
         <div className="flex min-w-0 items-center gap-2">
-          <TruncatedText className="text-meta text-muted-foreground leading-tight">
-            {meta}
-          </TruncatedText>
+          <TruncatedText className="text-meta text-muted-foreground">{meta}</TruncatedText>
           <TagBadges max={2} tags={account.tags} />
         </div>
       ) : (
-        <TruncatedText className="text-meta text-muted-foreground leading-tight">
-          {meta}
-        </TruncatedText>
+        <TruncatedText className="text-meta text-muted-foreground">{meta}</TruncatedText>
       )}
     </div>
   );

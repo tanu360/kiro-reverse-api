@@ -407,7 +407,7 @@ function CountsRow({ view }: { view: ProxyPoolView }): JSX.Element {
   const { t } = useT("proxy-pool");
   return (
     <p
-      className={`${SETTINGS_ROW_X} flex flex-wrap items-center gap-2 py-3`}
+      className={`${SETTINGS_ROW_X} flex flex-wrap items-center gap-2 py-4`}
       data-slot="settings-row"
     >
       <span className="sr-only">{t("counts.label")}</span>

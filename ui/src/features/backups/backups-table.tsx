@@ -319,7 +319,7 @@ export function BackupsTable({
       {
         id: "note",
         header: t("note"),
-        className: "min-w-32 max-w-96 whitespace-normal wrap-break-word leading-snug",
+        className: "min-w-32 max-w-96 whitespace-normal wrap-break-word leading-5",
         cell: (entry) => <NoteCell entry={entry} mask={mask} t={t} />,
       },
       {
