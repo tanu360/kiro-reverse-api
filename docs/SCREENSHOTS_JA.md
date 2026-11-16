@@ -8,9 +8,9 @@
 
 [← README に戻る](../README_JA.md)
 
-管理パネルの全ページです。各画像は GitHub のテーマに合わせて、ライトまたはダークで表示されます。
+管理パネルとユーザーパネルの全ページです。各画像は GitHub のテーマに合わせて、ライトまたはダークで表示されます。
 
-[サインイン](#サインイン) · [概要](#概要) · [アカウント](#アカウント) · [リクエスト](#リクエスト) · [API](#api) · [バックアップ](#バックアップ) · [設定](#設定)
+[サインイン](#サインイン) · [概要](#概要) · [アカウント](#アカウント) · [リクエスト](#リクエスト) · [API](#api) · [バックアップ](#バックアップ) · [設定](#設定) · [ユーザーパネル](#ユーザーパネル)
 
 ## サインイン
 
@@ -73,7 +73,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/ja/requests-dark.webp">
     <img alt="リクエスト" src="../screenshots/ja/requests-light.webp" width="100%">
   </picture>
-  <br><sub><b>リクエスト</b> — ステータスタブ、検索、並べ替え、詳細ビュー</sub>
+  <br><sub><b>リクエスト</b> — 各リクエストのモデルと呼び出したクライアント、トークン、クレジット、所要時間。ステータスタブ、検索、並べ替えに対応</sub>
 </p>
 
 <p align="center">
@@ -91,7 +91,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/ja/api-dark.webp">
     <img alt="API" src="../screenshots/ja/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>API</b> — API アクセス、上限付きのクライアント別キー、キー別の使用量、ハイライト表示のクライアント設定</sub>
+  <br><sub><b>API</b> — API アクセス、トークン・クレジット・呼び出し回数の上限付きのキー、キー別の使用量、エンドポイント、ハイライト表示のクライアント設定</sub>
 </p>
 
 ## バックアップ
@@ -128,6 +128,24 @@
     <img alt="設定 · セキュリティ" src="../screenshots/ja/settings-3-light.webp" width="100%">
   </picture>
   <br><sub><b>設定 · セキュリティ</b> — 管理者パスワード、2 段階認証、システムプロンプトフィルター、自動修復、アラート、ログの保持、危険な操作</sub>
+</p>
+
+## ユーザーパネル
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/ja/user-login-dark.webp">
+    <img alt="ユーザーのサインイン" src="../screenshots/ja/user-login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>ユーザーのサインイン</b> — キーの利用者が自分の API キーでサインインし、その使用量を確認</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/ja/user-dark.webp">
+    <img alt="ユーザーパネル" src="../screenshots/ja/user-light.webp" width="100%">
+  </picture>
+  <br><sub><b>ユーザーパネル</b> — 1 つのキーの状態と上限、KPI カード、使用量の推移、モデル別とクライアント別の使用量、最近のリクエスト、エンドポイント、クライアントの設定</sub>
 </p>
 
 [← README に戻る](../README_JA.md)

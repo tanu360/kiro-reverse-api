@@ -8,9 +8,9 @@
 
 [← 返回 README](../README_CN.md)
 
-管理面板的每个页面。图片会跟随你的 GitHub 主题显示浅色或深色。
+管理面板与用户面板的每个页面。图片会跟随你的 GitHub 主题显示浅色或深色。
 
-[登录](#登录) · [概览](#概览) · [账号](#账号) · [请求](#请求) · [接口](#接口) · [备份](#备份) · [设置](#设置)
+[登录](#登录) · [概览](#概览) · [账号](#账号) · [请求](#请求) · [接口](#接口) · [备份](#备份) · [设置](#设置) · [用户面板](#用户面板)
 
 ## 登录
 
@@ -73,7 +73,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/requests-dark.webp">
     <img alt="请求" src="../screenshots/zh/requests-light.webp" width="100%">
   </picture>
-  <br><sub><b>请求</b> — 状态标签、搜索、排序与详情视图</sub>
+  <br><sub><b>请求</b> — 每条请求的模型与发起调用的客户端、Token、Credits 与耗时，以及状态标签、搜索与排序</sub>
 </p>
 
 <p align="center">
@@ -91,7 +91,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/api-dark.webp">
     <img alt="接口" src="../screenshots/zh/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>接口</b> — API 访问、带限额的客户端 Key、各 API Key 用量与高亮的客户端配置</sub>
+  <br><sub><b>接口</b> — API 访问、带 Token、Credits 与调用次数限额的 Key、各 API Key 用量、接口地址与高亮的客户端配置</sub>
 </p>
 
 ## 备份
@@ -128,6 +128,24 @@
     <img alt="设置 · 安全" src="../screenshots/zh/settings-3-light.webp" width="100%">
   </picture>
   <br><sub><b>设置 · 安全</b> — 管理员密码、两步验证登录、System Prompt 过滤、自动恢复、告警、日志保留、危险操作</sub>
+</p>
+
+## 用户面板
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/user-login-dark.webp">
+    <img alt="用户登录" src="../screenshots/zh/user-login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>用户登录</b> — API Key 持有者用自己的 API Key 登录，查看它的用量</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/user-dark.webp">
+    <img alt="用户面板" src="../screenshots/zh/user-light.webp" width="100%">
+  </picture>
+  <br><sub><b>用户面板</b> — 单个 Key 的状态与限额、KPI 卡片、用量趋势、各模型与各客户端用量、最近请求、接口地址与客户端配置</sub>
 </p>
 
 [← 返回 README](../README_CN.md)

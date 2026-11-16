@@ -38,7 +38,7 @@
 1. Gộp nhiều tài khoản Kiro và cân bằng tải yêu cầu bằng round-robin, trọng số hoặc mức ưu tiên, cùng cơ chế giữ hội thoại trên cùng một tài khoản.
 2. Chuyển đổi hai chiều giữa các lệnh gọi Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, OpenAI `/v1/responses` và upstream Kiro, bao gồm tool, thinking, mức suy luận (reasoning effort) và tìm kiếm web.
 3. Tự động làm mới access token và stream Server-Sent Events xuyên suốt từ đầu đến cuối, kèm keepalive và failover.
-4. Đi kèm trang quản trị React nhúng sẵn trong binary để quản lý tài khoản, theo dõi trực tiếp và kiểm tra yêu cầu, với giao diện English, 简体中文, 日本語, Tiếng Việt và Português (Brasil).
+4. Đi kèm trang quản trị React nhúng sẵn trong binary để quản lý tài khoản, theo dõi trực tiếp và kiểm tra yêu cầu, với giao diện English, 简体中文, 日本語, Tiếng Việt và Português (Brasil). Trang người dùng cho người giữ mỗi API key xem mức sử dụng của chính key đó.
 
 > [!IMPORTANT]
 > Proxy cục bộ chỉ gồm một binary. **Không phải** dịch vụ được host sẵn, **không** liên kết với Amazon, AWS hay Kiro. Bạn phải sở hữu hoặc được cấp quyền sử dụng mọi tài khoản bạn thêm vào nhóm tài khoản.
@@ -57,7 +57,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
   <br><sub><b>Tổng quan</b> — lưu lượng, credit và lỗi trực tiếp trên các tài khoản</sub>
 </p>
 
-<p align="center">📸 <a href="docs/SCREENSHOTS_VI.md"><b>Xem thêm ảnh chụp màn hình</b></a> — tài khoản, yêu cầu, API, sao lưu và cài đặt</p>
+<p align="center">📸 <a href="docs/SCREENSHOTS_VI.md"><b>Xem thêm ảnh chụp màn hình</b></a> — tài khoản, yêu cầu, API, sao lưu, cài đặt và trang người dùng</p>
 
 ## ✨ Tính năng
 
@@ -109,11 +109,13 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Ứng dụng React một trang nhúng trong binary; không cần chạy web server riêng.
 - Bảng điều khiển Tổng quan cập nhật trực tiếp: bốn thẻ KPI (tài khoản, credit gói, cùng số yêu cầu và số yêu cầu thất bại trong giờ qua), lưu lượng trong 1 giờ, 6 giờ, 24 giờ qua hoặc toàn bộ thời gian dạng cột chồng, danh sách tài khoản cần chú ý, lưu lượng theo tài khoản, biểu đồ donut phân bổ model và các tài khoản hoạt động nhiều nhất. Thẻ **Credit gói** chia mức dùng credit Kiro thành phần dùng qua proxy và phần dùng ngoài proxy.
 - Tài khoản với tab trạng thái kèm số lượng, bộ lọc (gói, xác thực, khu vực, bật, thẻ), tìm kiếm theo email, biệt danh, ghi chú và thẻ, sắp xếp, thao tác hàng loạt, chế độ xem chi tiết, kiểm tra kết nối, số yêu cầu mỗi phút và hôm nay theo thời gian thực, xem lại tài khoản trùng lặp và xuất.
-- Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite. Chi tiết một yêu cầu mở được cuộc hội thoại của nó (các lượt theo thứ tự, tài khoản của từng lượt, các lần chuyển dự phòng và tổng cộng) và lọc nhật ký theo hội thoại đó; **Chạy lại** chạy lại một yêu cầu đã ghi trên tài khoản và model bạn chọn (xem [Hội thoại và chạy lại](#-hội-thoại-và-chạy-lại)).
-- Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token, credit và lượt gọi cho từng key, số yêu cầu mỗi phút, thời gian hết hạn, model được phép, gắn key với tài khoản theo từng tài khoản hoặc theo thẻ, chế độ định tuyến riêng cho từng key, tạo lại key, đặt lại mức sử dụng), biểu đồ **Mức sử dụng theo key** và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
+- Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite. Dưới model của mỗi dòng, nhật ký ghi tên client đã gọi: Claude Code, Codex, opencode, Cline, Roo Code hoặc Kilo Code, nếu không thì Anthropic API, OpenAI API hoặc OpenAI Responses. Proxy nhận ra client qua User-Agent và một vài header của client, và không bao giờ lưu chính User-Agent. Token hiển thị thành một thanh chia thành đầu vào, cache và đầu ra. Chi tiết một yêu cầu mở được cuộc hội thoại của nó (các lượt theo thứ tự, tài khoản của từng lượt, các lần chuyển dự phòng và tổng cộng) và lọc nhật ký theo hội thoại đó; **Chạy lại** chạy lại một yêu cầu đã ghi trên tài khoản và model bạn chọn (xem [Hội thoại và chạy lại](#-hội-thoại-và-chạy-lại)).
+- Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token, credit và lượt gọi cho từng key, số yêu cầu mỗi phút, thời gian hết hạn, model được phép, gắn key với tài khoản theo từng tài khoản hoặc theo thẻ, chế độ định tuyến riêng cho từng key, tạo lại key, đặt lại mức sử dụng), mức đã dùng so với giới hạn của từng key (màu hổ phách từ 75 %, màu đỏ khi đã dùng hết một giới hạn), biểu đồ **Mức sử dụng theo key** và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
 - Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, liên kết công khai, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, nhật ký máy chủ, mật khẩu quản trị, đăng nhập hai bước, chỉ số Prometheus, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
 - Cảnh báo qua webhook, Telegram, Discord hoặc Slack khi sắp hết credit, khi tài khoản bị cấm hoặc khi không còn tài khoản nào phục vụ được yêu cầu, cùng bản tóm tắt sử dụng hằng ngày tùy chọn (xem [Cảnh báo](#-cảnh-báo)).
 - Menu lệnh (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) để mở trang và chạy thao tác, chế độ riêng tư ẩn địa chỉ email, và kiểm tra cập nhật qua `version.json` trên nhánh `main` của repo.
+- Tự cập nhật cho bản cài bằng binary: hộp thoại cập nhật tải bản phát hành mới cho nền tảng của máy chủ, kiểm tra nó bằng `SHA256SUMS.txt` của bản phát hành và đặt nó vào chỗ chương trình đang chạy. Chương trình cũ được giữ lại bên cạnh dưới tên `<name>.old`. **Khởi động lại để cập nhật** cho các yêu cầu đang chạy tối đa 30 giây để hoàn tất, rồi chạy phiên bản mới, và các phiên đăng nhập vẫn còn sau khi khởi động lại. Máy chủ chạy trong container, trên nền tảng không có bản build phát hành, hoặc không có quyền ghi vào thư mục của chính nó sẽ nhận các bước để cập nhật thủ công.
+- **Trang người dùng** tại `/user`, nơi người giữ một API key đăng nhập bằng key đó và chỉ thấy key đó: trạng thái, giới hạn và cài đặt của key, bốn thẻ KPI (yêu cầu, thất bại, credit, token) trong 24 giờ, 7 ngày, 30 ngày hoặc toàn bộ thời gian, mức sử dụng theo thời gian, mức sử dụng theo model và theo client, các yêu cầu gần đây kèm chế độ xem chi tiết, các endpoint và thiết lập client (xem [Quản lý API key](#-quản-lý-api-key)).
 - Đổi mật khẩu quản trị sẽ kết thúc mọi phiên đăng nhập khác.
 - Đăng nhập hai bước bằng ứng dụng xác thực, kèm mười mã khôi phục dùng một lần (xem [Đăng nhập hai bước](#-đăng-nhập-hai-bước)).
 - Giao diện sáng, tối và theo hệ thống; năm ngôn ngữ giao diện: English, 简体中文, 日本語, Tiếng Việt và Português (Brasil).
@@ -183,7 +185,7 @@ cd kiro-proxy-linux-x64
 ./kiro-proxy
 ```
 
-Trên Windows, tải `kiro-proxy-windows-x64.zip` (hoặc `kiro-proxy-windows-arm64.zip`), giải nén rồi chạy `kiro-proxy.exe` trong terminal. Cơ sở dữ liệu được tạo trong thư mục hiện tại; đặt `DATA_DIR` để lưu ở nơi khác. Server lắng nghe tại `127.0.0.1:8080`: đặt `PORT` khi cổng 8080 đã bị dùng, và `LISTEN_HOST=0.0.0.0` để nhận kết nối từ máy khác. File `SHA256SUMS.txt` trong bản phát hành liệt kê checksum của từng file nén: kiểm tra file đã tải bằng `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Các binary chưa được ký: nếu macOS chặn, hãy chạy `xattr -d com.apple.quarantine kiro-proxy`; Windows SmartScreen có thể hỏi xác nhận ở lần chạy đầu tiên.
+Trên Windows, tải `kiro-proxy-windows-x64.zip` (hoặc `kiro-proxy-windows-arm64.zip`), giải nén rồi chạy `kiro-proxy.exe` trong terminal. Cơ sở dữ liệu được tạo trong thư mục hiện tại; đặt `DATA_DIR` để lưu ở nơi khác. Server lắng nghe tại `127.0.0.1:8080`: đặt `PORT` khi cổng 8080 đã bị dùng, và `LISTEN_HOST=0.0.0.0` để nhận kết nối từ máy khác. File `SHA256SUMS.txt` trong bản phát hành liệt kê checksum của từng file nén: kiểm tra file đã tải bằng `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Các binary chưa được ký: nếu macOS chặn, hãy chạy `xattr -d com.apple.quarantine kiro-proxy`; Windows SmartScreen có thể hỏi xác nhận ở lần chạy đầu tiên. Các bản phát hành sau được cài từ hộp thoại cập nhật trong trang quản trị, nên bạn không cần tải chúng thủ công.
 
 ### 🛠 Build từ mã nguồn
 
@@ -203,8 +205,8 @@ Chạy các lệnh sau trong `ui/`:
 
 | Lệnh            | Tác dụng                                                                        |
 | --------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev`      | Dev server tại `http://localhost:5173/admin/`; chuyển tiếp `/admin/api` và `/v1` tới `127.0.0.1:8080` |
-| `pnpm dev:mock` | Dev server dùng dữ liệu giả, không cần backend; đăng nhập bằng mật khẩu `12345678` |
+| `pnpm dev`      | Dev server tại `http://localhost:5173/`; chuyển tiếp `/admin/api`, `/user/api` và `/v1` tới `127.0.0.1:8080` |
+| `pnpm dev:mock` | Dev server dùng dữ liệu giả, không cần backend. Trang đăng nhập hiển thị mật khẩu lần chạy đầu gồm 8 chữ số, như một bản cài mới, và `/user/login` liệt kê các API key demo |
 | `pnpm test`     | Test unit và component (Vitest)                                                 |
 | `pnpm test:timings` | Chạy test unit và ghi lại thời gian của từng tệp, để CI chia test thành các phần đều nhau |
 | `pnpm test:e2e` | Smoke test trên trình duyệt ở chế độ mock (Playwright)                          |
@@ -279,6 +281,7 @@ Với Codex, hãy lưu `/v1/codex/models` thành một tệp và đặt `model_c
 | `GET`    | `/v1/stats`                     | Thống kê tổng hợp mức sử dụng proxy           |
 | `GET`    | `/metrics`                      | Chỉ số Prometheus, mặc định tắt, cần bearer token (xem [Chỉ số Prometheus](#-chỉ-số-prometheus)) |
 | `GET`    | `/health`                       | Kiểm tra tình trạng hoạt động                 |
+| `GET`    | `/user`                         | Trang người dùng, nơi người giữ API key đăng nhập bằng key tại `/user/login` và xem mức sử dụng của key |
 | `GET`    | `/`                             | Trang quản trị web (SPA nhúng; link trang như `/accounts` mở ứng dụng, link cũ `/admin/*` được chuyển hướng, client không yêu cầu HTML nhận health check) |
 
 ---
@@ -299,7 +302,9 @@ Bắt buộc API key từ trang **API** (**Truy cập API → Bắt buộc API k
 - **Model được phép** giới hạn một key vào một số model. Hệ thống kiểm tra model mà yêu cầu dùng sau hậu tố thinking và ánh xạ model, không phân biệt hoa thường, chứ không phải tên client gửi: `claude-haiku-4-5`, `claude-haiku-4.5-thinking` và một ánh xạ trỏ tới `claude-haiku-4.5` đều được tính là `claude-haiku-4.5`, và không bí danh nào tới được model ngoài danh sách. Model khác nhận HTTP 403 (`permission_error` ở API Anthropic, mã `model_not_allowed` ở các API OpenAI), và `/v1/models` chỉ liệt kê các model được phép.
 - **Tạo lại key** cấp cho key một giá trị mới, và giá trị cũ ngừng hoạt động ngay lập tức. Tên, giới hạn, tài khoản và mức sử dụng được giữ nguyên.
 - **Mức sử dụng theo key** vẽ biểu đồ số yêu cầu, token và credit của từng key trong 24 giờ, 7 ngày, 30 ngày hoặc toàn bộ thời gian, tách riêng thành công và thất bại, với các dòng riêng cho yêu cầu không có key, key không hợp lệ và key đã xóa.
-- Người giữ key đăng nhập tại `/user` bằng chính API key của mình để xem giới hạn, mức sử dụng theo ngày và theo model, và các yêu cầu gần đây của key đó; họ không bao giờ thấy tài khoản hay key khác.
+- Người giữ key đăng nhập tại `/user/login` bằng chính API key của mình. Tại `/user`, họ thấy trạng thái, giới hạn và cài đặt của key đó, mức sử dụng theo thời gian, theo model và theo client, các yêu cầu gần đây kèm chi tiết, các endpoint và thiết lập client. Họ không bao giờ thấy tài khoản, key khác, thông báo lỗi upstream hay nội dung yêu cầu.
+- Mọi key đều đăng nhập được ở đó, kể cả key đã tắt, đã hết hạn hoặc đã đạt giới hạn, và trang cho biết vì sao yêu cầu của key bị từ chối. Khi **Bắt buộc API key** tắt, lệnh gọi tới địa chỉ của chính máy chủ được tính là không có key, và trang có ghi rõ điều này. Một phiên đăng nhập kéo dài 12 giờ và kết thúc khi key bị xóa hoặc được tạo lại.
+- Khi bạn tạo một key, trang API hiển thị liên kết trang mức sử dụng để đưa cho người giữ key: liên kết công khai khi liên kết này đang chạy, nếu không thì địa chỉ đang dùng để mở trang quản trị.
 
 ---
 
@@ -387,7 +392,7 @@ Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi
 1. Bật **Liên kết HTTPS công khai**. Proxy tải chương trình hỗ trợ Tailscale `kiro-tunnel` (khoảng 8 MB) từ bản phát hành GitHub của phiên bản này và kiểm tra nó bằng một SHA-256 có sẵn trong proxy. Image Docker đã kèm sẵn chương trình này. Nếu không tải được chương trình hỗ trợ của phiên bản này (bản phát hành vẫn đang được đăng, hoặc không truy cập được GitHub), proxy chạy chương trình đã tải cho phiên bản trước và ghi chú trên thẻ; bản build từ mã nguồn mà chưa có chương trình nào trên đĩa sẽ dùng chương trình của bản phát hành mới nhất, được kiểm tra bằng `SHA256SUMS.txt` của bản phát hành đó.
 2. Chọn **Đăng nhập Tailscale** và đăng nhập bằng một tài khoản Tailscale miễn phí. Máy chủ tham gia tailnet của bạn dưới dạng thiết bị tên `kiro-proxy`; đổi tên ở **Tên thiết bị**.
 3. Lần đầu, chọn **Bật Funnel**. Bước này bật HTTPS và Funnel cho tailnet của bạn trong một lần.
-4. Thẻ hiển thị liên kết, ví dụ `https://kiro-proxy.tail1234.ts.net`. Liên kết giữ nguyên sau khi khởi động lại.
+4. Thẻ hiển thị liên kết, ví dụ `https://kiro-proxy.tail1234.ts.net`, khi liên kết đã mở được từ internet, việc này có thể mất vài phút. Liên kết giữ nguyên sau khi khởi động lại.
 5. Theo mặc định, Tailscale đăng xuất một thiết bị sau 180 ngày, và liên kết dừng cho đến khi bạn đăng nhập lại. Thẻ hiển thị ngày đó cùng **Tắt hết hạn khóa**, nút này mở trang của thiết bị trong bảng quản trị Tailscale: tắt hết hạn khóa ở đó một lần, và ngày đó biến mất khỏi thẻ.
 
 Bất kỳ ai có liên kết đều vào được trang đăng nhập và API, và tên Funnel xuất hiện trong nhật ký chứng chỉ công khai, nên bot sẽ tìm thấy nó. Qua liên kết:

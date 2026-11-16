@@ -38,7 +38,7 @@
 1. Pools multiple Kiro accounts and load-balances requests with round-robin, weights or priorities, and session affinity.
 2. Translates Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, and OpenAI `/v1/responses` calls to and from Kiro upstream, including tools, thinking, reasoning effort, and web search.
 3. Refreshes access tokens automatically and streams Server-Sent Events end-to-end, with keepalives and failover.
-4. Ships with a React admin panel, embedded in the binary, for account management, live observability, and request audit, in English, 简体中文, 日本語, Tiếng Việt, and Português (Brasil).
+4. Ships with a React admin panel, embedded in the binary, for account management, live observability, and request audit, in English, 简体中文, 日本語, Tiếng Việt, and Português (Brasil). A user panel lets each API key's holder check that key's own usage.
 
 > [!IMPORTANT]
 > Single-binary local proxy. **Not** a hosted service, **not** affiliated with Amazon, AWS, or Kiro. You must own or be authorized to use every account you add to the pool.
@@ -57,7 +57,7 @@ If this project helps you, a Star would mean a lot.
   <br><sub><b>Overview</b> — live traffic, credits and errors across accounts</sub>
 </p>
 
-<p align="center">📸 <a href="docs/SCREENSHOTS.md"><b>More screenshots</b></a> — accounts, requests, API, backups and settings</p>
+<p align="center">📸 <a href="docs/SCREENSHOTS.md"><b>More screenshots</b></a> — accounts, requests, API, backups, settings and the user panel</p>
 
 ## ✨ Features
 
@@ -109,11 +109,13 @@ If this project helps you, a Star would mean a lot.
 - React single-page app embedded in the binary; no separate web server to run.
 - Overview dashboard that updates live: four KPI cards (accounts, plan credits, and requests and failures in the last hour), traffic over the last hour, 6 hours, 24 hours or lifetime as stacked bars, a list of accounts that need attention, traffic by account, a model-mix donut, and the most active accounts. The **Plan credits** card splits Kiro credit use into the part used through the proxy and the part used outside it.
 - Accounts with status tabs and counts, filters (plan, auth, region, enabled, tag), search over email, nickname, notes and tags, sorting, batch actions, a detail view, connection tests, live requests per minute and today, a duplicates review, and export.
-- Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history. A request's detail opens its conversation (the turns in order, the account each used, failovers and totals) and filters the log to it, and **Replay** runs a logged request again on an account and model you choose (see [Conversations and replay](#-conversations-and-replay)).
-- API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, requests per minute, an expiry time, allowed models, account binding by account or tag, a routing mode per key, regenerate, usage reset), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
+- Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history. Under each row's model, the log names the client that called: Claude Code, Codex, opencode, Cline, Roo Code or Kilo Code, else the Anthropic API, OpenAI API or OpenAI Responses. The proxy tells the client from the User-Agent and a few client headers, and never stores the User-Agent itself. Tokens show as one bar split into input, cache and output. A request's detail opens its conversation (the turns in order, the account each used, failovers and totals) and filters the log to it, and **Replay** runs a logged request again on an account and model you choose (see [Conversations and replay](#-conversations-and-replay)).
+- API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, requests per minute, an expiry time, allowed models, account binding by account or tag, a routing mode per key, regenerate, usage reset), each key's use of its limits (amber from 75 %, red once a limit is used up), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
 - Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, public link, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, server log, admin password, two-factor sign-in, Prometheus metrics, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
 - Alerts to a webhook, Telegram, Discord or Slack when credits run low, an account is banned, or no account can serve requests, and an optional daily usage summary (see [Alerts](#-alerts)).
 - Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check that reads `version.json` from the repo's `main` branch.
+- Self-update for binary installs: the update dialog downloads the new release for the server's platform, checks it against the release's `SHA256SUMS.txt`, and puts it in place of the running program. The old program stays next to it as `<name>.old`. **Restart to update** gives requests in progress up to 30 seconds to finish, then starts the new version, and sign-ins survive the restart. A server in a container, on a platform with no release build, or without write access to its own folder gets the steps to update by hand.
+- **User panel** at `/user`, where the holder of an API key signs in with that key and sees only that key: its status, limits and settings, four KPI cards (requests, failed, credits, tokens) over 24 hours, 7 days, 30 days or lifetime, usage over time, usage by model and by client, recent requests with a detail view, the endpoints, and client setup (see [Managed API Keys](#-managed-api-keys)).
 - Changing the admin password ends every other signed-in session.
 - Two-factor sign-in with an authenticator app, with ten one-time recovery codes (see [Two-factor sign-in](#-two-factor-sign-in)).
 - Light, dark, and system theme; five UI languages: English, 简体中文, 日本語, Tiếng Việt, and Português (Brasil).
@@ -183,7 +185,7 @@ cd kiro-proxy-linux-x64
 ./kiro-proxy
 ```
 
-On Windows, download `kiro-proxy-windows-x64.zip` (or `kiro-proxy-windows-arm64.zip`), extract it and run `kiro-proxy.exe` from a terminal. The database is created in the current folder; set `DATA_DIR` to keep it somewhere else. The server listens on `127.0.0.1:8080`: set `PORT` when 8080 is taken, and `LISTEN_HOST=0.0.0.0` to accept other machines. `SHA256SUMS.txt` on the release lists every archive's checksum: check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). The binaries are not signed: if macOS refuses to open `kiro-proxy`, run `xattr -d com.apple.quarantine kiro-proxy`, and Windows SmartScreen may ask before the first run.
+On Windows, download `kiro-proxy-windows-x64.zip` (or `kiro-proxy-windows-arm64.zip`), extract it and run `kiro-proxy.exe` from a terminal. The database is created in the current folder; set `DATA_DIR` to keep it somewhere else. The server listens on `127.0.0.1:8080`: set `PORT` when 8080 is taken, and `LISTEN_HOST=0.0.0.0` to accept other machines. `SHA256SUMS.txt` on the release lists every archive's checksum: check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). The binaries are not signed: if macOS refuses to open `kiro-proxy`, run `xattr -d com.apple.quarantine kiro-proxy`, and Windows SmartScreen may ask before the first run. Later releases install from the update dialog in the admin panel, so you do not need to download them by hand.
 
 ### 🛠 Build from source
 
@@ -203,8 +205,8 @@ Run these from `ui/`:
 
 | Command         | What it does                                                                    |
 | --------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev`      | Dev server on `http://localhost:5173/admin/`; proxies `/admin/api` and `/v1` to `127.0.0.1:8080` |
-| `pnpm dev:mock` | Dev server with mock data and no backend; sign in with password `12345678`       |
+| `pnpm dev`      | Dev server on `http://localhost:5173/`; proxies `/admin/api`, `/user/api` and `/v1` to `127.0.0.1:8080` |
+| `pnpm dev:mock` | Dev server with mock data and no backend. The sign-in page shows the 8-digit first-run password, as a new install does, and `/user/login` lists demo API keys |
 | `pnpm test`     | Unit and component tests (Vitest)                                               |
 | `pnpm test:timings` | Runs the unit tests and records each file's time, which CI uses to split them into even shards |
 | `pnpm test:e2e` | Browser smoke tests against mock mode (Playwright)                              |
@@ -279,6 +281,7 @@ For Codex, save `/v1/codex/models` to a file and set `model_catalog_json` to its
 | `GET`    | `/v1/stats`                     | Aggregate proxy usage statistics              |
 | `GET`    | `/metrics`                      | Prometheus metrics, off by default, with a bearer token (see [Prometheus metrics](#-prometheus-metrics)) |
 | `GET`    | `/health`                       | Health check                                  |
+| `GET`    | `/user`                         | User panel, where an API key's holder signs in with the key on `/user/login` and checks its usage |
 | `GET`    | `/`                             | Web admin panel (embedded SPA; page links such as `/accounts` open the app, old `/admin/*` links redirect, and a client that does not ask for HTML gets the health check) |
 
 ---
@@ -299,7 +302,9 @@ Require API keys from the **API** page (**API access → Require an API key**). 
 - **Allowed models** limits a key to some models. It checks the model a request resolves to after the thinking suffix and model mappings, ignoring case, not the name the client sent: `claude-haiku-4-5`, `claude-haiku-4.5-thinking` and a mapping that points to `claude-haiku-4.5` all count as `claude-haiku-4.5`, and no alias reaches a model the list leaves out. Other models get HTTP 403 (`permission_error` on the Anthropic API, code `model_not_allowed` on the OpenAI APIs), and `/v1/models` lists only the allowed models.
 - **Regenerate key** gives a key a new value, and the old value stops working at once. The name, limits, accounts and usage stay.
 - **Usage by key** charts each key's requests, tokens and credits over 24 hours, 7 days, 30 days or lifetime, split into succeeded and failed, with separate rows for requests without a key, invalid keys and deleted keys.
-- Key holders sign in at `/user` with their own API key to see its limits, usage by day and model, and recent requests; they never see accounts or other keys.
+- Key holders sign in at `/user/login` with their own API key. On `/user` they see that key's status, limits and settings, its usage over time, by model and by client, its recent requests with their details, the endpoints, and client setup. They never see accounts, other keys, upstream error messages or request bodies.
+- Every key can sign in there, even one that is turned off, expired or at a limit, and the page says why its requests are refused. With **Require an API key** off, calls to the server's own address count for no key, and the page says so. A sign-in lasts 12 hours and ends when the key is deleted or regenerated.
+- When you create a key, the API page shows the usage page link to give its holder: the public link while it is live, else the address the admin panel is open on.
 
 ---
 
@@ -387,7 +392,7 @@ The order is: the account's own proxy, the pool, the global proxy, then direct. 
 1. Turn on **Public HTTPS link**. The proxy downloads its Tailscale helper, `kiro-tunnel` (about 8 MB), from this version's GitHub release and checks it against a SHA-256 built into the proxy. The Docker image already carries the helper. If this version's helper cannot be downloaded (its release is still publishing, or GitHub is out of reach), the proxy runs the helper it downloaded for an earlier version and says so on the card; a build from source with none on disk takes the latest release's helper, checked against that release's `SHA256SUMS.txt`.
 2. Select **Sign in to Tailscale** and sign in with a free Tailscale account. The server joins your tailnet as a device named `kiro-proxy`; **Device name** changes it.
 3. The first time, select **Turn on Funnel**. It turns on HTTPS and Funnel for your tailnet in one step.
-4. The card shows the link, such as `https://kiro-proxy.tail1234.ts.net`. It stays the same after a restart.
+4. The card shows the link, such as `https://kiro-proxy.tail1234.ts.net`, once it opens from the internet, which can take a few minutes. It stays the same after a restart.
 5. Tailscale signs a device out after 180 days by default, and the link stops until you sign in again. The card shows the date and **Disable key expiry**, which opens this device's page in the Tailscale admin console: turn key expiry off there once, and the date goes away from the card.
 
 Anyone with the link reaches the sign-in page and the API, and Funnel names appear in public certificate logs, so bots will find it. Through the link:

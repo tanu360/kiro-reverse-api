@@ -8,9 +8,9 @@
 
 [← Back to README](../README.md)
 
-Every page of the admin panel. Each image follows your GitHub theme, light or dark.
+Every page of the admin panel and the user panel. Each image follows your GitHub theme, light or dark.
 
-[Login](#login) · [Overview](#overview) · [Accounts](#accounts) · [Requests](#requests) · [API](#api) · [Backups](#backups) · [Settings](#settings)
+[Login](#login) · [Overview](#overview) · [Accounts](#accounts) · [Requests](#requests) · [API](#api) · [Backups](#backups) · [Settings](#settings) · [User panel](#user-panel)
 
 ## Login
 
@@ -73,7 +73,7 @@ Every page of the admin panel. Each image follows your GitHub theme, light or da
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/requests-dark.webp">
     <img alt="Requests" src="../screenshots/en/requests-light.webp" width="100%">
   </picture>
-  <br><sub><b>Requests</b> — status tabs, search, sorting and a detail view</sub>
+  <br><sub><b>Requests</b> — each request's model and calling client, tokens, credits and duration, with status tabs, search and sorting</sub>
 </p>
 
 <p align="center">
@@ -91,7 +91,7 @@ Every page of the admin panel. Each image follows your GitHub theme, light or da
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/api-dark.webp">
     <img alt="API" src="../screenshots/en/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>API</b> — API access, per-client keys with limits, usage by key, highlighted client setup</sub>
+  <br><sub><b>API</b> — API access, keys with token, credit and call limits, usage by key, endpoints and highlighted client setup</sub>
 </p>
 
 ## Backups
@@ -128,6 +128,24 @@ Every page of the admin panel. Each image follows your GitHub theme, light or da
     <img alt="Settings · Security" src="../screenshots/en/settings-3-light.webp" width="100%">
   </picture>
   <br><sub><b>Settings · Security</b> — admin password, two-factor sign-in, system prompt filter, self-heal, alerts, log retention, danger zone</sub>
+</p>
+
+## User panel
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/user-login-dark.webp">
+    <img alt="User sign-in" src="../screenshots/en/user-login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>User sign-in</b> — key holders sign in with their own API key to check its usage</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/user-dark.webp">
+    <img alt="User panel" src="../screenshots/en/user-light.webp" width="100%">
+  </picture>
+  <br><sub><b>User panel</b> — one key's status and limits, KPI cards, usage over time, by model and by client, recent requests, endpoints and client setup</sub>
 </p>
 
 [← Back to README](../README.md)

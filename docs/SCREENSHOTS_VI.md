@@ -8,9 +8,9 @@
 
 [← Quay lại README](../README_VI.md)
 
-Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tối theo giao diện GitHub của bạn.
+Mọi trang của trang quản trị và trang người dùng. Mỗi ảnh hiển thị sáng hoặc tối theo giao diện GitHub của bạn.
 
-[Đăng nhập](#đăng-nhập) · [Tổng quan](#tổng-quan) · [Tài khoản](#tài-khoản) · [Yêu cầu](#yêu-cầu) · [API](#api) · [Sao lưu](#sao-lưu) · [Cài đặt](#cài-đặt)
+[Đăng nhập](#đăng-nhập) · [Tổng quan](#tổng-quan) · [Tài khoản](#tài-khoản) · [Yêu cầu](#yêu-cầu) · [API](#api) · [Sao lưu](#sao-lưu) · [Cài đặt](#cài-đặt) · [Trang người dùng](#trang-người-dùng)
 
 ## Đăng nhập
 
@@ -73,7 +73,7 @@ Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tố
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/requests-dark.webp">
     <img alt="Yêu cầu" src="../screenshots/vi/requests-light.webp" width="100%">
   </picture>
-  <br><sub><b>Yêu cầu</b> — tab trạng thái, tìm kiếm, sắp xếp và xem chi tiết</sub>
+  <br><sub><b>Yêu cầu</b> — model và client gọi của từng yêu cầu, token, credit và thời lượng, kèm tab trạng thái, tìm kiếm và sắp xếp</sub>
 </p>
 
 <p align="center">
@@ -91,7 +91,7 @@ Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tố
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/api-dark.webp">
     <img alt="API" src="../screenshots/vi/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>API</b> — truy cập API, key riêng cho từng client kèm giới hạn, mức sử dụng theo key, thiết lập client có tô sáng</sub>
+  <br><sub><b>API</b> — truy cập API, key với giới hạn token, credit và lượt gọi, mức sử dụng theo key, endpoint và thiết lập client có tô sáng</sub>
 </p>
 
 ## Sao lưu
@@ -128,6 +128,24 @@ Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tố
     <img alt="Cài đặt · Bảo mật" src="../screenshots/vi/settings-3-light.webp" width="100%">
   </picture>
   <br><sub><b>Cài đặt · Bảo mật</b> — mật khẩu quản trị, đăng nhập hai bước, bộ lọc system prompt, tự phục hồi, cảnh báo, lưu giữ nhật ký, vùng nguy hiểm</sub>
+</p>
+
+## Trang người dùng
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/user-login-dark.webp">
+    <img alt="Đăng nhập người dùng" src="../screenshots/vi/user-login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Đăng nhập người dùng</b> — người giữ key đăng nhập bằng chính API key của mình để xem mức sử dụng của key</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/user-dark.webp">
+    <img alt="Trang người dùng" src="../screenshots/vi/user-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Trang người dùng</b> — trạng thái và giới hạn của một key, các thẻ KPI, mức sử dụng theo thời gian, theo model và theo client, yêu cầu gần đây, endpoint và thiết lập client</sub>
 </p>
 
 [← Quay lại README](../README_VI.md)

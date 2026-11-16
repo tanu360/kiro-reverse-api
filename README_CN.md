@@ -38,7 +38,7 @@
 1. 多账号池化，按轮询、权重或优先级以及会话亲和对请求做负载均衡。
 2. 在 Anthropic `/v1/messages`、OpenAI `/v1/chat/completions`、OpenAI `/v1/responses` 调用与 Kiro 上游之间双向翻译，涵盖工具调用、思考、推理强度与网络搜索。
 3. 自动刷新访问令牌，端到端转发 Server-Sent Events 流，支持保活与故障转移。
-4. 自带内嵌于二进制文件的 React 管理面板，提供账号管理、实时可观测性与请求审计，界面支持 English、简体中文、日本語、Tiếng Việt 与 Português (Brasil)。
+4. 自带内嵌于二进制文件的 React 管理面板，提供账号管理、实时可观测性与请求审计，界面支持 English、简体中文、日本語、Tiếng Việt 与 Português (Brasil)。用户面板让每个 API Key 的持有者查看该 Key 自己的用量。
 
 > [!IMPORTANT]
 > 单二进制本地代理。**非**托管服务，**不**隶属于 Amazon、AWS 或 Kiro。账号必须由你本人持有或经过合法授权方可加入账号池。
@@ -57,7 +57,7 @@
   <br><sub><b>概览</b> — 各账号的实时流量、Credits 与错误</sub>
 </p>
 
-<p align="center">📸 <a href="docs/SCREENSHOTS_CN.md"><b>更多截图</b></a> — 账号、请求、接口、备份与设置</p>
+<p align="center">📸 <a href="docs/SCREENSHOTS_CN.md"><b>更多截图</b></a> — 账号、请求、接口、备份、设置与用户面板</p>
 
 ## ✨ 功能特性
 
@@ -109,11 +109,13 @@
 - React 单页应用内嵌于二进制文件，无需另行部署 Web 服务。
 - 实时更新的概览仪表盘：四张 KPI 卡片（账号、套餐 Credits，以及最近一小时的请求与失败），以堆叠柱状图展示最近 1 小时、6 小时、24 小时或全部时间的流量趋势，需要处理的账号列表，各账号流量，模型分布环形图，以及最活跃的账号。「**套餐 Credits**」卡片把 Kiro Credits 用量分为经由本代理使用的部分与在代理之外使用的部分。
 - 账号页支持带计数的状态标签页、筛选（套餐、认证、区域、启用、标签）、按邮箱、昵称、备注与标签搜索、排序、批量操作、详情视图、连接测试、实时的每分钟请求数与今日请求数、重复账号检查与导出。
-- 请求日志支持带计数的状态标签页、搜索（也会匹配完整的 API Key）、排序、含错误分类的详情视图、追踪 ID 与每次上游尝试的时间线（账号、端点、耗时、结果、故障转移）、脱敏 API Key，以及基于 SQLite 的历史记录。 请求详情可打开所属对话（按顺序列出各轮、每轮所用账号、故障转移和合计），并把日志筛选到该对话；「**重放**」可用你选择的账号和模型再次运行一条已记录的请求（参见 [对话与重放](#-对话与重放)）。
-- 接口页管理客户端 API Key（可自定义 Key 值、启用/禁用、按 Key 设置 Token、Credits 与调用次数限额、每分钟请求数、过期时间、允许的模型、按账号或标签绑定账号、按 Key 设置路由模式、重新生成、重置用量），提供「**各 API Key 用量**」图表，以及语法高亮的接入示例生成器：为 Anthropic Messages、OpenAI Chat Completions 与 OpenAI Responses 接口生成 curl、Python、Node.js、Go、Java、PHP、Ruby 与 C# 请求代码（官方 SDK 或纯 HTTP，可选流式）及示例响应，另含 Claude Code 与 Codex 配置。
+- 请求日志支持带计数的状态标签页、搜索（也会匹配完整的 API Key）、排序、含错误分类的详情视图、追踪 ID 与每次上游尝试的时间线（账号、端点、耗时、结果、故障转移）、脱敏 API Key，以及基于 SQLite 的历史记录。日志在每行的模型下方标出发起调用的客户端：Claude Code、Codex、opencode、Cline、Roo Code 或 Kilo Code，都不是时显示 Anthropic API、OpenAI API 或 OpenAI Responses。代理根据 User-Agent 和几个客户端请求头识别客户端，从不保存 User-Agent 本身。Token 显示为一根条形，分为输入、缓存与输出三段。请求详情可打开所属对话（按顺序列出各轮、每轮所用账号、故障转移和合计），并把日志筛选到该对话；「**重放**」可用你选择的账号和模型再次运行一条已记录的请求（参见 [对话与重放](#-对话与重放)）。
+- 接口页管理客户端 API Key（可自定义 Key 值、启用/禁用、按 Key 设置 Token、Credits 与调用次数限额、每分钟请求数、过期时间、允许的模型、按账号或标签绑定账号、按 Key 设置路由模式、重新生成、重置用量），显示每个 Key 的限额使用情况（用到 75% 起显示为琥珀色，限额用完后显示为红色），提供「**各 API Key 用量**」图表，以及语法高亮的接入示例生成器：为 Anthropic Messages、OpenAI Chat Completions 与 OpenAI Responses 接口生成 curl、Python、Node.js、Go、Java、PHP、Ruby 与 C# 请求代码（官方 SDK 或纯 HTTP，可选流式）及示例响应，另含 Claude Code 与 Codex 配置。
 - 设置页涵盖用量与后台刷新、账号路由（路由模式、会话亲和、单账号限额）、自动续写、工具历史、图片缩放、自动恢复、Thinking、模型映射、System Prompt 过滤、流完整性、Kiro 端点、公开链接、上游域名与区域、出站代理、代理池、响应头、告警、服务器日志、管理员密码、两步验证登录、Prometheus 指标、日志保留与重置统计；备份页支持定时备份、上传与一键恢复。
 - Credits 不足、账号被封禁或没有账号可处理请求时，通过 Webhook、Telegram、Discord 或 Slack 发送告警，并可选每日用量摘要（见[告警](#-告警)）。
 - 命令菜单（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>）可快速打开页面和执行操作；隐私模式可隐藏邮箱地址；支持读取仓库 `main` 分支上的 `version.json` 检查更新。
+- 二进制安装可自我更新：更新对话框会下载适用于服务器平台的新 Release，用该 Release 的 `SHA256SUMS.txt` 校验，然后替换正在运行的程序。旧程序以 `<name>.old` 保留在同一目录。「**重启以更新**」会给进行中的请求最多 30 秒完成，然后启动新版本，登录状态在重启后依然保留。运行在容器中、所在平台没有对应的 Release 构建，或对自身所在目录没有写权限的服务器，会得到手动更新的步骤。
+- 「**用户面板**」位于 `/user`，API Key 的持有者用该 Key 登录，只能看到这个 Key：其状态、限额与设置，24 小时、7 天、30 天或全部时间内的四张 KPI 卡片（请求、失败、Credits、Token），用量趋势，各模型与各客户端用量，带详情视图的最近请求，接口地址，以及客户端配置（参见 [托管 API Key](#-托管-api-key)）。
 - 修改管理员密码会结束其他所有已登录的会话。
 - 支持用身份验证器应用进行两步验证登录，并提供 10 个一次性恢复码（参见 [两步验证登录](#-两步验证登录)）。
 - 浅色 / 深色 / 跟随系统主题；界面支持五种语言：English、简体中文、日本語、Tiếng Việt 与 Português (Brasil)。
@@ -183,7 +185,7 @@ cd kiro-proxy-linux-x64
 ./kiro-proxy
 ```
 
-Windows 用户请下载 `kiro-proxy-windows-x64.zip`（或 `kiro-proxy-windows-arm64.zip`），解压后在终端中运行 `kiro-proxy.exe`。数据库默认创建在当前目录，可通过 `DATA_DIR` 存放到其他位置。服务监听 `127.0.0.1:8080`：8080 端口被占用时设置 `PORT`，需要接受其他机器连接时设置 `LISTEN_HOST=0.0.0.0`。Release 中的 `SHA256SUMS.txt` 列出了每个压缩包的校验值，可用 `sha256sum -c SHA256SUMS.txt --ignore-missing` 校验下载的文件（macOS：`shasum -a 256 -c SHA256SUMS.txt --ignore-missing`）。二进制文件未签名：如果 macOS 阻止运行，请执行 `xattr -d com.apple.quarantine kiro-proxy`；Windows SmartScreen 可能在首次运行前要求确认。
+Windows 用户请下载 `kiro-proxy-windows-x64.zip`（或 `kiro-proxy-windows-arm64.zip`），解压后在终端中运行 `kiro-proxy.exe`。数据库默认创建在当前目录，可通过 `DATA_DIR` 存放到其他位置。服务监听 `127.0.0.1:8080`：8080 端口被占用时设置 `PORT`，需要接受其他机器连接时设置 `LISTEN_HOST=0.0.0.0`。Release 中的 `SHA256SUMS.txt` 列出了每个压缩包的校验值，可用 `sha256sum -c SHA256SUMS.txt --ignore-missing` 校验下载的文件（macOS：`shasum -a 256 -c SHA256SUMS.txt --ignore-missing`）。二进制文件未签名：如果 macOS 阻止运行，请执行 `xattr -d com.apple.quarantine kiro-proxy`；Windows SmartScreen 可能在首次运行前要求确认。之后的版本可在管理面板的更新对话框中安装，无需手动下载。
 
 ### 🛠 源码编译
 
@@ -203,8 +205,8 @@ go build -o kiro-proxy .
 
 | 命令            | 说明                                                                            |
 | --------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev`      | 开发服务器，地址 `http://localhost:5173/admin/`；将 `/admin/api` 与 `/v1` 代理到 `127.0.0.1:8080` |
-| `pnpm dev:mock` | 使用模拟数据的开发服务器，无需后端；登录密码 `12345678`                          |
+| `pnpm dev`      | 开发服务器，地址 `http://localhost:5173/`；将 `/admin/api`、`/user/api` 与 `/v1` 代理到 `127.0.0.1:8080` |
+| `pnpm dev:mock` | 使用模拟数据的开发服务器，无需后端。登录页会像新安装时一样显示 8 位首次运行密码，`/user/login` 会列出演示 API Key |
 | `pnpm test`     | 单元与组件测试（Vitest）                                                        |
 | `pnpm test:timings` | 运行单元测试并记录每个文件的耗时，CI 据此把测试均匀分片 |
 | `pnpm test:e2e` | 基于模拟模式的浏览器冒烟测试（Playwright）                                      |
@@ -279,6 +281,7 @@ curl http://localhost:8080/v1/responses \
 | `GET`    | `/v1/stats`                     | 代理使用聚合统计                              |
 | `GET`    | `/metrics`                      | Prometheus 指标，默认关闭，需 Bearer Token（参见 [Prometheus 指标](#-prometheus-指标)） |
 | `GET`    | `/health`                       | 健康检查                                      |
+| `GET`    | `/user`                         | 用户面板，API Key 持有者在 `/user/login` 用该 Key 登录并查看其用量 |
 | `GET`    | `/`                             | Web 管理面板（内嵌 SPA；`/accounts` 等页面链接直接打开应用，旧的 `/admin/*` 链接会重定向，不请求 HTML 的客户端得到健康检查） |
 
 ---
@@ -299,7 +302,9 @@ curl http://localhost:8080/v1/responses \
 - 「**允许的模型**」把 Key 限制在部分模型上。检查的是请求经 Thinking 后缀与模型映射处理后实际使用的模型（不区分大小写），而不是客户端发送的名称：`claude-haiku-4-5`、`claude-haiku-4.5-thinking` 以及指向 `claude-haiku-4.5` 的映射都算作 `claude-haiku-4.5`，任何别名都无法访问列表之外的模型。其他模型返回 HTTP 403（Anthropic 接口为 `permission_error`，OpenAI 接口的 code 为 `model_not_allowed`），`/v1/models` 也只列出允许的模型。
 - 「**重新生成 API Key**」会为 Key 生成新值，旧值立即失效；名称、限额、绑定的账号与用量保持不变。
 - 「**各 API Key 用量**」以图表展示每个 Key 在 24 小时、7 天、30 天或全部时间内的请求数、Token 与 Credits，区分成功与失败，并单独列出无 API Key、无效 API Key 与已删除 API Key 的请求。
-- API Key 持有者可以用自己的 API Key 在 `/user` 登录，查看该 Key 的限额、按天与按模型的用量以及最近的请求；他们看不到账号，也看不到其他 Key。
+- API Key 持有者用自己的 API Key 在 `/user/login` 登录。在 `/user` 上，他们可以看到该 Key 的状态、限额与设置，它的用量趋势、各模型与各客户端用量，最近的请求及其详情，接口地址，以及客户端配置。他们看不到账号、其他 Key、上游错误信息或请求体。
+- 每个 Key 都能在那里登录，即使已禁用、已过期或已达限额，页面会说明其请求被拒绝的原因。关闭「**要求 API Key**」时，发往服务器自身地址的调用不计入任何 Key，页面也会说明这一点。登录有效期为 12 小时，Key 被删除或重新生成时登录随即结束。
+- 创建 Key 时，接口页会显示要交给其持有者的用量页面链接：公开链接运行时使用公开链接，否则使用当前打开管理面板的地址。
 
 ---
 
@@ -387,7 +392,7 @@ Kiro 没有 JSON 模式，因此代理会要求模型输出 JSON，去掉代码�
 1. 打开「**公开 HTTPS 链接**」。代理会从当前版本的 GitHub Release 下载 Tailscale 辅助程序 `kiro-tunnel`（约 8 MB），并用内置在代理中的 SHA-256 校验。Docker 镜像已自带该辅助程序。如果无法下载当前版本的辅助程序（其 Release 仍在发布中，或无法访问 GitHub），代理会运行之前为早期版本下载的辅助程序，并在卡片上注明；从源码构建且磁盘上没有辅助程序时，会改用最新 Release 的辅助程序，并用该 Release 的 `SHA256SUMS.txt` 校验。
 2. 点击「**登录 Tailscale**」，用免费的 Tailscale 账号登录。服务器会以名为 `kiro-proxy` 的设备加入你的 tailnet；可在「**设备名称**」中修改。
 3. 首次使用时点击「**开启 Funnel**」，一步为你的 tailnet 开启 HTTPS 和 Funnel。
-4. 卡片会显示链接，例如 `https://kiro-proxy.tail1234.ts.net`。重启后链接不变。
+4. 链接能从互联网打开后（可能需要几分钟），卡片会显示该链接，例如 `https://kiro-proxy.tail1234.ts.net`。重启后链接不变。
 5. Tailscale 默认 180 天后让设备退出登录，链接会停止，直到你重新登录。卡片会显示到期日期和「**禁用密钥过期**」，它会打开此设备在 Tailscale 管理控制台中的页面：在那里关闭一次密钥过期，卡片上的日期就会消失。
 
 拿到链接的任何人都能访问登录页和 API，而且 Funnel 域名会出现在公开的证书日志中，所以爬虫一定会找到它。经由该链接时：

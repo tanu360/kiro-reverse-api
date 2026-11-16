@@ -38,7 +38,7 @@
 1. Agrupa várias contas Kiro e distribui as requisições com round-robin, pesos ou prioridades e afinidade de sessão.
 2. Traduz chamadas Anthropic `/v1/messages`, OpenAI `/v1/chat/completions` e OpenAI `/v1/responses` de e para o upstream do Kiro, incluindo ferramentas, raciocínio, nível de esforço do raciocínio e busca na web.
 3. Atualiza os tokens de acesso automaticamente e transmite Server-Sent Events de ponta a ponta, com keepalives e failover.
-4. Inclui um painel de administração em React, embutido no binário, para gerenciar contas, acompanhar tudo ao vivo e auditar requisições, em English, 简体中文, 日本語, Tiếng Việt e Português (Brasil).
+4. Inclui um painel de administração em React, embutido no binário, para gerenciar contas, acompanhar tudo ao vivo e auditar requisições, em English, 简体中文, 日本語, Tiếng Việt e Português (Brasil). Um painel do usuário deixa quem tem cada chave de API consultar o uso da própria chave.
 
 > [!IMPORTANT]
 > Proxy local em um único binário. **Não** é um serviço hospedado e **não** tem vínculo com a Amazon, a AWS ou a Kiro. Você precisa ser dono de cada conta que adicionar ao pool ou ter autorização para usá-la.
@@ -57,7 +57,7 @@ Se este projeto ajuda você, uma Star significaria muito.
   <br><sub><b>Visão geral</b> — tráfego ao vivo, créditos e erros de todas as contas</sub>
 </p>
 
-<p align="center">📸 <a href="docs/SCREENSHOTS_PT-BR.md"><b>Mais capturas de tela</b></a> — contas, requisições, API, backups e configurações</p>
+<p align="center">📸 <a href="docs/SCREENSHOTS_PT-BR.md"><b>Mais capturas de tela</b></a> — contas, requisições, API, backups, configurações e o painel do usuário</p>
 
 ## ✨ Recursos
 
@@ -109,11 +109,13 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Aplicativo React de página única embutido no binário; não há servidor web separado para rodar.
 - Painel Visão geral atualizado ao vivo: quatro cartões de KPI (contas, créditos do plano, e requisições e falhas na última hora), o tráfego da última hora, das últimas 6 ou 24 horas ou de todo o período em barras empilhadas, uma lista das contas que precisam de atenção, o tráfego por conta, um gráfico de rosca com a distribuição por modelo e as contas mais ativas. O cartão **Créditos do plano** separa o uso de créditos do Kiro em uso pelo proxy e uso fora dele.
 - Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada, tag), busca por e-mail, apelido, notas e tags, ordenação, ações em lote, visão de detalhes, testes de conexão, requisições por minuto e de hoje ao vivo, revisão de duplicadas e exportação.
-- Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite. O detalhe de uma requisição abre a conversa dela (os turnos em ordem, a conta de cada um, as trocas de conta e os totais) e filtra o log por ela, e **Repetir** roda uma requisição registrada de novo numa conta e num modelo que você escolher (veja [Conversas e repetição](#-conversas-e-repetição)).
-- Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, requisições por minuto, horário de expiração, modelos permitidos, vínculo com contas por conta ou por tag, modo de roteamento por chave, gerar nova chave, redefinição de uso), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
+- Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite. Abaixo do modelo de cada linha, o log mostra o cliente que fez a chamada: Claude Code, Codex, opencode, Cline, Roo Code ou Kilo Code; senão, Anthropic API, OpenAI API ou OpenAI Responses. O proxy identifica o cliente pelo User-Agent e por alguns cabeçalhos do cliente, e nunca guarda o User-Agent em si. Os tokens aparecem como uma barra só, dividida em entrada, cache e saída. O detalhe de uma requisição abre a conversa dela (os turnos em ordem, a conta de cada um, as trocas de conta e os totais) e filtra o log por ela, e **Repetir** roda uma requisição registrada de novo numa conta e num modelo que você escolher (veja [Conversas e repetição](#-conversas-e-repetição)).
+- Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, requisições por minuto, horário de expiração, modelos permitidos, vínculo com contas por conta ou por tag, modo de roteamento por chave, gerar nova chave, redefinição de uso), o quanto cada chave já usou dos seus limites (âmbar a partir de 75 %, vermelho quando um limite se esgota), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
 - Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, link público, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, log do servidor, senha de administrador, login em duas etapas, métricas do Prometheus, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
 - Alertas para webhook, Telegram, Discord ou Slack quando os créditos estão acabando, uma conta é banida ou nenhuma conta consegue atender requisições, e um resumo diário de uso opcional (veja [Alertas](#-alertas)).
 - Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
+- Atualização automática nas instalações por binário: a janela de atualização baixa a nova release para a plataforma do servidor, confere com o `SHA256SUMS.txt` da release e a coloca no lugar do programa em execução. O programa antigo fica ao lado como `<name>.old`. **Reiniciar para atualizar** dá às requisições em andamento até 30 segundos para terminar e depois inicia a nova versão, e os logins continuam valendo depois de reiniciar. Um servidor em contêiner, numa plataforma sem versão compilada ou sem permissão de gravação na própria pasta recebe os passos para atualizar à mão.
+- **Painel do usuário** em `/user`, onde quem tem uma chave de API entra com essa chave e vê só essa chave: o status, os limites e as configurações dela, quatro cartões de KPI (requisições, falhas, créditos, tokens) nas últimas 24 horas, 7 dias, 30 dias ou em todo o período, o uso ao longo do tempo, o uso por modelo e por cliente, as requisições recentes com visão de detalhes, os endpoints e a configuração do cliente (veja [Chaves de API gerenciadas](#-chaves-de-api-gerenciadas)).
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
 - Login em duas etapas com um app autenticador, com dez códigos de recuperação de uso único (veja [Login em duas etapas](#-login-em-duas-etapas)).
 - Tema claro, escuro e do sistema; cinco idiomas na interface: English, 简体中文, 日本語, Tiếng Việt e Português (Brasil).
@@ -183,7 +185,7 @@ cd kiro-proxy-linux-x64
 ./kiro-proxy
 ```
 
-No Windows, baixe `kiro-proxy-windows-x64.zip` (ou `kiro-proxy-windows-arm64.zip`), extraia e execute `kiro-proxy.exe` em um terminal. O banco de dados é criado na pasta atual; defina `DATA_DIR` para guardá-lo em outro lugar. O servidor escuta em `127.0.0.1:8080`: defina `PORT` se a porta 8080 estiver ocupada e `LISTEN_HOST=0.0.0.0` para aceitar outras máquinas. O `SHA256SUMS.txt` da release lista o checksum de cada arquivo: confira um download com `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Os binários não são assinados: se o macOS bloquear a execução, rode `xattr -d com.apple.quarantine kiro-proxy`; o SmartScreen do Windows pode pedir confirmação na primeira execução.
+No Windows, baixe `kiro-proxy-windows-x64.zip` (ou `kiro-proxy-windows-arm64.zip`), extraia e execute `kiro-proxy.exe` em um terminal. O banco de dados é criado na pasta atual; defina `DATA_DIR` para guardá-lo em outro lugar. O servidor escuta em `127.0.0.1:8080`: defina `PORT` se a porta 8080 estiver ocupada e `LISTEN_HOST=0.0.0.0` para aceitar outras máquinas. O `SHA256SUMS.txt` da release lista o checksum de cada arquivo: confira um download com `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Os binários não são assinados: se o macOS bloquear a execução, rode `xattr -d com.apple.quarantine kiro-proxy`; o SmartScreen do Windows pode pedir confirmação na primeira execução. As releases seguintes são instaladas pela janela de atualização do painel de administração, então você não precisa baixá-las à mão.
 
 ### 🛠 Compilar a partir do código-fonte
 
@@ -203,8 +205,8 @@ Execute estes comandos a partir de `ui/`:
 
 | Comando         | O que faz                                                                       |
 | --------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev`      | Servidor de desenvolvimento em `http://localhost:5173/admin/`; faz proxy de `/admin/api` e `/v1` para `127.0.0.1:8080` |
-| `pnpm dev:mock` | Servidor de desenvolvimento com dados simulados e sem backend; entre com a senha `12345678` |
+| `pnpm dev`      | Servidor de desenvolvimento em `http://localhost:5173/`; faz proxy de `/admin/api`, `/user/api` e `/v1` para `127.0.0.1:8080` |
+| `pnpm dev:mock` | Servidor de desenvolvimento com dados simulados e sem backend. A página de login mostra a senha de 8 dígitos da primeira execução, como numa instalação nova, e `/user/login` lista chaves de API de demonstração |
 | `pnpm test`     | Testes unitários e de componentes (Vitest)                                      |
 | `pnpm test:timings` | Roda os testes unitários e registra o tempo de cada arquivo, que o CI usa para dividi-los em partes iguais |
 | `pnpm test:e2e` | Smoke tests no navegador contra o modo mock (Playwright)                        |
@@ -279,6 +281,7 @@ Para o Codex, salve `/v1/codex/models` em um arquivo e defina `model_catalog_jso
 | `GET`    | `/v1/stats`                     | Estatísticas agregadas de uso do proxy        |
 | `GET`    | `/metrics`                      | Métricas do Prometheus, desligadas por padrão, com bearer token (veja [Métricas do Prometheus](#-métricas-do-prometheus)) |
 | `GET`    | `/health`                       | Verificação de saúde                          |
+| `GET`    | `/user`                         | Painel do usuário, onde quem tem uma chave de API entra com ela em `/user/login` e consulta o uso dela |
 | `GET`    | `/`                             | Painel de administração web (SPA embutido; links de página como `/accounts` abrem o app, links antigos `/admin/*` redirecionam e um cliente que não pede HTML recebe o health check) |
 
 ---
@@ -299,7 +302,9 @@ Exija chaves de API na página **API** (**Acesso à API → Exigir chave de API*
 - **Modelos permitidos** limita uma chave a alguns modelos. Vale o modelo que a requisição usa depois do sufixo de thinking e dos mapeamentos de modelo, sem diferenciar maiúsculas, e não o nome que o cliente enviou: `claude-haiku-4-5`, `claude-haiku-4.5-thinking` e um mapeamento que aponta para `claude-haiku-4.5` contam todos como `claude-haiku-4.5`, e nenhum apelido alcança um modelo fora da lista. Outros modelos recebem HTTP 403 (`permission_error` na API Anthropic, código `model_not_allowed` nas APIs OpenAI), e `/v1/models` lista só os modelos permitidos.
 - **Gerar nova chave** dá um novo valor à chave, e o valor antigo para de funcionar na hora. Nome, limites, contas e uso continuam iguais.
 - **Uso por chave** mostra em gráfico as requisições, os tokens e os créditos de cada chave nas últimas 24 horas, 7 dias, 30 dias ou em todo o período, separados entre sucesso e falha, com linhas próprias para requisições sem chave, chaves inválidas e chaves excluídas.
-- Quem tem uma chave entra em `/user` com a própria chave de API para ver os limites dela, o uso por dia e por modelo e as requisições recentes; essa pessoa nunca vê as contas nem outras chaves.
+- Quem tem uma chave entra em `/user/login` com a própria chave de API. Em `/user`, essa pessoa vê o status, os limites e as configurações da chave, o uso dela ao longo do tempo, por modelo e por cliente, as requisições recentes com os detalhes, os endpoints e a configuração do cliente. Ela nunca vê as contas, outras chaves, mensagens de erro do upstream nem corpos de requisição.
+- Toda chave pode entrar ali, mesmo uma desabilitada, expirada ou no limite, e a página diz por que as requisições dela são recusadas. Com **Exigir chave de API** desligado, as chamadas ao endereço do próprio servidor não contam para nenhuma chave, e a página avisa isso. Um login dura 12 horas e termina quando a chave é excluída ou recebe um novo valor.
+- Quando você cria uma chave, a página API mostra o link da página de uso para entregar a quem vai usá-la: o link público, enquanto ele estiver no ar, ou então o endereço em que o painel de administração está aberto.
 
 ---
 
@@ -387,7 +392,7 @@ A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a 
 1. Ligue **Link HTTPS público**. O proxy baixa o auxiliar do Tailscale, `kiro-tunnel` (cerca de 8 MB), do release desta versão no GitHub e o confere com um SHA-256 embutido no proxy. A imagem Docker já traz o auxiliar. Se o auxiliar desta versão não puder ser baixado (o release ainda está sendo publicado, ou o GitHub está fora de alcance), o proxy usa o auxiliar que baixou para uma versão anterior e avisa no cartão; uma build a partir do código-fonte sem nenhum no disco usa o auxiliar do release mais recente, conferido com o `SHA256SUMS.txt` desse release.
 2. Clique em **Entrar no Tailscale** e entre com uma conta gratuita do Tailscale. O servidor entra na sua tailnet como um dispositivo chamado `kiro-proxy`; **Nome do dispositivo** o altera.
 3. Na primeira vez, clique em **Habilitar Funnel**. Isso liga o HTTPS e o Funnel da sua tailnet em um passo só.
-4. O card mostra o link, como `https://kiro-proxy.tail1234.ts.net`. Ele continua o mesmo depois de reiniciar.
+4. O card mostra o link, como `https://kiro-proxy.tail1234.ts.net`, assim que ele abre pela internet, o que pode levar alguns minutos. Ele continua o mesmo depois de reiniciar.
 5. Por padrão, o Tailscale desconecta um dispositivo depois de 180 dias, e o link para até você entrar de novo. O card mostra a data e **Desabilitar expiração da chave**, que abre a página deste dispositivo no console de administração do Tailscale: desabilite a expiração da chave lá uma vez, e a data some do card.
 
 Qualquer pessoa com o link chega à página de login e à API, e os nomes do Funnel aparecem em logs públicos de certificados, então bots vão encontrá-lo. Pelo link:

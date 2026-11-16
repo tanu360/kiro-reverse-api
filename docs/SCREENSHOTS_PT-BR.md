@@ -8,9 +8,9 @@
 
 [← Voltar ao README](../README_PT-BR.md)
 
-Todas as páginas do painel de administração. Cada imagem segue o tema do seu GitHub, claro ou escuro.
+Todas as páginas do painel de administração e do painel do usuário. Cada imagem segue o tema do seu GitHub, claro ou escuro.
 
-[Entrar](#entrar) · [Visão geral](#visão-geral) · [Contas](#contas) · [Requisições](#requisições) · [API](#api) · [Backups](#backups) · [Configurações](#configurações)
+[Entrar](#entrar) · [Visão geral](#visão-geral) · [Contas](#contas) · [Requisições](#requisições) · [API](#api) · [Backups](#backups) · [Configurações](#configurações) · [Painel do usuário](#painel-do-usuário)
 
 ## Entrar
 
@@ -73,7 +73,7 @@ Todas as páginas do painel de administração. Cada imagem segue o tema do seu 
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/requests-dark.webp">
     <img alt="Requisições" src="../screenshots/pt-BR/requests-light.webp" width="100%">
   </picture>
-  <br><sub><b>Requisições</b> — abas de status, busca, ordenação e visão de detalhes</sub>
+  <br><sub><b>Requisições</b> — o modelo de cada requisição e o cliente que a fez, tokens, créditos e duração, com abas de status, busca e ordenação</sub>
 </p>
 
 <p align="center">
@@ -91,7 +91,7 @@ Todas as páginas do painel de administração. Cada imagem segue o tema do seu 
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/api-dark.webp">
     <img alt="API" src="../screenshots/pt-BR/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>API</b> — acesso à API, chaves por cliente com limites, uso por chave, configuração do cliente destacada</sub>
+  <br><sub><b>API</b> — acesso à API, chaves com limites de tokens, créditos e chamadas, uso por chave, endpoints e configuração do cliente destacada</sub>
 </p>
 
 ## Backups
@@ -128,6 +128,24 @@ Todas as páginas do painel de administração. Cada imagem segue o tema do seu 
     <img alt="Configurações · Segurança" src="../screenshots/pt-BR/settings-3-light.webp" width="100%">
   </picture>
   <br><sub><b>Configurações · Segurança</b> — senha de administrador, login em duas etapas, filtro de system prompt, autorrecuperação, alertas, retenção de logs, zona de perigo</sub>
+</p>
+
+## Painel do usuário
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/user-login-dark.webp">
+    <img alt="Login do usuário" src="../screenshots/pt-BR/user-login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Login do usuário</b> — quem tem uma chave entra com a própria chave de API para consultar o uso dela</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/user-dark.webp">
+    <img alt="Painel do usuário" src="../screenshots/pt-BR/user-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Painel do usuário</b> — status e limites de uma chave, cartões de KPI, uso ao longo do tempo, por modelo e por cliente, requisições recentes, endpoints e configuração do cliente</sub>
 </p>
 
 [← Voltar ao README](../README_PT-BR.md)
