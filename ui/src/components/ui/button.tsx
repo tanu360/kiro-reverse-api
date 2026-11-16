@@ -103,10 +103,11 @@ export const buttonVariants = cva(
         "link-inline":
           "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground underline decoration-dotted underline-offset-3 sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 hover:decoration-solid data-pressed:decoration-solid",
         // A standalone text action with a trailing arrow (the sidebar update card's "See what's
-        // new"): the text's own size, no box and no underline; the icon nudges 2 px toward the
-        // end on hover. The Button drops the size classes for it, as for `link-inline`.
+        // new"): the text's own size, no box and no underline. On hover or press the label turns
+        // the purple link colour, so it reads as a link, and the icon nudges 2 px toward the
+        // end. The Button drops the size classes for it, as for `link-inline`.
         "link-action":
-          "h-auto gap-1 rounded-sm border-0 p-0 text-[length:inherit] text-foreground sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 [&_svg]:mx-0 [&_svg]:transition-transform [&_svg]:duration-150 [&_svg]:ease-out hover:[&_svg]:translate-x-0.5 data-pressed:[&_svg]:translate-x-0.5",
+          "h-auto gap-1 rounded-sm border-0 p-0 text-[length:inherit] text-foreground transition-[color,box-shadow] duration-150 ease-out sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 hover:text-info-foreground data-pressed:text-info-foreground [&_svg]:mx-0 [&_svg]:transition-transform [&_svg]:duration-150 [&_svg]:ease-out hover:[&_svg]:translate-x-0.5 data-pressed:[&_svg]:translate-x-0.5",
         // A field-like trigger (the Accounts filter selects in their label group): a faint
         // foreground tint with a hairline border, a step past a field's, and a step deeper on
         // hover (index.css --neutral-button-*). Supporting actions use `secondary`.
