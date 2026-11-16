@@ -8,7 +8,12 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { InfoHint } from "@/components/shared/info-hint";
-import { PageSizeSelect, SortSelect, StatusTabs } from "@/components/shared/table-toolbar";
+import {
+  FilterBar,
+  PageSizeSelect,
+  SortSelect,
+  StatusTabs,
+} from "@/components/shared/table-toolbar";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useElementWidth } from "@/hooks/use-element-width";
@@ -143,92 +148,96 @@ export function RequestsToolbar({
         value={status ?? ALL}
       />
 
-      {/* Below a 64rem card the search has a row of its own and the controls follow under it. */}
-      <div className="flex min-w-0 flex-wrap items-center gap-2" ref={rowRef}>
-        {searchable ? (
-          <InputGroup className="@5xl/requests:w-96">
-            <InputGroupAddon>
-              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t("search")}
-              autoComplete="off"
-              onChange={(event) => setText(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && text) {
-                  event.preventDefault();
-                  setText("");
-                }
-              }}
-              placeholder={placeholder}
-              ref={inputRef}
-              spellCheck={false}
-              type="search"
-              value={text}
-            />
-            {/*
-              One trailing control at a time: the clear X takes the hint's slot while there is
-              text, so it sits at the field's edge and the two touch targets never overlap.
-            */}
-            <InputGroupAddon align="inline-end">
-              {text ? (
-                <Button
-                  aria-label={t("clearSearch")}
-                  onClick={() => {
-                    setText("");
-                    inputRef.current?.focus();
+      {/* Below a 64rem bar the search and Rows share a line over the controls, which never wrap. */}
+      <div className="min-w-0" ref={rowRef}>
+        <FilterBar
+          end={
+            refined && shown !== undefined && tabTotal !== undefined ? (
+              <span
+                aria-live="polite"
+                className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
+              >
+                {t("filter.results", {
+                  shown: formatNumber(shown, lang),
+                  total: formatNumber(tabTotal, lang),
+                })}
+              </span>
+            ) : undefined
+          }
+          pageSize={
+            <PageSizeSelect onChange={onPageSizeChange} options={PAGE_SIZES} value={pageSize} />
+          }
+          search={
+            searchable ? (
+              <InputGroup className="@5xl/filter-bar:w-96 @5xl/filter-bar:shrink-0">
+                <InputGroupAddon>
+                  <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  aria-label={t("search")}
+                  autoComplete="off"
+                  onChange={(event) => setText(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && text) {
+                      event.preventDefault();
+                      setText("");
+                    }
                   }}
-                  size="icon-xs"
-                  variant="quiet"
-                >
-                  <HugeiconsIcon icon={XIcon} aria-hidden="true" />
-                </Button>
-              ) : (
-                // Opens on hover, click and tap; the label is for screen readers only.
-                <InfoHint className="gap-0" hint={t("searchHint")}>
-                  <span className="sr-only">{t("searchHintLabel")}</span>
-                </InfoHint>
-              )}
-            </InputGroupAddon>
-          </InputGroup>
-        ) : null}
+                  placeholder={placeholder}
+                  ref={inputRef}
+                  spellCheck={false}
+                  type="search"
+                  value={text}
+                />
+                {/*
+                  One trailing control at a time: the clear X takes the hint's slot while there is
+                  text, so it sits at the field's edge and the two touch targets never overlap.
+                */}
+                <InputGroupAddon align="inline-end">
+                  {text ? (
+                    <Button
+                      aria-label={t("clearSearch")}
+                      onClick={() => {
+                        setText("");
+                        inputRef.current?.focus();
+                      }}
+                      size="icon-xs"
+                      variant="quiet"
+                    >
+                      <HugeiconsIcon icon={XIcon} aria-hidden="true" />
+                    </Button>
+                  ) : (
+                    // Opens on hover, click and tap; the label is for screen readers only.
+                    <InfoHint className="gap-0" hint={t("searchHint")}>
+                      <span className="sr-only">{t("searchHintLabel")}</span>
+                    </InfoHint>
+                  )}
+                </InputGroupAddon>
+              </InputGroup>
+            ) : undefined
+          }
+        >
+          <SortSelect
+            defaultSortDesc={defaultSortDesc}
+            desc={desc}
+            onChange={(next, nextDesc) => {
+              if (next) onSortChange(next, nextDesc);
+            }}
+            options={sortOptions}
+            sort={sort}
+          />
 
-        <SortSelect
-          defaultSortDesc={defaultSortDesc}
-          desc={desc}
-          onChange={(next, nextDesc) => {
-            if (next) onSortChange(next, nextDesc);
-          }}
-          options={sortOptions}
-          sort={sort}
-        />
-
-        {refined && onClear ? (
-          <Button
-            aria-label={tc("actions.clearFilters")}
-            onClick={onClear}
-            size="sm"
-            variant="ghost"
-          >
-            {t("filter.clear")}
-          </Button>
-        ) : null}
-
-        {/* The result count and the page size share the row's end. */}
-        <div className="ms-auto flex shrink-0 items-center gap-2">
-          {refined && shown !== undefined && tabTotal !== undefined ? (
-            <span
-              aria-live="polite"
-              className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
+          {refined && onClear ? (
+            <Button
+              aria-label={tc("actions.clearFilters")}
+              onClick={onClear}
+              size="sm"
+              variant="ghost"
             >
-              {t("filter.results", {
-                shown: formatNumber(shown, lang),
-                total: formatNumber(tabTotal, lang),
-              })}
-            </span>
+              {t("filter.clear")}
+            </Button>
           ) : null}
-          <PageSizeSelect onChange={onPageSizeChange} options={PAGE_SIZES} value={pageSize} />
-        </div>
+        </FilterBar>
       </div>
     </div>
   );

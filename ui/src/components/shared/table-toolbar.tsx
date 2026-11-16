@@ -1,6 +1,6 @@
 import { ArrowDown02Icon, ArrowUp02Icon, ChevronDownIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { type JSX, type ReactNode, useEffect, useRef } from "react";
+import { createContext, type JSX, type ReactNode, useContext, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
@@ -12,15 +12,77 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/components/ui/menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { selectTriggerIconClassName } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
+import { useElementWidth } from "@/hooks/use-element-width";
 import { prefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 // The pieces a list page's DataTableCard toolbar is built from (Accounts, Requests): status tabs
-// with counts, "Label: Value" selects, "Sort by" and "Rows".
+// with counts, the filter bar, "Label: Value" selects, "Sort by" and "Rows".
+
+/** The filter bar's width (64rem) from which the search, the controls and Rows share one line. */
+const FILTER_BAR_WIDE_PX = 1024;
+
+/** True inside a narrow filter bar: Rows drops its label (the menu still names it). */
+const FilterBarCompactContext = createContext(false);
+
+/**
+ * A table toolbar's filter row. From a 64rem bar it is one line: the search, the controls and
+ * `pageSize` at the end. Narrower, the search and `pageSize` (its label dropped, "25") share the
+ * first line and the controls take the second. The controls never wrap: past the bar's width
+ * they scroll sideways, fading at the edge with more past it. `end` (the result count) closes
+ * the controls, pushed to the right while there is room. Without a search, the controls and
+ * `pageSize` share one line at every width.
+ */
+export function FilterBar({
+  search,
+  children,
+  end,
+  pageSize,
+}: {
+  /** The search field; its 64rem-up width goes in `@5xl/filter-bar:` classes. */
+  search?: ReactNode;
+  children?: ReactNode;
+  end?: ReactNode;
+  /** PageSizeSelect, kept out of the scrolling line so it is always in view. */
+  pageSize?: ReactNode;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  const width = useElementWidth(ref);
+  const compact = width > 0 && width < FILTER_BAR_WIDE_PX;
+  return (
+    <div className="@container/filter-bar min-w-0" data-slot="filter-bar" ref={ref}>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 @5xl/filter-bar:flex-nowrap">
+        {search ? <div className="min-w-0 flex-1 @5xl/filter-bar:flex-none">{search}</div> : null}
+        {pageSize ? (
+          <div className="flex shrink-0 items-center @5xl/filter-bar:order-last">
+            <FilterBarCompactContext.Provider value={compact}>
+              {pageSize}
+            </FilterBarCompactContext.Provider>
+          </div>
+        ) : null}
+        {/* The 4 px bleed (-m-1 with p-1 inside) keeps the controls' focus outline unclipped. */}
+        <ScrollArea
+          className={cn(
+            "-m-1 h-auto w-auto min-w-0 flex-1",
+            search ? "basis-full @5xl/filter-bar:basis-0" : "order-first",
+          )}
+          scrollFade
+        >
+          <div className="flex w-max min-w-full items-center gap-2 p-1">
+            {children}
+            {end ? <div className="ms-auto flex shrink-0 items-center gap-2">{end}</div> : null}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  );
+}
 
 /**
  * A "Label: Value" control: the muted label as a group segment, then an outline button with the
@@ -33,29 +95,34 @@ export function FilterTrigger({
   label,
   value,
   after,
+  compact = false,
 }: {
   label: string;
   value: string;
   after?: ReactNode;
+  /** The value button alone, without the label segment (its name still spells the label). */
+  compact?: boolean;
 }): JSX.Element {
   const { t } = useT();
+  const trigger = (
+    <MenuTrigger
+      render={<Button aria-label={t("table.filterTrigger", { label, value })} variant="outline" />}
+    >
+      <span className="max-w-36 truncate">{value}</span>
+      {after}
+      <HugeiconsIcon
+        aria-hidden="true"
+        className={selectTriggerIconClassName}
+        icon={ChevronDownIcon}
+      />
+    </MenuTrigger>
+  );
+  if (compact) return trigger;
   return (
     <Group>
       <GroupText aria-hidden="true">{label}</GroupText>
       <GroupSeparator />
-      <MenuTrigger
-        render={
-          <Button aria-label={t("table.filterTrigger", { label, value })} variant="outline" />
-        }
-      >
-        <span className="max-w-36 truncate">{value}</span>
-        {after}
-        <HugeiconsIcon
-          aria-hidden="true"
-          className={selectTriggerIconClassName}
-          icon={ChevronDownIcon}
-        />
-      </MenuTrigger>
+      {trigger}
     </Group>
   );
 }
@@ -142,7 +209,10 @@ export function SortSelect<S extends string>({
   );
 }
 
-/** "Rows: 25": the page size, as a filter-style select at the end of the filter row. */
+/**
+ * "Rows: 25": the page size, as a filter-style select at the end of the filter row; "25" alone
+ * in a narrow FilterBar, beside the search.
+ */
 export function PageSizeSelect({
   value,
   options,
@@ -153,9 +223,14 @@ export function PageSizeSelect({
   onChange: (size: number) => void;
 }): JSX.Element {
   const { t, lang } = useT();
+  const compact = useContext(FilterBarCompactContext);
   return (
     <Menu>
-      <FilterTrigger label={t("table.rowsShort")} value={formatNumber(value, lang)} />
+      <FilterTrigger
+        compact={compact}
+        label={t("table.rowsShort")}
+        value={formatNumber(value, lang)}
+      />
       {/* Short numbers: the list fits them (the trigger is past the 3rem icon cut-off), not 11rem. */}
       <MenuPopup align="end">
         <MenuRadioGroup onValueChange={(next) => onChange(Number(next))} value={String(value)}>

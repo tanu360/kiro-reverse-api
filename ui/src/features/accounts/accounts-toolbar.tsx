@@ -8,6 +8,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, useMemo } from "react";
 import {
+  FilterBar,
   FilterTrigger,
   PageSizeSelect,
   SortSelect,
@@ -23,7 +24,6 @@ import {
   MenuRadioItem,
   MenuSeparator,
 } from "@/components/ui/menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
@@ -249,7 +249,6 @@ export function AccountsToolbar({
     issue !== undefined;
   const showTabs = loading || accounts.length > 0 || filters.status !== undefined;
   const showSort = accounts.length > 1 || sort !== undefined;
-  const hasControls = showSort || showIssue || selectDimensions.length > 0;
   const pageSizeControl =
     pageSize !== undefined && pageSizeOptions?.length && onPageSizeChange ? (
       <PageSizeSelect onChange={onPageSizeChange} options={pageSizeOptions} value={pageSize} />
@@ -270,77 +269,81 @@ export function AccountsToolbar({
         />
       ) : null}
 
-      {/* Below a 64rem card the search has a row of its own and the filters follow under it.
-          From there the search starts at 10rem and grows to 16rem only with room to spare, so the
-          filters and the page size stay on its row. */}
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <InputGroup className="@5xl/accounts:w-auto @5xl/accounts:max-w-64 @5xl/accounts:grow @5xl/accounts:basis-40">
-          <InputGroupAddon>
-            <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label={t("filter.search")}
-            autoComplete="off"
-            onChange={(event) => onFiltersChange({ q: event.target.value || undefined })}
-            // Short, so it fits the 10rem the search starts at; the label names every field.
-            placeholder={t("filter.searchPlaceholder")}
-            type="search"
-            value={filters.q ?? ""}
-          />
-        </InputGroup>
-
+      {/* Below a 64rem bar the search and Rows share a line over the filters, which never wrap. */}
+      <FilterBar
+        end={
+          !loading && refined ? (
+            <span
+              aria-live="polite"
+              className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
+            >
+              {t("filter.results", {
+                shown: formatNumber(shown, lang),
+                total: formatNumber(accounts.length, lang),
+              })}
+            </span>
+          ) : undefined
+        }
+        pageSize={pageSizeControl ?? undefined}
+        search={
+          <InputGroup className="@5xl/filter-bar:w-64 @5xl/filter-bar:shrink-0">
+            <InputGroupAddon>
+              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label={t("filter.search")}
+              autoComplete="off"
+              onChange={(event) => onFiltersChange({ q: event.target.value || undefined })}
+              // Short, so it fits a phone's row; the label names every field.
+              placeholder={t("filter.searchPlaceholder")}
+              type="search"
+              value={filters.q ?? ""}
+            />
+          </InputGroup>
+        }
+      >
         {loading ? (
           // The filter row's height: a control's.
           <Skeleton className="h-9 w-40 pointer-coarse:h-10" />
         ) : (
           <>
-            {hasControls ? (
-              // One sideways-scrolling row below a 32rem card; from there up the controls wrap.
-              // The 4 px bleed (-m-1 with p-1 inside) keeps the buttons' focus outline unclipped.
-              <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade>
-                <div className="flex w-max items-center gap-2 p-1 @lg/accounts:w-auto @lg/accounts:flex-wrap">
-                  {showSort ? (
-                    <SortSelect
-                      defaultLabel={t("sort.default")}
-                      defaultSortDesc={defaultSortDesc}
-                      desc={desc}
-                      onChange={onSortChange}
-                      options={sortOptions}
-                      sort={sort}
-                    />
-                  ) : null}
-
-                  {showIssue ? (
-                    <FilterSelect
-                      label={t("filter.dim.issue")}
-                      onValueChange={(value) =>
-                        onFiltersChange({
-                          status: (value as AccountStatus | undefined) ?? "attention",
-                        })
-                      }
-                      options={issueOptions}
-                      total={groupCounts.attention}
-                      value={issue}
-                    />
-                  ) : null}
-
-                  {selectDimensions.map((dimension) => (
-                    <FilterSelect
-                      key={dimension}
-                      label={
-                        dimension === "tag" ? t("metadata.tagFilter") : t(`filter.dim.${dimension}`)
-                      }
-                      masked={dimension === "tag"}
-                      onValueChange={(value) => onFiltersChange({ [dimension]: value })}
-                      options={options[dimension]}
-                      total={accounts.length}
-                      // Tag options are keyed in lowercase; a typed ?tag= may differ in case.
-                      value={dimension === "tag" ? filters.tag?.toLowerCase() : filters[dimension]}
-                    />
-                  ))}
-                </div>
-              </ScrollArea>
+            {showSort ? (
+              <SortSelect
+                defaultLabel={t("sort.default")}
+                defaultSortDesc={defaultSortDesc}
+                desc={desc}
+                onChange={onSortChange}
+                options={sortOptions}
+                sort={sort}
+              />
             ) : null}
+
+            {showIssue ? (
+              <FilterSelect
+                label={t("filter.dim.issue")}
+                onValueChange={(value) =>
+                  onFiltersChange({
+                    status: (value as AccountStatus | undefined) ?? "attention",
+                  })
+                }
+                options={issueOptions}
+                total={groupCounts.attention}
+                value={issue}
+              />
+            ) : null}
+
+            {selectDimensions.map((dimension) => (
+              <FilterSelect
+                key={dimension}
+                label={dimension === "tag" ? t("metadata.tagFilter") : t(`filter.dim.${dimension}`)}
+                masked={dimension === "tag"}
+                onValueChange={(value) => onFiltersChange({ [dimension]: value })}
+                options={options[dimension]}
+                total={accounts.length}
+                // Tag options are keyed in lowercase; a typed ?tag= may differ in case.
+                value={dimension === "tag" ? filters.tag?.toLowerCase() : filters[dimension]}
+              />
+            ))}
 
             {refined ? (
               <Button
@@ -352,27 +355,9 @@ export function AccountsToolbar({
                 {t("filter.clear")}
               </Button>
             ) : null}
-
-            {/* The result count and the page size share the row's end. */}
-            {refined || pageSizeControl ? (
-              <div className="ms-auto flex shrink-0 items-center gap-2">
-                {refined ? (
-                  <span
-                    aria-live="polite"
-                    className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
-                  >
-                    {t("filter.results", {
-                      shown: formatNumber(shown, lang),
-                      total: formatNumber(accounts.length, lang),
-                    })}
-                  </span>
-                ) : null}
-                {pageSizeControl}
-              </div>
-            ) : null}
           </>
         )}
-      </div>
+      </FilterBar>
     </div>
   );
 }
