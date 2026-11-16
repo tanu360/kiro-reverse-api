@@ -3,11 +3,15 @@ import type { JSX } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccountHealNotices } from "@/features/settings/account-heal-notices";
 import { isAuthenticated, useSession } from "@/lib/auth/session";
+import { isUserSignedIn } from "@/lib/auth/user-session";
 import { AdminEventsProvider } from "@/lib/events/admin-events";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: ({ location }) => {
     if (!isAuthenticated()) {
+      //! A key holder (signed in at /user/login, not as the admin) who opened the site's address
+      //! or an admin page landed on the admin's password sign-in; their own page is /user.
+      if (isUserSignedIn()) throw redirect({ to: "/user" });
       // The redirect value keeps the query string; the login route splits it back out.
       throw redirect({
         to: "/login",

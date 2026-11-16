@@ -1,8 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
 import { act, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getFirstRun } from "@/lib/api/session";
+import { USER_API_BASE } from "@/lib/api/user-panel";
 import { isAuthenticated, type Session, type SessionChangeReason } from "@/lib/auth/session";
+import { USER_TOKEN_KEY } from "@/lib/auth/user-session";
+import { mockServer } from "@/lib/mocks/node";
 import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 
@@ -74,6 +78,23 @@ describe("route guards", () => {
     expect(router.state.location.pathname).toBe("/login");
     expect(router.state.location.search).toEqual({ redirect: "/accounts" });
     expect(router.state.location.href).toBe("/login?redirect=%2Faccounts");
+  });
+
+  it("sends a key holder's visit to an admin page to their own page, not the admin sign-in", async () => {
+    // Signed in with an API key only; the /user page's data is stubbed (any token reads as live).
+    sessionStorage.setItem(USER_TOKEN_KEY, "c".repeat(64));
+    mockServer.use(http.get(`${USER_API_BASE}/*`, () => HttpResponse.json({})));
+    for (const path of ["/", "/accounts"]) {
+      const { router } = await renderApp(path, { authed: false });
+      await waitFor(() => expect(router.state.location.pathname).toBe("/user"));
+    }
+  });
+
+  it("keeps the admin on admin pages when an API key is signed in too", async () => {
+    authed.mockReturnValue(true);
+    sessionStorage.setItem(USER_TOKEN_KEY, "c".repeat(64));
+    const { router } = await renderApp("/accounts");
+    expect(router.state.location.pathname).toBe("/accounts");
   });
 
   it("keeps the query string in the redirect", async () => {
