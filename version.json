@@ -1,5 +1,5 @@
 {
-  "version": "4.0.3",
-  "changelog": "🔐 On the sign-in pages, \"Stay signed in\" sits above the Sign in button. Under the button, a faint line sets off the link to the other sign-in page, which now has an arrow.",
+  "version": "4.0.4",
+  "changelog": "🔔 The update notice now waits until the new version's files are on its GitHub release. Before, it could show up a few minutes early, and Download update failed until the files were there.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
