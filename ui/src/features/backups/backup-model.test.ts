@@ -65,6 +65,20 @@ describe("noteText", () => {
     );
   });
 
+  it("keeps the id of a restored backup whose id holds an impossible date or time", () => {
+    // Date.UTC would read these as real times in the next month, day or hour.
+    for (const id of [
+      "20261315-131200-123456789-abcd1234",
+      "20260231-131200-123456789-abcd1234",
+      "20261115-251200-123456789-abcd1234",
+      "20261115-136000-123456789-abcd1234",
+    ]) {
+      expect(noteText(entry({ kind: "pre-restore", note: `auto before restore ${id}` }), t)).toBe(
+        `Before restoring backup ${id}`,
+      );
+    }
+  });
+
   it("describes the backup a duplicate merge saves first", () => {
     const merge = entry({ kind: "auto", note: "before merging duplicate accounts" });
     expect(noteText(merge, t)).toBe("Duplicate accounts");

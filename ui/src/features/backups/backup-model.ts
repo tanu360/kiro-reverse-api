@@ -93,12 +93,27 @@ const CADENCE_NOTE: Record<BackupCadence, string> = {
   weekly: "noteEveryWeek",
 };
 
-/** When a backup was made, read from its id (config/backup.go: UTC `20060102-150405-…`). */
+/**
+ * When a backup was made, read from its id (config/backup.go: UTC `20060102-150405-…`). Null for
+ * an impossible date or time: Date.UTC would roll month 13 or 25:00 over into a real time, so the
+ * fields are read back and must match.
+ */
 function backupIdTime(id: string): number | null {
   const match = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-/.exec(id);
   if (!match) return null;
   const [, y, mo, d, h, mi, s] = match.map(Number);
-  return Date.UTC(y, mo - 1, d, h, mi, s) / 1000;
+  const date = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  if (
+    date.getUTCFullYear() !== y ||
+    date.getUTCMonth() !== mo - 1 ||
+    date.getUTCDate() !== d ||
+    date.getUTCHours() !== h ||
+    date.getUTCMinutes() !== mi ||
+    date.getUTCSeconds() !== s
+  ) {
+    return null;
+  }
+  return date.getTime() / 1000;
 }
 
 const KIND_KEYS: Record<string, string> = {

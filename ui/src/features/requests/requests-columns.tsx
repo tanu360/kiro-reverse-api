@@ -270,8 +270,8 @@ export function useRequestSummary(accounts = true): (record: RequestRecord) => s
  * A request as a list row, for narrow containers: the status node and the age, then (indented
  * past the node) the model and caller, the token bar with the credits and duration chips, the
  * four token counts, the account, and a failure's category and message. With `details` the
- * request ID and its copy button sit at the header's end, and the speed and the cache hit get a
- * line under the token counts. With `onOpen` the whole row
+ * request ID and its copy button sit at the header's end, and the speed and the cache hit, when
+ * either is known, get a line under the token counts. With `onOpen` the whole row
  * opens the detail sheet; without it the row is plain text.
  */
 export function RequestCard({
@@ -287,6 +287,8 @@ export function RequestCard({
   const { t, lang } = useT("requests");
   const summary = useRequestSummary(accounts);
   const tokens = !usedNoTokens(record);
+  const speed = outputSpeed(record) !== undefined;
+  const cache = record.inTokens > 0;
   return (
     <ListCard
       action={details && record.requestId ? <RequestIdCopy record={record} /> : undefined}
@@ -318,16 +320,19 @@ export function RequestCard({
         </div>
         <div className="flex min-w-0 items-center gap-2 text-sm">
           {tokens ? <TokenTotalBar className="flex-1" record={record} /> : null}
-          <div className={cn("flex shrink-0 items-center gap-1", !tokens && "flex-1")}>
+          {/* Spaced as the speed and cache-hit line, so the credits and the duration read as two
+              figures, not one run of grey text. */}
+          <div className={cn("flex shrink-0 items-center gap-3", !tokens && "flex-1")}>
             {record.success || record.credits > 0 ? <CreditsChip record={record} /> : null}
             <DurationChip record={record} />
           </div>
         </div>
         {tokens ? <TokenFigures record={record} /> : null}
-        {details ? (
+        {/* Only with a figure to show: a failed request with no tokens gets no empty line. */}
+        {details && (speed || cache) ? (
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-            {outputSpeed(record) === undefined ? null : <SpeedChip record={record} />}
-            {record.inTokens > 0 ? <CacheHit labelled record={record} /> : null}
+            {speed ? <SpeedChip record={record} /> : null}
+            {cache ? <CacheHit labelled record={record} /> : null}
           </div>
         ) : null}
         {accounts ? (

@@ -414,12 +414,7 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
       <div className="size-52">{qr}</div>
       {setup && !showKey ? (
         <p className="text-muted-foreground text-xs">
-          <Button
-            className="text-muted-foreground"
-            onClick={() => setShowKey(true)}
-            type="button"
-            variant="link-inline"
-          >
+          <Button onClick={() => setShowKey(true)} type="button" variant="link-inline">
             {t("twoFactor.showSecret")}
           </Button>
         </p>
