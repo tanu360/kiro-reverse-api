@@ -318,7 +318,7 @@ describe("RequestsPage", () => {
     if (!row) throw new Error("no row with an API key");
     const cells = within(row).getAllByRole("cell");
     expect(within(cells[2]).getByText(/^sk-/)).toHaveClass("@[68rem]/requests:hidden");
-    expect(cells[5].querySelector("[data-speed]")?.parentElement).toHaveClass(
+    expect(cells[5].querySelector("[data-slot=duration]")?.parentElement).toHaveClass(
       "@4xl/requests:hidden",
     );
 

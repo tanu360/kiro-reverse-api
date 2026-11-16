@@ -32,13 +32,7 @@ import { type Lang, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { requestProxyText } from "./proxy-failure";
-import {
-  type ErrorTone,
-  errorTypeTone,
-  formatRowDate,
-  isKnownErrorType,
-  requestTries,
-} from "./request-model";
+import { type ErrorTone, errorTypeTone, formatRowDate, isKnownErrorType } from "./request-model";
 
 /*
  * The pieces of a Requests row, shared by the table cells and the narrow-layout row: the status
@@ -374,20 +368,9 @@ export function CreditsChip({ record }: { record: RequestRecord }): JSX.Element 
   );
 }
 
-export type SpeedTone = "fast" | "normal" | "slow" | "crawl";
-
-/** How quick a request was: under 3 s fast, under 20 s normal, under 90 s slow, then a crawl. */
-export function speedTone(ms: number | undefined): SpeedTone {
-  const value = ms ?? 0;
-  if (value < 3_000) return "fast";
-  if (value < 20_000) return "normal";
-  if (value < 90_000) return "slow";
-  return "crawl";
-}
-
 /**
  * The duration as plain muted text, the exact milliseconds on hover; a dash on rows logged before
- * durations were. data-speed carries the tone for tests and styling hooks, not a colour.
+ * durations were.
  */
 export function DurationChip({ record }: { record: RequestRecord }): JSX.Element {
   const { t, lang } = useT("requests");
@@ -399,7 +382,7 @@ export function DurationChip({ record }: { record: RequestRecord }): JSX.Element
         render={
           <span
             className="whitespace-nowrap text-muted-foreground tabular-nums"
-            data-speed={speedTone(record.durationMs)}
+            data-slot="duration"
           />
         }
       >
@@ -412,17 +395,6 @@ export function DurationChip({ record }: { record: RequestRecord }): JSX.Element
   );
 }
 
-/*
- * Output speed, from the rates Claude writes at once a reply has started: Haiku about 100-150
- * tokens a second, Sonnet 50-80 and Opus 30-50. The row's figure is over the whole request, the
- * wait for the first token included, so it reads lower than those, most for a short reply: under
- * 20 tok/s is slow for any model, and 80 tok/s or more (a quick Sonnet, any Haiku) is fast.
- */
-const SLOW_TOKENS_PER_SECOND = 20;
-const FAST_TOKENS_PER_SECOND = 80;
-
-export type OutputSpeedTone = "fast" | "normal" | "slow";
-
 /**
  * Output tokens a second over the whole request; undefined when it cannot be worked out: a
  * failure, no output or no duration.
@@ -431,12 +403,6 @@ export function outputSpeed(record: RequestRecord): number | undefined {
   const ms = record.durationMs ?? 0;
   if (!record.success || record.outTokens <= 0 || !(ms > 0)) return undefined;
   return record.outTokens / (ms / 1000);
-}
-
-export function outputSpeedTone(tokensPerSecond: number): OutputSpeedTone {
-  if (tokensPerSecond < SLOW_TOKENS_PER_SECOND) return "slow";
-  if (tokensPerSecond >= FAST_TOKENS_PER_SECOND) return "fast";
-  return "normal";
 }
 
 /** "52 tok/s" as plain muted text, as the duration; a dash when it cannot be worked out. */
@@ -452,10 +418,7 @@ export function SpeedChip({ record }: { record: RequestRecord }): JSX.Element {
         ? belowStep(1, lang)
         : formatDecimal(speed, 1, lang);
   return (
-    <span
-      className="whitespace-nowrap text-muted-foreground tabular-nums"
-      data-output-speed={outputSpeedTone(speed)}
-    >
+    <span className="whitespace-nowrap text-muted-foreground tabular-nums" data-slot="output-speed">
       {t("speed.value", { n: value })}
     </span>
   );
@@ -538,50 +501,6 @@ const ERROR_BADGE = {
   warning: "warning",
   destructive: "destructive",
 } as const satisfies Record<ErrorTone, "neutral" | "warning" | "destructive">;
-
-/**
- * The HTTP status the client got as a small pill (neutral on a success, the error's tier colour
- * on a failure), with how many upstream attempts the request took: under it in a table cell,
- * beside it on a narrow row. No count for a request refused before any attempt.
- */
-export function HttpStatus({
-  record,
-  inline = false,
-}: {
-  record: RequestRecord;
-  inline?: boolean;
-}): JSX.Element {
-  const { t } = useT("requests");
-  const tries = requestTries(record);
-  const tone = record.success ? "neutral" : ERROR_BADGE[errorTypeTone(record.errorType)];
-  return (
-    <span
-      className={cn("flex", inline ? "items-center gap-2" : "flex-col items-start gap-1")}
-      data-slot="http-status"
-    >
-      {record.status ? (
-        <Badge data-tone={tone} size="sm" tone={tone}>
-          <span className="sr-only">{t("http")} </span>
-          {record.status}
-        </Badge>
-      ) : (
-        <Muted />
-      )}
-      {tries > 0 ? (
-        <span
-          className={cn(
-            "whitespace-nowrap text-meta tabular-nums",
-            // A retried request stands out from the usual single try.
-            tries > 1 ? "font-medium text-foreground" : "text-muted-foreground",
-          )}
-          data-tries={tries}
-        >
-          {t("tries", { count: tries })}
-        </span>
-      ) : null}
-    </span>
-  );
-}
 
 /**
  * A failure's category as a pill in its tier's colour, with the HTTP status the client got

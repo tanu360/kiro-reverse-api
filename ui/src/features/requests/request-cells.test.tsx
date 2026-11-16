@@ -9,19 +9,15 @@ import {
   cacheHitShare,
   DurationChip,
   ErrorPill,
-  HttpStatus,
   outputSpeed,
-  outputSpeedTone,
   RequestIdCopy,
   SpeedChip,
   StatusNode,
   shortRequestId,
-  speedTone,
   TokenUsage,
   whenText,
 } from "./request-cells";
 import { CallerLabel, requestCaller } from "./request-client";
-import { requestTries } from "./request-model";
 import { RequestCard, useRequestColumns } from "./requests-columns";
 
 vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn(() => Promise.resolve(true)) }));
@@ -179,19 +175,14 @@ describe("the token usage", () => {
 
 describe("the duration and credits", () => {
   it.each([
-    [900, "fast", "900ms", "text-muted-foreground"],
-    [2_999, "fast", "3.00s", "text-muted-foreground"],
-    [3_000, "normal", "3.00s", "text-muted-foreground"],
-    [19_999, "normal", "20.0s", "text-muted-foreground"],
-    [20_000, "slow", "20.0s", "text-muted-foreground"],
-    [89_999, "slow", "1m 30s", "text-muted-foreground"],
-    [90_000, "crawl", "1m 30s", "text-muted-foreground"],
-  ] as const)("marks a %i ms duration %s, always muted", (durationMs, speed, text, tone) => {
-    expect(speedTone(durationMs)).toBe(speed);
+    [900, "900ms"],
+    [2_999, "3.00s"],
+    [19_999, "20.0s"],
+    [89_999, "1m 30s"],
+  ] as const)("reads a %i ms duration as %s, muted", (durationMs, text) => {
     const { container } = renderWithProviders(<DurationChip record={record({ durationMs })} />);
-    const duration = container.querySelector("[data-speed]");
-    expect(duration).toHaveAttribute("data-speed", speed);
-    expect(duration).toHaveClass(tone);
+    const duration = container.querySelector("[data-slot=duration]");
+    expect(duration).toHaveClass("text-muted-foreground");
     expect(container).toHaveTextContent(new RegExp(`^${text}$`));
     // No chip, no mark and no screen-reader label: the column header names it.
     expect(container.querySelector("svg")).toBeNull();
@@ -202,7 +193,7 @@ describe("the duration and credits", () => {
     const { container, user } = renderWithProviders(
       <DurationChip record={record({ durationMs: 89_999 })} />,
     );
-    await user.hover(container.querySelector("[data-speed]") as HTMLElement);
+    await user.hover(container.querySelector("[data-slot=duration]") as HTMLElement);
     expect(await screen.findByText("89,999 ms")).toBeInTheDocument();
   });
 
@@ -253,26 +244,16 @@ describe("the error pill", () => {
 describe("the speed", () => {
   it.each([
     // 1,600 output tokens over the whole request.
-    [8_000, "200 tok/s", "fast", "text-muted-foreground"],
-    [20_000, "80 tok/s", "fast", "text-muted-foreground"],
-    [32_000, "50 tok/s", "normal", "text-muted-foreground"],
-    [80_000, "20 tok/s", "normal", "text-muted-foreground"],
-    [200_000, "8.0 tok/s", "slow", "text-muted-foreground"],
-  ] as const)("reads 1.6K tokens over %i ms as %s (%s)", (durationMs, text, speed, tone) => {
+    [8_000, "200 tok/s"],
+    [32_000, "50 tok/s"],
+    [200_000, "8.0 tok/s"],
+  ] as const)("reads 1.6K tokens over %i ms as %s, muted", (durationMs, text) => {
     const { container } = renderWithProviders(<SpeedChip record={record({ durationMs })} />);
-    const figure = container.querySelector("[data-output-speed]");
-    expect(figure).toHaveAttribute("data-output-speed", speed);
-    expect(figure).toHaveClass(tone);
+    const figure = container.querySelector("[data-slot=output-speed]");
+    expect(figure).toHaveClass("text-muted-foreground");
     expect(container).toHaveTextContent(new RegExp(`^${text}$`));
     expect(container.querySelector("svg")).toBeNull();
     expect(screen.queryByText("Speed")).not.toBeInTheDocument();
-  });
-
-  it("puts the slow and fast lines at 20 and 80 tok/s", () => {
-    expect(outputSpeedTone(19.9)).toBe("slow");
-    expect(outputSpeedTone(20)).toBe("normal");
-    expect(outputSpeedTone(79.9)).toBe("normal");
-    expect(outputSpeedTone(80)).toBe("fast");
   });
 
   it("never reads 0 for a trickle", () => {
@@ -323,40 +304,6 @@ describe("the cache hit", () => {
     rerender(<CacheHit record={FAILED} />);
     expect(cacheHitShare(FAILED)).toBeUndefined();
     expect(container).toHaveTextContent(/^—$/);
-  });
-});
-
-describe("the HTTP status and tries", () => {
-  it("shows a success's status on a neutral pill over one try", () => {
-    const { container } = renderWithProviders(<HttpStatus record={record({ tries: 1 })} />);
-    expect(container.querySelector("[data-tone]")).toHaveAttribute("data-tone", "neutral");
-    expect(container).toHaveTextContent("HTTP 2001 try");
-    expect(screen.getByText("HTTP")).toHaveClass("sr-only");
-    expect(screen.getByText("1 try")).toHaveClass("text-muted-foreground");
-  });
-
-  it("tints a failure's status as its error pill and brings out a retried request", () => {
-    const { container } = renderWithProviders(<HttpStatus record={{ ...FAILED, tries: 4 }} />);
-    expect(container.querySelector("[data-tone]")).toHaveAttribute("data-tone", "warning");
-    expect(screen.getByText("4 tries")).toHaveAttribute("data-tries", "4");
-    expect(screen.getByText("4 tries")).toHaveClass("font-medium");
-  });
-
-  it("counts no tries for a request refused before any attempt", () => {
-    const { container } = renderWithProviders(
-      <HttpStatus record={{ ...FAILED, status: 401, errorType: "auth", tries: 0 }} />,
-    );
-    expect(container).toHaveTextContent(/^HTTP 401$/);
-    expect(container.querySelector("[data-tries]")).toBeNull();
-  });
-
-  it("counts an admin row's chain with the attempts the cap dropped", () => {
-    const attempt = { accountId: "acc-1", startMs: 0, durationMs: 10, success: false };
-    expect(requestTries(record())).toBe(0);
-    expect(requestTries(record({ tries: 2 }))).toBe(2);
-    expect(
-      requestTries(record({ attempts: [attempt, { ...attempt, success: true, skipped: 3 }] })),
-    ).toBe(5);
   });
 });
 
@@ -414,7 +361,7 @@ describe("RequestCard", () => {
     expect(screen.getByRole("button", { name: "Copy request ID" })).toBeInTheDocument();
     expect(container).toHaveTextContent("req_2dc2…");
     expect(container.querySelector("[data-slot=http-status]")).toBeNull();
-    expect(container.querySelector("[data-output-speed]")).toHaveTextContent(/^870 tok\/s$/);
+    expect(container.querySelector("[data-slot=output-speed]")).toHaveTextContent(/^870 tok\/s$/);
     expect(screen.getByText("Cache hit")).not.toHaveClass("sr-only");
   });
 
@@ -424,7 +371,7 @@ describe("RequestCard", () => {
     );
     expect(screen.getByText("Rate limited · 429")).toBeInTheDocument();
     expect(container.querySelector("[data-slot=http-status]")).toBeNull();
-    expect(container.querySelector("[data-output-speed]")).toBeNull();
+    expect(container.querySelector("[data-slot=output-speed]")).toBeNull();
     expect(container.querySelector("[data-slot=cache-hit]")).toBeNull();
   });
 
@@ -433,8 +380,7 @@ describe("RequestCard", () => {
     expect(container.querySelector("[data-slot=token-bar]")).not.toBeNull();
     expect(screen.getByText("0.15")).toHaveClass("font-semibold");
     expect(screen.getByText("cr")).toHaveClass("text-muted-foreground");
-    expect(container.querySelector("[data-speed]")).toHaveAttribute("data-speed", "fast");
-    expect(container.querySelector("[data-speed]")).toHaveTextContent(/^1\.84s$/);
+    expect(container.querySelector("[data-slot=duration]")).toHaveTextContent(/^1\.84s$/);
     expect(container.querySelector("[data-slot=token-figures]")?.textContent).toBe(
       "In12KOut1.6KCache read5KCache write0",
     );

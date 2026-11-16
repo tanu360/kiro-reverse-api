@@ -157,7 +157,8 @@ describe("RequestDetailSheet for a key holder", () => {
     // The table's pill, without the code: the status code has its own fact.
     expect(fact(dialog, "Error")).toHaveTextContent(/^Rate limited$/);
     expect(fact(dialog, "Status code")).toHaveTextContent("429");
-    expect(fact(dialog, "Endpoint")).toHaveTextContent("Claude");
+    // The path: the Client fact already names the API.
+    expect(fact(dialog, "Endpoint")).toHaveTextContent("/v1/messages");
     expect(fact(dialog, "Client")).toHaveTextContent("Claude Code");
     expect(fact(dialog, "Request ID")).toHaveTextContent("req_0123456789abcdef01234567");
     expect(within(dialog).getByRole("button", { name: "Copy Request ID" })).toBeInTheDocument();
@@ -185,7 +186,8 @@ describe("RequestDetailSheet for a key holder", () => {
     expect(fact(dialog, "Cache read")).toHaveTextContent("25025% of input");
     expect(fact(dialog, "Cache write")).toHaveTextContent("40");
     expect(fact(dialog, "Client")).toHaveTextContent("OpenAI API");
-    expect(fact(dialog, "Endpoint")).toHaveTextContent("OpenAI");
+    // The path: the Client fact already names the API.
+    expect(fact(dialog, "Endpoint")).toHaveTextContent("/v1/chat/completions");
     expect(fact(dialog, "Attempts")).toHaveTextContent(/^1$/);
   });
 

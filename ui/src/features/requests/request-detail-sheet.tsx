@@ -49,8 +49,14 @@ import { ReplayDialog } from "./replay-dialog";
 import { AttemptsCard } from "./request-attempts";
 import { ErrorPill, outputSpeed, SpeedChip } from "./request-cells";
 import { CallerLabel, requestCaller } from "./request-client";
-import { isKnownErrorType, normalizeApiKeyMask, requestTries, rowKey } from "./request-model";
-import { endpointLabel, type RequestViewOptions, StatusBadge } from "./requests-columns";
+import {
+  endpointPath,
+  isKnownErrorType,
+  normalizeApiKeyMask,
+  requestTries,
+  rowKey,
+} from "./request-model";
+import { type RequestViewOptions, StatusBadge } from "./requests-columns";
 
 // The account's own sheet opens over this one; its code stays out of the Requests chunk until then.
 const AccountDetailSheet = lazy(() =>
@@ -253,7 +259,13 @@ export function RequestDetailSheet({
         span: 2,
       });
     }
-    facts.push({ label: t("endpoint"), value: endpointLabel(record.endpoint, t) });
+    // The path, not the API's name: the Client fact names the API when no known tool called.
+    const path = endpointPath(record.endpoint);
+    facts.push(
+      path === EMPTY
+        ? { label: t("endpoint"), value: <span className="text-muted-foreground">{EMPTY}</span> }
+        : { label: t("endpoint"), value: path, mono: true },
+    );
     if (showStatus) facts.push(statusItem);
     if (details) {
       facts.push({

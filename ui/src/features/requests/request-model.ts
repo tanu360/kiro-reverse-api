@@ -7,7 +7,7 @@ import {
   type RequestErrorType,
   type RequestRecord,
 } from "@/lib/api/types";
-import { dateTimeFormat, formatDateTime, formatTime, unixToDate } from "@/lib/format";
+import { dateTimeFormat, EMPTY, formatDateTime, formatTime, unixToDate } from "@/lib/format";
 import { type Lang, type TFunction, translate } from "@/lib/i18n";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
 
@@ -61,6 +61,18 @@ export function isKnownErrorType(type: string | undefined): type is RequestError
 
 export function isKnownEndpoint(endpoint: string | undefined): endpoint is RequestEndpoint {
   return endpoint !== undefined && (ENDPOINTS as readonly string[]).includes(endpoint);
+}
+
+/** The path each client API is served on (the Endpoints card lists the same). */
+const ENDPOINT_PATHS: Record<RequestEndpoint, string> = {
+  claude: "/v1/messages",
+  openai: "/v1/chat/completions",
+  responses: "/v1/responses",
+};
+
+/** A request's API as its path ("/v1/messages"), or the empty dash for an unknown one. */
+export function endpointPath(endpoint: string | undefined): string {
+  return isKnownEndpoint(endpoint) ? ENDPOINT_PATHS[endpoint] : EMPTY;
 }
 
 /**

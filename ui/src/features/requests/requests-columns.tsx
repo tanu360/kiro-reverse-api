@@ -123,8 +123,9 @@ function ApiKeyCode({
   return <TruncatedText className={cn("font-mono", className)}>{masked}</TruncatedText>;
 }
 
+/** A client API by the name the table's caller line uses ("Anthropic API"), or the empty dash. */
 export function endpointLabel(endpoint: string | undefined, t: TFunction): string {
-  return isKnownEndpoint(endpoint) ? t(`endpoint.${endpoint}`) : EMPTY;
+  return isKnownEndpoint(endpoint) ? t(`client.${endpoint}`) : EMPTY;
 }
 
 /**
