@@ -46,7 +46,7 @@ function isoTime(unixSec: number): string {
   return new Date(unixSec * 1000).toISOString();
 }
 
-/** The date and time on the first line, how long ago on a muted second line. */
+/** The date and time on the first line, how long ago ("3m ago") on a muted second line. */
 function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
   const { lang } = useT("backups");
   return (
@@ -55,7 +55,7 @@ function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
         {formatDateTime(entry.createdAt, lang)}
       </time>
       <span className="text-meta text-muted-foreground">
-        <RelativeTime value={entry.createdAt} />
+        <RelativeTime style="narrow" value={entry.createdAt} />
       </span>
     </div>
   );
@@ -88,10 +88,9 @@ function AccountsCell({ entry, t }: { entry: BackupEntry; t: TFunction }): JSX.E
 
 type Mask = (text?: string) => string;
 
-/** The note, or a muted dash when there is none. */
+/** The note in muted text, as the other tables' secondary details; a dash when there is none. */
 function NoteCell({ entry, t, mask }: { entry: BackupEntry; t: TFunction; mask: Mask }): ReactNode {
-  const note = noteText(entry, t, mask);
-  return note === EMPTY ? <span className="text-muted-foreground">{EMPTY}</span> : note;
+  return <span className="text-muted-foreground">{noteText(entry, t, mask)}</span>;
 }
 
 /** The card's row menu: every action of the row, one tap away. */

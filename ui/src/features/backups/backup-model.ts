@@ -157,7 +157,8 @@ export function noteText(
   if (entry.kind === "manual" && MANUAL_NOTE.test(note)) return EMPTY;
   if (entry.kind === "scheduled") {
     const match = SCHEDULED_NOTE.exec(note);
-    if (match) return t("noteScheduled", { cadence: cadenceLabel(match[1] as BackupCadence, t) });
+    // Only the cadence: the Kind badge beside it already says Scheduled.
+    if (match) return cadenceLabel(match[1] as BackupCadence, t);
   }
   // Another note the server writes itself (config/account_rows.go) is in words too.
   const serverNote = serverDataText(note, t);

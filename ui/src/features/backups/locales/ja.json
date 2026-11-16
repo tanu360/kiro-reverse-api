@@ -43,7 +43,6 @@
   "kindPreMerge": "統合前",
   "noteBeforeUpload": "ファイル {name} から復元する前",
   "noteBeforeRestore": "バックアップ {id} を復元する前",
-  "noteScheduled": "定期（{cadence}）",
   "noteBeforeMerge": "重複アカウントを統合する前",
   "restoredAccountCount": "{n} 件を復元",
   "preRestoreSavedHint_other": "ロールバックポイントには、復元前のアカウント {n} 件が保存されています。",

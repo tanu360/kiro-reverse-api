@@ -63,11 +63,10 @@ describe("noteText", () => {
     expect(noteText(current, tFor("vi"))).not.toBe("before merging duplicate accounts");
   });
 
-  it("labels the server note of a scheduled backup", () => {
-    expect(noteText(entry({ kind: "scheduled", note: "auto-daily" }), t)).toBe("Scheduled (Daily)");
-    expect(noteText(entry({ kind: "scheduled", note: "auto-weekly" }), tFor("zh"))).toBe(
-      "定时（每周）",
-    );
+  it("labels the server note of a scheduled backup with its cadence only", () => {
+    // The Kind badge beside it already says Scheduled.
+    expect(noteText(entry({ kind: "scheduled", note: "auto-daily" }), t)).toBe("Daily");
+    expect(noteText(entry({ kind: "scheduled", note: "auto-weekly" }), tFor("zh"))).toBe("每周");
   });
 
   it("shows a plain note through the mask", () => {
