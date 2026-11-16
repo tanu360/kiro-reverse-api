@@ -135,8 +135,9 @@ describe("kindLabel and kindTone", () => {
     );
   });
 
-  it("shows an unknown kind raw, and an em dash when empty", () => {
-    expect(kindLabel("nightly-import", t)).toBe("nightly-import");
+  it("shows an unknown kind in words, and an em dash when empty", () => {
+    expect(kindLabel("nightly-import", t)).toBe("Nightly import");
+    expect(kindLabel("legacy_import", t)).toBe("Legacy import");
     expect(kindLabel("", t)).toBe("—");
   });
 

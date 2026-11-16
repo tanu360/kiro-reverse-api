@@ -119,11 +119,16 @@ export function backupKind(entry: Pick<BackupEntry, "kind" | "note">): string {
   return entry.kind;
 }
 
-/** Known kinds are translated; any other kind is shown as the server sent it. */
+/**
+ * Known kinds are translated; any other kind (one a newer or older server files) is shown in
+ * words, its hyphens and underscores as spaces and its first letter capitalised:
+ * "legacy-import" reads "Legacy import".
+ */
 export function kindLabel(kind: string, t: TFunction): string {
   const key = KIND_KEYS[kind];
   if (key) return t(key);
-  return kind || EMPTY;
+  const words = kind.replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : EMPTY;
 }
 
 /** A backup someone made stands out, a rollback point warns, the automatic ones stay quiet. */
