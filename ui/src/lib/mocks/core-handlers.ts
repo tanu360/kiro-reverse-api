@@ -1,5 +1,5 @@
 import { type HttpHandler, HttpResponse, http, sse } from "msw";
-import { REMOTE_VERSION_URL } from "@/lib/api/system";
+import { RELEASE_API_URL, REMOTE_VERSION_URL } from "@/lib/api/system";
 import type { AdminEventType, RequestRecord } from "@/lib/api/types";
 import { claimMockPassword, mockDb, mockNowUnix, mockScenario } from "./db";
 import { onMockEvent } from "./events";
@@ -547,6 +547,15 @@ export const coreHandlers: HttpHandler[] = [
       ...mockDb.remoteVersion,
       // Like the real version.json: the latest release page (the release list until there is one).
       download: "https://github.com/tanu360/kiro-reverse-api/releases/latest",
+    }),
+  ),
+
+  // Every release the update check asks about is out with its files.
+  http.get(`${RELEASE_API_URL}/:tag`, ({ params }) =>
+    HttpResponse.json({
+      tag_name: params.tag,
+      draft: false,
+      assets: [{ name: "SHA256SUMS.txt", state: "uploaded" }],
     }),
   ),
 

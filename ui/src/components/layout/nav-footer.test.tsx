@@ -23,6 +23,7 @@ vi.mock("@/lib/api/system", () => ({
       queryFn: () => Promise.resolve({}),
     }),
   fetchRemoteVersion: vi.fn(),
+  fetchReleaseReady: vi.fn(() => Promise.resolve(true)),
   compareVersions: (a: string, b: string) =>
     a.replace(/^v/, "").localeCompare(b.replace(/^v/, ""), undefined, { numeric: true }),
 }));

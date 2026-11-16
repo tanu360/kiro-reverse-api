@@ -10,7 +10,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { compareVersions, fetchRemoteVersion, versionQuery } from "@/lib/api/system";
+import {
+  compareVersions,
+  fetchReleaseReady,
+  fetchRemoteVersion,
+  versionQuery,
+} from "@/lib/api/system";
 import type { RemoteVersionJson, VersionResponse } from "@/lib/api/types";
 import { updateStatusQuery } from "@/lib/api/update";
 import { useT } from "@/lib/i18n";
@@ -52,7 +57,8 @@ const UpdateCheckContext = createContext<UpdateCheckValue | null>(null);
 
 /**
  * Owns the version check: one silent check shortly after mount (the only allowed external
- * network call), the manual check behind the badge and menus, and the update dialog.
+ * network calls: version.json, then the newer version's GitHub release), the manual check
+ * behind the badge and menus, and the update dialog.
  */
 export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.Element {
   const { t } = useT();
@@ -72,7 +78,10 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
   const tRef = useRef(t);
   tRef.current = t;
 
-  /** Resolves the remote release when it is newer than the running version, else null. */
+  /**
+   * Resolves the remote release when it is newer than the running version and its files are out,
+   * else null.
+   */
   const lookUp = useCallback(async (): Promise<{ newer: RemoteVersionJson | null }> => {
     const [running, remote] = await Promise.all([
       queryClient.ensureQueryData(versionQuery()),
@@ -81,7 +90,11 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
     const { version } = running;
     setCurrent(stripV(version));
     setServer(running);
-    const newer = compareVersions(remote.version, version) > 0 ? remote : null;
+    let newer = compareVersions(remote.version, version) > 0 ? remote : null;
+    // version.json names a version as soon as it reaches main, minutes before the release workflow
+    // has uploaded its files. Until they are on the release there is nothing to download, so the
+    // version is not announced yet; a later check finds it.
+    if (newer && !(await fetchReleaseReady(newer.version))) newer = null;
     // Whether this server installs the release itself is asked before the release is shown, so
     // the update card appears in its right mode at once: a quick click on a server that updates
     // itself never meets the steps by hand first. An older server without the endpoint is fine.

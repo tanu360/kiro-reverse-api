@@ -73,6 +73,42 @@ export async function fetchRemoteVersion(): Promise<RemoteVersionJson> {
   };
 }
 
+/** The GitHub API's release of one tag (the bare version, such as 4.0.3). */
+export const RELEASE_API_URL =
+  "https://api.github.com/repos/tanu360/kiro-reverse-api/releases/tags";
+
+/** The file the release workflow uploads with the archives, and the self-update checks them by. */
+const RELEASE_CHECKSUMS = "SHA256SUMS.txt";
+
+/**
+ * Whether `version`'s GitHub release is out with its files. version.json on main names a new
+ * version as soon as it is pushed, but the release workflow builds and uploads the archives
+ * minutes later, all in one go with SHA256SUMS.txt. Until that file is on the release there is
+ * nothing to install, so the release is not ready: a 404 (no release yet) or no checksums.
+ */
+export async function fetchReleaseReady(version: string): Promise<boolean> {
+  const tag = encodeURIComponent(version.trim().replace(/^v/i, ""));
+  let response: Response;
+  try {
+    response = await fetch(`${RELEASE_API_URL}/${tag}`, { cache: "no-store" });
+  } catch {
+    throw new ApiError({ status: 0, serverMessage: "network" });
+  }
+  if (response.status === 404) return false;
+  if (!response.ok) {
+    throw new ApiError({ status: response.status, serverMessage: response.statusText });
+  }
+  const data: unknown = await response.json().catch(() => null);
+  const assets = (data as { assets?: unknown } | null)?.assets;
+  return (
+    Array.isArray(assets) &&
+    assets.some(
+      (asset: { name?: unknown; state?: unknown } | null) =>
+        asset?.name === RELEASE_CHECKSUMS && (asset.state ?? "uploaded") === "uploaded",
+    )
+  );
+}
+
 function versionParts(value: string): number[] {
   return String(value ?? "")
     .trim()

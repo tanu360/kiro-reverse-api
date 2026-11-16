@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { act, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { fetchRemoteVersion } from "@/lib/api/system";
+import { fetchReleaseReady, fetchRemoteVersion } from "@/lib/api/system";
 import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
 import { SILENT_CHECK_DELAY_MS, UpdateCheckProvider } from "./update-check";
@@ -30,6 +30,7 @@ vi.mock("@/lib/api/system", () => {
         staleTime: Number.POSITIVE_INFINITY,
       }),
     fetchRemoteVersion: vi.fn(),
+    fetchReleaseReady: vi.fn(),
     compareVersions: (a: string, b: string) => {
       const [x, y] = [parts(a), parts(b)];
       for (let i = 0; i < Math.max(x.length, y.length); i++) {
@@ -45,6 +46,7 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 const fetchRemote = vi.mocked(fetchRemoteVersion);
+const releaseReady = vi.mocked(fetchReleaseReady);
 
 function renderMenu() {
   return renderWithProviders(
@@ -59,6 +61,7 @@ function renderMenu() {
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   fetchRemote.mockReset();
+  releaseReady.mockReset().mockResolvedValue(true);
   getStatus.mockReset().mockResolvedValue({});
 });
 
@@ -116,6 +119,18 @@ describe("UserMenu", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it("stays silent about a newer version whose release files are not out yet", async () => {
+    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "Fixes", download: "https://x" });
+    releaseReady.mockResolvedValue(false);
+    renderMenu();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
+    });
+    expect(releaseReady).toHaveBeenCalledWith("v2.2.0");
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it("stays silent when the silent check fails", async () => {
     fetchRemote.mockRejectedValue(new Error("offline"));
     renderMenu();
@@ -136,6 +151,20 @@ describe("UserMenu", () => {
       await vi.advanceTimersByTimeAsync(10);
     });
     expect(toast.success).toHaveBeenCalledWith(expect.any(String), { duration: 3600 });
+  });
+
+  it("a manual check reports up to date while the newer release has no files yet", async () => {
+    fetchRemote.mockResolvedValue({ version: "2.2.0" });
+    releaseReady.mockResolvedValue(false);
+    const { user } = renderMenu();
+    await screen.findByText("2.1.0");
+    await user.click(screen.getByRole("button", { name: /^Admin menu/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Check for updates" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(toast.success).toHaveBeenCalledWith(expect.any(String), { duration: 3600 });
+    expect(toast.warning).not.toHaveBeenCalled();
   });
 });
 
