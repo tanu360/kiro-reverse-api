@@ -134,6 +134,7 @@ export function CodeBlock({
   bare = false,
   actions,
   capHeight = false,
+  fillHeight = false,
   className,
 }: {
   code: string;
@@ -154,6 +155,12 @@ export function CodeBlock({
   actions?: ReactNode;
   /** Caps the code at 288 px (13 lines); longer code scrolls inside the block instead of growing the page. */
   capHeight?: boolean;
+  /**
+   * Below xl as capHeight; from xl the block fills the height its flex column gives it (at least
+   * 288 px) and the code scrolls inside past that. For a block that shares a card with taller
+   * tab panels, so it reaches the card's bottom instead of stopping at 13 lines.
+   */
+  fillHeight?: boolean;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
@@ -162,7 +169,9 @@ export function CodeBlock({
   const preClassName = cn(
     "max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed focus-outline-inset",
     wrap && "whitespace-pre-wrap wrap-anywhere",
-    capHeight && "max-h-72 overflow-y-auto",
+    (capHeight || fillHeight) && "max-h-72 overflow-y-auto",
+    // A zero basis: the code's own length never sets the column's height, only fills it.
+    fillHeight && "xl:max-h-none xl:min-h-72 xl:flex-1 xl:basis-0",
   );
   const content = <HighlightedCode code={code} language={language} />;
   return (
@@ -170,6 +179,7 @@ export function CodeBlock({
       className={cn(
         "flex min-w-0 flex-col overflow-hidden bg-surface-inset",
         !bare && "rounded-lg border border-border",
+        fillHeight && "xl:min-h-0 xl:flex-1",
         className,
       )}
       data-slot="code-block"
@@ -200,7 +210,10 @@ export function CodeBlock({
         scroll it); otherwise the unnamed section is plain markup. It stays mounted either way,
         so the measured <pre> is never replaced.
       */}
-      <section aria-label={scrolls ? (regionLabel ?? title) : undefined} className="min-w-0">
+      <section
+        aria-label={scrolls ? (regionLabel ?? title) : undefined}
+        className={cn("min-w-0", fillHeight && "xl:flex xl:min-h-0 xl:flex-1 xl:flex-col")}
+      >
         <pre className={preClassName} data-wrap={wrap ? "" : undefined} ref={preRef}>
           {content}
         </pre>

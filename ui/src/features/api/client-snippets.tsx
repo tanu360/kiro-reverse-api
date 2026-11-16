@@ -127,9 +127,10 @@ function Snippet({
   language,
   actions,
   capHeight,
+  fillHeight,
 }: Pick<
   ComponentProps<typeof CodeBlock>,
-  "code" | "title" | "copyLabel" | "language" | "actions" | "capHeight"
+  "code" | "title" | "copyLabel" | "language" | "actions" | "capHeight" | "fillHeight"
 > & {
   /** What the code is, for the scrolling region's name; the title by default. */
   name?: string;
@@ -140,6 +141,7 @@ function Snippet({
       actions={actions}
       capHeight={capHeight}
       code={code}
+      fillHeight={fillHeight}
       copyLabel={copyLabel}
       language={language}
       regionLabel={t("snippets.codeRegion", { name: name ?? title })}
@@ -225,7 +227,7 @@ function RequestBuilder({ origin, model }: { origin: string; model?: string }): 
   const requestName = t("snippets.request", { language: t(`snippets.lang.${choice.language}`) });
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4 xl:flex-1">
       <RadioGroupPrimitive
         aria-label={t("snippets.endpoint")}
         className="grid grid-cols-3 gap-2"
@@ -285,8 +287,10 @@ function RequestBuilder({ origin, model }: { origin: string; model?: string }): 
             </Label>
           ) : null
         }
-        capHeight
         code={request}
+        // From xl the card is as tall as its tallest tab (Codex): the request fills down to the
+        // card's bottom instead of stopping at 13 lines over an empty area.
+        fillHeight
         copyLabel={t("snippets.copy", { name: requestName })}
         language={info.highlight}
         name={requestName}
