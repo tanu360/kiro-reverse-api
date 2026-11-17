@@ -128,11 +128,11 @@ export interface MockTunnel {
   pinned: Partial<TunnelStatus> | null;
 }
 
-export function freshTunnel(): MockTunnel {
+function freshTunnel(): MockTunnel {
   return { enabled: false, hostname: "kiro-proxy", signedIn: false, since: 0, pinned: null };
 }
 
-export function freshTwoFactor(): MockTwoFactor {
+function freshTwoFactor(): MockTwoFactor {
   return {
     enabled: false,
     enabledAt: 0,

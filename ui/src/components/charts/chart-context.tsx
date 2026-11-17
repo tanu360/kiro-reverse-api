@@ -54,15 +54,6 @@ export const chartCssVars = {
   tooltipBackground: "var(--chart-tooltip-background)",
 };
 
-/** Default scatter series colors from the chart palette (`--chart-1` … `--chart-5`). */
-export const defaultScatterColors = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-] as const;
-
 /**
  * Above this many x labels, `ChartTooltip` switches to discrete interaction:
  * the crosshair, tooltip box and dots snap between points instead of
@@ -106,7 +97,7 @@ export interface LineConfig {
 }
 
 /** Y-domain and tooltip inputs collected from a `<Band>` child. */
-export interface BandConfig {
+interface BandConfig {
   yAxisId: string;
   upperKey: string;
   lowerKey: string;
@@ -123,7 +114,7 @@ export interface BandConfig {
  * Lives in its own context so cold consumers (Grid, YAxis, PatternArea, …)
  * can subscribe to the stable slice and skip re-rendering on every hover.
  */
-export interface ChartHoverContextValue {
+interface ChartHoverContextValue {
   // Tooltip state
   tooltipData: TooltipData | null;
   setTooltipData: Dispatch<SetStateAction<TooltipData | null>>;
@@ -147,7 +138,7 @@ export interface ChartHoverContextValue {
   setHoveredCandleIndex?: (index: number | null) => void;
 }
 
-export interface ChartContextValue extends ChartHoverContextValue {
+interface ChartContextValue extends ChartHoverContextValue {
   // Data
   data: Record<string, unknown>[];
   /** Decimated subset for SVG path rendering; equals `data` when no decimation is needed. */
@@ -262,7 +253,7 @@ export interface ChartContextValue extends ChartHoverContextValue {
  * (data, scales, dimensions, animation state, layout config). Consumers that
  * subscribe via `useChartStable()` skip re-renders on every mouse move.
  */
-export type ChartStableContextValue = Omit<ChartContextValue, keyof ChartHoverContextValue>;
+type ChartStableContextValue = Omit<ChartContextValue, keyof ChartHoverContextValue>;
 
 /** `useLayoutEffect` in the browser, `useEffect` on the server (no SSR warning). */
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -275,62 +266,12 @@ const ChartHoverContext = createContext<ChartHoverContextValue | null>(null);
  * these instead of React state, so a pointer move re-renders only the
  * components that read hover — not the chart shell and its layers.
  */
-export interface ChartHoverStore {
+interface ChartHoverStore {
   getSnapshot: () => ChartHoverContextValue;
   subscribe: (listener: () => void) => () => void;
 }
 
-/** A {@link ChartHoverStore} the owning chart writes to. */
-interface WritableChartHoverStore extends ChartHoverStore {
-  setTooltipData: Dispatch<SetStateAction<TooltipData | null>>;
-  setSelection: (selection: ChartSelection | null) => void;
-}
-
 const ChartHoverStoreContext = createContext<ChartHoverStore | null>(null);
-
-export function createChartHoverStore(): WritableChartHoverStore {
-  const listeners = new Set<() => void>();
-  let tooltipData: TooltipData | null = null;
-  let selection: ChartSelection | null = null;
-  const emit = () => {
-    snapshot = { ...snapshot, tooltipData, selection };
-    for (const listener of listeners) {
-      listener();
-    }
-  };
-  const setTooltipData: Dispatch<SetStateAction<TooltipData | null>> = (action) => {
-    const next = typeof action === "function" ? action(tooltipData) : action;
-    if (next === tooltipData) {
-      return;
-    }
-    tooltipData = next;
-    emit();
-  };
-  const setSelection = (next: ChartSelection | null) => {
-    if (next === selection) {
-      return;
-    }
-    selection = next;
-    emit();
-  };
-  let snapshot: ChartHoverContextValue = {
-    tooltipData,
-    setTooltipData,
-    selection,
-    clearSelection: () => setSelection(null),
-  };
-  return {
-    getSnapshot: () => snapshot,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    setTooltipData,
-    setSelection,
-  };
-}
 
 const noop = () => undefined;
 
@@ -340,28 +281,6 @@ function staticChartHoverStore(value: ChartHoverContextValue): ChartHoverStore {
     getSnapshot: () => value,
     subscribe: () => noop,
   };
-}
-
-/**
- * Publishes a hover store to `useChartHover()` (whole slice, re-renders on
- * every change) and `useChartHoverSelector()` (re-renders only when the
- * selected value changes). Only this provider re-renders on a hover change;
- * `children` keeps its identity, so the subtree is skipped apart from hover
- * consumers.
- */
-export function ChartHoverStoreProvider({
-  children,
-  store,
-}: {
-  children: ReactNode;
-  store: ChartHoverStore;
-}) {
-  const hover = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  return (
-    <ChartHoverStoreContext.Provider value={store}>
-      <ChartHoverContext.Provider value={hover}>{children}</ChartHoverContext.Provider>
-    </ChartHoverStoreContext.Provider>
-  );
 }
 
 /**
@@ -508,9 +427,6 @@ export function ChartProvider({
   );
 }
 
-/** Stable-slice context, for chart shells that build the slice themselves. */
-export const ChartStableContextProvider = ChartStableContext.Provider;
-
 /**
  * Stable slice — data, scales, dimensions, animation state, layout config.
  * Subscribers skip re-renders on hover (the hover slice lives in a separate
@@ -557,15 +473,6 @@ export function useChartPortalContainer<T extends HTMLElement>(
     setContainer((previous) => (previous === element ? previous : element));
   }, [containerRef]);
   return container;
-}
-
-/**
- * Same margin object while its four numbers are unchanged, so an inline
- * `margin={{…}}` (or the default merge) doesn't defeat memoised chart cores.
- */
-export function useStableMargin(margin: Margin): Margin {
-  const { top, right, bottom, left } = margin;
-  return useMemo(() => ({ top, right, bottom, left }), [top, right, bottom, left]);
 }
 
 /** Y-scale for a series axis (`yAxisId` on Line / Area / YAxis). */
@@ -630,21 +537,8 @@ export function useChartHoverSelector<T>(selector: (hover: ChartHoverContextValu
   return useSyncExternalStore(store.subscribe, getSelected, getSelected);
 }
 
-/**
- * The hover store itself, for components that drive motion values straight
- * from hover changes without re-rendering. `null` outside a chart.
- */
-export function useChartHoverStore(): ChartHoverStore | null {
-  return useContext(ChartHoverStoreContext);
-}
-
 export function selectTooltipData(hover: ChartHoverContextValue): TooltipData | null {
   return hover.tooltipData;
-}
-
-/** Whether the chart is hovered or a drag-selection is active. */
-export function selectIsChartHovering(hover: ChartHoverContextValue): boolean {
-  return hover.tooltipData !== null || hover.selection?.active === true;
 }
 
 /**

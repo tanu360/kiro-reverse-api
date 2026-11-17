@@ -330,10 +330,6 @@ export interface ReloginOtherAccountBody {
   /** true when the other account took the new sign-in's tokens */
   saved: boolean;
 }
-/** POST /accounts/{id}/relogin/confirm and /discard */
-export interface ReloginPendingRequest {
-  pendingId: string;
-}
 
 // IAM SSO
 export interface IamSsoStartRequest {
@@ -922,10 +918,6 @@ export interface ObserveError {
   status?: number;
   /** <= 240 chars */
   message?: string;
-}
-/** newest first, max 100 */
-export interface RecentErrorsResponse {
-  errors: ObserveError[];
 }
 
 // ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ export function UrlBox({ label, url }: { label: string; url: string }): JSX.Elem
  * A link out of the dialog as plain text: no fill, no border and no underline at rest or on
  * hover, where only the colour turns to the primary. Opens in a new tab.
  */
-export function ExternalLink({
+function ExternalLink({
   href,
   children,
   className,

@@ -13,7 +13,7 @@ import { useT } from "@/lib/i18n";
  * the public link while it is live, since the admin's own address is often localhost or a LAN
  * address the holder cannot open; else this page's origin.
  */
-export function useUserPanelUrl(): string {
+function useUserPanelUrl(): string {
   const { data: publicUrl } = useQuery({
     ...tunnelQuery(),
     select: (status) => (status.state === "running" ? status.url : undefined),

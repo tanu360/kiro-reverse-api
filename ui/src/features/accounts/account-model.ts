@@ -531,7 +531,7 @@ export function proxyDisplayUrl(url: string): string {
 }
 
 /** What the server shows in place of a saved proxy password; sent back, it keeps the password. */
-export const MASKED_PROXY_PASSWORD = "********";
+const MASKED_PROXY_PASSWORD = "********";
 
 /** Whether a proxy URL from the server holds a saved password (shown masked). */
 export function hasMaskedProxyPassword(url: string): boolean {

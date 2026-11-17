@@ -8,7 +8,7 @@ import { useTheme } from "@/components/layout/theme-provider";
  * skullet skeleton sits beside a hand-drawn one without a seam.
  */
 const SKELETON_COLORS = { base: "var(--skeleton)", highlight: "var(--skeleton-highlight)" };
-export const SKELETON_THEME = {
+const SKELETON_THEME = {
   light: SKELETON_COLORS,
   dark: SKELETON_COLORS,
   radius: "var(--radius-md)",

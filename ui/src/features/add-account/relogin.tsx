@@ -19,7 +19,7 @@ interface FinishedLogin {
   identityVerified?: boolean;
 }
 
-export interface ReloginFlow {
+interface ReloginFlow {
   /** The account being logged in again, or null when the dialog adds accounts. */
   target: Account | null;
   /** Sent as reloginAccountId; undefined (left out of the body) when adding. */

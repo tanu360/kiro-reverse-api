@@ -6,7 +6,7 @@ import type {
 } from "@/lib/api/alerts";
 
 /** The server's rules for a threshold list (config.ValidateAlertThresholds). */
-export const MAX_THRESHOLDS = 10;
+const MAX_THRESHOLDS = 10;
 export const COOLDOWN_MIN = 1;
 export const COOLDOWN_MAX = 1440;
 export const MAX_CHANNELS = 20;
@@ -16,7 +16,7 @@ export const URL_MAX = 2048;
 export const SECRET_MAX = 256;
 export const CHAT_ID_MAX = 64;
 
-export type ThresholdParse = { ok: true; values: number[] } | { ok: false };
+type ThresholdParse = { ok: true; values: number[] } | { ok: false };
 
 /**
  * "80, 90 100" → [80, 90, 100]: 1 to 10 whole percentages from 1 to 100, strictly ascending,
@@ -69,7 +69,7 @@ export interface RulesForm {
 }
 
 /** The server's default send time: 09:00 UTC. */
-export const DEFAULT_SUMMARY_MINUTE = 9 * 60;
+const DEFAULT_SUMMARY_MINUTE = 9 * 60;
 
 /**
  * The send times the summary offers: each whole hour of the viewer's day, as minutes after
@@ -122,7 +122,7 @@ export function rulesForm(config: AlertsConfig): RulesForm {
 
 export type RulesField = "accountThresholds" | "poolThresholds" | "poolCooldownMinutes";
 
-export function validCooldown(value: number | null): value is number {
+function validCooldown(value: number | null): value is number {
   return (
     value !== null && Number.isInteger(value) && value >= COOLDOWN_MIN && value <= COOLDOWN_MAX
   );
@@ -199,7 +199,7 @@ function byteLength(value: string): number {
   return new TextEncoder().encode(value).length;
 }
 
-export function isHttpUrl(value: string): boolean {
+function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return (url.protocol === "http:" || url.protocol === "https:") && url.host !== "";
@@ -269,7 +269,7 @@ export function toChannelInputs(channels: readonly AlertChannel[]): AlertChannel
 }
 
 /** A draft as a POST sends it: only its type's fields, trimmed; a blank secret is left out. */
-export function draftInput(draft: ChannelDraft): AlertChannelInput {
+function draftInput(draft: ChannelDraft): AlertChannelInput {
   const input: AlertChannelInput = {
     ...(draft.id ? { id: draft.id } : {}),
     type: draft.type,

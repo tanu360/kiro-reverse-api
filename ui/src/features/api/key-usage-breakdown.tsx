@@ -50,7 +50,7 @@ function callerOf(id: string): Pick<RequestRecord, "client" | "endpoint"> | null
   return null;
 }
 
-export interface UsageBreakdownCardProps {
+interface UsageBreakdownCardProps {
   models: ApiKeyUsageBreakdownItem[] | undefined;
   /** Not needed with `showAccounts={false}`. */
   accounts?: ApiKeyUsageBreakdownItem[] | undefined;

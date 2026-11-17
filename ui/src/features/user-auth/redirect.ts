@@ -1,6 +1,6 @@
 import { redirectTarget } from "@/routes/-search";
 
-export interface UserLoginSearch {
+interface UserLoginSearch {
   redirect?: string;
 }
 

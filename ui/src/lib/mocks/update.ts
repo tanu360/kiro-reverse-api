@@ -38,7 +38,7 @@ const ARCHIVE_BYTES = 9_437_184;
 /** The `fail` server's download stops here with a checksum error. */
 const FAIL_AT = 0.62;
 /** Where the browser mock remembers the version it "updated" to, so a reload runs on it. */
-export const UPDATED_VERSION_KEY = "kiro_mock_updated_version";
+const UPDATED_VERSION_KEY = "kiro_mock_updated_version";
 
 /** GET /version's answer for the mock server's kind. */
 export function mockServerInfo(): { os: string; arch: string; docker: boolean } {
@@ -61,7 +61,7 @@ function unsupported(): Pick<UpdateStatus, "supported" | "reason" | "path"> {
 }
 
 /** GET /update, worked out from the clock like the tunnel mock. */
-export function mockUpdateStatus(now = Date.now()): UpdateStatus {
+function mockUpdateStatus(now = Date.now()): UpdateStatus {
   const base = { state: "idle" as const, ...unsupported() };
   const update = mockDb.update;
   if (!update.startedAt) return base;

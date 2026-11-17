@@ -838,7 +838,7 @@ function UsageLine({
  * The key's limits as meters, or the infinity sign when it has none. `labelled` names that sign
  * "Limits" in the UsageLine style, for a card, where no Usage column header says what it is.
  */
-export function KeyUsage({
+function KeyUsage({
   apiKey,
   labelled = false,
 }: {

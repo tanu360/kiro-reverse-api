@@ -626,11 +626,6 @@
   }
 }
 
-/* A heatmap cell with failures under the alert threshold: a thin red bar along its bottom. */
-@utility heat-fail {
-  box-shadow: inset 0 -2px 0 var(--chart-negative);
-}
-
 /*
  * t3code's frosted dialog surface (index.css dialog-glass, dialog-backdrop): the background tone
  * at 80% under a 12 px blur, a foreground-tinted hairline, and a solid fallback where

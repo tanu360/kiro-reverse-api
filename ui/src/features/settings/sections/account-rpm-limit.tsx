@@ -16,9 +16,9 @@ import { useGeneralSettingsSave } from "./general-settings";
 import { Hint, SaveFooter } from "./settings-section";
 
 /** config.MaxAccountRPMLimit */
-export const MAX_ACCOUNT_RPM_LIMIT = 1000;
+const MAX_ACCOUNT_RPM_LIMIT = 1000;
 /** The value the field offers when the limit is switched on for the first time. */
-export const DEFAULT_ACCOUNT_RPM_LIMIT = 20;
+const DEFAULT_ACCOUNT_RPM_LIMIT = 20;
 
 /**
  * The draft is the saved setting itself, so a save commits it as is. `on` is set only while the
@@ -26,7 +26,7 @@ export const DEFAULT_ACCOUNT_RPM_LIMIT = 20;
  */
 type RpmLimitDraft = { accountRpmLimit: number | null; on?: true };
 
-export interface RpmLimitForm {
+interface RpmLimitForm {
   draft: Draft<RpmLimitDraft>;
   /** The draft's limit is on (anything but 0). */
   on: boolean;

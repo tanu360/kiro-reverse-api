@@ -26,7 +26,7 @@ export interface TwoFactorSetup {
 }
 
 /** Turning it on and replacing the recovery codes return the codes: the only time they show. */
-export interface TwoFactorCodes {
+interface TwoFactorCodes {
   status: TwoFactorStatus;
   recoveryCodes: string[];
 }

@@ -181,7 +181,7 @@ interface LineLoadingSweepProps {
  * with the shimmer sweeping across it. The silhouette re-randomizes between
  * passes. Reads inner dimensions from chart context.
  */
-export function LineLoadingSweep({
+function LineLoadingSweep({
   curve,
   withArea = false,
   mode = "loop",

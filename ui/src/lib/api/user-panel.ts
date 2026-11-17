@@ -102,8 +102,7 @@ export interface UserUsageBreakdown extends ApiKeyUsageBreakdown {
 }
 export type UserUsageRange = ApiKeyUsageRange;
 
-export type UserRequestStatus = "all" | "success" | "error";
-export const USER_REQUEST_STATUSES: readonly UserRequestStatus[] = ["all", "success", "error"];
+type UserRequestStatus = "all" | "success" | "error";
 
 /** One of the key's logged requests: no account, message, body or conversation. */
 export interface UserRequest {
@@ -168,7 +167,7 @@ export interface UserRequestPage {
   counts?: UserRequestCounts;
 }
 
-export interface UserRequestsParams {
+interface UserRequestsParams {
   /** >= 1, default 1 */
   page?: number;
   /** 1..100, default 25 */
@@ -181,8 +180,8 @@ export interface UserRequestsParams {
   order?: UserRequestOrder;
 }
 
-export const USER_REQUESTS_PAGE_SIZE = 25;
-export const USER_REQUESTS_MAX_PAGE_SIZE = 100;
+const USER_REQUESTS_PAGE_SIZE = 25;
+const USER_REQUESTS_MAX_PAGE_SIZE = 100;
 
 // ---------------------------------------------------------------------------
 // Normalisers

@@ -126,14 +126,6 @@ export interface AlertsUpdate {
   dailySummaryMinute?: number;
 }
 
-/** The codes a 400 from POST /alerts carries; `field` (and `index` for a channel) say where. */
-export type AlertsErrorCode =
-  | "alert_thresholds_invalid"
-  | "alert_cooldown_range"
-  | "alert_channel_invalid"
-  | "alert_channel_limit"
-  | "alert_summary_time_range";
-
 /** Under ["settings"], so a settings_changed event refetches it. */
 export const alertsQueryKey = ["settings", "alerts"] as const;
 

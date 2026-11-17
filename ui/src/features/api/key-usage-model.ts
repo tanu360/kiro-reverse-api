@@ -54,7 +54,7 @@ export function findEntry(
  * One chart bar: `primary` at the bottom of the stack and `secondary` on top. Requests are
  * succeeded under failed, tokens input under output; credits have no second part.
  */
-export interface UsageBar {
+interface UsageBar {
   start: number;
   primary: number;
   secondary: number;

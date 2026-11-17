@@ -112,7 +112,7 @@ export function updateErrorText(
   return withDetail(t(key, { version: status.version ?? "" }), status.errorDetail, t);
 }
 
-export async function getUpdateStatus(): Promise<UpdateStatus> {
+async function getUpdateStatus(): Promise<UpdateStatus> {
   return normalizeUpdateStatus(await apiRequest("/update"));
 }
 
@@ -143,7 +143,7 @@ export async function restartForUpdate(): Promise<UpdateStatus> {
 }
 
 /** How long the restart may take before the page says the server did not come back. */
-export const RESTART_TIMEOUT_MS = 120_000;
+const RESTART_TIMEOUT_MS = 120_000;
 const RESTART_POLL_MS = 1000;
 
 /**

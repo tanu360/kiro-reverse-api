@@ -8,7 +8,6 @@
   "sparkline.summary_other": "{count} 個のデータ点、{first} から {last}",
   "sparkline.summaryUp_other": "{count} 個のデータ点、{first} から {last}、{change}% 上昇",
   "sparkline.summaryDown_other": "{count} 個のデータ点、{first} から {last}、{change}% 下降",
-  "chart.loading": "読み込み中…",
   "pie.total": "合計",
   "spinner.loading": "読み込み中…",
   "toast.region": "通知",

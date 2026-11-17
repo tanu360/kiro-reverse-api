@@ -34,19 +34,19 @@ export interface DuplicateGroup {
   accounts: DuplicateAccount[];
 }
 
-export interface DuplicatesResponse {
+interface DuplicatesResponse {
   /** Accounts a merge of every group would remove: each group's size minus one, summed. */
   duplicateCount: number;
   groups: DuplicateGroup[];
 }
 
-export interface MergeDuplicatesRequest {
+interface MergeDuplicatesRequest {
   keepId: string;
   /** The group's accounts; keepId may be among them. */
   ids: string[];
 }
 
-export interface MergeDuplicatesResponse {
+interface MergeDuplicatesResponse {
   success: true;
   keptId: string;
   removed: string[];

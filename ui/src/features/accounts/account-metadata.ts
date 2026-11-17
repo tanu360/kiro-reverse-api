@@ -60,7 +60,7 @@ export function normalizeTags(tags: readonly string[]): string[] {
   return out;
 }
 
-export type TagInputError = { kind: "tooMany" } | { kind: "tooLong"; tag: string };
+type TagInputError = { kind: "tooMany" } | { kind: "tooLong"; tag: string };
 
 /**
  * The tags typed into the comma-separated field. Unlike the server, it refuses instead of

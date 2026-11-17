@@ -8,7 +8,7 @@ export type UserSessionChangeReason = "signed-in" | "signed-out" | "expired";
 
 export const USER_TOKEN_KEY = "kiro_user_token";
 export const USER_TOKEN_EXP_KEY = "kiro_user_token_exp";
-export const USER_REMEMBER_KEY = "kiro_user_remember";
+const USER_REMEMBER_KEY = "kiro_user_remember";
 
 type Listener = (token: string | null, reason: UserSessionChangeReason) => void;
 

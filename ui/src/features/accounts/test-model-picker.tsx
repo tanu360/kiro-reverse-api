@@ -26,7 +26,7 @@ import { modelOrigin } from "@/lib/model-maker";
 import { cn } from "@/lib/utils";
 
 /** What the picker shows of a model's latest run (the dialog's own run type fits it). */
-export type PickerRun =
+type PickerRun =
   | { kind: "queued" }
   | { kind: "running" }
   | { kind: "ok"; seconds: string }

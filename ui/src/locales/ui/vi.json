@@ -8,7 +8,6 @@
   "sparkline.summary_other": "{count} điểm, từ {first} đến {last}",
   "sparkline.summaryUp_other": "{count} điểm, từ {first} đến {last}, tăng {change}%",
   "sparkline.summaryDown_other": "{count} điểm, từ {first} đến {last}, giảm {change}%",
-  "chart.loading": "Đang tải…",
   "pie.total": "Tổng",
   "spinner.loading": "Đang tải…",
   "toast.region": "Thông báo",

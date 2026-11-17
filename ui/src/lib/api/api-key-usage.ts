@@ -70,10 +70,7 @@ export function browserTzOffset(): number {
   return -new Date().getTimezoneOffset();
 }
 
-export function getApiKeyUsage(
-  range: ApiKeyUsageRange,
-  tzOffset: number,
-): Promise<ApiKeyUsageResponse> {
+function getApiKeyUsage(range: ApiKeyUsageRange, tzOffset: number): Promise<ApiKeyUsageResponse> {
   return apiRequest("/api-keys/usage", { query: { range, tzOffset } });
 }
 
@@ -116,7 +113,7 @@ export interface ApiKeyUsageBreakdown {
   accounts: ApiKeyUsageBreakdownItem[];
 }
 
-export function getApiKeyUsageBreakdown(
+function getApiKeyUsageBreakdown(
   ref: string,
   range: ApiKeyUsageRange,
   tzOffset: number,

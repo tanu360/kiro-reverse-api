@@ -27,7 +27,7 @@ export function formatDay(unixSec: number, lang: Lang): string {
  * (amber) or Limit reached (amber) for a token, credit or call limit; an active key with an
  * expiry also carries "Expires {date}".
  */
-export function KeyStatusBadges({ apiKey }: { apiKey: UserKey }): JSX.Element {
+function KeyStatusBadges({ apiKey }: { apiKey: UserKey }): JSX.Element {
   const { t, lang } = useT("user-panel");
   const status = userKeyStatus(apiKey);
   return (

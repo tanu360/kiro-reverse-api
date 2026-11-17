@@ -11,7 +11,7 @@ export function normalizeYAxisId(id?: string | number): string {
   return String(id);
 }
 
-export function groupLinesByYAxisId(lines: LineConfig[]): Map<string, LineConfig[]> {
+function groupLinesByYAxisId(lines: LineConfig[]): Map<string, LineConfig[]> {
   const groups = new Map<string, LineConfig[]>();
   for (const line of lines) {
     const axisId = normalizeYAxisId(line.yAxisId);
@@ -55,34 +55,6 @@ export function buildYScalesForLines({
 
   if (!scales[DEFAULT_Y_AXIS_ID]) {
     scales[DEFAULT_Y_AXIS_ID] = scaleLinear().domain([0, 100]).nice().range([innerHeight, 0]);
-  }
-
-  return scales;
-}
-
-/** Build y-scales from pre-computed (already nice'd) domain endpoints. */
-export function buildYScalesFromDomains({
-  lines,
-  innerHeight,
-  domainsByAxis,
-}: {
-  lines: LineConfig[];
-  innerHeight: number;
-  domainsByAxis: Record<string, [number, number]>;
-}): Record<string, YScale> {
-  const groups = groupLinesByYAxisId(lines);
-  const scales: Record<string, YScale> = {};
-
-  for (const [axisId] of groups) {
-    const domain =
-      domainsByAxis[axisId] ?? domainsByAxis[DEFAULT_Y_AXIS_ID] ?? ([0, 100] as [number, number]);
-    scales[axisId] = scaleLinear().domain(domain).range([innerHeight, 0]);
-  }
-
-  if (!scales[DEFAULT_Y_AXIS_ID]) {
-    scales[DEFAULT_Y_AXIS_ID] = scaleLinear()
-      .domain(domainsByAxis[DEFAULT_Y_AXIS_ID] ?? [0, 100])
-      .range([innerHeight, 0]);
   }
 
   return scales;

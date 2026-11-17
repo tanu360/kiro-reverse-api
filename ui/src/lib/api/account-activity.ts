@@ -34,7 +34,7 @@ export interface AccountActivityView extends AccountActivity {
 }
 
 /** The live RPM moves every second, so the numbers poll on their own. */
-export const ACCOUNT_ACTIVITY_POLL_MS = 5000;
+const ACCOUNT_ACTIVITY_POLL_MS = 5000;
 
 const IDLE: AccountActivity = { today: 0, rpm: 0, atLimit: false };
 
@@ -47,7 +47,7 @@ function getAccountActivity(): Promise<AccountActivityResponse> {
  * request) does not refetch it on top of the poll. Under the observe key, so a stats reset
  * still refetches it at once.
  */
-export function accountActivityQuery() {
+function accountActivityQuery() {
   return queryOptions({
     queryKey: queryKeys.observe.accountActivity(),
     queryFn: getAccountActivity,

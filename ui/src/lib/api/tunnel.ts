@@ -101,7 +101,7 @@ const WAITING: ReadonlySet<TunnelState> = new Set([
  * Whether the link is on its way, "running" with no link yet (the certificate) included: the card
  * polls every 2 s then, in case events are off.
  */
-export function tunnelWaiting(status: TunnelStatus): boolean {
+function tunnelWaiting(status: TunnelStatus): boolean {
   return WAITING.has(status.state) || (status.state === "running" && !status.url);
 }
 

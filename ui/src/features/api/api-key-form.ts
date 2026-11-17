@@ -284,7 +284,7 @@ export function flooredShare(used: number, limit: number, digits = 0): number {
 }
 
 /** From this share of a limit its figures turn amber, before red once it is used up. */
-export const LIMIT_WARNING = 0.75;
+const LIMIT_WARNING = 0.75;
 
 /**
  * A limit's colour, one rule for every place that shows one (the API keys table and cards, Usage

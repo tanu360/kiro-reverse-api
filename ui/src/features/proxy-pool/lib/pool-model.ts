@@ -110,7 +110,7 @@ export function editorModel(proxy?: PoolProxy): EditorModel {
   };
 }
 
-export interface EditorErrors {
+interface EditorErrors {
   /**
    * What the server would refuse in the host (proxyHostProblem): none given, a port typed after
    * it (an IPv6 host keeps its colons), or a space or slash.

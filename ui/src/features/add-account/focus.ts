@@ -11,21 +11,8 @@ function focusField(element: HTMLElement | null | undefined): void {
   element.closest<HTMLElement>('[data-slot="field"]')?.scrollIntoView?.({ block: "nearest" });
 }
 
-const STEP_CONTROLS = 'input:not([type="hidden"]), textarea, select, button, [role="combobox"]';
-
-/** The first enabled form control in a step, skipping hidden helpers such as file inputs. */
-export function firstStepControl(root: HTMLElement): HTMLElement | null {
-  for (const element of root.querySelectorAll<HTMLElement>(STEP_CONTROLS)) {
-    if (element.tabIndex < 0 || element.matches(":disabled") || element.closest("[hidden]")) {
-      continue;
-    }
-    return element;
-  }
-  return null;
-}
-
 /** True on touch screens, where a focused text field opens the on-screen keyboard. */
-export function isCoarsePointer(): boolean {
+function isCoarsePointer(): boolean {
   return window.matchMedia?.("(pointer: coarse)").matches ?? false;
 }
 

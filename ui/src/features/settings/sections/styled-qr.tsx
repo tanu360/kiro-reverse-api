@@ -5,7 +5,7 @@ const QUIET = 2;
 /** Finder patterns (the three corner eyes) are 7 modules square. */
 const EYE = 7;
 
-export interface QrModules {
+interface QrModules {
   size: number;
   dark: boolean[][];
 }

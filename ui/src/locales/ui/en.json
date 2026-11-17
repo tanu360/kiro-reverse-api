@@ -11,7 +11,6 @@
   "sparkline.summaryUp_other": "{count} points, from {first} to {last}, up {change}%",
   "sparkline.summaryDown_one": "{count} point, from {first} to {last}, down {change}%",
   "sparkline.summaryDown_other": "{count} points, from {first} to {last}, down {change}%",
-  "chart.loading": "Loading…",
   "pie.total": "Total",
   "spinner.loading": "Loading…",
   "toast.region": "Notifications",

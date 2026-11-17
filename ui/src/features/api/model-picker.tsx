@@ -14,7 +14,7 @@ import { MAX_KEY_MODELS } from "./api-key-form";
 
 const lower = (model: string) => model.toLowerCase();
 
-export interface ModelPicksProps {
+interface ModelPicksProps {
   selected: readonly string[];
   onSelectedChange: (models: string[]) => void;
   /** "Only selected models" with nothing ticked, or too many. */

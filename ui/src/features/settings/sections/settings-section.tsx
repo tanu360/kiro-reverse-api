@@ -170,7 +170,7 @@ export function SettingsGroup({
  * Focuses the form's first field marked invalid, unless focus is in one, and scrolls it to the
  * middle of the view: at the top edge it would hide under the sticky header.
  */
-export function focusFirstInvalidField(form: HTMLFormElement): void {
+function focusFirstInvalidField(form: HTMLFormElement): void {
   const field = form.querySelector<HTMLElement>('[aria-invalid="true"]');
   if (!field || field.contains(document.activeElement)) return;
   field.focus({ preventScroll: true });

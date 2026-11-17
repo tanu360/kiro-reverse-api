@@ -129,7 +129,7 @@ export function useSession(): Session | null {
 }
 
 /** A sign-in either got its token, or waits for a two-factor code against `challenge`. */
-export type SignInResult =
+type SignInResult =
   | { kind: "signed-in" }
   | { kind: "two-factor"; challenge: string; expiresAt: number };
 

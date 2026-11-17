@@ -102,7 +102,7 @@ function metricSeries(metric: UsageMetric, t: TFunction): MetricSeries {
   };
 }
 
-export interface ApiKeyUsageSheetProps {
+interface ApiKeyUsageSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The row to chart (key-usage-model entryRef). */
@@ -207,7 +207,7 @@ function UsageTotalsStrip({
   );
 }
 
-export interface UsageChartCardProps {
+interface UsageChartCardProps {
   /** The range's usage; undefined while it loads. */
   data: ApiKeyUsageResponse | undefined;
   /** The row to chart; undefined when the range has no traffic for it. */

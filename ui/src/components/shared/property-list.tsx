@@ -37,7 +37,7 @@ export function PropertyList({
   );
 }
 
-export interface PropertyRowProps {
+interface PropertyRowProps {
   label: string;
   /** The label's id, for a control that names itself after the row (an Edit button). */
   labelId?: string;
@@ -135,7 +135,7 @@ const ROW_GRID =
   "grid grid-cols-1 gap-x-4 rounded-lg px-2 sm:grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)]";
 const ROW_LABEL = "text-muted-foreground max-sm:text-meta";
 
-export interface InlineEditRowProps {
+interface InlineEditRowProps {
   label: string;
   /** The saved value. A string or number; empty shows `placeholder` (or a dash). */
   value: ReactNode;

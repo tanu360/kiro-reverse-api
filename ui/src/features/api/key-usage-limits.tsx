@@ -14,7 +14,7 @@ import { flooredShare, limitTone } from "./api-key-form";
 /** A limit used past this share turns its meter amber; a spent one turns it red. */
 
 /** The counters and caps the card reads: an admin ApiKey or the key holder's own key. */
-export type KeyLimitsSource = Pick<
+type KeyLimitsSource = Pick<
   ApiKey,
   "tokensUsed" | "tokenLimit" | "creditsUsed" | "creditLimit" | "successfulCalls" | "callLimit"
 >;

@@ -143,7 +143,7 @@ async function getProxyPool(): Promise<ProxyPoolView> {
 }
 
 /** Fills what an older server leaves out. */
-export function normalizeView(res: Partial<ProxyPoolView>): ProxyPoolView {
+function normalizeView(res: Partial<ProxyPoolView>): ProxyPoolView {
   return {
     mode: res.mode === "on" ? "on" : "off",
     directFallback: res.directFallback === true,

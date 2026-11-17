@@ -6,8 +6,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
 import { Input } from "@/components/ui/input";
 import { useUiT } from "@/components/ui/messages";
-import { POPUP_ROW_CLASS } from "@/components/ui/popup-row";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 export const Autocomplete: typeof AutocompletePrimitive.Root = AutocompletePrimitive.Root;
@@ -91,110 +89,6 @@ export function AutocompleteInput({
         </AutocompleteClear>
       )}
     </AutocompletePrimitive.InputGroup>
-  );
-}
-
-export function AutocompletePopup({
-  className,
-  children,
-  side = "bottom",
-  sideOffset = 4,
-  alignOffset,
-  align = "start",
-  anchor,
-  collisionPadding = 16,
-  portalProps,
-  ...props
-}: AutocompletePrimitive.Popup.Props & {
-  align?: AutocompletePrimitive.Positioner.Props["align"];
-  sideOffset?: AutocompletePrimitive.Positioner.Props["sideOffset"];
-  alignOffset?: AutocompletePrimitive.Positioner.Props["alignOffset"];
-  side?: AutocompletePrimitive.Positioner.Props["side"];
-  anchor?: AutocompletePrimitive.Positioner.Props["anchor"];
-  /** The space kept from the viewport edge: the 16 px phone gutter, as menus (menu.tsx). */
-  collisionPadding?: AutocompletePrimitive.Positioner.Props["collisionPadding"];
-  portalProps?: AutocompletePrimitive.Portal.Props;
-}): React.ReactElement {
-  return (
-    <AutocompletePrimitive.Portal {...portalProps}>
-      <AutocompletePrimitive.Positioner
-        align={align}
-        alignOffset={alignOffset}
-        anchor={anchor}
-        // z-70: above the toast layer (toast.tsx, z-60), so a toast never covers an open list.
-        className="z-70 select-none"
-        collisionPadding={collisionPadding}
-        data-slot="autocomplete-positioner"
-        side={side}
-        sideOffset={sideOffset}
-      >
-        <span
-          className={cn(
-            // The popups' one open and close motion (select, menu, popover): a 100 ms fade from
-            // 98 %. The state attributes sit on the Popup inside this sheet.
-            "popup-surface popup-width relative flex max-h-full origin-(--transform-origin) transition-[scale,opacity] duration-100 has-data-ending-style:scale-98 has-data-starting-style:scale-98 has-data-ending-style:opacity-0 has-data-starting-style:opacity-0",
-            className,
-          )}
-        >
-          <AutocompletePrimitive.Popup
-            className="flex max-h-[min(var(--available-height),23rem,90dvh)] flex-1 flex-col text-foreground"
-            data-slot="autocomplete-popup"
-            {...props}
-          >
-            {children}
-          </AutocompletePrimitive.Popup>
-        </span>
-      </AutocompletePrimitive.Positioner>
-    </AutocompletePrimitive.Portal>
-  );
-}
-
-export function AutocompleteItem({
-  className,
-  children,
-  ...props
-}: AutocompletePrimitive.Item.Props): React.ReactElement {
-  return (
-    <AutocompletePrimitive.Item
-      className={cn(
-        // The select row (popup-row.tsx); suggestions have no chosen state, so no CheckedDot.
-        POPUP_ROW_CLASS,
-        "[&_svg:not([class*='text-'])]:text-muted-foreground",
-        className,
-      )}
-      data-slot="autocomplete-item"
-      {...props}
-    >
-      {children}
-    </AutocompletePrimitive.Item>
-  );
-}
-
-export function AutocompleteEmpty({
-  className,
-  ...props
-}: AutocompletePrimitive.Empty.Props): React.ReactElement {
-  return (
-    <AutocompletePrimitive.Empty
-      className={cn("not-empty:p-2 text-center text-control text-muted-foreground", className)}
-      data-slot="autocomplete-empty"
-      {...props}
-    />
-  );
-}
-
-export function AutocompleteList({
-  className,
-  ...props
-}: AutocompletePrimitive.List.Props): React.ReactElement {
-  return (
-    <ScrollArea overscrollContain scrollFade>
-      <AutocompletePrimitive.List
-        className={cn("not-empty:scroll-py-1 not-empty:p-1", className)}
-        data-slot="autocomplete-list"
-        {...props}
-      />
-    </ScrollArea>
   );
 }
 

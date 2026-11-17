@@ -47,7 +47,7 @@ const FORBIDDEN_PREFIX = "access-control-";
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to find them
 const CONTROL = /[\u0000-\u0008\u000a-\u001f\u007f]/;
 
-export type ResponseHeaderErrorCode =
+type ResponseHeaderErrorCode =
   | "response_headers_too_many"
   | "response_header_name_empty"
   | "response_header_name_invalid"
@@ -59,7 +59,7 @@ export type ResponseHeaderErrorCode =
   | "response_header_value_too_long"
   | "response_header_unknown_variable";
 
-export interface ResponseHeaderProblem {
+interface ResponseHeaderProblem {
   code: ResponseHeaderErrorCode;
   /** The text's placeholders: name, max, variable. */
   params?: TParams;

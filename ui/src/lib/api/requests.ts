@@ -4,7 +4,7 @@ import { queryKeys } from "./query-keys";
 import type { RecentRequestsParams, RecentRequestsResponse, RequestRecord } from "./types";
 
 /** Empty `search`/`status` are left out of the query string, like the old UI. */
-export async function getRecentRequests(
+async function getRecentRequests(
   params: RecentRequestsParams,
   signal?: AbortSignal,
 ): Promise<RecentRequestsResponse> {
@@ -102,7 +102,7 @@ export function conversationQuery(id: string) {
 }
 
 /** The kept body of a logged request, with the client's key masked. */
-export interface RequestBody {
+interface RequestBody {
   endpoint: string;
   size: number;
   model: string;

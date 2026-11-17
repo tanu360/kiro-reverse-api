@@ -29,7 +29,7 @@ export interface AccountHealth {
  * POST /admin/api/account-health, a patch. 400 `self_heal_interval_range` or
  * `self_heal_rounds_range` when a value is out of range; the card checks both first.
  */
-export interface AccountHealthPatch {
+interface AccountHealthPatch {
   enabled?: boolean;
   minIntervalSec?: number;
   maxRounds?: number;

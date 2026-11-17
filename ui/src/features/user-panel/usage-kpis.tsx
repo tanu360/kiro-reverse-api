@@ -35,7 +35,7 @@ import {
 import { type Lang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export type Metric = "requests" | "failed" | "credits" | "tokens";
+type Metric = "requests" | "failed" | "credits" | "tokens";
 
 /** A limit used past this share turns amber; a spent one red (as the admin's limits card). */
 

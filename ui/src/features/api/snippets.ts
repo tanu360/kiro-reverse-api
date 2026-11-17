@@ -574,7 +574,7 @@ export function buildRequestSnippet(
  * change only the client that copies them: a client that names its model keeps it, and Opus stays
  * Opus for every other client of an account that serves it.
  */
-export const CLAUDE_CODE_MODELS = {
+const CLAUDE_CODE_MODELS = {
   main: "claude-sonnet-4.5",
   opus: "claude-sonnet-4.5",
   sonnet: "claude-sonnet-4.5",

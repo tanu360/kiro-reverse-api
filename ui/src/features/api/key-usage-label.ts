@@ -17,7 +17,7 @@ export interface UsageIdentity {
   keyMasked?: string;
 }
 
-export interface UsageLabel {
+interface UsageLabel {
   /** The key's name (emails masked in privacy mode), or the group's name. */
   title: string;
   /** False for an unnamed key: its title is the placeholder, its masked key says more. */

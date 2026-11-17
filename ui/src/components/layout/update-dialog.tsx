@@ -42,7 +42,7 @@ const COMPOSE_COMMAND = "git pull && docker compose up -d --build";
 const IMAGE_COMMAND = "docker pull ghcr.io/tanu360/kiro-reverse-api:latest";
 const RELEASE_DOWNLOAD = "https://github.com/tanu360/kiro-reverse-api/releases/latest/download";
 
-export type UpdateMethod = "compose" | "image" | "binary";
+type UpdateMethod = "compose" | "image" | "binary";
 
 /** The platforms build-release.sh packages, by GOOS/GOARCH: the archive's platform part and the locale key of the name the steps show. */
 const RELEASE_TARGETS: Record<string, { name: string; label: string }> = {
@@ -115,7 +115,7 @@ export function plainChangelog(changelog: string | undefined): ChangelogLine[] {
   );
 }
 
-export interface ReleaseArchive {
+interface ReleaseArchive {
   /** The archive's file name on the release. */
   file: string;
   /** The one folder the archive holds (and the old install sits in). */

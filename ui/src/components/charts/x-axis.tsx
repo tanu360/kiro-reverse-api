@@ -688,7 +688,7 @@ function appendProjectionTailTicks(
   return [...ticks, ...extras].sort((a, b) => a.x - b.x);
 }
 
-export function XAxis(props: XAxisProps) {
+function XAxis(props: XAxisProps) {
   const { containerRef } = useChartStable();
 
   const container = useChartPortalContainer(containerRef);

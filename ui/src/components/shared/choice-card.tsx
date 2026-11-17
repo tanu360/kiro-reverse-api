@@ -1,7 +1,4 @@
-import { ChevronRightIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { type ComponentProps, type JSX, type ReactNode, useId } from "react";
-import { IconChip } from "@/components/shared/icon-chip";
+import { type JSX, type ReactNode, useId } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -123,60 +120,5 @@ export function ChoiceList({
     >
       {children}
     </Card>
-  );
-}
-
-/**
- * One row of a ChoiceList: a button that goes somewhere (the next step of a flow), with an icon
- * chip, a title, a short description and a chevron at its end.
- */
-export function ChoiceRow({
-  icon,
-  title,
-  badge,
-  description,
-  className,
-  ...props
-}: Omit<ComponentProps<"button">, "title" | "children"> & {
-  icon: IconSvgElement;
-  title: ReactNode;
-  /** After the title, on its line (a Recommended badge). */
-  badge?: ReactNode;
-  description?: ReactNode;
-}): JSX.Element {
-  return (
-    <li className="group/choice-row flex">
-      <button
-        className={cn(
-          // The end rows round with the card, so their focus outline follows its corners. 52 px
-          // rows (py-2.5), so an eight-row method list fits a 768 px tall screen.
-          "flex min-h-13 w-full min-w-0 cursor-pointer items-center gap-3 px-4 py-2.5 text-start transition-[background-color,scale] hover:bg-accent focus-outline-inset active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64 group-first/choice-row:rounded-t-xl group-last/choice-row:rounded-b-xl",
-          // In a flush list: a rounded hover area with the icon bare, no chip and no card.
-          "in-data-flush:rounded-lg in-data-flush:px-2 in-data-flush:group-first/choice-row:rounded-lg in-data-flush:group-last/choice-row:rounded-lg",
-          className,
-        )}
-        type="button"
-        {...props}
-      >
-        <IconChip className="in-data-flush:hidden" icon={icon} size="md" />
-        <span className="hidden size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors group-hover/choice-row:text-foreground in-data-flush:flex">
-          <HugeiconsIcon aria-hidden="true" className="size-4" icon={icon} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-medium text-foreground text-sm">{title}</span>
-            {badge}
-          </span>
-          {description ? (
-            <span className="text-muted-foreground text-xs leading-normal">{description}</span>
-          ) : null}
-        </span>
-        <HugeiconsIcon
-          icon={ChevronRightIcon}
-          aria-hidden="true"
-          className="size-4 shrink-0 text-icon-muted transition-[translate,color] group-hover/choice-row:translate-x-0.5 group-hover/choice-row:text-foreground rtl:-scale-x-100 rtl:group-hover/choice-row:-translate-x-0.5"
-        />
-      </button>
-    </li>
   );
 }

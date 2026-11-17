@@ -38,7 +38,7 @@ import { ACCOUNT_STATUSES, type AccountStatus } from "@/routes/-search";
 const LIMIT = 5;
 
 /** A dialog that can open again on the same account: each open is a new session. */
-export interface DialogTarget {
+interface DialogTarget {
   id: string;
   open: boolean;
   session: number;

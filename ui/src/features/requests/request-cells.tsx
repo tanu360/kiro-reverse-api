@@ -45,7 +45,7 @@ export function Muted({ children = EMPTY }: { children?: string }): JSX.Element 
 }
 
 /** "Succeeded", or "Failed 429" with the HTTP status the client got. */
-export function useStatusText(record: RequestRecord): string {
+function useStatusText(record: RequestRecord): string {
   const { t } = useT("requests");
   if (record.success) return t("ok");
   return record.status ? `${t("fail")} ${record.status}` : t("fail");
@@ -172,7 +172,7 @@ export function usedNoTokens(record: RequestRecord): boolean {
  * cache, the cache read (a lighter step of the input colour; it is part of the input) and the
  * output, in the detail sheet's colours. A 2 px floor keeps a small part visible.
  */
-export function TokenBar({
+function TokenBar({
   record,
   className,
 }: {
@@ -528,7 +528,7 @@ export function ErrorPill({
  * A failure's message: for a Proxy error the plain sentence its Attempts show, otherwise the
  * error the client got. `raw` is always the client's error, for the tooltip.
  */
-export function useErrorMessage(record: RequestRecord): { text: string; raw: string } {
+function useErrorMessage(record: RequestRecord): { text: string; raw: string } {
   const { t } = useT("requests");
   const maskText = useMaskText();
   const raw = maskText(record.message) || t("noErrorMessage");

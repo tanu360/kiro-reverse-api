@@ -22,7 +22,7 @@ export interface ResponseHeadersResponse {
 }
 
 /** POST /response-headers replaces the whole list. */
-export interface ResponseHeadersUpdate {
+interface ResponseHeadersUpdate {
   headers: ResponseHeaderRule[];
 }
 

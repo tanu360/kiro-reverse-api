@@ -8,7 +8,7 @@ const DAY = 86_400;
 const MAX_BUCKETS = 60;
 const MIN_DAYS = 7;
 
-export interface LifetimeGrid {
+interface LifetimeGrid {
   bucket: Exclude<TimeBucket, "hour">;
   bucketSeconds: number;
   /** Bucket starts, unix s: the viewer's local midnights. */

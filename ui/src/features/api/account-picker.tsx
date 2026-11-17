@@ -24,7 +24,7 @@ interface TagOption {
 }
 
 /** Every tag on the accounts, case-insensitively once, most used first, then by name. */
-export function tagOptions(accounts: readonly Account[]): TagOption[] {
+function tagOptions(accounts: readonly Account[]): TagOption[] {
   const byKey = new Map<string, TagOption>();
   for (const account of accounts) {
     for (const tag of account.tags ?? []) {
@@ -37,7 +37,7 @@ export function tagOptions(accounts: readonly Account[]): TagOption[] {
 }
 
 /** The accounts a scope reaches: the picked ids plus every account carrying a picked tag. */
-export function scopedAccountIds(
+function scopedAccountIds(
   accounts: readonly Account[],
   ids: readonly string[],
   tags: readonly string[],
@@ -50,7 +50,7 @@ export function scopedAccountIds(
   return out;
 }
 
-export interface AccountPicksProps {
+interface AccountPicksProps {
   selected: readonly string[];
   /** Picked account tags. */
   tags?: readonly string[];

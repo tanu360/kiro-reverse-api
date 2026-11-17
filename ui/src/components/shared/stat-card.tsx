@@ -8,7 +8,7 @@ import { type Lang, useT } from "@/lib/i18n";
 import { cn, placeholderKeys } from "@/lib/utils";
 import { InfoHint } from "./info-hint";
 
-export interface StatMetric {
+interface StatMetric {
   label: string;
   value: ReactNode;
   tone?: "default" | "danger" | "muted";
@@ -22,7 +22,7 @@ export interface StatMetric {
   hint?: string;
 }
 
-export interface StatDelta {
+interface StatDelta {
   /** A fraction: 0.12 = +12 %. */
   value: number;
   /** The comparison, in the muted colour after the value ("vs previous hour"). */
@@ -31,7 +31,7 @@ export interface StatDelta {
   goodWhen?: "up" | "down";
 }
 
-export interface StatTileProps {
+interface StatTileProps {
   icon?: IconSvgElement;
   label: string;
   /** Explains the label in a popup (info icon after it). */
@@ -63,7 +63,7 @@ export interface StatTileProps {
   className?: string;
 }
 
-export type StatTrendPlacement = "inline" | "aside";
+type StatTrendPlacement = "inline" | "aside";
 
 /** The trend slot's height in px per placement, for a sparkline's `height`. */
 export const STAT_TREND_HEIGHT: Record<StatTrendPlacement, number> = { inline: 28, aside: 48 };
@@ -390,7 +390,7 @@ export function StatTile({
  * The tile's placeholder, row for row: label, value, delta with the trend block, and (with
  * `metrics`) the hairline and a 2x2 grid, so nothing shifts when the data arrives.
  */
-export function StatTileSkeleton({
+function StatTileSkeleton({
   metrics = 4,
   size = "display",
   trendPlacement = "inline",
