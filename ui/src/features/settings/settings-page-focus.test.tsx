@@ -288,19 +288,22 @@ describe("settings focus", () => {
 
   it("gives touch-size targets to section chips and rule inputs", async () => {
     const { user } = await renderPage("security");
-    // Below xl (and in tests, which match no media query) the nav is the chip row: 40 px chips.
-    expect(within(nav()).getByRole("link", { name: "Admin password" })).toHaveClass("min-h-10");
+    // Below xl (and in tests, which match no media query) the nav is the chip row: 32 px chips
+    // on a phone (the default button there), 40 px on a touch tablet.
+    const chip = within(nav()).getByRole("link", { name: "Admin password" });
+    expect(chip).toHaveClass("min-h-8");
+    expect(chip).toHaveClass("sm:pointer-coarse:min-h-10");
 
     const filter = section(SECTION_ID.promptFilter);
     await user.click(within(filter).getByRole("button", { name: "Add rule" }));
     const editor = await screen.findByRole("dialog", { name: "Add rule" });
     await user.click(within(editor).getByRole("combobox", { name: "Type" }));
     await user.click(await screen.findByRole("option", { name: "Regex" }));
-    // The Input sizes itself for touch (40 px with its border); no call site adds a class.
+    // The Input sizes itself for a touch tablet (40 px with its border); no call site adds a class.
     for (const input of within(editor).getAllByRole("textbox")) {
       const control = input.closest('[data-slot="input-control"]');
       expect(control).toHaveAttribute("data-size", "default");
-      expect(input.className).toContain("pointer-coarse:h-9.5");
+      expect(input.className).toContain("sm:pointer-coarse:h-9.5");
     }
   });
 

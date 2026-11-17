@@ -25,7 +25,7 @@ export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
  * pointer 40 / 36 px (44 lg), with a 44 px hit area (the ::after layer).
  */
 export const selectTriggerVariants = cva(
-  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-control text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground icon-slot",
+  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-sm text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground icon-slot",
   {
     defaultVariants: {
       fit: "field",
@@ -41,10 +41,12 @@ export const selectTriggerVariants = cva(
         field: "w-full min-w-0",
       },
       size: {
-        // Touch screens get a real 40 / 36 px trigger, as the input (pointer-coarse sorts after
-        // sm:).
+        // As the input: 32 / 28 px on phones (shadcn Nova), 36 / 32 from sm up, and a real 40 /
+        // 36 px trigger on a touch tablet (sm:pointer-coarse sorts after sm:). The label is
+        // 14 px at every width, as Nova's: a trigger is a button, which iOS does not zoom
+        // into, so it does not need a field's 16 px phone text. lg (sign-in) keeps it.
         default: "min-h-8 px-[calc(--spacing(3)-1px)] sm:min-h-9 sm:pointer-coarse:min-h-10",
-        lg: "min-h-10 px-[calc(--spacing(3)-1px)] sm:pointer-coarse:min-h-11",
+        lg: "min-h-10 px-[calc(--spacing(3)-1px)] text-control sm:pointer-coarse:min-h-11",
         sm: "min-h-7 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-8 sm:pointer-coarse:min-h-9",
       },
     },

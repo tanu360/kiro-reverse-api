@@ -277,10 +277,11 @@ function useActiveSection(
  * firmer edge for the current section, red text and a red tint for the danger zone. On a phone
  * the row is the first thing under the header and a dozen hairlines read heavy there: the chips
  * drop their edge and take the segmented control's look instead (the sign-in theme toggle), a
- * faint tint, with the current section raised on the solid thumb and its soft shadow.
+ * faint tint, with the current section raised on the solid thumb and its soft shadow. Chips
+ * are 32 px on a phone (the default button there), 36 px from sm up, 40 px on a touch tablet.
  */
 const CHIP_CLASS =
-  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 font-medium text-muted-foreground text-sm transition-colors hover:bg-accent hover:text-foreground focus-outline aria-current:border-border-strong aria-current:bg-surface-2 aria-current:text-foreground sm:min-h-9 pointer-coarse:min-h-10 [&_svg]:size-4 [&_svg]:shrink-0 max-sm:border-transparent max-sm:bg-(--segment-track) max-sm:aria-current:border-transparent max-sm:aria-current:bg-(--segment-thumb) max-sm:aria-current:shadow-(--segment-thumb-shadow)";
+  "inline-flex min-h-8 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 font-medium text-muted-foreground text-sm transition-colors hover:bg-accent hover:text-foreground focus-outline aria-current:border-border-strong aria-current:bg-surface-2 aria-current:text-foreground sm:min-h-9 sm:pointer-coarse:min-h-10 [&_svg]:size-4 [&_svg]:shrink-0 max-sm:border-transparent max-sm:bg-(--segment-track) max-sm:aria-current:border-transparent max-sm:aria-current:bg-(--segment-thumb) max-sm:aria-current:shadow-(--segment-thumb-shadow)";
 const DANGER_CHIP_CLASS =
   "text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground aria-current:border-destructive/32 aria-current:bg-error-surface aria-current:text-destructive-foreground max-sm:aria-current:bg-error-surface max-sm:aria-current:shadow-none";
 

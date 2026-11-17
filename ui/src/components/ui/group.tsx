@@ -55,8 +55,9 @@ export function GroupText({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      // A label segment beside a field or button in a Group: the field's fill and hairline.
-      "relative inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-field-border bg-field px-[calc(--spacing(3)-1px)] text-control text-muted-foreground outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] [&_svg:not([class*='size-'])]:size-4 [&_svg]:-mx-0.5 [&_svg]:shrink-0",
+      // A label segment beside a field or button in a Group: the field's fill and hairline, and
+      // the select trigger's 14 px label (not a field's 16 px phone text: it is not typed in).
+      "relative inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-field-border bg-field px-[calc(--spacing(3)-1px)] text-sm text-muted-foreground outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] [&_svg:not([class*='size-'])]:size-4 [&_svg]:-mx-0.5 [&_svg]:shrink-0",
       className,
     ),
     "data-slot": "group-text",
