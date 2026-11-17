@@ -23,6 +23,7 @@
   "actions.details": "Chi tiết",
   "actions.more": "Thao tác khác",
   "actions.back": "Quay lại",
+  "actions.next": "Tiếp",
   "actions.copy": "Sao chép",
   "actions.copyValue": "Sao chép {label}",
   "actions.viewAll": "Xem tất cả",

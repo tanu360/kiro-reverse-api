@@ -23,6 +23,7 @@
   "actions.details": "詳細",
   "actions.more": "その他の操作",
   "actions.back": "戻る",
+  "actions.next": "次へ",
   "actions.copy": "コピー",
   "actions.copyValue": "{label} をコピー",
   "actions.viewAll": "すべて表示",

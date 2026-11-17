@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsPatch } from "@/lib/api/types";
@@ -80,6 +80,15 @@ async function renderPage() {
   return result;
 }
 
+type User = Awaited<ReturnType<typeof renderPage>>["user"];
+
+/** Next through the create wizard's steps to the last one (Access). */
+async function toAccessStep(user: User, dialog: HTMLElement): Promise<void> {
+  await user.click(within(dialog).getByRole("button", { name: "Next" }));
+  await user.click(within(dialog).getByRole("button", { name: "Next" }));
+  expect(within(dialog).getByText("Step 3 of 3 · Access")).toBeInTheDocument();
+}
+
 describe("ApiPage", () => {
   it("lists the seeded keys with masked values and flags the limit-reached key", async () => {
     await renderPage();
@@ -105,6 +114,7 @@ describe("ApiPage", () => {
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
+    await toAccessStep(user, dialog);
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     const panel = await screen.findByTestId("created-key-panel");
     await waitFor(() =>
@@ -116,7 +126,25 @@ describe("ApiPage", () => {
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "  laptop  ");
+    // Three steps; the first has no Back.
+    expect(within(dialog).getByText("Step 1 of 3 · Basics")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    // Enter in a field moves on, and focus lands on the next step's first field. user-event
+    // only presses a submit button inside the form, and Next sits in the footer, so the test
+    // sends the browser's implicit submit itself.
+    const name = within(dialog).getByRole("textbox", { name: "Name" });
+    await user.type(name, "  laptop  ");
+    const form = name.closest("form");
+    if (!form) throw new Error("no form");
+    fireEvent.submit(form);
+    expect(within(dialog).getByText("Step 2 of 3 · Limits")).toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "Token limit" })).toHaveFocus();
+    // Back keeps what was typed.
+    await user.click(within(dialog).getByRole("button", { name: "Back" }));
+    expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue("  laptop  ");
+    expect(within(dialog).getByRole("button", { name: "Next" })).toHaveFocus();
+    expect(sent("POST", "/api-keys")).toHaveLength(0);
+    await toAccessStep(user, dialog);
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
 
     const panel = await screen.findByTestId("created-key-panel");
@@ -153,8 +181,8 @@ describe("ApiPage", () => {
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
-    // One form, no tabs: every field is on it.
     expect(within(dialog).queryByRole("tab")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Next" }));
     const tokenLimit = within(dialog).getByRole("textbox", { name: "Token limit" });
     await user.clear(tokenLimit);
     // A whole-number field refuses the decimal mark as it is typed...
@@ -164,8 +192,10 @@ describe("ApiPage", () => {
     await user.clear(tokenLimit);
     await user.click(tokenLimit);
     await user.paste("1.5");
-    await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
+    // Next checks the step's fields and stays on it.
+    await user.click(within(dialog).getByRole("button", { name: "Next" }));
     const error = await within(dialog).findByText("Token limit must be a whole number, 0 or more.");
+    expect(within(dialog).getByText("Step 2 of 3 · Limits")).toBeInTheDocument();
     // Only the failing field is marked and described; the credit limit stays untouched.
     expect(tokenLimit).toHaveAttribute("aria-invalid", "true");
     // Focus moves to the bad field.
@@ -186,6 +216,7 @@ describe("ApiPage", () => {
       within(dialog).getByRole("textbox", { name: "Custom key (optional)" }),
       existing,
     );
+    await toAccessStep(user, dialog);
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     expect(await within(dialog).findByText("This API key already exists.")).toBeInTheDocument();
     expect(screen.queryByTestId("created-key-panel")).not.toBeInTheDocument();
@@ -270,6 +301,7 @@ describe("ApiPage", () => {
     const dana = mockDb.accounts[0];
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
+    await toAccessStep(user, dialog);
     await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
 
     // "Only selected" with nothing picked would mean every account: the form refuses it.
@@ -314,15 +346,17 @@ describe("ApiPage", () => {
     expect(within(dialog).getByRole("button", { name: /^Expires/ })).not.toHaveTextContent(
       "Never expires",
     );
+    await user.click(within(dialog).getByRole("button", { name: "Next" }));
+    const rpm = within(dialog).getByRole("textbox", { name: "Requests per minute" });
+    await user.clear(rpm);
+    await user.type(rpm, "30");
+    await user.click(within(dialog).getByRole("button", { name: "Next" }));
     await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
     // The tag picks accounts on its own: both spellings count, and the count says so.
     await user.click(within(dialog).getByRole("checkbox", { name: /team-eu/ }));
     expect(
       within(dialog).getByText(`2 of ${mockDb.accounts.length} accounts in scope`),
     ).toBeInTheDocument();
-    const rpm = within(dialog).getByRole("textbox", { name: "Requests per minute" });
-    await user.clear(rpm);
-    await user.type(rpm, "30");
     // "Only selected models" with none ticked is refused, like accounts.
     await user.click(within(dialog).getByRole("radio", { name: "Only selected models" }));
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
@@ -393,6 +427,7 @@ describe("ApiPage", () => {
     const day = new Date(now.getFullYear(), now.getMonth() + 1, 15);
     const label = new Intl.DateTimeFormat("en-US", { dateStyle: "full" }).format(day);
     await user.click(await screen.findByRole("button", { name: label }));
+    await toAccessStep(user, dialog);
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     await screen.findByTestId("created-key-panel");
     expect(sent("POST", "/api-keys")[0]?.body).toMatchObject({ expiresAt: endOfLocalDay(day) });

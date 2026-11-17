@@ -29,6 +29,7 @@ import {
 import { SectionCard } from "@/components/shared/section-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { DialogPanel } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldHint, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -53,9 +54,11 @@ import type { ApiKey, ApiKeyRoutingMode } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { noSpaces } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { AccountPicker } from "./account-picker";
 import {
   type ApiKeyFormData,
+  type ApiKeyFormFailure,
   type ApiKeyFormField,
   type ApiKeyFormValues,
   type ApiKeyLimitField,
@@ -102,6 +105,10 @@ interface KeyForm {
   formId: string;
   pending: boolean;
   error: unknown;
+  /** Marks the failed field and focuses it once it is on screen. */
+  reject: (failure: ApiKeyFormFailure) => void;
+  /** Sends the checked values. */
+  submit: (data: ApiKeyFormData) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -165,18 +172,19 @@ function useKeyForm(
     else if (field === invalid) setInvalid(null);
   };
 
+  const reject = (failure: ApiKeyFormFailure) => {
+    if (failure.field === "allowedModels") setModelsError(failure.error as ModelsError);
+    setInvalid(failure.field);
+    // Straight to the bad field, so nobody has to hunt for the red one.
+    setFocusTick((n) => n + 1);
+  };
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (mutation.isPending) return;
     const parsed = parseApiKeyForm(values);
-    if (!parsed.ok) {
-      if (parsed.field === "allowedModels") setModelsError(parsed.error as ModelsError);
-      setInvalid(parsed.field);
-      // Straight to the bad field, so nobody has to hunt for the red one.
-      setFocusTick((n) => n + 1);
-      return;
-    }
-    mutation.mutate(parsed.value);
+    if (!parsed.ok) reject(parsed);
+    else mutation.mutate(parsed.value);
   };
 
   return {
@@ -189,6 +197,8 @@ function useKeyForm(
     formId,
     pending: mutation.isPending,
     error: mutation.isError ? mutation.error : null,
+    reject,
+    submit: (data) => mutation.mutate(data),
     onSubmit,
   };
 }
@@ -273,6 +283,20 @@ function LimitField({ form, field }: { form: KeyForm; field: ApiKeyLimitField })
         </FieldError>
       ) : null}
     </Field>
+  );
+}
+
+/** The four limits two by two, with what 0 means under them. */
+function LimitsGrid({ form }: { form: KeyForm }): JSX.Element {
+  const { t } = useT("api");
+  return (
+    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+      <LimitField field="tokenLimit" form={form} />
+      <LimitField field="creditLimit" form={form} />
+      <LimitField field="callLimit" form={form} />
+      <LimitField field="rpmLimit" form={form} />
+      <FieldHint className="sm:col-span-2">{t("form.limitsHint")}</FieldHint>
+    </div>
   );
 }
 
@@ -393,10 +417,25 @@ function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }
   );
 }
 
+/** The create wizard's steps, in order. */
+const CREATE_STEPS = ["form.stepBasics", "form.stepLimits", "form.stepAccess"] as const;
+const LAST_STEP = CREATE_STEPS.length - 1;
+
+/** The step each checked field sits on, so a failed check goes back to it. */
+const FIELD_STEP: Readonly<Record<ApiKeyFormField, number>> = {
+  tokenLimit: 1,
+  creditLimit: 1,
+  callLimit: 1,
+  rpmLimit: 1,
+  accountIds: 2,
+  allowedModels: 2,
+};
+
 /**
- * Create: the app's dialog at its default width, one form: name and expiry, then the token, call
- * and per-minute limits on one line, the accounts, the credit limit beside the routing mode, the
- * models and the custom key.
+ * Create: the app's dialog at its default width, in three short steps: Basics (name, expiry,
+ * custom key), Limits, then Access (accounts, routing mode, models). Next checks the fields up to
+ * the current step; the last step creates the key. Hung from the top, as step flows are, so the
+ * title stays put while the steps change height.
  */
 function ApiKeyCreateDialog({
   open,
@@ -409,38 +448,137 @@ function ApiKeyCreateDialog({
 }): JSX.Element {
   const { t } = useT("api");
   const form = useKeyForm({ mode: "create" }, onOpenChange, onCreated);
+  const [step, setStep] = useState(0);
+  const stepRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  // Where focus goes once a step change removed the focused element: the new step's first field
+  // after Enter in a field, Next after Back leaves the first step (where Back is gone).
+  const refocus = useRef<"field" | "next" | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per step change.
+  useEffect(() => {
+    const target = refocus.current;
+    refocus.current = null;
+    if (target === "next") nextRef.current?.focus();
+    else if (target === "field") {
+      const first =
+        step === 0
+          ? form.refs.name.current
+          : step === 1
+            ? form.refs.tokenLimit.current
+            : stepRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
+      first?.focus();
+    }
+  }, [step]);
+
+  const goTo = (next: number) => {
+    const active = document.activeElement;
+    if (stepRef.current?.contains(active)) refocus.current = "field";
+    else if (next === 0 && active === backRef.current) refocus.current = "next";
+    setStep(next);
+  };
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (form.pending) return;
+    const parsed = parseApiKeyForm(form.values);
+    if (!parsed.ok && FIELD_STEP[parsed.field] <= step) {
+      setStep(FIELD_STEP[parsed.field]);
+      form.reject(parsed);
+      return;
+    }
+    if (step < LAST_STEP) goTo(step + 1);
+    else if (parsed.ok) form.submit(parsed.value);
+  };
+
+  const last = step === LAST_STEP;
   return (
     <ResponsiveDialog
-      footer={<FormActions form={form} onCancel={() => onOpenChange(false)} />}
+      anchor="top"
+      description={t("form.stepOf", {
+        step: step + 1,
+        total: CREATE_STEPS.length,
+        name: t(CREATE_STEPS[step] ?? CREATE_STEPS[0]),
+      })}
+      footer={
+        <>
+          <Button
+            className="sm:me-auto"
+            key="cancel"
+            onClick={() => onOpenChange(false)}
+            variant="ghost"
+          >
+            {t("common:actions.cancel")}
+          </Button>
+          {step > 0 ? (
+            <Button
+              disabled={form.pending}
+              key="back"
+              onClick={() => goTo(step - 1)}
+              ref={backRef}
+              variant="outline"
+            >
+              {t("common:actions.back")}
+            </Button>
+          ) : null}
+          <Button
+            form={form.formId}
+            key="next"
+            loading={form.pending}
+            loadingText={t("form.submitCreating")}
+            ref={nextRef}
+            type="submit"
+          >
+            {last ? t("form.submitCreate") : t("common:actions.next")}
+          </Button>
+        </>
+      }
       initialFocus={form.refs.name}
       onOpenChange={onOpenChange}
       open={open}
+      panel={false}
       title={t("form.createTitle")}
     >
-      <form
-        aria-busy={form.pending || undefined}
-        className="flex flex-col gap-4"
-        id={form.formId}
-        noValidate
-        onSubmit={form.onSubmit}
-      >
-        <NameAndExpiry form={form} />
-        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
-          <LimitField field="tokenLimit" form={form} />
-          <LimitField field="callLimit" form={form} />
-          <LimitField field="rpmLimit" form={form} />
-          <FieldHint className="sm:col-span-3">{t("form.limitsHint")}</FieldHint>
-        </div>
-        <AccountsField form={form} />
-        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-          <LimitField field="creditLimit" form={form} />
-          <RoutingField form={form} />
-        </div>
-        <ModelsField form={form} />
-        <CustomKeyField form={form} />
-        <ServerError form={form} />
-      </form>
+      {/* The steps as three bars, done and current ones filled; the description names the step. */}
+      <div aria-hidden="true" className="flex gap-2 px-4 pb-3">
+        {CREATE_STEPS.map((name, index) => (
+          <span
+            className={cn(
+              "h-1 flex-1 rounded-full",
+              index <= step ? "bg-primary" : "bg-chart-scale-01",
+            )}
+            key={name}
+          />
+        ))}
+      </div>
+      <DialogPanel>
+        <form
+          aria-busy={form.pending || undefined}
+          className="flex flex-col gap-4"
+          id={form.formId}
+          noValidate
+          onSubmit={onSubmit}
+        >
+          <div className="flex flex-col gap-4" ref={stepRef}>
+            {step === 0 ? (
+              <>
+                <NameAndExpiry form={form} />
+                <CustomKeyField form={form} />
+              </>
+            ) : step === 1 ? (
+              <LimitsGrid form={form} />
+            ) : (
+              <>
+                <AccountsField form={form} />
+                <RoutingField form={form} />
+                <ModelsField form={form} />
+              </>
+            )}
+          </div>
+          {last ? <ServerError form={form} /> : null}
+        </form>
+      </DialogPanel>
     </ResponsiveDialog>
   );
 }
@@ -492,13 +630,7 @@ function ApiKeyEditSheet({
           >
             <NameAndExpiry form={form} />
             <CustomKeyField form={form} />
-            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-              <LimitField field="tokenLimit" form={form} />
-              <LimitField field="creditLimit" form={form} />
-              <LimitField field="callLimit" form={form} />
-              <LimitField field="rpmLimit" form={form} />
-              <FieldHint className="sm:col-span-2">{t("form.limitsHint")}</FieldHint>
-            </div>
+            <LimitsGrid form={form} />
           </SectionCard>
           <SectionCard icon={UserMultipleIcon} title={t("form.accounts")}>
             <AccountsField form={form} hideLegend />

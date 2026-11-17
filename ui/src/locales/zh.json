@@ -23,6 +23,7 @@
   "actions.details": "详情",
   "actions.more": "更多操作",
   "actions.back": "返回",
+  "actions.next": "下一步",
   "actions.copy": "复制",
   "actions.copyValue": "复制 {label}",
   "actions.viewAll": "查看全部",

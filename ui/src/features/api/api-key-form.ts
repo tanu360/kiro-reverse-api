@@ -70,11 +70,13 @@ export type ApiKeyLimitField = "tokenLimit" | "creditLimit" | "callLimit" | "rpm
 /** Any field the form can mark invalid. */
 export type ApiKeyFormField = ApiKeyLimitField | "accountIds" | "allowedModels";
 
-type ApiKeyFormResult =
-  | { ok: true; value: ApiKeyFormData }
+/** Why the form was refused, and the one field to mark. */
+export type ApiKeyFormFailure =
   | { ok: false; error: "invalidLimits"; field: ApiKeyLimitField }
   | { ok: false; error: "noAccounts"; field: "accountIds" }
   | { ok: false; error: "noModels" | "tooManyModels" | "modelTooLong"; field: "allowedModels" };
+
+type ApiKeyFormResult = { ok: true; value: ApiKeyFormData } | ApiKeyFormFailure;
 
 export const EMPTY_API_KEY_FORM: ApiKeyFormValues = {
   name: "",

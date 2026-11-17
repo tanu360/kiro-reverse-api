@@ -23,6 +23,7 @@
   "actions.details": "Detalhes",
   "actions.more": "Mais ações",
   "actions.back": "Voltar",
+  "actions.next": "Avançar",
   "actions.copy": "Copiar",
   "actions.copyValue": "Copiar {label}",
   "actions.viewAll": "Ver tudo",
