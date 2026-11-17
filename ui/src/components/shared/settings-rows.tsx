@@ -53,13 +53,14 @@ const CONTROL_WIDTH: Record<ControlWidth, string> = {
 
 /*
  * Compact rows (a dialog or a sheet, about 450 px wide): 12 px above and below, the text keeps
- * 10rem, the gap is 24 px, and a field (14rem) or a number (9rem) goes beside the text as soon as
+ * 10rem, the gap is 24 px, and a field (14rem) or a number (11rem) goes beside the text as soon as
  * both fit, under it before that (on a phone). The breakpoints are text + gap + control, so the
  * control never wraps at its narrow width.
  */
 const COMPACT_CONTROL_WIDTH: Partial<Record<ControlWidth, string>> = {
   field: "w-full @min-[25.5rem]/settings-row:w-56",
-  number: "w-full @min-[20.5rem]/settings-row:w-36",
+  // 11rem: "2,000,000" fits between the − and + buttons.
+  number: "w-full @min-[22.5rem]/settings-row:w-44",
 };
 
 /** A row title: a Label for the control when `htmlFor` is set, red in a danger row. */
