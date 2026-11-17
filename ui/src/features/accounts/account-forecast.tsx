@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { JSX } from "react";
+import { type JSX, useCallback } from "react";
 import { accountForecastQuery } from "@/lib/api/accounts";
 import type { AccountForecast, AccountForecastResponse } from "@/lib/api/types";
 import { dateTimeFormat, formatRelativeTime, unixToDate } from "@/lib/format";
@@ -13,19 +13,22 @@ const LEFT_OVER_MIN = 1;
 
 /** The forecast of one account, from the shared GET /accounts/forecast; undefined until it loads. */
 export function useAccountForecast(accountId: string): AccountForecast | undefined {
-  const { data } = useQuery({
-    ...accountForecastQuery(),
-    select: (res: AccountForecastResponse) => res.forecasts?.[accountId],
-  });
+  // A stable select runs once per fetch, not on every render of every row.
+  const select = useCallback(
+    (res: AccountForecastResponse) => res.forecasts?.[accountId],
+    [accountId],
+  );
+  const { data } = useQuery({ ...accountForecastQuery(), select });
   return data;
+}
+
+function selectWindowDays(res: AccountForecastResponse): number {
+  return res.windowDays;
 }
 
 /** The forecast window in days, 7 until the response says otherwise. */
 function useForecastWindow(): number {
-  const { data } = useQuery({
-    ...accountForecastQuery(),
-    select: (res: AccountForecastResponse) => res.windowDays,
-  });
+  const { data } = useQuery({ ...accountForecastQuery(), select: selectWindowDays });
   return data ?? 7;
 }
 

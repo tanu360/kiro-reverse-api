@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, Suspense, useId, useState } from "react";
+import { type JSX, lazy, Suspense, useId, useMemo, useState } from "react";
 import { Skeleton as SkulletSkeleton } from "skullet/react";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { CreditAmount } from "@/components/shared/credit-amount";
@@ -99,17 +99,23 @@ function ActivityStrip({
   const { t, lang } = useT("accounts");
   const query = useQuery(heatmapQuery(HOURS * 60, { bucketMin: 60, live: false }));
   const [hovered, setHovered] = useState<number | null>(null);
+  // Kept per poll, so moving the pointer along the chart re-renders the summary line, not the
+  // chart.
+  const row = query.data?.accounts.find((item) => item.accountId === accountId);
+  const cells = useMemo(
+    (): HeatmapCell[] =>
+      // Offset 0 is the current hour: reverse so the newest point is on the right.
+      row
+        ? row.cells.slice(0, HOURS).reverse()
+        : Array.from({ length: HOURS }, (_, index) => ({
+            offset: HOURS - 1 - index,
+            reqs: 0,
+            failures: 0,
+          })),
+    [row],
+  );
   if (query.isError) return null;
 
-  const row = query.data?.accounts.find((item) => item.accountId === accountId);
-  // Offset 0 is the current hour: reverse so the newest point is on the right.
-  const cells: HeatmapCell[] = row
-    ? row.cells.slice(0, HOURS).reverse()
-    : Array.from({ length: HOURS }, (_, index) => ({
-        offset: HOURS - 1 - index,
-        reqs: 0,
-        failures: 0,
-      }));
   const total = cells.reduce((sum, cell) => sum + cell.reqs, 0);
   const failures = cells.reduce((sum, cell) => sum + cell.failures, 0);
   const point = hovered === null ? undefined : cells[hovered];

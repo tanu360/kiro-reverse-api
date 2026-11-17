@@ -6,7 +6,7 @@ import {
   UsersIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type JSX, type ReactNode, useMemo, useRef } from "react";
+import { type JSX, memo, type ReactNode, useMemo, useRef } from "react";
 import {
   FilterBar,
   FilterTrigger,
@@ -180,7 +180,7 @@ const STATUS_GROUP_ICON = {
  * it (or a filter on it is set). Needs attention groups the problem statuses; once it is picked,
  * an Issue select narrows it to one of them.
  */
-export function AccountsToolbar({
+export const AccountsToolbar = memo(function AccountsToolbar({
   accounts,
   filters,
   onFiltersChange,
@@ -371,4 +371,4 @@ export function AccountsToolbar({
       </FilterBar>
     </div>
   );
-}
+});

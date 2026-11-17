@@ -8,7 +8,15 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type JSX,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -82,6 +90,22 @@ function useClockAt(tick: number): number {
   return next.nowSec;
 }
 
+/**
+ * The previous array while it holds the same items in the same order, so a refetch that changes
+ * none of the page's accounts (or a clock tick) does not render the table again.
+ */
+function useSameItems<T>(items: T[]): T[] {
+  const kept = useRef(items);
+  const previous = kept.current;
+  if (
+    previous !== items &&
+    (previous.length !== items.length || items.some((item, index) => item !== previous[index]))
+  ) {
+    kept.current = items;
+  }
+  return kept.current;
+}
+
 export function AccountsPage(): JSX.Element {
   const { t } = useT("accounts");
   const { t: tc } = useT();
@@ -124,13 +148,17 @@ export function AccountsPage(): JSX.Element {
     () => ({ q, status, plan, auth, region, enabled, tag }),
     [q, status, plan, auth, region, enabled, tag],
   );
+  // The search field follows every key at once; the rows follow the filters (and the page, which
+  // a filter change resets) at a lower priority, so typing never waits for the table.
+  const listView = useMemo(() => ({ filters, page: search.page }), [filters, search.page]);
+  const shownView = useDeferredValue(listView);
   const sort = search.sort;
   const desc = search.order ? search.order === "desc" : sort ? defaultSortDesc(sort) : false;
   // One clock per fetch, so the token-expiry status does not change between filter and sort.
   const nowSec = useClockAt(query.dataUpdatedAt);
   const filtered = useMemo(
-    () => filterAccounts(accounts, filters, nowSec),
-    [accounts, filters, nowSec],
+    () => filterAccounts(accounts, shownView.filters, nowSec),
+    [accounts, shownView.filters, nowSec],
   );
   const sorted = useMemo(
     () => sortAccounts(filtered, sort, desc, nowSec),
@@ -138,31 +166,47 @@ export function AccountsPage(): JSX.Element {
   );
   const pageSize = search.pageSize ?? DEFAULT_PAGE_SIZE;
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const page = Math.min(search.page ?? 1, pageCount);
-  const pageRows = useMemo(
+  const page = Math.min(shownView.page ?? 1, pageCount);
+  const pageSlice = useMemo(
     () => sorted.slice((page - 1) * pageSize, page * pageSize),
     [sorted, page, pageSize],
   );
+  const pageRows = useSameItems(pageSlice);
 
-  const updateSearch = (patch: Partial<AccountsSearch>, replace = true) => {
-    void navigate({ search: (prev) => ({ ...prev, ...patch }), replace });
-  };
+  // Stable callbacks (navigate is), so the memoised table and toolbar skip unrelated renders.
+  const updateSearch = useCallback(
+    (patch: Partial<AccountsSearch>, replace = true) => {
+      void navigate({ search: (prev) => ({ ...prev, ...patch }), replace });
+    },
+    [navigate],
+  );
   // Any filter change starts over at page 1.
-  const setFilters = (patch: Partial<AccountFilters>) =>
-    updateSearch({ ...patch, page: undefined });
-  const clearFilters = () =>
-    setFilters(
-      Object.fromEntries(
-        ["q", ...FILTER_DIMENSIONS].map((key) => [key, undefined]),
-      ) as Partial<AccountFilters>,
-    );
-  const setSort = (next: AccountSort | undefined, nextDesc: boolean) =>
-    updateSearch({
-      sort: next,
-      order: next ? (nextDesc ? "desc" : "asc") : undefined,
-      page: undefined,
-    });
-  const setAddOpen = (open: boolean) => updateSearch({ add: open ? true : undefined }, false);
+  const setFilters = useCallback(
+    (patch: Partial<AccountFilters>) => updateSearch({ ...patch, page: undefined }),
+    [updateSearch],
+  );
+  const clearFilters = useCallback(
+    () =>
+      setFilters(
+        Object.fromEntries(
+          ["q", ...FILTER_DIMENSIONS].map((key) => [key, undefined]),
+        ) as Partial<AccountFilters>,
+      ),
+    [setFilters],
+  );
+  const setSort = useCallback(
+    (next: AccountSort | undefined, nextDesc: boolean) =>
+      updateSearch({
+        sort: next,
+        order: next ? (nextDesc ? "desc" : "asc") : undefined,
+        page: undefined,
+      }),
+    [updateSearch],
+  );
+  const setAddOpen = useCallback(
+    (open: boolean) => updateSearch({ add: open ? true : undefined }, false),
+    [updateSearch],
+  );
 
   const onRefreshAllModels = async () => {
     const ok = await confirm({
@@ -193,48 +237,62 @@ export function AccountsPage(): JSX.Element {
     }
   };
 
-  const onExport = (ids?: string[]) => {
-    if (accounts.length === 0) {
-      toast.warning(t("export.noAccounts"));
-      return;
-    }
-    setExportState({ open: true, ids });
-  };
+  const listEmpty = accounts.length === 0;
+  const onExport = useCallback(
+    (ids?: string[]) => {
+      if (listEmpty) {
+        toast.warning(t("export.noAccounts"));
+        return;
+      }
+      setExportState({ open: true, ids });
+    },
+    [listEmpty, t],
+  );
+  const onExportOpenChange = useCallback(
+    (open: boolean) => setExportState((current) => ({ ...current, open })),
+    [],
+  );
 
   const onTest = useCallback((account: Account) => openTest(account.id), [openTest]);
   const onDetails = useCallback((account: Account) => openDetail(account.id), [openDetail]);
   const onRelogin = useCallback((account: Account) => openRelogin(account.id), [openRelogin]);
 
+  // The filters the rows were drawn with, so the empty state matches the rows it stands for.
+  const shownFilters = shownView.filters;
   const hasFilters =
-    Boolean(filters.q) || FILTER_DIMENSIONS.some((dimension) => filters[dimension] !== undefined);
-  const emptyState =
-    accounts.length === 0 ? (
-      <EmptyState
-        action={
-          <Button onClick={() => setAddOpen(true)}>
-            <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-            {t("actions.add")}
-          </Button>
-        }
-        description={t("empty.body")}
-        icon={UsersRoundIcon}
-        title={t("empty.title")}
-      />
-    ) : (
-      <EmptyState
-        action={
-          hasFilters ? (
-            <Button onClick={clearFilters} variant="secondary">
-              {tc("actions.clearFilters")}
+    Boolean(shownFilters.q) ||
+    FILTER_DIMENSIONS.some((dimension) => shownFilters[dimension] !== undefined);
+  const emptyState = useMemo(
+    () =>
+      listEmpty ? (
+        <EmptyState
+          action={
+            <Button onClick={() => setAddOpen(true)}>
+              <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+              {t("actions.add")}
             </Button>
-          ) : undefined
-        }
-        description={tc("state.noMatchesBody")}
-        icon={SearchXIcon}
-        title={tc("state.noMatches")}
-        variant="compact"
-      />
-    );
+          }
+          description={t("empty.body")}
+          icon={UsersRoundIcon}
+          title={t("empty.title")}
+        />
+      ) : (
+        <EmptyState
+          action={
+            hasFilters ? (
+              <Button onClick={clearFilters} variant="secondary">
+                {tc("actions.clearFilters")}
+              </Button>
+            ) : undefined
+          }
+          description={tc("state.noMatchesBody")}
+          icon={SearchXIcon}
+          title={tc("state.noMatches")}
+          variant="compact"
+        />
+      ),
+    [listEmpty, hasFilters, setAddOpen, clearFilters, t, tc],
+  );
 
   const testAccount = test ? accounts.find((account) => account.id === test.id) : undefined;
   const reloginAccount = relogin
@@ -244,11 +302,53 @@ export function AccountsPage(): JSX.Element {
   const noAccounts = !query.isPending && !query.isError && accounts.length === 0;
   const loadFailed = query.isError && !query.data;
 
-  const onPageSizeChange = (size: number) =>
-    updateSearch({
-      pageSize: size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
-      page: undefined,
-    });
+  const onPageSizeChange = useCallback(
+    (size: number) =>
+      updateSearch({
+        pageSize: size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
+        page: undefined,
+      }),
+    [updateSearch],
+  );
+
+  const pending = query.isPending;
+  const tabActions = useMemo(
+    () =>
+      // A quiet action at the end of the tab row: no fill and no border, the label lighting up
+      // on hover; an icon button with a tooltip on phones. It waits for the list, so it never
+      // exports an empty fleet.
+      phone ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={t("actions.export")}
+                disabled={pending}
+                onClick={() => onExport()}
+                size="icon-sm"
+                variant="quiet"
+              />
+            }
+          >
+            <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipPopup>{t("actions.export")}</TooltipPopup>
+        </Tooltip>
+      ) : (
+        <Button
+          // The label, not the invisible box, lines up with the card's content edge.
+          className="-me-2.5"
+          disabled={pending}
+          onClick={() => onExport()}
+          size="sm"
+          variant="quiet"
+        >
+          <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+          {t("actions.export")}
+        </Button>
+      ),
+    [phone, pending, onExport, t],
+  );
 
   const toolbar =
     noAccounts || loadFailed ? undefined : (
@@ -256,7 +356,7 @@ export function AccountsPage(): JSX.Element {
         accounts={accounts}
         desc={desc}
         filters={filters}
-        loading={query.isPending}
+        loading={pending}
         onClearFilters={clearFilters}
         onFiltersChange={setFilters}
         onPageSizeChange={onPageSizeChange}
@@ -265,41 +365,7 @@ export function AccountsPage(): JSX.Element {
         pageSizeOptions={PAGE_SIZES}
         shown={sorted.length}
         sort={sort}
-        tabActions={
-          // A quiet action at the end of the tab row: no fill and no border, the label lighting up
-          // on hover; an icon button with a tooltip on phones. It waits for the list, so it never
-          // exports an empty fleet.
-          phone ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label={t("actions.export")}
-                    disabled={query.isPending}
-                    onClick={() => onExport()}
-                    size="icon-sm"
-                    variant="quiet"
-                  />
-                }
-              >
-                <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
-              </TooltipTrigger>
-              <TooltipPopup>{t("actions.export")}</TooltipPopup>
-            </Tooltip>
-          ) : (
-            <Button
-              // The label, not the invisible box, lines up with the card's content edge.
-              className="-me-2.5"
-              disabled={query.isPending}
-              onClick={() => onExport()}
-              size="sm"
-              variant="quiet"
-            >
-              <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
-              {t("actions.export")}
-            </Button>
-          )
-        }
+        tabActions={tabActions}
       />
     );
 
@@ -360,8 +426,8 @@ export function AccountsPage(): JSX.Element {
               accounts={pageRows}
               desc={desc}
               emptyState={emptyState}
-              filtered={hasFilters && accounts.length > 0}
-              loading={query.isPending}
+              filtered={hasFilters && !listEmpty}
+              loading={pending}
               onDetails={onDetails}
               onSelectionChange={setSelected}
               onSortChange={setSort}
@@ -407,7 +473,7 @@ export function AccountsPage(): JSX.Element {
       <ExportDialog
         accounts={accounts}
         initialSelection={exportState.ids}
-        onOpenChange={(open) => setExportState((current) => ({ ...current, open }))}
+        onOpenChange={onExportOpenChange}
         open={exportState.open}
       />
       <BatchTagDialog

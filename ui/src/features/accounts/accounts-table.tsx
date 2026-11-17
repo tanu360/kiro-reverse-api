@@ -1,4 +1,4 @@
-import { type JSX, type ReactNode, useMemo } from "react";
+import { type JSX, memo, type ReactNode, useCallback, useMemo } from "react";
 import {
   DataTable,
   type DataTableCardContext,
@@ -51,6 +51,13 @@ function width(classes: string): { className: string; headerClassName: string } 
 
 const SORTABLE = new Set<string>(ACCOUNT_SORTS);
 
+// Module-level, so the table's row props stay the same from one render to the next.
+const accountRowId = (account: Account): string => account.id;
+// The phone loading rows take the account card's shape and height.
+const renderAccountCardSkeleton = (): ReactNode => (
+  <ListCardSkeleton action leading lines={1} meter stats={3} variant="row" />
+);
+
 interface AccountsTableProps extends RowActionHandlers {
   /** The rows of the current page, already filtered and sorted. */
   accounts: Account[];
@@ -70,9 +77,10 @@ interface AccountsTableProps extends RowActionHandlers {
 /**
  * The accounts table, with comfortable two-line rows; below a 42rem table (@2xl) each row is a
  * card divided inside the surrounding card. Sorting, filtering and paging happen in the page;
- * this renders the rows it is given.
+ * this renders the rows it is given. Memoised, with stable props for DataTable: opening a sheet
+ * or a dialog on the page does not render the rows again.
  */
-export function AccountsTable({
+export const AccountsTable = memo(function AccountsTable({
   accounts,
   loading,
   pageSize,
@@ -177,7 +185,34 @@ export function AccountsTable({
     [t, tc, lang, onDetails, onTest],
   );
 
-  const tableSort: DataTableSort | null = sort ? { id: sort, desc } : null;
+  const tableSort = useMemo<DataTableSort | null>(
+    () => (sort ? { id: sort, desc } : null),
+    [sort, desc],
+  );
+  const onTableSortChange = useCallback(
+    (next: DataTableSort) => {
+      if (SORTABLE.has(next.id)) onSortChange(next.id as AccountSort, next.desc);
+    },
+    [onSortChange],
+  );
+  const renderCard = useCallback(
+    (account: Account, ctx: DataTableCardContext) => (
+      <AccountCard account={account} ctx={ctx} onDetails={onDetails} onTest={onTest} />
+    ),
+    [onDetails, onTest],
+  );
+  const rowLabel = useCallback(
+    (account: Account) => t("openDetails", { email: accountName(account).text }),
+    [t, accountName],
+  );
+  const selectionRowLabel = useCallback(
+    (account: Account) => accountName(account).text,
+    [accountName],
+  );
+  const selection = useMemo(
+    () => ({ selected, onChange: onSelectionChange, rowLabel: selectionRowLabel }),
+    [selected, onSelectionChange, selectionRowLabel],
+  );
 
   return (
     <DataTable
@@ -190,31 +225,20 @@ export function AccountsTable({
       density="comfortable"
       emptyState={emptyState}
       filtered={filtered}
-      getRowId={(account) => account.id}
+      getRowId={accountRowId}
       inset
       loading={loading}
       onRowClick={onDetails}
-      onSortChange={(next) => {
-        if (SORTABLE.has(next.id)) onSortChange(next.id as AccountSort, next.desc);
-      }}
+      onSortChange={onTableSortChange}
       pageSize={pageSize}
-      renderCard={(account, ctx) => (
-        <AccountCard account={account} ctx={ctx} onDetails={onDetails} onTest={onTest} />
-      )}
-      // The phone loading rows take the account card's shape and height.
-      renderCardSkeleton={() => (
-        <ListCardSkeleton action leading lines={1} meter stats={3} variant="row" />
-      )}
-      rowLabel={(account) => t("openDetails", { email: accountName(account).text })}
-      selection={{
-        selected,
-        onChange: onSelectionChange,
-        rowLabel: (account) => accountName(account).text,
-      }}
+      renderCard={renderCard}
+      renderCardSkeleton={renderAccountCardSkeleton}
+      rowLabel={rowLabel}
+      selection={selection}
       sort={tableSort}
     />
   );
-}
+});
 
 /** Tags a phone card shows on their own line; more fold into a "+N" pill. */
 const CARD_TAGS = 3;

@@ -5,7 +5,7 @@ import {
   SquareLock02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type JSX, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type JSX, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -62,10 +62,62 @@ function maskSecrets(value: unknown, key = ""): unknown {
 }
 
 /**
+ * One account in the pick list. Memoised: a click re-renders only the row it checks, not the
+ * whole pool.
+ */
+const ExportRow = memo(function ExportRow({
+  account,
+  checked,
+  onToggle,
+}: {
+  account: Account;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}): JSX.Element {
+  const { t } = useT("accounts");
+  const name = useAccountName()(account);
+  const id = `export-${account.id}`;
+  return (
+    <li>
+      <label
+        className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-(--row-hover)"
+        htmlFor={id}
+      >
+        <Checkbox
+          // Named by the account alone; the meta line and status pill follow.
+          aria-labelledby={`${id}-name`}
+          checked={checked}
+          id={id}
+          onCheckedChange={() => onToggle(account.id)}
+        />
+        <AuthIcon account={account} />
+        <span className="min-w-0 flex-1">
+          <span
+            id={`${id}-name`}
+            className={
+              name.mono
+                ? "block truncate font-mono text-meta"
+                : "block truncate font-medium text-sm/5"
+            }
+          >
+            {name.text}
+          </span>
+          <span className="block truncate text-meta text-muted-foreground">
+            {accountMeta(account, t)}
+          </span>
+        </span>
+        <StatusPill account={account} plain size="sm" />
+      </label>
+    </li>
+  );
+});
+
+/**
  * Exports the chosen accounts (the list filter does not apply). The JSON holds live secrets:
  * it is never logged or cached, and lives only in this dialog's state while it is shown.
+ * Memoised: the page renders it on every change of its own, while it is mostly closed.
  */
-export function ExportDialog({
+export const ExportDialog = memo(function ExportDialog({
   accounts,
   open,
   onOpenChange,
@@ -79,7 +131,6 @@ export function ExportDialog({
 }): JSX.Element {
   const { t } = useT("accounts");
   const { t: tc } = useT();
-  const accountName = useAccountName();
   const jsonId = useId();
   const selectAllId = useId();
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -123,32 +174,54 @@ export function ExportDialog({
       accounts.map((account) => [account.id, statusGroup(accountStatus(account, now))]),
     );
   }, [accounts]);
-  const groupIds = (group: QuickGroup) =>
-    accounts
-      .filter((account) => group === "all" || groups.get(account.id) === group)
-      .map((account) => account.id);
+  // Each quick pick's ids, once per list instead of on every render and click.
+  const groupIdLists = useMemo(
+    () =>
+      Object.fromEntries(
+        QUICK_GROUPS.map((group) => [
+          group,
+          accounts
+            .filter((account) => group === "all" || groups.get(account.id) === group)
+            .map((account) => account.id),
+        ]),
+      ) as Record<QuickGroup, string[]>,
+    [accounts, groups],
+  );
+  const groupIds = (group: QuickGroup) => groupIdLists[group];
   /** The quick pick the selection equals, if any. */
-  const pickedGroup = QUICK_GROUPS.find((group) => {
-    const ids = groupIds(group);
-    return ids.length > 0 && ids.length === selected.size && ids.every((id) => selected.has(id));
-  });
+  const pickedGroup = useMemo(
+    () =>
+      QUICK_GROUPS.find((group) => {
+        const ids = groupIdLists[group];
+        return (
+          ids.length > 0 && ids.length === selected.size && ids.every((id) => selected.has(id))
+        );
+      }),
+    [groupIdLists, selected],
+  );
 
   // The search narrows the list by email or nickname; the selection keeps hidden rows.
   const visible = useMemo(
     () => (query.trim() ? filterAccounts(accounts, { q: query }, 0) : accounts),
     [accounts, query],
   );
-  const visibleSelected = visible.filter((account) => selected.has(account.id)).length;
+  const visibleSelected = useMemo(
+    () => visible.filter((account) => selected.has(account.id)).length,
+    [visible, selected],
+  );
   const allVisible = visible.length > 0 && visibleSelected === visible.length;
   const someVisible = visibleSelected > 0 && !allVisible;
 
-  const toggle = (id: string) =>
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggle = useCallback(
+    (id: string) =>
+      setSelected((current) => {
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    [],
+  );
 
   const toggleVisible = () =>
     setSelected((current) => {
@@ -161,7 +234,10 @@ export function ExportDialog({
     });
 
   const selectedIds = () => accounts.filter((a) => selected.has(a.id)).map((a) => a.id);
-  const selectedCount = selectedIds().length;
+  const selectedCount = useMemo(
+    () => accounts.reduce((count, account) => count + (selected.has(account.id) ? 1 : 0), 0),
+    [accounts, selected],
+  );
 
   /** Fetches the export, or warns when nothing is selected. Server errors toast. */
   const fetchExport = async (): Promise<ExportData | null> => {
@@ -406,43 +482,14 @@ export function ExportDialog({
                 scrollFade
               >
                 <ul aria-label={t("export.list")} className="divide-y divide-border-subtle">
-                  {visible.map((account) => {
-                    const name = accountName(account);
-                    const id = `export-${account.id}`;
-                    return (
-                      <li key={account.id}>
-                        <label
-                          className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-(--row-hover)"
-                          htmlFor={id}
-                        >
-                          <Checkbox
-                            // Named by the account alone; the meta line and status pill follow.
-                            aria-labelledby={`${id}-name`}
-                            checked={selected.has(account.id)}
-                            id={id}
-                            onCheckedChange={() => toggle(account.id)}
-                          />
-                          <AuthIcon account={account} />
-                          <span className="min-w-0 flex-1">
-                            <span
-                              id={`${id}-name`}
-                              className={
-                                name.mono
-                                  ? "block truncate font-mono text-meta"
-                                  : "block truncate font-medium text-sm/5"
-                              }
-                            >
-                              {name.text}
-                            </span>
-                            <span className="block truncate text-meta text-muted-foreground">
-                              {accountMeta(account, t)}
-                            </span>
-                          </span>
-                          <StatusPill account={account} plain size="sm" />
-                        </label>
-                      </li>
-                    );
-                  })}
+                  {visible.map((account) => (
+                    <ExportRow
+                      account={account}
+                      checked={selected.has(account.id)}
+                      key={account.id}
+                      onToggle={toggle}
+                    />
+                  ))}
                 </ul>
               </ScrollArea>
             ) : (
@@ -453,4 +500,4 @@ export function ExportDialog({
       </div>
     </ResponsiveDialog>
   );
-}
+});

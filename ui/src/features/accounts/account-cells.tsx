@@ -14,7 +14,7 @@ import {
   ZapIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import type { ComponentType, JSX, ReactNode } from "react";
+import { type ComponentType, type JSX, type ReactNode, useCallback } from "react";
 import { AwsLogo, GithubLogo, GoogleLogo, MicrosoftLogo } from "@/components/shared/brand-logos";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { TruncatedText } from "@/components/shared/truncated-text";
@@ -113,10 +113,14 @@ export function StatusPill({
  */
 export function useAccountName(): (account: Account) => { text: string; mono: boolean } {
   const displayEmail = useDisplayEmail();
-  return (account) => ({
-    text: displayEmail(account.email, account.id),
-    mono: isApiKeyAccount(account) || !account.email,
-  });
+  // Stable while the privacy mode holds, so the lists' memoised row props stay equal.
+  return useCallback(
+    (account: Account) => ({
+      text: displayEmail(account.email, account.id),
+      mono: isApiKeyAccount(account) || !account.email,
+    }),
+    [displayEmail],
+  );
 }
 
 /** The account's name cut to its column, with the full text as a tooltip only when cut off. */

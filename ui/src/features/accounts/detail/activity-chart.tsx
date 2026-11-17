@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { type JSX, memo, useCallback, useMemo } from "react";
 import { AreaSparkline } from "@/components/charts/sparkline";
 
 /** The idle day's line: the stat tiles' quiet grey (overview/stat-sparkline). */
@@ -14,9 +14,10 @@ export interface ActivityPoint {
  * both on one 0..peak scale so they line up. Hovering moves a dashed guide and a dot along the
  * requests and reports the hour through `onHover` (the summary line above says it in words, so
  * the drawing itself is hidden from screen readers). Loaded lazily: the chart code stays out of
- * the Accounts route chunk until a sheet opens.
+ * the Accounts route chunk until a sheet opens. Memoised: the hover it reports re-renders the
+ * summary above, not the chart.
  */
-export default function ActivityChart({
+export default memo(function ActivityChart({
   data,
   height,
   onHover,
@@ -29,9 +30,10 @@ export default function ActivityChart({
   /** No request in the day: a quiet grey line on the floor, so it does not read as traffic. */
   idle?: boolean;
 }): JSX.Element {
-  const peak = Math.max(1, ...data.map((point) => point.reqs));
-  const domain: [number, number] = [0, peak];
+  const peak = useMemo(() => Math.max(1, ...data.map((point) => point.reqs)), [data]);
+  const domain = useMemo((): [number, number] => [0, peak], [peak]);
   const hasFailures = data.some((point) => point.failures > 0);
+  const onHoverChange = useCallback((index: number | null) => onHover(index), [onHover]);
   return (
     <div aria-hidden="true" className="relative">
       <AreaSparkline
@@ -44,7 +46,7 @@ export default function ActivityChart({
         fill="solid"
         fillOpacity={idle ? 0 : 0.14}
         height={height}
-        onHoverChange={(index) => onHover(index)}
+        onHoverChange={onHoverChange}
         strokeWidth={1.75}
         yDomain={domain}
       />
@@ -67,4 +69,4 @@ export default function ActivityChart({
       ) : null}
     </div>
   );
-}
+});
