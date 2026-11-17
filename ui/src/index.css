@@ -457,6 +457,16 @@
   --control-text: 1rem;
   --control-text-leading: 1.5;
 }
+/*
+ * Phones: a field's placeholder stays at 14 px. The typed text keeps 16 px, since iOS zooms into a
+ * field whose own text is smaller, but the placeholder does not count, and at 16 px it read
+ * larger than the 12 / 14 px labels around a 32 px field.
+ */
+@media (width < 40rem) {
+  :is(input, textarea)::placeholder {
+    font-size: var(--text-sm);
+  }
+}
 @media (width >= 40rem) {
   :root {
     --control-text: 0.875rem;
