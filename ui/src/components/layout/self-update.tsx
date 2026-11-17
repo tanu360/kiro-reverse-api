@@ -85,6 +85,9 @@ export function useSelfUpdateController({
     onSuccess: (next) => queryClient.setQueryData(queryKeys.update, next),
     onError: (error) => toastError(error, tRef.current),
   });
+  // useMutation's result is a new object every render; its mutate is stable, so the value below
+  // (the update context's) only changes when the update does.
+  const download = begin.mutate;
 
   const restart = useCallback(() => {
     toast.dismiss(READY_TOAST_ID);
@@ -155,12 +158,12 @@ export function useSelfUpdateController({
       error: restartError ?? (status ? updateErrorText(status, t) : undefined),
       start: () => {
         setRestartError(undefined);
-        begin.mutate();
+        download();
       },
       restart,
       confirmRestart,
     }),
-    [status, enabled, target, phase, restartError, begin, restart, confirmRestart, t],
+    [status, enabled, target, phase, restartError, download, restart, confirmRestart, t],
   );
 }
 
