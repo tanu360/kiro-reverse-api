@@ -41,11 +41,6 @@ type BackupEntry struct {
 	IncludesCredentials bool   `json:"includesCredentials,omitempty"`
 }
 
-type BackupManifest struct {
-	Updated int64         `json:"updated"`
-	Entries []BackupEntry `json:"entries"`
-}
-
 type BackupSchedule struct {
 	Enabled bool   `json:"enabled,omitempty"`
 	Cadence string `json:"cadence,omitempty"`
@@ -644,19 +639,6 @@ func AutoSnapshotBeforeSave() {
 	backupMu.Lock()
 	_, _ = createBackupLocked("auto", "", data, accountCnt, version, includesCredentials, autoKeep)
 	backupMu.Unlock()
-}
-
-func GetBackupConfig() BackupConfig {
-	cfgLock.RLock()
-	defer cfgLock.RUnlock()
-	return cfg.Backup
-}
-
-func UpdateBackupConfig(bc BackupConfig) error {
-	cfgLock.Lock()
-	cfg.Backup = bc
-	defer cfgLock.Unlock()
-	return saveLocked()
 }
 
 func GetBackupSchedule() BackupSchedule {

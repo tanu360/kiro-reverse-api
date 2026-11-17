@@ -12,15 +12,6 @@ type RetryConfig struct {
 	MaxDelay      time.Duration
 }
 
-func DefaultRetryConfig() RetryConfig {
-	return RetryConfig{
-		MaxPerAccount: 3,
-		MaxPerRequest: 9,
-		BaseDelay:     100 * time.Millisecond,
-		MaxDelay:      5 * time.Second,
-	}
-}
-
 func (rc RetryConfig) CalculateBackoff(attempt int) time.Duration {
 	if attempt < 0 {
 		attempt = 0

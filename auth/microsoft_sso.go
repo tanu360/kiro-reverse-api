@@ -854,14 +854,6 @@ func issuerFromKAMUserID(userID string) string {
 	return u.Scheme + "://" + u.Host + "/" + segments[0] + "/v2.0"
 }
 
-func ExternalIdpTokenExpiry(accessToken string) int64 {
-	return parseExternalTokenMetadata(accessToken).ExpiresAt
-}
-
-func ExternalIdpTokenIssuer(accessToken string) string {
-	return parseExternalTokenMetadata(accessToken).Issuer
-}
-
 // ExternalIdpTokenIdentity extracts display-only identity hints from the JWT
 // payload returned by Microsoft's trusted token endpoint. Authorization never
 // relies on these unverified claims.

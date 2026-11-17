@@ -377,10 +377,6 @@ func getSortedEndpoints(preferred string) []kiroEndpoint {
 	return result
 }
 
-func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
-	return CallKiroAPIContext(context.Background(), account, payload, callback)
-}
-
 func CallKiroAPIContext(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	noteResponseAccount(ctx, account)
 	return callWithToolHistoryFallback(payload, func() error {

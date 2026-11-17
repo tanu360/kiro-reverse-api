@@ -484,10 +484,6 @@ func GetHost() string {
 	return cfg.Host
 }
 
-func GetDataDir() string {
-	return db.DataDir()
-}
-
 func GetAccounts() []Account {
 
 	if CredentialsLoaded() {
@@ -878,12 +874,6 @@ func UpdateStats(totalReq, successReq, failedReq, totalTokens int, totalCredits 
 	cfg.TotalTokens = totalTokens
 	cfg.TotalCredits = totalCredits
 	return Save()
-}
-
-func GetStats() (int, int, int, int, float64) {
-	cfgLock.RLock()
-	defer cfgLock.RUnlock()
-	return cfg.TotalRequests, cfg.SuccessRequests, cfg.FailedRequests, cfg.TotalTokens, cfg.TotalCredits
 }
 
 func UpdateAccountStats(id string, requestCount, errorCount, totalTokens int, totalCredits float64, lastUsed int64) error {

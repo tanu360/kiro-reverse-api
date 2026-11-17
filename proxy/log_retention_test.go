@@ -456,7 +456,7 @@ func TestLogRetentionAPI(t *testing.T) {
 
 	for body, code := range map[string]string{
 		`{"days":-1}`:   codeLogRetentionRange,
-		`{"days":366}`: codeLogRetentionRange,
+		`{"days":366}`:  codeLogRetentionRange,
 		`{}`:            codeLogRetentionRange,
 		`{"days":null}`: codeLogRetentionRange,
 		`{"days":1.5}`:  codeInvalidJSON,

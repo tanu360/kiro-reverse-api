@@ -73,36 +73,6 @@ func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 	return &result, nil
 }
 
-func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
-	url := regionalizeURL(fmt.Sprintf("%s/GetUserInfo", kiroRestAPIBase), account)
-
-	payload := `{"origin":"KIRO_IDE"}`
-	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
-	if err != nil {
-		return nil, err
-	}
-
-	setKiroHeaders(req, account)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := accountClient(account, false).Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result UserInfoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	ensureRestProfileArn(account)
 	baseURL := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroModelAPIBase)
@@ -851,13 +821,6 @@ type SubscriptionInfo struct {
 type UserInfo struct {
 	Email  string `json:"email"`
 	UserId string `json:"userId"`
-}
-
-type UserInfoResponse struct {
-	Email  string `json:"email"`
-	UserId string `json:"userId"`
-	Idp    string `json:"idp"`
-	Status string `json:"status"`
 }
 
 type ModelInfo struct {

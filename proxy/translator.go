@@ -1111,27 +1111,6 @@ func (t *OpenAITool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type OpenAIResponse struct {
-	ID      string         `json:"id"`
-	Object  string         `json:"object"`
-	Created int64          `json:"created"`
-	Model   string         `json:"model"`
-	Choices []OpenAIChoice `json:"choices"`
-	Usage   OpenAIUsage    `json:"usage"`
-}
-
-type OpenAIChoice struct {
-	Index        int           `json:"index"`
-	Message      OpenAIMessage `json:"message"`
-	FinishReason string        `json:"finish_reason"`
-}
-
-type OpenAIUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
 func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 	modelID := MapModel(req.Model)
 	origin := "AI_EDITOR"
@@ -2131,51 +2110,6 @@ func uniqueKiroToolName(name string, used map[string]bool) string {
 			used[candidate] = true
 			return candidate
 		}
-	}
-}
-
-func KiroToOpenAIResponse(content string, toolUses []KiroToolUse, inputTokens, outputTokens int, model string) *OpenAIResponse {
-	msg := OpenAIMessage{
-		Role: "assistant",
-	}
-
-	finishReason := "stop"
-
-	if len(toolUses) > 0 {
-		msg.Content = nil
-		if strings.TrimSpace(content) != "" {
-			msg.Content = content
-		}
-		msg.ToolCalls = make([]ToolCall, len(toolUses))
-		for i, tu := range toolUses {
-			args, _ := json.Marshal(tu.Input)
-			msg.ToolCalls[i] = ToolCall{
-				ID:   tu.ToolUseID,
-				Type: "function",
-			}
-			msg.ToolCalls[i].Function.Name = tu.Name
-			msg.ToolCalls[i].Function.Arguments = string(args)
-		}
-		finishReason = "tool_calls"
-	} else {
-		msg.Content = content
-	}
-
-	return &OpenAIResponse{
-		ID:      "chatcmpl-" + uuid.New().String(),
-		Object:  "chat.completion",
-		Created: time.Now().Unix(),
-		Model:   model,
-		Choices: []OpenAIChoice{{
-			Index:        0,
-			Message:      msg,
-			FinishReason: finishReason,
-		}},
-		Usage: OpenAIUsage{
-			PromptTokens:     inputTokens,
-			CompletionTokens: outputTokens,
-			TotalTokens:      inputTokens + outputTokens,
-		},
 	}
 }
 

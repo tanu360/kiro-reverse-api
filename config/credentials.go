@@ -54,12 +54,6 @@ func LoadCredentials() error {
 	return nil
 }
 
-func SaveCredentials() error {
-	credLock.Lock()
-	defer credLock.Unlock()
-	return saveCredentialsLocked()
-}
-
 func CredentialsSnapshot() (bool, []Account) {
 	credLock.RLock()
 	defer credLock.RUnlock()
