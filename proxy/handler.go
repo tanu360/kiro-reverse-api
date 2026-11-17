@@ -660,21 +660,25 @@ func buildAnthropicModelsResponse(cached []ModelInfo, thinkingSuffix string) []m
 	return models
 }
 
+// fallbackModelIDs are listed while no account has reported its models yet.
+var fallbackModelIDs = []string{
+	"claude-sonnet-5",
+	"claude-opus-5",
+	"claude-haiku-4.5",
+	"claude-sonnet-4.5",
+	"claude-opus-4.5",
+	"claude-sonnet-4",
+}
+
 func fallbackAnthropicModels(thinkingSuffix string) []map[string]interface{} {
-	return []map[string]interface{}{
-		buildModelInfo("claude-sonnet-5", "anthropic", true),
-		buildModelInfo("claude-sonnet-5"+thinkingSuffix, "anthropic", true),
-		buildModelInfo("claude-opus-5", "anthropic", true),
-		buildModelInfo("claude-opus-5"+thinkingSuffix, "anthropic", true),
-		buildModelInfo("claude-haiku-4.5", "anthropic", true),
-		buildModelInfo("claude-haiku-4.5"+thinkingSuffix, "anthropic", true),
-		buildModelInfo("claude-sonnet-4.5", "anthropic", true),
-		buildModelInfo("claude-sonnet-4.5"+thinkingSuffix, "anthropic", true),
-		buildModelInfo("claude-opus-4.5", "anthropic", true),
-		buildModelInfo("claude-opus-4.5"+thinkingSuffix, "anthropic", true),
-		buildModelInfo("claude-sonnet-4", "anthropic", true),
-		buildModelInfo("claude-sonnet-4"+thinkingSuffix, "anthropic", true),
+	models := make([]map[string]interface{}, 0, len(fallbackModelIDs)*2)
+	for _, id := range fallbackModelIDs {
+		models = append(models,
+			buildModelInfo(id, "anthropic", true),
+			buildModelInfo(id+thinkingSuffix, "anthropic", true),
+		)
 	}
+	return models
 }
 
 func modelSupportsImage(inputTypes []string) bool {
@@ -2724,6 +2728,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiListDuplicateAccounts(w, r)
 	case path == "/accounts/forecast" && r.Method == "GET":
 		h.apiAccountForecast(w, r)
+	case path == "/models" && r.Method == "GET":
+		h.apiListModels(w, r)
 	case path == "/accounts/duplicates/merge" && r.Method == "POST":
 		h.apiMergeDuplicateAccounts(w, r)
 
@@ -4564,6 +4570,36 @@ func (h *Handler) apiGetAccountModelsCached(w http.ResponseWriter, _ *http.Reque
 		"success": true,
 		"models":  models,
 	})
+}
+
+// apiListModels lists the model names an API key can be limited to: what the accounts last
+// reported (the fallback list before any did), then auto. Thinking variants are left out, as
+// a key's model check strips the suffix first. It never asks upstream, so it answers at once.
+func (h *Handler) apiListModels(w http.ResponseWriter, _ *http.Request) {
+	h.modelsCacheMu.RLock()
+	cached := h.cachedModels
+	h.modelsCacheMu.RUnlock()
+
+	models := make([]string, 0, len(cached)+1)
+	seen := make(map[string]bool, len(cached)+1)
+	add := func(id string) {
+		key := strings.ToLower(id)
+		if id == "" || seen[key] {
+			return
+		}
+		seen[key] = true
+		models = append(models, id)
+	}
+	for _, m := range cached {
+		add(m.ModelId)
+	}
+	if len(models) == 0 {
+		for _, id := range fallbackModelIDs {
+			add(id)
+		}
+	}
+	add("auto")
+	json.NewEncoder(w).Encode(map[string]interface{}{"models": models})
 }
 
 func (h *Handler) apiGetThinkingConfig(w http.ResponseWriter, _ *http.Request) {
