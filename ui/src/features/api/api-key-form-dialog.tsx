@@ -432,8 +432,8 @@ const FIELD_STEP: Readonly<Record<ApiKeyFormField, number>> = {
 };
 
 /**
- * Create: the app's dialog at its default width, in two steps: Basics (name, expiry, custom key,
- * the limits and the routing mode), then Access (accounts and models). Next checks the fields up to the
+ * Create: the app's dialog at its default width, in two steps: Basics (name, expiry, custom key
+ * and the limits), then Access (accounts, routing mode, models). Next checks the fields up to the
  * current step; the last step creates the key. Both steps share one body height, so the dialog
  * keeps its size between them, and a longer step scrolls inside it.
  */
@@ -552,7 +552,7 @@ function ApiKeyCreateDialog({
         ))}
       </div>
       {/* One height from sm up for both steps, so Next and Back never resize the dialog. */}
-      <div className="flex min-h-0 flex-1 flex-col sm:h-130 sm:flex-initial">
+      <div className="flex min-h-0 flex-1 flex-col sm:h-120 sm:flex-initial">
         <DialogPanel>
           <form
             aria-busy={form.pending || undefined}
@@ -567,11 +567,11 @@ function ApiKeyCreateDialog({
                   <NameAndExpiry form={form} />
                   <CustomKeyField form={form} />
                   <LimitsGrid form={form} />
-                  <RoutingField form={form} />
                 </>
               ) : (
                 <>
                   <AccountsField form={form} />
+                  <RoutingField form={form} />
                   <ModelsField form={form} />
                 </>
               )}
