@@ -1,6 +1,5 @@
 import {
   AlertCircleIcon,
-  DashboardSpeed02Icon,
   Key01Icon,
   Route01Icon,
   UserMultipleIcon,
@@ -77,23 +76,22 @@ import { ModelPicker } from "./model-picker";
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
 
 /** The form's parts: the create dialog's tabs, the edit sheet's sections, in this order. */
-type Section = "general" | "limits" | "accounts" | "routing";
+type Section = "general" | "accounts" | "routing";
 
-const SECTIONS: readonly Section[] = ["general", "limits", "accounts", "routing"];
+const SECTIONS: readonly Section[] = ["general", "accounts", "routing"];
 
 const SECTION_ICON: Readonly<Record<Section, IconSvgElement>> = {
   general: Key01Icon,
-  limits: DashboardSpeed02Icon,
   accounts: UserMultipleIcon,
   routing: Route01Icon,
 };
 
 /** Where each field that can fail lives, so a failed submit opens its tab. */
 const FIELD_SECTION: Readonly<Record<ApiKeyFormField, Section>> = {
-  tokenLimit: "limits",
-  creditLimit: "limits",
-  callLimit: "limits",
-  rpmLimit: "limits",
+  tokenLimit: "general",
+  creditLimit: "general",
+  callLimit: "general",
+  rpmLimit: "general",
   accountIds: "accounts",
   allowedModels: "routing",
 };
@@ -116,8 +114,6 @@ function sectionLabel(section: Section, t: TFunction): string {
   switch (section) {
     case "general":
       return t("form.tabGeneral");
-    case "limits":
-      return t("usage.limits");
     case "accounts":
       return t("form.accounts");
     case "routing":
@@ -232,26 +228,31 @@ function useKeyForm(
   };
 }
 
-/** Name, expiry and the custom key. */
+/**
+ * Name and expiry side by side (stacked on phones), the custom key under them, then the four
+ * limits two by two.
+ */
 function GeneralSection({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
   return (
     <>
-      <Field>
-        <FieldLabel>{t("form.name")}</FieldLabel>
-        <Input
-          maxLength={64}
-          autoComplete="off"
-          onValueChange={(value) => form.set("name", value)}
-          placeholder={t("form.namePlaceholder")}
-          ref={form.refs.name}
-          value={form.values.name}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldLabel>{t("form.name")}</FieldLabel>
+          <Input
+            maxLength={64}
+            autoComplete="off"
+            onValueChange={(value) => form.set("name", value)}
+            placeholder={t("form.namePlaceholder")}
+            ref={form.refs.name}
+            value={form.values.name}
+          />
+        </Field>
+        <ExpiryPicker
+          onChange={(value) => form.set("expiresAt", value)}
+          value={form.values.expiresAt}
         />
-      </Field>
-      <ExpiryPicker
-        onChange={(value) => form.set("expiresAt", value)}
-        value={form.values.expiresAt}
-      />
+      </div>
       <Field>
         <FieldLabel>{t("form.customKey")}</FieldLabel>
         <Input
@@ -267,12 +268,13 @@ function GeneralSection({ form }: { form: KeyForm }): JSX.Element {
           {form.editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder")}
         </FieldDescription>
       </Field>
+      <LimitFields form={form} />
     </>
   );
 }
 
-/** The four limits, two by two from sm up. */
-function LimitsSection({ form }: { form: KeyForm }): JSX.Element {
+/** The four limits, two by two from sm up, under a hairline. */
+function LimitFields({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
   const limit = (
     field: ApiKeyLimitField,
@@ -303,7 +305,7 @@ function LimitsSection({ form }: { form: KeyForm }): JSX.Element {
     </Field>
   );
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 border-border-subtle border-t pt-4 sm:grid-cols-2">
       {limit("tokenLimit", t("form.tokenLimit"))}
       {/* Two decimals, as formatCredits shows credits in the table and the cards. */}
       {limit("creditLimit", t("form.creditLimit"), { format: CREDIT_FORMAT, step: 0.01 })}
@@ -392,8 +394,6 @@ function SectionBody({ section, form }: { section: Section; form: KeyForm }): JS
   switch (section) {
     case "general":
       return <GeneralSection form={form} />;
-    case "limits":
-      return <LimitsSection form={form} />;
     case "accounts":
       return <AccountsSection form={form} />;
     case "routing":
@@ -434,10 +434,10 @@ function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }
 }
 
 /*
- * The body under the header: a hairline, then one fixed height from sm up (448 px), so the dialog
+ * The body under the header: a hairline, then one fixed height from sm up (480 px), so the dialog
  * keeps its size from tab to tab; on phones it takes what the 90dvh dialog leaves.
  */
-const CREATE_BODY = "min-h-0 flex-1 gap-0 border-border-subtle border-t sm:h-112 sm:flex-none";
+const CREATE_BODY = "min-h-0 flex-1 gap-0 border-border-subtle border-t sm:h-120 sm:flex-none";
 
 /**
  * Create: a settings-style dialog. From sm up the sections are a vertical tab list on the left
@@ -477,7 +477,7 @@ function ApiKeyCreateDialog({
         orientation={phone ? "horizontal" : "vertical"}
         value={tab}
       >
-        <div className="min-w-0 shrink-0 max-sm:px-4 sm:w-48 sm:border-border-subtle sm:border-e sm:bg-surface-inset sm:p-2">
+        <div className="min-w-0 shrink-0 max-sm:px-4 sm:w-48 sm:border-border-subtle sm:border-e sm:bg-sidebar sm:p-2">
           <TabsList variant={phone ? "underline" : "nav"}>
             {SECTIONS.map((section) => (
               <TabsTab key={section} value={section}>
@@ -486,11 +486,11 @@ function ApiKeyCreateDialog({
                   className="max-sm:hidden"
                   icon={SECTION_ICON[section]}
                 />
-                {sectionLabel(section, t)}
+                <span className="min-w-0 flex-1 truncate">{sectionLabel(section, t)}</span>
                 {failedSection === section ? (
                   <span
                     aria-hidden="true"
-                    className="size-1.5 shrink-0 rounded-full bg-destructive sm:ms-auto"
+                    className="size-1.5 shrink-0 rounded-full bg-destructive"
                     data-slot="tab-error-dot"
                   />
                 ) : null}
@@ -498,7 +498,8 @@ function ApiKeyCreateDialog({
             ))}
           </TabsList>
         </div>
-        <ScrollArea className="min-h-0 flex-1" overscrollContain scrollFade>
+        {/* min-w-0: beside the vertical tabs a wide row (the sideways tag strip) must not widen it. */}
+        <ScrollArea className="min-h-0 min-w-0 flex-1" overscrollContain scrollFade>
           <form
             aria-busy={form.pending || undefined}
             className="flex flex-col gap-4 p-4"

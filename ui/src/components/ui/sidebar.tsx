@@ -39,7 +39,7 @@ const SIDEBAR_KEYBOARD_SHORTCUT: string = "b";
 
 // Kiro patch: row states, geometry and icon colour follow t3code's sidebar
 // (apps/web/src/components/ui/sidebar.tsx), reading the --sidebar-row-* tokens.
-const sidebarMenuButtonVariants = cva(
+export const sidebarMenuButtonVariants = cva(
   "peer/menu-button flex w-full cursor-pointer items-center gap-(--sidebar-control-gap) overflow-hidden text-left outline-hidden transition-[width,height,padding] duration-200 ease-in-out hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-has-data-[sidebar=menu-chevron]/menu-item:pe-8 aria-disabled:pointer-events-none aria-disabled:opacity-64 data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[state=open]:hover:bg-sidebar-row-hover data-[state=open]:hover:text-sidebar-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-(--sidebar-content-inset)! [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-(--sidebar-icon-color) hover:[&>svg]:text-sidebar-foreground active:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
   {
     defaultVariants: {

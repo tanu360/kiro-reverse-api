@@ -10,6 +10,7 @@ import {
   segmentedControlSlideClassName,
   segmentedControlTrackClassName,
 } from "@/components/ui/segmented-control";
+import { sidebarMenuButtonVariants } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 type TabsVariant = "default" | "underline" | "nav";
@@ -35,8 +36,8 @@ export function Tabs({ className, ...props }: TabsPrimitive.Root.Props): React.R
  * `default`: the segmented control (the sign-in theme toggle), the same sizes and sliding
  * indicator. `underline`: page-level tabs over a full-width hairline, the active one underlined
  * in purple; the strip scrolls sideways on its own, fading at an edge it can still scroll past.
- * `nav`: a settings-style section list (the API key dialog), full-width rows with an icon; the
- * active row sits on a purple tint that slides between rows, its icon purple, with no line.
+ * `nav`: a settings-style section list (the API key dialog) drawn as the app sidebar's own rows
+ * (sidebarMenuButtonVariants): the active row takes the sidebar's selected tint, nothing slides.
  */
 export function TabsList({
   variant = "default",
@@ -57,8 +58,8 @@ export function TabsList({
           ? // The segmented control's frame (the sign-in theme toggle): 6 px tabs in an 8 px track.
             cn(segmentedControlTrackClassName, "*:data-[slot=tabs-tab]:rounded-md")
           : variant === "nav"
-            ? // Section rows, no frame: the list is as wide as its column.
-              "w-full items-stretch gap-0.5 data-[orientation=vertical]:items-stretch"
+            ? // The sidebar menu's column (SidebarMenu): full-width rows 2 px apart.
+              "w-full min-w-0 items-stretch gap-0.5"
             : // Page-level tabs: left-aligned over a full-width hairline, the active one underlined.
               "w-max min-w-full justify-start gap-x-1 data-[orientation=horizontal]:border-b data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:grow-0 *:data-[slot=tabs-tab]:hover:bg-accent",
         className,
@@ -68,18 +69,18 @@ export function TabsList({
       {...props}
     >
       <TabsListContext.Provider value={{ size, variant }}>{children}</TabsListContext.Provider>
-      <TabsPrimitive.Indicator
-        className={cn(
-          "absolute bottom-0 left-0 h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) -translate-y-(--active-tab-bottom)",
-          segmentedControlSlideClassName,
-          variant === "underline"
-            ? "z-10 bg-primary data-[orientation=horizontal]:h-0.5 data-[orientation=vertical]:w-0.5 data-[orientation=vertical]:-translate-x-px data-[orientation=horizontal]:translate-y-px"
-            : variant === "nav"
-              ? "-z-1 rounded-lg bg-info-surface"
+      {variant === "nav" ? null : (
+        <TabsPrimitive.Indicator
+          className={cn(
+            "absolute bottom-0 left-0 h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) -translate-y-(--active-tab-bottom)",
+            segmentedControlSlideClassName,
+            variant === "underline"
+              ? "z-10 bg-primary data-[orientation=horizontal]:h-0.5 data-[orientation=vertical]:w-0.5 data-[orientation=vertical]:-translate-x-px data-[orientation=horizontal]:translate-y-px"
               : cn("-z-1", segmentedControlIndicatorSurfaceClassName),
-        )}
-        data-slot="tab-indicator"
-      />
+          )}
+          data-slot="tab-indicator"
+        />
+      )}
     </TabsPrimitive.List>
   );
 
@@ -106,6 +107,22 @@ export function TabsTab({
   const context = React.useContext(TabsListContext);
   const resolvedSize: TabsSize = size ?? context.size;
 
+  if (context.variant === "nav") {
+    // The sidebar row, with Base UI's data-active (a bare attribute) standing in for the
+    // sidebar's data-active="true".
+    return (
+      <TabsPrimitive.Tab
+        className={cn(
+          sidebarMenuButtonVariants(),
+          "data-active:bg-sidebar-row-selected data-active:font-medium data-active:text-sidebar-foreground data-active:hover:bg-sidebar-row-selected data-active:[&>svg]:text-sidebar-foreground",
+          className,
+        )}
+        data-slot="tabs-tab"
+        {...props}
+      />
+    );
+  }
+
   return (
     <TabsPrimitive.Tab
       className={cn(
@@ -116,10 +133,6 @@ export function TabsTab({
         "max-sm:px-2.5",
         // A count badge in a tab (coss p-tabs-10) goes muted while its tab is not the active one.
         "not-data-active:**:data-[slot=badge]:text-muted-foreground",
-        // A section row: 32 / 36 px, left-aligned; hover tints only rows that are not active, and
-        // the active row's icon turns purple over the sliding tint.
-        context.variant === "nav" &&
-          "h-8 grow-0 justify-start gap-2 rounded-lg px-2.5 max-sm:px-2.5 sm:h-9 not-data-active:hover:bg-accent data-active:[&_svg]:text-info-foreground data-active:[&_svg]:opacity-100",
         className,
       )}
       data-size={resolvedSize}

@@ -24,7 +24,9 @@ const lower = (model: string) => model.toLowerCase();
  * Which models a key may call: every model, or the ticked ones. The list is what the server
  * offers (GET /models: the accounts' models, then auto); a ticked name it no longer offers stays
  * listed, ticked, until unticked, so editing a key never drops one silently. Names compare
- * case-insensitively, as the server's check does. At most MAX_KEY_MODELS can be ticked.
+ * case-insensitively, as the server's check does. At most MAX_KEY_MODELS can be ticked. The list
+ * shows under both choices: while "Every model" is on nothing is ticked, and ticking one switches
+ * to "Only selected models" with just that model, as the account picker does.
  */
 export function ModelPicker({
   scope,
@@ -49,15 +51,20 @@ export function ModelPicker({
   const [query, setQuery] = useState("");
   const baseId = useId();
   const errorId = `${baseId}-error`;
+  const active = scope === "selected";
+  const shown = active ? selected : [];
   const offered = models.data ?? [];
-  const picked = new Set(selected.map(lower));
+  const picked = new Set(shown.map(lower));
   const known = new Set(offered.map(lower));
-  const rows = [...offered, ...selected.filter((model) => !known.has(lower(model)))];
+  const rows = [...offered, ...shown.filter((model) => !known.has(lower(model)))];
   const needle = query.trim().toLowerCase();
   const visible = needle ? rows.filter((model) => lower(model).includes(needle)) : rows;
 
   const toggle = (model: string) => {
-    if (picked.has(lower(model))) {
+    if (!active) {
+      onScopeChange("selected");
+      onSelectedChange([model]);
+    } else if (picked.has(lower(model))) {
       onSelectedChange(selected.filter((x) => lower(x) !== lower(model)));
     } else if (selected.length < MAX_KEY_MODELS) {
       onSelectedChange([...selected, model]);
@@ -86,7 +93,7 @@ export function ModelPicker({
               control={(id) => (
                 <Checkbox
                   checked={checked}
-                  disabled={!checked && selected.length >= MAX_KEY_MODELS}
+                  disabled={!checked && shown.length >= MAX_KEY_MODELS}
                   id={id}
                   onCheckedChange={() => toggle(model)}
                 />
@@ -123,48 +130,46 @@ export function ModelPicker({
           </Label>
         ))}
       </RadioGroup>
-      {scope === "selected" ? (
-        <div className="flex min-w-0 flex-col gap-2">
-          <InputGroup>
-            <InputGroupAddon>
-              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-describedby={invalid ? errorId : undefined}
-              aria-invalid={invalid ? true : undefined}
-              aria-label={t("form.modelsSearch")}
-              autoCapitalize="off"
-              autoComplete="off"
-              autoCorrect="off"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("form.modelsSearch")}
-              ref={searchRef}
-              spellCheck={false}
-              type="search"
-              value={query}
-            />
-          </InputGroup>
-          {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
-          {invalid ? (
-            <p
-              className="text-destructive-foreground text-xs leading-normal"
-              id={errorId}
-              role="alert"
-            >
-              {invalid}
-            </p>
-          ) : null}
-          {list}
-          {models.data !== undefined ? (
-            <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-              {t("form.accountsSelectedCount", {
-                n: formatNumber(selected.length, lang),
-                total: formatNumber(rows.length, lang),
-              })}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="flex min-w-0 flex-col gap-2">
+        <InputGroup>
+          <InputGroupAddon>
+            <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-describedby={invalid ? errorId : undefined}
+            aria-invalid={invalid ? true : undefined}
+            aria-label={t("form.modelsSearch")}
+            autoCapitalize="off"
+            autoComplete="off"
+            autoCorrect="off"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("form.modelsSearch")}
+            ref={searchRef}
+            spellCheck={false}
+            type="search"
+            value={query}
+          />
+        </InputGroup>
+        {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
+        {invalid ? (
+          <p
+            className="text-destructive-foreground text-xs leading-normal"
+            id={errorId}
+            role="alert"
+          >
+            {invalid}
+          </p>
+        ) : null}
+        {list}
+        {models.data !== undefined && active ? (
+          <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
+            {t("form.accountsSelectedCount", {
+              n: formatNumber(selected.length, lang),
+              total: formatNumber(rows.length, lang),
+            })}
+          </p>
+        ) : null}
+      </div>
       <FieldHint>{t("form.allowedModelsHint")}</FieldHint>
     </Fieldset>
   );
