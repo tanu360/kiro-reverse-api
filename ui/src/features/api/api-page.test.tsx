@@ -137,7 +137,7 @@ describe("ApiPage", () => {
     if (!form) throw new Error("no form");
     fireEvent.submit(form);
     expect(within(dialog).getByText("Step 2 of 2 · Access")).toBeInTheDocument();
-    expect(within(dialog).getByRole("radio", { name: "All accounts" })).toHaveFocus();
+    expect(within(dialog).getByRole("combobox", { name: "Routing mode" })).toHaveFocus();
     // Back keeps what was typed.
     await user.click(within(dialog).getByRole("button", { name: "Back" }));
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue("  laptop  ");

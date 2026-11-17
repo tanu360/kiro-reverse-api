@@ -433,7 +433,7 @@ const FIELD_STEP: Readonly<Record<ApiKeyFormField, number>> = {
 
 /**
  * Create: the app's dialog at its default width, in two steps: Basics (name, expiry, custom key
- * and the limits), then Access (accounts, routing mode, models). Next checks the fields up to the
+ * and the limits), then Access (routing mode, models, accounts). Next checks the fields up to the
  * current step; the last step creates the key. Both steps share one body height, so the dialog
  * keeps its size between them, and a longer step scrolls inside it.
  */
@@ -465,8 +465,7 @@ function ApiKeyCreateDialog({
       const first =
         step === 0
           ? form.refs.name.current
-          : // The accounts' checked radio: Base UI sets the radios' tabindex only after mount.
-            stepRef.current?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]');
+          : stepRef.current?.querySelector<HTMLElement>('[role="combobox"]');
       first?.focus();
     }
   }, [step]);
@@ -570,9 +569,9 @@ function ApiKeyCreateDialog({
                 </>
               ) : (
                 <>
-                  <AccountsField form={form} />
                   <RoutingField form={form} />
                   <ModelsField form={form} />
+                  <AccountsField form={form} />
                 </>
               )}
             </div>
