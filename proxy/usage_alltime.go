@@ -205,7 +205,7 @@ func queryApiKeyUsageAllTime(now time.Time, tzOffsetMin int, keys []config.ApiKe
 		Keys:     []apiKeyUsageEntry{},
 	}
 
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return resp, err
 	}
@@ -357,7 +357,7 @@ func queryTrafficHistory(now time.Time, tzOffsetMin int) (trafficHistoryResponse
 	curDay := localDay(now.Unix(), off)
 	resp := trafficHistoryResponse{Range: usageRangeAll, TZOffset: tzOffsetMin, NowUnix: now.Unix()}
 
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return resp, err
 	}

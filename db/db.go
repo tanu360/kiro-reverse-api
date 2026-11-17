@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -18,7 +20,17 @@ var (
 	once    sync.Once
 	handle  *sql.DB
 	openErr error
+	// walMode is true once the open handle runs in WAL mode; only then does Read hand out
+	// connections of its own.
+	walMode bool
+
+	readOnce sync.Once
+	reader   *sql.DB
+	readErr  error
 )
+
+// readConns bounds the read pool: a few admin pages and polls reading at once.
+const readConns = 4
 
 const ddl = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -85,8 +97,8 @@ CREATE INDEX IF NOT EXISTS idx_requests_lookup ON requests(email, account_id, mo
 CREATE INDEX IF NOT EXISTS idx_requests_api_key ON requests(api_key_id, api_key);
 -- A Requests status tab (proxy/observe_persist.go) reads its newest rows in order from this
 -- instead of sorting every row of that status, and counts them without reading the table.
--- Each index on requests adds about 2 ms to every logged request (the journal syncs its
--- pages), so the other sort columns have none: their pages sort only row ids.
+-- Each index on requests adds to every logged request's write (about 2 ms while the rollback
+-- journal synced its pages), so the other sort columns have none: their pages sort only row ids.
 CREATE INDEX IF NOT EXISTS idx_requests_success_ts ON requests(success, ts DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS errors (
@@ -204,12 +216,21 @@ CREATE TABLE IF NOT EXISTS error_rollup_daily (
 );
 `
 
+// WAL lets the read pool (Read) query beside the one writer, so an admin search or a usage
+// chart never holds up request logging or a settings save. With synchronous=NORMAL a commit
+// does not wait for the disk: an app crash or restart loses nothing, and a power cut or a
+// host crash can lose the last few seconds of commits, never the file. The mode is kept in
+// the file; journal_size_limit trims the -wal file back after a checkpoint.
 const pragmas = `
-PRAGMA journal_mode=DELETE;
+PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
+PRAGMA journal_size_limit=67108864;
 PRAGMA busy_timeout=5000;
 PRAGMA foreign_keys=ON;
 `
+
+// readParams opens a read connection: query_only refuses any write on it.
+const readParams = "?_pragma=busy_timeout(5000)&_pragma=query_only(1)"
 
 func Init(dir string) error {
 	mu.RLock()
@@ -260,6 +281,15 @@ func Get() (*sql.DB, error) {
 			openErr = err
 			return
 		}
+		//! A file system without shared memory (a network share) keeps the old journal: then
+		//! Read hands out this handle, since a separate reader would lock the writer out.
+		var mode string
+		if err := db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil {
+			_ = db.Close()
+			openErr = err
+			return
+		}
+		walMode = strings.EqualFold(mode, "wal")
 		if _, err := db.Exec(ddl); err != nil {
 			_ = db.Close()
 			openErr = err
@@ -347,14 +377,54 @@ func addMissingColumns(db *sql.DB, table string, columns []struct{ name, definit
 	return nil
 }
 
+// Read returns the handle for queries that only read (the request log's pages, search and
+// totals, usage charts, conversations). In WAL mode it is a pool of read-only connections
+// beside the writer's one, so a slow read never queues request logging or a save behind it;
+// a read sees every commit made before it starts. Without WAL it is Get's handle.
+func Read() (*sql.DB, error) {
+	w, err := Get()
+	if err != nil {
+		return nil, err
+	}
+	readOnce.Do(func() {
+		if !walMode {
+			reader = w
+			return
+		}
+		r, err := sql.Open("sqlite", filepath.Join(DataDir(), fileName)+readParams)
+		if err != nil {
+			readErr = err
+			return
+		}
+		r.SetMaxOpenConns(readConns)
+		r.SetMaxIdleConns(readConns)
+		// An idle connection keeps its page cache; a quiet admin gives it back.
+		r.SetConnMaxIdleTime(5 * time.Minute)
+		reader = r
+	})
+	if readErr != nil {
+		return nil, readErr
+	}
+	return reader, nil
+}
+
 func Close() error {
 	mu.Lock()
 	defer mu.Unlock()
 	var err error
+	if reader != nil && reader != handle {
+		err = reader.Close()
+	}
+	reader = nil
+	readOnce = sync.Once{}
+	readErr = nil
 	if handle != nil {
-		err = handle.Close()
+		if cerr := handle.Close(); err == nil {
+			err = cerr
+		}
 		handle = nil
 	}
+	walMode = false
 	once = sync.Once{}
 	openErr = nil
 	return err
@@ -367,6 +437,8 @@ func ResetForTest(dir string) error {
 	mu.Lock()
 	dataDir = dir
 	mu.Unlock()
-	_ = os.Remove(filepath.Join(dir, fileName))
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		_ = os.Remove(filepath.Join(dir, fileName+suffix))
+	}
 	return nil
 }

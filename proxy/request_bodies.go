@@ -180,7 +180,7 @@ type storedRequestBody struct {
 var errRequestBodyMissing = errors.New("this request's body was not kept")
 
 func loadRequestBody(id int64) (*storedRequestBody, error) {
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return nil, err
 	}

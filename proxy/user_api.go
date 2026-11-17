@@ -583,7 +583,7 @@ func userUsagePrevious(now time.Time, rng usageRange, tz int, keys []config.ApiK
 	from := ((now.Unix()+off)/rng.bucketSec-int64(rng.buckets)+1)*rng.bucketSec - off
 	start, end := from-span, now.Unix()+1-span
 
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return nil, err
 	}

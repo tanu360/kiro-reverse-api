@@ -149,7 +149,7 @@ func queryUsageBreakdown(now time.Time, rng usageRange, tzOffsetMin int, keys []
 		}
 	}
 
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return resp, clients, err
 	}

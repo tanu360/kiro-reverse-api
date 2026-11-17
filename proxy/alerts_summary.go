@@ -101,7 +101,7 @@ type dailySummary struct {
 // busiest accounts and keys, most requests first.
 func loadSummaryTraffic(from, to int64) (summaryTotals, []summaryRow, []summaryRow, error) {
 	var totals summaryTotals
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return totals, nil, nil, err
 	}
@@ -226,7 +226,7 @@ func (h *Handler) buildDailySummary(from, to time.Time) (dailySummary, error) {
 // sent in [from, to), so two deleted keys never read the same. "deleted key"
 // alone when the log kept no value.
 func deletedKeyLabel(id string, from, to int64) string {
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return "deleted key"
 	}

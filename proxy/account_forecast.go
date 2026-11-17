@@ -76,7 +76,7 @@ type accountSpend struct {
 // counted from the day that holds from).
 func loadAccountSpend(from int64) (map[string]accountSpend, error) {
 	out := make(map[string]accountSpend)
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return out, err
 	}

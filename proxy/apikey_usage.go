@@ -327,7 +327,7 @@ func queryApiKeyUsage(now time.Time, rng usageRange, tzOffsetMin int, keys []con
 		resp.Buckets[i] = from + int64(i)*size
 	}
 
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return resp, err
 	}

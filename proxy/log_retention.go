@@ -304,7 +304,7 @@ func currentLogRetentionStatus() (logRetentionStatus, error) {
 	status.LastPrunedErrors = logRetention.lastPrunedErrors
 	logRetention.mu.Unlock()
 
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return status, err
 	}

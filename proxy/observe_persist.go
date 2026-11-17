@@ -124,7 +124,7 @@ func requestLogChanged() {
 }
 
 func queryPersistedRequestStats() (persistedRequestStats, error) {
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return persistedRequestStats{}, err
 	}
@@ -276,7 +276,7 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 // went away) stops its queries, so an abandoned search does not keep the database busy.
 func queryPersistedRequestsContext(ctx context.Context, q requestQuery) (requestPage, error) {
 	q = normalizeRequestQuery(q)
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return requestPage{}, err
 	}

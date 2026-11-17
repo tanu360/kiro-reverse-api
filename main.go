@@ -14,7 +14,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -104,6 +106,19 @@ func main() {
 	if config.GetHost() == config.DefaultHost {
 		logger.Infof("Only this machine can connect. Set LISTEN_HOST=0.0.0.0 to accept other machines.")
 	}
+
+	// A stop (Ctrl+C, docker stop, systemd) closes the database before the process ends, so
+	// its WAL is folded back into kiro.db and the data folder holds the whole database in that
+	// one file again. Open requests end at once, as they did before.
+	go func() {
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+		<-stop
+		if err := db.Close(); err != nil {
+			logger.Warnf("Close the database: %v", err)
+		}
+		os.Exit(0)
+	}()
 
 	err := srv.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {

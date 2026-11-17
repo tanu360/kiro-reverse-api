@@ -59,7 +59,7 @@ type conversationView struct {
 
 func loadConversation(id string) (conversationView, error) {
 	view := conversationView{ID: id, Turns: []requestRecord{}}
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return view, err
 	}
@@ -152,7 +152,7 @@ func (h *Handler) apiConversation(w http.ResponseWriter, id string) {
 }
 
 func loadRequestRecord(id int64) (requestRecord, error) {
-	d, err := db.Get()
+	d, err := db.Read()
 	if err != nil {
 		return requestRecord{}, err
 	}
