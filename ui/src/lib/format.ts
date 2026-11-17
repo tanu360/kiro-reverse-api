@@ -62,6 +62,20 @@ function finite(value: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const listFormats = new Map<string, Intl.ListFormat>();
+
+/** A cached Intl.ListFormat: building one per call is slow in list and table cells. */
+function listFormat(lang: Lang | undefined, style: "long" | "narrow"): Intl.ListFormat {
+  const tag = locale(lang);
+  const id = `${tag}|${style}`;
+  let format = listFormats.get(id);
+  if (!format) {
+    format = new Intl.ListFormat(tag, { type: "conjunction", style });
+    listFormats.set(id, format);
+  }
+  return format;
+}
+
 const HAN = /\p{Script=Han}/u;
 const LATIN_OR_DIGIT = /[\p{Script=Latin}\d]/u;
 
@@ -71,7 +85,7 @@ const LATIN_OR_DIGIT = /[\p{Script=Latin}\d]/u;
  * write it everywhere else ("无 Token").
  */
 export function formatList(items: readonly string[], lang?: Lang): string {
-  const parts = new Intl.ListFormat(locale(lang), { type: "conjunction" }).formatToParts(items);
+  const parts = listFormat(lang, "long").formatToParts(items);
   return parts
     .map((part, index) => {
       if (part.type !== "literal") return part.value;
@@ -89,7 +103,7 @@ export function formatList(items: readonly string[], lang?: Lang): string {
  * ("a、b、c" in Chinese and Japanese).
  */
 export function formatItems(items: readonly string[], lang?: Lang): string {
-  return new Intl.ListFormat(locale(lang), { type: "conjunction", style: "narrow" }).format(items);
+  return listFormat(lang, "narrow").format(items);
 }
 
 /** Grouped integer (truncated toward zero). */

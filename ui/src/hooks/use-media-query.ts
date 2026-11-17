@@ -63,13 +63,32 @@ type MediaQueryInput = {
   pointer?: "coarse" | "fine";
 };
 
+// One MediaQueryList per query for the page: getSnapshot runs on every render of every caller,
+// and matchMedia() parses and evaluates the query anew each time.
+const mediaQueryLists = new Map<string, MediaQueryList>();
+// The matchMedia the lists came from; a new one (a test's stub) starts the cache over.
+let listsFrom: typeof window.matchMedia | null = null;
+
+function mediaQueryList(query: string): MediaQueryList {
+  if (listsFrom !== window.matchMedia) {
+    listsFrom = window.matchMedia;
+    mediaQueryLists.clear();
+  }
+  let mql = mediaQueryLists.get(query);
+  if (!mql) {
+    mql = window.matchMedia(query);
+    mediaQueryLists.set(query, mql);
+  }
+  return mql;
+}
+
 export function useMediaQuery(query: BreakpointQuery | MediaQueryInput | (string & {})): boolean {
   const mediaQuery = parseQuery(query);
 
   const subscribe = useCallback(
     (callback: () => void) => {
       if (typeof window === "undefined") return () => {};
-      const mql = window.matchMedia(mediaQuery);
+      const mql = mediaQueryList(mediaQuery);
       mql.addEventListener("change", callback);
       return () => mql.removeEventListener("change", callback);
     },
@@ -78,7 +97,7 @@ export function useMediaQuery(query: BreakpointQuery | MediaQueryInput | (string
 
   const getSnapshot = useCallback(() => {
     if (typeof window === "undefined") return false;
-    return window.matchMedia(mediaQuery).matches;
+    return mediaQueryList(mediaQuery).matches;
   }, [mediaQuery]);
 
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
