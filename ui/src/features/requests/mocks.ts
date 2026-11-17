@@ -127,22 +127,47 @@ function primaryCompare(a: RequestRecord, b: RequestRecord, sort: RequestSort): 
   }
 }
 
-function sortRecords(
-  records: RequestRecord[],
-  query: NormalizedQuery,
-  tieBreak: (a: RequestRecord, b: RequestRecord) => number,
-): RequestRecord[] {
-  const direction = query.order === "asc" ? 1 : -1;
-  return [...records].sort(
-    (a, b) => direction * (primaryCompare(a, b, query.sort) || tieBreak(a, b)),
-  );
+/** Whether every record keeps its place under `compare` (none sorts before the one above it). */
+function inOrder(
+  records: readonly RequestRecord[],
+  compare: (a: RequestRecord, b: RequestRecord) => number,
+): boolean {
+  for (let i = 1; i < records.length; i++) {
+    if (compare(records[i - 1], records[i]) > 0) return false;
+  }
+  return true;
 }
 
-function page(records: RequestRecord[], query: NormalizedQuery, persistent: boolean) {
-  const start = Math.min((query.page - 1) * query.pageSize, records.length);
+/** The query's page of the records that match it, in its order, with how many matched. */
+function page(
+  records: readonly RequestRecord[],
+  query: NormalizedQuery,
+  tieBreak: (a: RequestRecord, b: RequestRecord) => number,
+  persistent: boolean,
+) {
+  const direction = query.order === "asc" ? 1 : -1;
+  const compare = (a: RequestRecord, b: RequestRecord) =>
+    direction * (primaryCompare(a, b, query.sort) || tieBreak(a, b));
+  const start = (query.page - 1) * query.pageSize;
+  let requests: RequestRecord[] = [];
+  let total = 0;
+  if (inOrder(records, compare)) {
+    // The log is kept newest first, so the default order (time, newest first) is usually there
+    // already, and a stable sort would leave it as it is: one pass then counts the matches and
+    // keeps the page, with no copy of a log that can hold 200k rows.
+    for (const record of records) {
+      if (!matches(record, query)) continue;
+      if (total >= start && requests.length < query.pageSize) requests.push(record);
+      total++;
+    }
+  } else {
+    const sorted = records.filter((record) => matches(record, query)).sort(compare);
+    total = sorted.length;
+    requests = sorted.slice(Math.min(start, total), start + query.pageSize);
+  }
   const body: RecentRequestsResponse = {
-    requests: records.slice(start, start + query.pageSize),
-    total: records.length,
+    requests,
+    total,
     page: query.page,
     pageSize: query.pageSize,
     sort: query.sort,
@@ -166,12 +191,7 @@ export function inMemoryRequestsHandler(): HttpHandler {
     const query = normalizeQuery(new URL(request.url));
     indexKeys();
     const ring = mockDb.requests.slice(0, MEMORY_RING_SIZE).map(({ id: _id, ...rest }) => rest);
-    const filtered = ring.filter((record) => matches(record, query));
-    return page(
-      sortRecords(filtered, query, (a, b) => sign(a.ts, b.ts)),
-      query,
-      false,
-    );
+    return page(ring, query, (a, b) => sign(a.ts, b.ts), false);
   });
 }
 
@@ -182,12 +202,7 @@ export const handlers: HttpHandler[] = [
     await mockDelay();
     const query = normalizeQuery(new URL(request.url));
     indexKeys();
-    const filtered = mockDb.requests.filter((record) => matches(record, query));
-    return page(
-      sortRecords(filtered, query, (a, b) => sign(a.id ?? 0, b.id ?? 0)),
-      query,
-      true,
-    );
+    return page(mockDb.requests, query, (a, b) => sign(a.id ?? 0, b.id ?? 0), true);
   }),
 
   http.get(apiUrl("/observe/conversations/:id"), async ({ request, params }) => {
@@ -247,7 +262,8 @@ export const handlers: HttpHandler[] = [
       return jsonError(400, "choose an account that exists", { code: "replay_account_invalid" });
     }
     const chosenModel = typeof model === "string" && model.trim() ? model.trim() : original.model;
-    const nextId = Math.max(0, ...mockDb.requests.map((item) => item.id ?? 0)) + 1;
+    // A loop, not Math.max(...ids): spreading a 200k-row log overflows the call stack.
+    const nextId = mockDb.requests.reduce((max, item) => Math.max(max, item.id ?? 0), 0) + 1;
     const replay: RequestRecord = {
       id: nextId,
       ts: mockNowUnix(),

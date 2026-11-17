@@ -316,7 +316,9 @@ function appendSyntheticRequests(): number {
   if (serving.length === 0) return 0;
   const count = Math.floor(Math.random() * 4);
   const now = mockNowUnix();
-  let nextId = mockDb.requests.reduce((max, r) => Math.max(max, r.id ?? 0), 0) + 1;
+  // The log is newest first, so its first row holds the highest ID (as appendFullRequests reads
+  // it): no pass over the whole log on every tick.
+  let nextId = (mockDb.requests[0]?.id ?? 0) + 1;
   for (let i = 0; i < count; i++) {
     const account = serving[Math.floor(Math.random() * serving.length)];
     const model = LIVE_MODELS[Math.floor(Math.random() * LIVE_MODELS.length)];
