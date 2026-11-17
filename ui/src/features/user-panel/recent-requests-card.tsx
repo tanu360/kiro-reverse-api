@@ -1,6 +1,6 @@
 import { InboxIcon, SearchXIcon } from "@hugeicons/core-free-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { type JSX, useCallback, useId, useMemo, useRef, useState } from "react";
+import { type JSX, memo, useCallback, useId, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableSort } from "@/components/shared/data-table";
 import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -91,8 +91,9 @@ function rowId(record: RequestRecord, index: number): string {
  * below a 56rem card, where the ten columns stop fitting), and the pager under the card. A row
  * opens the Requests detail sheet as there, stepping through the page's rows, without the
  * admin's actions (Open account, Conversation, Replay, Copy as JSON): they read the admin API.
+ * Memoised: the panel renders again on each key poll, which changes nothing here.
  */
-export function RecentRequestsCard(): JSX.Element {
+export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Element {
   const { t } = useT("user-panel");
   const { t: tr, lang } = useT("requests");
   const requestSummary = useRequestSummary(HOLDER_VIEW.accounts);
@@ -286,4 +287,4 @@ export function RecentRequestsCard(): JSX.Element {
       />
     </section>
   );
-}
+});

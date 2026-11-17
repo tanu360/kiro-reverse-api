@@ -31,6 +31,30 @@ function useUserSignOut(): { signOut: () => Promise<void>; signingOut: boolean }
 }
 
 /**
+ * The page heading with its Refresh, which spins while any panel query fetches. Its own
+ * component, so the start and end of every poll render the heading again, not every card.
+ */
+function PanelHeading(): JSX.Element {
+  const queryClient = useQueryClient();
+  const key = useQuery(userKeyQuery());
+  // Subscribed, so Refresh stops spinning when the last panel query settles, not at the next
+  // render something else happens to cause.
+  const refreshing = useIsFetching({ queryKey: queryKeys.userPanel.all }) > 0;
+  return (
+    <KeyHeading
+      apiKey={key.data}
+      failed={key.isError}
+      fetching={key.isFetching || refreshing}
+      // Only the queries on screen: a cached range or page would spend the key's usage budget
+      // (20 builds a minute) too, and it loads again when shown once stale.
+      onRefresh={() =>
+        void queryClient.refetchQueries({ queryKey: queryKeys.userPanel.all, type: "active" })
+      }
+    />
+  );
+}
+
+/**
  * /user: everything about the signed-in API key and nothing else. Its status and why requests
  * fail when it is off or expired, its usage against its limits, its settings, usage over time
  * and by model, its own recent requests, and how to connect. Built from the admin pages' cards; it calls only
@@ -38,28 +62,15 @@ function useUserSignOut(): { signOut: () => Promise<void>; signingOut: boolean }
  */
 export function UserPanelPage(): JSX.Element {
   const { t } = useT("user-panel");
-  const queryClient = useQueryClient();
   const key = useQuery(userKeyQuery());
   const { signOut, signingOut } = useUserSignOut();
   const apiKey = key.data;
   // The badge, notice and key facts read the clock: they turn to Expired when the expiry passes.
   useRerenderAtExpiry(apiKey?.expiresAt ?? 0);
-  // Subscribed, so Refresh stops spinning when the last panel query settles, not at the next
-  // render something else happens to cause.
-  const refreshing = useIsFetching({ queryKey: queryKeys.userPanel.all }) > 0;
 
   return (
     <UserShell onSignOut={() => void signOut()} signingOut={signingOut}>
-      <KeyHeading
-        apiKey={apiKey}
-        failed={key.isError}
-        fetching={key.isFetching || refreshing}
-        // Only the queries on screen: a cached range or page would spend the key's usage budget
-        // (20 builds a minute) too, and it loads again when shown once stale.
-        onRefresh={() =>
-          void queryClient.refetchQueries({ queryKey: queryKeys.userPanel.all, type: "active" })
-        }
-      />
+      <PanelHeading />
       {key.isError && !apiKey ? (
         <Card>
           <ErrorState
