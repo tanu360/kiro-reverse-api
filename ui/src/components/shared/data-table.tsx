@@ -132,6 +132,12 @@ interface DataTableProps<T> {
   inset?: boolean;
   /** Cell padding: compact 10 px (default), comfortable 12 px for two-line cells. */
   density?: "compact" | "comfortable";
+  /**
+   * Changes when the rows were fetched again (the query's dataUpdatedAt): every row and card
+   * renders again then, even when the data came back the same, so a cell that reads the clock
+   * (a relative age) is current after each refresh, as it was before rows were memoized.
+   */
+  refreshKey?: unknown;
 }
 
 type CardsBelow = "xs" | "lg" | "2xl" | "3xl" | "4xl" | "5xl";
@@ -265,6 +271,8 @@ interface RowProps<T> {
    * reads the clock again with each refresh.
    */
   data: readonly T[];
+  /** The table's refreshKey: a new fetch renders every row again. */
+  refresh: unknown;
   selected: boolean;
   hoverable: boolean;
   actions: RowActions<T>;
@@ -395,6 +403,7 @@ export function DataTable<T>({
   bleed = false,
   inset: insetProp,
   density = "compact",
+  refreshKey,
 }: DataTableProps<T>): JSX.Element {
   const { t } = useT();
   const selectAllId = useId();
@@ -551,6 +560,7 @@ export function DataTable<T>({
                 <DataTableCardItem<T>
                   actions={actions}
                   data={data}
+                  refresh={refreshKey}
                   hoverable={hoverable}
                   id={row.id}
                   index={row.index}
@@ -708,6 +718,7 @@ export function DataTable<T>({
                   clickable={onRowClick !== undefined}
                   columns={columns}
                   data={data}
+                  refresh={refreshKey}
                   description={description}
                   hoverable={hoverable}
                   id={row.id}

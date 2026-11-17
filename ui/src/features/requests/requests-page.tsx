@@ -255,6 +255,8 @@ export function RequestsPage(): JSX.Element {
               <DataTable<RequestRecord>
                 caption={t("table")}
                 cardLayout="divided"
+                // Each fetch renders the rows again, so their ages read the clock afresh.
+                refreshKey={query.dataUpdatedAt}
                 cardsBelow="2xl"
                 columns={columns}
                 data={rows}

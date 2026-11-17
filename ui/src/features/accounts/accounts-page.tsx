@@ -8,15 +8,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import {
-  type JSX,
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type JSX, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -90,22 +82,6 @@ function useClockAt(tick: number): number {
   return next.nowSec;
 }
 
-/**
- * The previous array while it holds the same items in the same order, so a refetch that changes
- * none of the page's accounts (or a clock tick) does not render the table again.
- */
-function useSameItems<T>(items: T[]): T[] {
-  const kept = useRef(items);
-  const previous = kept.current;
-  if (
-    previous !== items &&
-    (previous.length !== items.length || items.some((item, index) => item !== previous[index]))
-  ) {
-    kept.current = items;
-  }
-  return kept.current;
-}
-
 export function AccountsPage(): JSX.Element {
   const { t } = useT("accounts");
   const { t: tc } = useT();
@@ -171,7 +147,9 @@ export function AccountsPage(): JSX.Element {
     () => sorted.slice((page - 1) * pageSize, page * pageSize),
     [sorted, page, pageSize],
   );
-  const pageRows = useSameItems(pageSlice);
+  // A new array after each fetch (its clock moves), so every row reads the time again: a token
+  // that expired turns its pill and its time left on the next refetch.
+  const pageRows = pageSlice;
 
   // Stable callbacks (navigate is), so the memoised table and toolbar skip unrelated renders.
   const updateSearch = useCallback(

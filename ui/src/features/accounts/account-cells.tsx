@@ -16,7 +16,7 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type ComponentType, type JSX, type ReactNode, useCallback } from "react";
 import { AwsLogo, GithubLogo, GoogleLogo, MicrosoftLogo } from "@/components/shared/brand-logos";
-import { RelativeTime } from "@/components/shared/relative-time";
+import { RelativeTime, useMinuteClock } from "@/components/shared/relative-time";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge, type BadgeProps, type BadgeTone } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
@@ -81,6 +81,8 @@ export function StatusPill({
   size?: BadgeProps["size"];
 }): JSX.Element {
   const { t } = useT("accounts");
+  // Re-renders once a minute: a token that expires turns the pill without a refetch.
+  useMinuteClock();
   const status = accountStatus(account, nowSec());
   const pill = STATUS_PILL[status];
   // The pool also writes a reason when it switches an account off (banStatus DISABLED).
@@ -230,6 +232,8 @@ function FlagList({
   showWeight?: boolean;
 }): JSX.Element | null {
   const { t, lang } = useT("accounts");
+  // Re-renders once a minute, so the trial hint's days move on in a memoized row.
+  useMinuteClock();
   const runsOut = forecastHint(useAccountForecast(account.id), t, lang);
   const flags: ReactNode[] = [];
   if (priorityMode) {
@@ -475,6 +479,8 @@ export function UsageMeter({
 /** Time left on the access token, muted: the status pill already flags an expired one. */
 export function TokenExpiryText({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
+  // Re-renders once a minute, so the time left counts down in a memoized row.
+  useMinuteClock();
   const expiry = tokenExpiry(account.expiresAt, nowSec());
   return (
     <span className="text-muted-foreground tabular-nums">{formatTokenExpiry(expiry, t, lang)}</span>

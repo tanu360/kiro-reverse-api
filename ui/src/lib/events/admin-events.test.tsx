@@ -217,6 +217,25 @@ describe("AdminEventsProvider", () => {
     expect(FakeEventSource.instances).toHaveLength(6);
   });
 
+  it("reconnects at once when the browser comes back online, starting the backoff over", async () => {
+    renderProvider();
+    await flush();
+    const fail = () => act(() => latest().onerror?.(new Event("error")));
+    fail();
+    await advance(5000);
+    fail();
+    expect(FakeEventSource.instances).toHaveLength(2);
+
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await flush();
+    expect(FakeEventSource.instances).toHaveLength(3);
+    fail();
+    await advance(5000);
+    expect(FakeEventSource.instances).toHaveLength(4);
+  });
+
   it("closes the stream when the session ends", async () => {
     renderProvider();
     await flush();

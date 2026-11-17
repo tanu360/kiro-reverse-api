@@ -103,6 +103,23 @@ function RerenderingPage({
   );
 }
 
+/** A page that re-renders around a table, and refetches the same rows (a new refreshKey). */
+function RefetchingPage({ columns }: { columns: DataTableColumn<Row>[] }) {
+  const [renders, setRenders] = useState(0);
+  const [fetchedAt, setFetchedAt] = useState(1);
+  return (
+    <>
+      <button onClick={() => setRenders((n) => n + 1)} type="button">
+        Render {renders}
+      </button>
+      <button onClick={() => setFetchedAt((n) => n + 1)} type="button">
+        Refetch
+      </button>
+      <DataTable columns={columns} data={ROWS} getRowId={(row) => row.id} refreshKey={fetchedAt} />
+    </>
+  );
+}
+
 /** The select-all checkbox is the first one; its label depends on the loaded catalog. */
 function headerCheckbox(): HTMLElement {
   const [first] = screen.getAllByRole("checkbox");
@@ -430,6 +447,17 @@ describe("DataTable", () => {
 
     await user.click(screen.getByRole("row", { name: "Open Bravo" }));
     expect(clicks).toEqual(["Bravo 2"]);
+  });
+
+  it("renders every row again when refreshKey changes, even with the same rows", async () => {
+    const cell = vi.fn((row: Row) => row.name);
+    const columns: DataTableColumn<Row>[] = [{ id: "name", header: "Name", cell }];
+    const { user } = renderWithProviders(<RefetchingPage columns={columns} />);
+    const calls = cell.mock.calls.length;
+    await user.click(screen.getByRole("button", { name: "Render 0" }));
+    expect(cell).toHaveBeenCalledTimes(calls);
+    await user.click(screen.getByRole("button", { name: "Refetch" }));
+    expect(cell).toHaveBeenCalledTimes(calls + ROWS.length);
   });
 
   it("leaves rows unfocusable without onRowClick", () => {

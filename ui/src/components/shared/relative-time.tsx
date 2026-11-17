@@ -33,8 +33,11 @@ function getNow(): number {
   return nowMs;
 }
 
-/** The current time in ms, updated once a minute (shared by every caller). */
-function useMinuteClock(): number {
+/**
+ * The current time in ms, updated once a minute (shared by every caller). A cell that reads the
+ * clock while rendering calls it, so a memoized table row still moves on with the time.
+ */
+export function useMinuteClock(): number {
   return useSyncExternalStore(subscribe, getNow, getNow);
 }
 

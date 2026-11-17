@@ -249,6 +249,8 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
             <DataTable<RequestRecord>
               caption={t("requests.caption")}
               cardLayout="divided"
+              // Each fetch renders the rows again, so their ages read the clock afresh.
+              refreshKey={query.dataUpdatedAt}
               cardsBelow="4xl"
               columns={columns}
               data={rows}

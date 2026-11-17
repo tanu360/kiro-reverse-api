@@ -326,6 +326,8 @@ export function TopAccounts(): JSX.Element {
         loading={query.isPending}
         onRowClick={onDetails}
         pageSize={LIMIT}
+        // Each fetch renders the rows again, so their status reads the clock afresh.
+        refreshKey={query.dataUpdatedAt}
         renderCard={renderCard}
         renderCardSkeleton={renderTopAccountSkeleton}
         rowLabel={rowLabel}

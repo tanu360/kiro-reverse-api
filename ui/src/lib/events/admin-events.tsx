@@ -259,8 +259,21 @@ export function AdminEventsProvider(props: {
 
     void connect();
 
+    // Back on the tab or the network: try again at once instead of sitting out a long backoff.
+    const retryNow = () => {
+      if (disposed || !reconnectTimer || document.visibilityState === "hidden") return;
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      failures = 0;
+      void connect();
+    };
+    window.addEventListener("online", retryNow);
+    document.addEventListener("visibilitychange", retryNow);
+
     return () => {
       disposed = true;
+      window.removeEventListener("online", retryNow);
+      document.removeEventListener("visibilitychange", retryNow);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (observeTimer) clearTimeout(observeTimer);
       for (const timer of changeTimers.values()) clearTimeout(timer);
