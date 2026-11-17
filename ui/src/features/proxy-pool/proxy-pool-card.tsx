@@ -8,7 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useState } from "react";
+import { type JSX, memo, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { InfoHint } from "@/components/shared/info-hint";
 import { RelativeTime } from "@/components/shared/relative-time";
@@ -279,6 +279,28 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const openEditor = (proxy?: PoolProxy) =>
     setEditor((prev) => ({ open: true, session: prev.session + 1, proxy }));
 
+  // The rows get handlers that stay the same from render to render and call the latest ones, so
+  // a memoised row renders again only when its own proxy or busy state changes, not for a test,
+  // a switch or the dialog elsewhere in a pool of a hundred proxies.
+  const latest = useRef({ test, toggle, remove, openEditor, testDetected, adopt });
+  latest.current = { test, toggle, remove, openEditor, testDetected, adopt };
+  const rowActions = useMemo<ProxyRowActions>(
+    () => ({
+      onTest: (proxy) => void latest.current.test(proxy),
+      onToggle: (proxy, enabled) => void latest.current.toggle(proxy, enabled),
+      onEdit: (proxy) => latest.current.openEditor(proxy),
+      onRemove: (proxy) => void latest.current.remove(proxy),
+    }),
+    [],
+  );
+  const detectedActions = useMemo<DetectedRowActions>(
+    () => ({
+      onTest: (proxy) => void latest.current.testDetected(proxy),
+      onAdopt: (proxy) => void latest.current.adopt(proxy),
+    }),
+    [],
+  );
+
   return (
     <SettingsGroup
       actions={
@@ -347,12 +369,9 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       ) : (
         view.proxies.map((proxy) => (
           <ProxyRow
+            actions={rowActions}
             key={proxy.id}
             maxFailures={view.maxFailures}
-            onEdit={() => openEditor(proxy)}
-            onRemove={() => void remove(proxy)}
-            onTest={() => void test(proxy)}
-            onToggle={(enabled) => void toggle(proxy, enabled)}
             proxy={proxy}
             switching={switching.has(proxy.id)}
             testing={testing.has(proxy.id)}
@@ -373,9 +392,8 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
           />
           {view.detected.map((proxy) => (
             <DetectedRow
+              actions={detectedActions}
               key={proxy.id}
-              onAdopt={() => void adopt(proxy)}
-              onTest={() => void testDetected(proxy)}
               proxy={proxy}
               testing={testing.has(proxy.id)}
             />
@@ -490,28 +508,36 @@ function StateNote({
   );
 }
 
+/** A pool row's actions; the same object on every render of the card. */
+interface ProxyRowActions {
+  onTest: (proxy: PoolProxy) => void;
+  onToggle: (proxy: PoolProxy, enabled: boolean) => void;
+  onEdit: (proxy: PoolProxy) => void;
+  onRemove: (proxy: PoolProxy) => void;
+}
+
+/** A detected row's actions; the same object on every render of the card. */
+interface DetectedRowActions {
+  onTest: (proxy: DetectedProxy) => void;
+  onAdopt: (proxy: DetectedProxy) => void;
+}
+
 /**
  * One proxy: its name and state, then its address, sign-in, last check, latency and load. The
  * switch takes it out of the pool without removing it.
  */
-function ProxyRow({
+const ProxyRow = memo(function ProxyRow({
   proxy,
   maxFailures,
   testing,
   switching,
-  onTest,
-  onToggle,
-  onEdit,
-  onRemove,
+  actions,
 }: {
   proxy: PoolProxy;
   maxFailures: number;
   testing: boolean;
   switching: boolean;
-  onTest: () => void;
-  onToggle: (enabled: boolean) => void;
-  onEdit: () => void;
-  onRemove: () => void;
+  actions: ProxyRowActions;
 }): JSX.Element {
   const { t } = useT("proxy-pool");
   const mask = useMaskText();
@@ -526,24 +552,34 @@ function ProxyRow({
             aria-label={t("card.switchLabel", { name })}
             checked={proxy.enabled}
             disabled={switching}
-            onCheckedChange={(next) => onToggle(next)}
+            onCheckedChange={(next) => actions.onToggle(proxy, next)}
           />
           {/* Each action also reads the proxy after its name, so nine Tests are told apart. */}
           <Button
             aria-description={name}
             loading={testing}
-            onClick={onTest}
+            onClick={() => actions.onTest(proxy)}
             size="sm"
             variant="secondary"
           >
             <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
             {t("actions.test")}
           </Button>
-          <Button aria-description={name} onClick={onEdit} size="sm" variant="secondary">
+          <Button
+            aria-description={name}
+            onClick={() => actions.onEdit(proxy)}
+            size="sm"
+            variant="secondary"
+          >
             <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
             {t("common:actions.edit")}
           </Button>
-          <Button aria-description={name} onClick={onRemove} size="sm" variant="danger">
+          <Button
+            aria-description={name}
+            onClick={() => actions.onRemove(proxy)}
+            size="sm"
+            variant="danger"
+          >
             <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
             {t("actions.remove")}
           </Button>
@@ -583,22 +619,20 @@ function ProxyRow({
       <StateNote maxFailures={maxFailures} proxy={proxy} />
     </SettingsRow>
   );
-}
+});
 
 /**
  * A proxy in use outside the pool: the global proxy or accounts' own. Checked like a pool proxy
  * and never shared; one without a sign-in can join the pool, one with a sign-in never does.
  */
-function DetectedRow({
+const DetectedRow = memo(function DetectedRow({
   proxy,
   testing,
-  onTest,
-  onAdopt,
+  actions,
 }: {
   proxy: DetectedProxy;
   testing: boolean;
-  onTest: () => void;
-  onAdopt: () => void;
+  actions: DetectedRowActions;
 }): JSX.Element {
   const { t } = useT("proxy-pool");
   const mask = useMaskText();
@@ -612,7 +646,7 @@ function DetectedRow({
           <Button
             aria-description={proxy.url}
             loading={testing}
-            onClick={onTest}
+            onClick={() => actions.onTest(proxy)}
             size="sm"
             variant="secondary"
           >
@@ -620,7 +654,12 @@ function DetectedRow({
             {t("actions.test")}
           </Button>
           {proxy.canAdopt ? (
-            <Button aria-description={proxy.url} onClick={onAdopt} size="sm" variant="secondary">
+            <Button
+              aria-description={proxy.url}
+              onClick={() => actions.onAdopt(proxy)}
+              size="sm"
+              variant="secondary"
+            >
               <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
               {t("detected.adopt")}
             </Button>
@@ -659,4 +698,4 @@ function DetectedRow({
       <StateNote proxy={proxy} />
     </SettingsRow>
   );
-}
+});
