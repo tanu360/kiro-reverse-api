@@ -68,7 +68,10 @@ export const buttonVariants = cva(
         "icon-xs": "size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3",
         // The sign-in button keeps the larger text (16 px on phones, 14 px from sm up).
         lg: "h-10 px-[calc(--spacing(3.5)-1px)] text-control sm:pointer-coarse:h-11",
-        sm: "h-7 gap-1.5 px-[calc(--spacing(2.5)-1px)] has-[>svg]:px-[calc(--spacing(2)-1px)] sm:h-8 sm:px-[calc(--spacing(3)-1px)] sm:has-[>svg]:px-[calc(--spacing(2.5)-1px)] sm:pointer-coarse:h-9",
+        // On a phone the 28 px sm button is shadcn Nova's sm, label and all: 12.8 px text, a
+        // 14 px icon with no pull-in margin, a 4 px gap, 10 px sides and 6 px beside a leading
+        // icon. From sm up: 14 / 16 and the -2 px icon margin, as before.
+        sm: "h-7 gap-1 px-2.5 text-button-sm has-[>svg:first-child]:ps-1.5 [&_svg]:mx-0 [&_svg:not([class*='size-'])]:size-3.5 sm:h-8 sm:[&_svg]:-mx-0.5 sm:gap-1.5 sm:px-[calc(--spacing(3)-1px)] sm:text-sm sm:has-[>svg]:px-[calc(--spacing(2.5)-1px)] sm:[&_svg:not([class*='size-'])]:size-4 sm:pointer-coarse:h-9",
         xs: "h-6 gap-1 px-[calc(--spacing(2)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3",
       },
       // Hover is the guarded `hover:` variant (only where the pointer can hover), never a bare

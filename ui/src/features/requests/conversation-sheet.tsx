@@ -135,7 +135,7 @@ export function ConversationSheet({
           </ResponsiveSheetDescription>
         </div>
         {onShowInLog ? (
-          <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0">
+          <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0 max-sm:justify-center">
             <Button onClick={() => onShowInLog(conversationId)} size="sm" variant="secondary">
               <HugeiconsIcon aria-hidden="true" icon={FilterHorizontalIcon} />
               {t("conversation.showInLog")}

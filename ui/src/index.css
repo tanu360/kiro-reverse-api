@@ -338,6 +338,9 @@
   --text-meta--line-height: calc(1 / 0.75);
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
+  /* shadcn Nova's small-button label (0.8rem, 12.8 px): the sm button's text on phones. */
+  --text-button-sm: 0.8rem;
+  --text-button-sm--line-height: 1rem;
   --text-control: var(--control-text);
   --text-control--line-height: var(--control-text-leading);
 }

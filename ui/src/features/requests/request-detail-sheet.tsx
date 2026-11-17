@@ -397,10 +397,11 @@ export function RequestDetailSheet({
         {record && actions ? (
           /*
             The header keeps 48 px at its end for the close button; the actions sit under it, so
-            they run out to the cards' 16 px edge instead (as on the account sheet). On a phone
-            (whose header keeps no room) they are two equal columns, not a ragged wrap.
+            they run out to the cards' 16 px edge instead (as on the account sheet). A phone's
+            header keeps no room; there the buttons keep their own widths and each line of them
+            is centred.
           */
-          <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0 max-sm:grid max-sm:grid-cols-2">
+          <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0 max-sm:justify-center">
             {canOpenAccount ? (
               <Button
                 onClick={() =>
