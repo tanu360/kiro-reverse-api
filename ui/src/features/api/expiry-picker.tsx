@@ -7,6 +7,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { selectTriggerIconClassName, selectTriggerVariants } from "@/components/ui/select";
 import { dateTimeFormat, formatRelativeTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { endOfLocalDay, expiryInDays } from "./api-key-form";
 
 /** Preset spans, in days from today; the year preset is the same date a year on. */
@@ -68,7 +69,9 @@ export function ExpiryPicker({
       <PopoverTrigger
         aria-describedby={rowDescribedBy}
         aria-labelledby={`${rowLabelledBy ?? ""} ${valueId}`.trim()}
-        className={selectTriggerVariants()}
+        // Its own width is the query: the "in 30 days" note shows only where it fits beside the
+        // date (a full-width trigger on a phone), so the date itself is never cut.
+        className={cn(selectTriggerVariants(), "@container/expiry")}
       >
         <HugeiconsIcon aria-hidden="true" icon={Calendar03Icon} />
         <span className="min-w-0 flex-1 truncate" id={valueId}>
@@ -77,7 +80,7 @@ export function ExpiryPicker({
             : t("form.expiryNone")}
         </span>
         {selected && !past ? (
-          <span className="shrink-0 text-muted-foreground text-xs">
+          <span className="hidden shrink-0 text-muted-foreground text-xs @[18rem]/expiry:inline">
             {formatRelativeTime(value, lang)}
           </span>
         ) : null}
