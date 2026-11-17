@@ -306,18 +306,18 @@ export function BackupsPage(): JSX.Element {
 
       <SectionCard
         actions={
-          <>
-            <RefreshButton
-              fetching={list.isFetching && !list.isPending}
-              onRefresh={() => void invalidate()}
-              variant="icon"
-            />
-            {/* The page's primary action at the page's button size, as Add account. */}
-            <Button loading={create.isPending} onClick={startCreate} ref={createRef}>
-              <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-              {t("create")}
-            </Button>
-          </>
+          // The page's primary action at the page's button size, as Add account.
+          <Button loading={create.isPending} onClick={startCreate} ref={createRef}>
+            <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+            {t("create")}
+          </Button>
+        }
+        cornerAction={
+          <RefreshButton
+            fetching={list.isFetching && !list.isPending}
+            onRefresh={() => void invalidate()}
+            variant="icon"
+          />
         }
         description={t("list.description")}
         icon={ArchiveIcon}

@@ -462,18 +462,18 @@ export function ApiKeysCard(): JSX.Element {
   );
 
   const headerActions = (
-    <>
-      <RefreshButton
-        fetching={keys.isFetching}
-        onRefresh={() => void keys.refetch()}
-        variant="icon"
-      />
-      {/* The primary action at the page's button size, as Add account. */}
-      <Button onClick={openCreate} ref={createRef}>
-        <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-        {t("keys.create")}
-      </Button>
-    </>
+    // The primary action at the page's button size, as Add account.
+    <Button onClick={openCreate} ref={createRef}>
+      <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+      {t("keys.create")}
+    </Button>
+  );
+  const headerRefresh = (
+    <RefreshButton
+      fetching={keys.isFetching}
+      onRefresh={() => void keys.refetch()}
+      variant="icon"
+    />
   );
 
   // The header keeps the one primary Create; the empty state offers the same as an outline.
@@ -505,6 +505,7 @@ export function ApiKeysCard(): JSX.Element {
   return (
     <SectionCard
       actions={headerActions}
+      cornerAction={headerRefresh}
       // Clips the last row's hover tint to the card's rounded corners.
       className="overflow-hidden"
       description={t("keys.description")}
