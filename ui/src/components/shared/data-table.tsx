@@ -7,10 +7,14 @@ import {
   type JSX,
   type KeyboardEvent,
   type MouseEvent,
+  memo,
   type ReactNode,
   useContext,
   useId,
+  useLayoutEffect,
   useMemo,
+  useRef,
+  useState,
 } from "react";
 import { CARD_GRID_CLASS, ListCardSkeleton } from "@/components/shared/list-card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -240,6 +244,131 @@ interface Boxed<T> {
   value: T;
 }
 
+/**
+ * The row handlers, one object for the table's lifetime: each reads the table's latest props
+ * when it runs, so a memoized row or card re-renders only when its own props change, not on
+ * every render of the page around the table (a detail sheet stepping through the rows).
+ */
+interface RowActions<T> {
+  click: (row: T, event: MouseEvent<HTMLElement>) => void;
+  keyDown: (row: T, event: KeyboardEvent<HTMLElement>) => void;
+  hover: (row: T | null) => void;
+  toggle: (id: string) => void;
+}
+
+interface RowProps<T> {
+  id: string;
+  index: number;
+  original: T;
+  /**
+   * The page of rows: a new page re-renders every row, as before, so a relative age in a cell
+   * reads the clock again with each refresh.
+   */
+  data: readonly T[];
+  selected: boolean;
+  hoverable: boolean;
+  actions: RowActions<T>;
+}
+
+function hoverHandlers<T>(
+  hoverable: boolean,
+  row: T,
+  actions: RowActions<T>,
+): { onPointerEnter: () => void; onPointerLeave: () => void } | undefined {
+  return hoverable
+    ? { onPointerEnter: () => actions.hover(row), onPointerLeave: () => actions.hover(null) }
+    : undefined;
+}
+
+function DataTableRowImpl<T>({
+  id,
+  index,
+  original,
+  selected,
+  hoverable,
+  actions,
+  columns,
+  selectLabel,
+  clickable,
+  label,
+  description,
+}: RowProps<T> & {
+  columns: DataTableColumn<T>[];
+  /** The row checkbox's name, or undefined without selection. */
+  selectLabel: string | undefined;
+  clickable: boolean;
+  label: string | undefined;
+  description: string | undefined;
+}): JSX.Element {
+  return (
+    <TableRow
+      aria-description={description}
+      aria-haspopup={label ? "dialog" : undefined}
+      aria-label={label}
+      className={cn(clickable && ROW_FOCUS)}
+      data-row-id={id}
+      data-row-index={index}
+      data-state={selected ? "selected" : undefined}
+      onClick={clickable ? (event) => actions.click(original, event) : undefined}
+      onKeyDown={clickable ? (event) => actions.keyDown(original, event) : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      {...hoverHandlers(hoverable, original, actions)}
+    >
+      {selectLabel !== undefined ? (
+        <TableCell className="w-px">
+          <Checkbox
+            aria-label={selectLabel}
+            checked={selected}
+            onCheckedChange={() => actions.toggle(id)}
+          />
+        </TableCell>
+      ) : null}
+      {columns.map((column) => (
+        <TableCell
+          className={cn(
+            ALIGN_CLASS[column.align ?? "start"],
+            stickyClass(column.sticky),
+            column.className,
+          )}
+          key={column.id}
+        >
+          {column.cell(original, index)}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+}
+
+const DataTableRow = memo(DataTableRowImpl) as typeof DataTableRowImpl;
+
+function DataTableCardItemImpl<T>({
+  id,
+  index,
+  original,
+  selected,
+  hoverable,
+  actions,
+  renderCard,
+}: RowProps<T> & {
+  renderCard: (row: T, ctx: DataTableCardContext) => ReactNode;
+}): JSX.Element {
+  return (
+    <li
+      data-row-id={id}
+      data-row-index={index}
+      data-state={selected ? "selected" : undefined}
+      {...hoverHandlers(hoverable, original, actions)}
+    >
+      {renderCard(original, {
+        selected,
+        toggleSelected: () => actions.toggle(id),
+      })}
+    </li>
+  );
+}
+
+const DataTableCardItem = memo(DataTableCardItemImpl) as typeof DataTableCardItemImpl;
+
 export function DataTable<T>({
   columns,
   data,
@@ -309,13 +438,32 @@ export function DataTable<T>({
     selection.onChange(next);
   };
 
-  const toggleOne = (id: string) => {
-    if (!selection) return;
-    const next = new Set(selection.selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    selection.onChange(next);
-  };
+  // The props the row handlers read when they run, from the last committed render.
+  const latest = useRef({ selection, onRowClick, onRowHover });
+  useLayoutEffect(() => {
+    latest.current = { selection, onRowClick, onRowHover };
+  });
+  const [actions] = useState<RowActions<T>>(() => ({
+    click: (row, event) => {
+      if (fromInteractiveChild(event)) return;
+      latest.current.onRowClick?.(row);
+    },
+    keyDown: (row, event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.target !== event.currentTarget) return;
+      event.preventDefault();
+      latest.current.onRowClick?.(row);
+    },
+    hover: (row) => latest.current.onRowHover?.(row),
+    toggle: (id) => {
+      const current = latest.current.selection;
+      if (!current) return;
+      const next = new Set(current.selected);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      current.onChange(next);
+    },
+  }));
 
   const sortBy = (column: DataTableColumn<T>) => {
     if (!onSortChange) return;
@@ -326,22 +474,7 @@ export function DataTable<T>({
     onSortChange({ id: column.id, desc: defaultSortDesc?.(column.id) ?? false });
   };
 
-  const onRowClickEvent = (row: T) => (event: MouseEvent<HTMLElement>) => {
-    if (fromInteractiveChild(event)) return;
-    onRowClick?.(row);
-  };
-
-  const hoverProps = (row: T) =>
-    onRowHover
-      ? { onPointerEnter: () => onRowHover(row), onPointerLeave: () => onRowHover(null) }
-      : undefined;
-
-  const onRowKeyDown = (row: T) => (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    if (event.target !== event.currentTarget) return;
-    event.preventDefault();
-    onRowClick?.(row);
-  };
+  const hoverable = onRowHover !== undefined;
 
   const showEmpty = !loading && rows.length === 0;
   const showSkeleton = loading && rows.length === 0;
@@ -414,23 +547,19 @@ export function DataTable<T>({
               </label>
             ) : null}
             <ul aria-label={caption} className={cardListClass}>
-              {rows.map((row) => {
-                const isSelected = selected?.has(row.id) ?? false;
-                return (
-                  <li
-                    data-row-id={row.id}
-                    data-row-index={row.index}
-                    data-state={isSelected ? "selected" : undefined}
-                    key={row.id}
-                    {...hoverProps(row.original)}
-                  >
-                    {cardRenderer(row.original, {
-                      selected: isSelected,
-                      toggleSelected: () => toggleOne(row.id),
-                    })}
-                  </li>
-                );
-              })}
+              {rows.map((row) => (
+                <DataTableCardItem<T>
+                  actions={actions}
+                  data={data}
+                  hoverable={hoverable}
+                  id={row.id}
+                  index={row.index}
+                  key={row.id}
+                  original={row.original}
+                  renderCard={cardRenderer}
+                  selected={selected?.has(row.id) ?? false}
+                />
+              ))}
             </ul>
           </>
         )}
@@ -569,49 +698,30 @@ export function DataTable<T>({
                 ))
               : null}
             {rows.map((row) => {
-              const isSelected = selected?.has(row.id) ?? false;
+              // The row's names as strings, so a memoized row skips a render that changed none.
               const label = onRowClick && rowLabel ? rowLabel(row.original) : undefined;
               const description =
                 label && rowDescription ? rowDescription(row.original) : undefined;
               return (
-                <TableRow
-                  aria-description={description}
-                  aria-haspopup={label ? "dialog" : undefined}
-                  aria-label={label}
-                  className={cn(onRowClick && ROW_FOCUS)}
-                  data-row-id={row.id}
-                  data-row-index={row.index}
-                  data-state={isSelected ? "selected" : undefined}
+                <DataTableRow<T>
+                  actions={actions}
+                  clickable={onRowClick !== undefined}
+                  columns={columns}
+                  data={data}
+                  description={description}
+                  hoverable={hoverable}
+                  id={row.id}
+                  index={row.index}
                   key={row.id}
-                  onClick={onRowClick ? onRowClickEvent(row.original) : undefined}
-                  onKeyDown={onRowClick ? onRowKeyDown(row.original) : undefined}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  {...hoverProps(row.original)}
-                >
-                  {selection ? (
-                    <TableCell className="w-px">
-                      <Checkbox
-                        aria-label={t("table.selectRow", {
-                          label: selection.rowLabel(row.original),
-                        })}
-                        checked={isSelected}
-                        onCheckedChange={() => toggleOne(row.id)}
-                      />
-                    </TableCell>
-                  ) : null}
-                  {columns.map((column) => (
-                    <TableCell
-                      className={cn(
-                        ALIGN_CLASS[column.align ?? "start"],
-                        stickyClass(column.sticky),
-                        column.className,
-                      )}
-                      key={column.id}
-                    >
-                      {column.cell(row.original, row.index)}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                  label={label}
+                  original={row.original}
+                  selected={selected?.has(row.id) ?? false}
+                  selectLabel={
+                    selection
+                      ? t("table.selectRow", { label: selection.rowLabel(row.original) })
+                      : undefined
+                  }
+                />
               );
             })}
           </TableBody>

@@ -1,5 +1,5 @@
 import { screen, within } from "@testing-library/react";
-import { useState } from "react";
+import { type JSX, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { DataTable, type DataTableColumn, type DataTableSort } from "./data-table";
@@ -71,6 +71,35 @@ function SortedTable({ onSortChange }: { onSortChange: (sort: DataTableSort) => 
       }}
       sort={sort}
     />
+  );
+}
+
+/** A page that re-renders around a table with the same rows, its row handler new each time. */
+function RerenderingPage({
+  columns,
+  onClick,
+  renderCard,
+}: {
+  columns: DataTableColumn<Row>[];
+  onClick: (text: string) => void;
+  renderCard: (row: Row) => JSX.Element;
+}) {
+  const [count, setCount] = useState(0);
+  return (
+    <>
+      <button onClick={() => setCount((n) => n + 1)} type="button">
+        Bump {count}
+      </button>
+      <DataTable
+        columns={columns}
+        data={ROWS}
+        getRowId={(row) => row.id}
+        // A new handler on every render, reading this render's count.
+        onRowClick={(row) => onClick(`${row.name} ${count}`)}
+        renderCard={renderCard}
+        rowLabel={(row) => `Open ${row.name}`}
+      />
+    </>
   );
 }
 
@@ -380,6 +409,27 @@ describe("DataTable", () => {
     expect(screen.getByRole("columnheader", { name: "Name" }).className).toContain(
       "in-data-overflow-start:shadow-[inset_-1px_0_0_var(--border-subtle)]",
     );
+  });
+
+  it("renders no row again when the page around it re-renders, and clicks reach the latest handler", async () => {
+    const cell = vi.fn((row: Row) => row.name);
+    const card = vi.fn((row: Row) => <span>{row.name}</span>);
+    const columns: DataTableColumn<Row>[] = [{ id: "name", header: "Name", cell }];
+    const clicks: string[] = [];
+    const { user } = renderWithProviders(
+      <RerenderingPage columns={columns} onClick={(text) => clicks.push(text)} renderCard={card} />,
+    );
+    const cellCalls = cell.mock.calls.length;
+    const cardCalls = card.mock.calls.length;
+    expect(cellCalls).toBeGreaterThanOrEqual(ROWS.length);
+
+    await user.click(screen.getByRole("button", { name: "Bump 0" }));
+    await user.click(screen.getByRole("button", { name: "Bump 1" }));
+    expect(cell).toHaveBeenCalledTimes(cellCalls);
+    expect(card).toHaveBeenCalledTimes(cardCalls);
+
+    await user.click(screen.getByRole("row", { name: "Open Bravo" }));
+    expect(clicks).toEqual(["Bravo 2"]);
   });
 
   it("leaves rows unfocusable without onRowClick", () => {
