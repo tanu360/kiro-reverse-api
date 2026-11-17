@@ -12,10 +12,14 @@ import {
 } from "@/components/ui/segmented-control";
 import { cn } from "@/lib/utils";
 
-type TabsVariant = "default" | "underline";
+type TabsVariant = "default" | "underline" | "nav";
 type TabsSize = SegmentedControlSize;
 
-const TabsListContext: React.Context<TabsSize> = React.createContext<TabsSize>("default");
+const TabsListContext: React.Context<{ size: TabsSize; variant: TabsVariant }> =
+  React.createContext<{ size: TabsSize; variant: TabsVariant }>({
+    size: "default",
+    variant: "default",
+  });
 
 export function Tabs({ className, ...props }: TabsPrimitive.Root.Props): React.ReactElement {
   return (
@@ -31,6 +35,8 @@ export function Tabs({ className, ...props }: TabsPrimitive.Root.Props): React.R
  * `default`: the segmented control (the sign-in theme toggle), the same sizes and sliding
  * indicator. `underline`: page-level tabs over a full-width hairline, the active one underlined
  * in purple; the strip scrolls sideways on its own, fading at an edge it can still scroll past.
+ * `nav`: a settings-style section list (the API key dialog), full-width rows with an icon; the
+ * active row sits on a purple tint that slides between rows, its icon purple, with no line.
  */
 export function TabsList({
   variant = "default",
@@ -50,22 +56,27 @@ export function TabsList({
         variant === "default"
           ? // The segmented control's frame (the sign-in theme toggle): 6 px tabs in an 8 px track.
             cn(segmentedControlTrackClassName, "*:data-[slot=tabs-tab]:rounded-md")
-          : // Page-level tabs: left-aligned over a full-width hairline, the active one underlined.
-            "w-max min-w-full justify-start gap-x-1 data-[orientation=horizontal]:border-b data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:grow-0 *:data-[slot=tabs-tab]:hover:bg-accent",
+          : variant === "nav"
+            ? // Section rows, no frame: the list is as wide as its column.
+              "w-full items-stretch gap-0.5 data-[orientation=vertical]:items-stretch"
+            : // Page-level tabs: left-aligned over a full-width hairline, the active one underlined.
+              "w-max min-w-full justify-start gap-x-1 data-[orientation=horizontal]:border-b data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:grow-0 *:data-[slot=tabs-tab]:hover:bg-accent",
         className,
       )}
       data-size={size}
       data-slot="tabs-list"
       {...props}
     >
-      <TabsListContext.Provider value={size}>{children}</TabsListContext.Provider>
+      <TabsListContext.Provider value={{ size, variant }}>{children}</TabsListContext.Provider>
       <TabsPrimitive.Indicator
         className={cn(
           "absolute bottom-0 left-0 h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) -translate-y-(--active-tab-bottom)",
           segmentedControlSlideClassName,
           variant === "underline"
             ? "z-10 bg-primary data-[orientation=horizontal]:h-0.5 data-[orientation=vertical]:w-0.5 data-[orientation=vertical]:-translate-x-px data-[orientation=horizontal]:translate-y-px"
-            : cn("-z-1", segmentedControlIndicatorSurfaceClassName),
+            : variant === "nav"
+              ? "-z-1 rounded-lg bg-info-surface"
+              : cn("-z-1", segmentedControlIndicatorSurfaceClassName),
         )}
         data-slot="tab-indicator"
       />
@@ -92,8 +103,8 @@ export function TabsTab({
 }: TabsPrimitive.Tab.Props & {
   size?: TabsSize;
 }): React.ReactElement {
-  const contextSize: TabsSize = React.useContext(TabsListContext);
-  const resolvedSize: TabsSize = size ?? contextSize;
+  const context = React.useContext(TabsListContext);
+  const resolvedSize: TabsSize = size ?? context.size;
 
   return (
     <TabsPrimitive.Tab
@@ -105,6 +116,10 @@ export function TabsTab({
         "max-sm:px-2.5",
         // A count badge in a tab (coss p-tabs-10) goes muted while its tab is not the active one.
         "not-data-active:**:data-[slot=badge]:text-muted-foreground",
+        // A section row: 32 / 36 px, left-aligned; hover tints only rows that are not active, and
+        // the active row's icon turns purple over the sliding tint.
+        context.variant === "nav" &&
+          "h-8 grow-0 justify-start gap-2 rounded-lg px-2.5 max-sm:px-2.5 sm:h-9 not-data-active:hover:bg-accent data-active:[&_svg]:text-info-foreground data-active:[&_svg]:opacity-100",
         className,
       )}
       data-size={resolvedSize}

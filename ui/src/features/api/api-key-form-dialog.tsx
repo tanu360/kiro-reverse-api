@@ -478,7 +478,7 @@ function ApiKeyCreateDialog({
         value={tab}
       >
         <div className="min-w-0 shrink-0 max-sm:px-4 sm:w-48 sm:border-border-subtle sm:border-e sm:bg-surface-inset sm:p-2">
-          <TabsList variant="underline">
+          <TabsList variant={phone ? "underline" : "nav"}>
             {SECTIONS.map((section) => (
               <TabsTab key={section} value={section}>
                 <HugeiconsIcon
