@@ -94,6 +94,22 @@ Mọi trang của trang quản trị và trang người dùng. Mỗi ảnh hiể
   <br><sub><b>API</b> — truy cập API, key với giới hạn token, credit và lượt gọi, mức sử dụng theo key, endpoint và thiết lập client có tô sáng</sub>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/api-create-dark.webp">
+    <img alt="Tạo API key" src="../screenshots/vi/api-create-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Tạo API key</b> — hai bước ngắn: tên, hạn dùng, key tùy chỉnh và giới hạn, rồi chế độ định tuyến, model và tài khoản</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/api-edit-dark.webp">
+    <img alt="Sửa API key" src="../screenshots/vi/api-edit-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Sửa API key</b> — bảng mở ra từ một key: cài đặt chung, giới hạn và quyền truy cập, theo từng thẻ</sub>
+</p>
+
 ## Sao lưu
 
 <p align="center">

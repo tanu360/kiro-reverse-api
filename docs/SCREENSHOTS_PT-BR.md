@@ -94,6 +94,22 @@ Todas as páginas do painel de administração e do painel do usuário. Cada ima
   <br><sub><b>API</b> — acesso à API, chaves com limites de tokens, créditos e chamadas, uso por chave, endpoints e configuração do cliente destacada</sub>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/api-create-dark.webp">
+    <img alt="Criar chave de API" src="../screenshots/pt-BR/api-create-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Criar chave de API</b> — duas etapas curtas: nome, validade, chave personalizada e limites, depois modo de roteamento, modelos e contas</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/api-edit-dark.webp">
+    <img alt="Editar chave de API" src="../screenshots/pt-BR/api-edit-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Editar chave de API</b> — o painel que uma chave abre: configurações gerais, limites e acesso, em cartões</sub>
+</p>
+
 ## Backups
 
 <p align="center">

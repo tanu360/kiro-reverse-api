@@ -94,6 +94,22 @@
   <br><sub><b>API</b> — API アクセス、トークン・クレジット・呼び出し回数の上限付きのキー、キー別の使用量、エンドポイント、ハイライト表示のクライアント設定</sub>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/ja/api-create-dark.webp">
+    <img alt="API キーを作成" src="../screenshots/ja/api-create-light.webp" width="100%">
+  </picture>
+  <br><sub><b>API キーを作成</b> — 2 つの短いステップ：名前・有効期限・カスタムキー・上限、続いてルーティングモード・モデル・アカウント</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/ja/api-edit-dark.webp">
+    <img alt="API キーを編集" src="../screenshots/ja/api-edit-light.webp" width="100%">
+  </picture>
+  <br><sub><b>API キーを編集</b> — キーから開くシート：一般設定・制限・アクセスをカードごとに</sub>
+</p>
+
 ## バックアップ
 
 <p align="center">

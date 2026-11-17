@@ -94,6 +94,22 @@ Every page of the admin panel and the user panel. Each image follows your GitHub
   <br><sub><b>API</b> — API access, keys with token, credit and call limits, usage by key, endpoints and highlighted client setup</sub>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/api-create-dark.webp">
+    <img alt="Create API key" src="../screenshots/en/api-create-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Create API key</b> — two short steps: name, expiry, custom key and limits, then routing mode, models and accounts</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/api-edit-dark.webp">
+    <img alt="Edit API key" src="../screenshots/en/api-edit-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Edit API key</b> — the sheet a key opens: its general settings, limits and access, in cards</sub>
+</p>
+
 ## Backups
 
 <p align="center">

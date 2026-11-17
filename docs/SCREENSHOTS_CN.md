@@ -94,6 +94,22 @@
   <br><sub><b>接口</b> — API 访问、带 Token、Credits 与调用次数限额的 Key、各 API Key 用量、接口地址与高亮的客户端配置</sub>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/api-create-dark.webp">
+    <img alt="创建 API Key" src="../screenshots/zh/api-create-light.webp" width="100%">
+  </picture>
+  <br><sub><b>创建 API Key</b> — 两个简短步骤：名称、过期时间、自定义 Key 与限额，然后是路由模式、模型与账号</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/api-edit-dark.webp">
+    <img alt="编辑 API Key" src="../screenshots/zh/api-edit-light.webp" width="100%">
+  </picture>
+  <br><sub><b>编辑 API Key</b> — 点开 Key 的侧边面板：常规设置、限额与访问范围，分卡片展示</sub>
+</p>
+
 ## 备份
 
 <p align="center">
