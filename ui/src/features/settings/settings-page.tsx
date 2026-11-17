@@ -41,7 +41,7 @@ import { tunnelQuery } from "@/lib/api/tunnel";
 import { twoFactorQuery } from "@/lib/api/two-factor";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
+import { UnsavedChangesProvider, useIsDirty, useUnsavedChanges } from "./lib/unsaved";
 import { AdminPasswordCard } from "./sections/admin-password-card";
 import { AlertsCard } from "./sections/alerts-card";
 import { AutoContinueCard } from "./sections/auto-continue-card";
@@ -561,8 +561,8 @@ function SectionNav({
 function useLeaveGuard(): void {
   const { t } = useT("settings");
   const confirm = useConfirm();
-  const unsaved = useUnsavedChanges();
-  const isDirty = unsaved?.isDirty ?? (() => false);
+  // Not the dirty set itself: this hook runs in the component that renders every card.
+  const isDirty = useIsDirty();
   useBlocker({
     shouldBlockFn: async ({ current, next }) => {
       // Section jumps stay on the page; sign-out and an expired session must always leave.
