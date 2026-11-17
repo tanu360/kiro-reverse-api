@@ -332,16 +332,17 @@ export function RequestDetailSheet({
             )
           }
           icon={ArrowDataTransferHorizontalIcon}
-          slim
-          title={t("detail.request")}
-        >
-          {record.replayOf ? (
-            <div className="px-4 pt-4">
+          // A replay names its original beside the title, centred on the title's line.
+          meta={
+            record.replayOf ? (
               <Badge size="sm" tone="primary">
                 {t("replay.badge", { id: record.replayOf })}
               </Badge>
-            </div>
-          ) : null}
+            ) : undefined
+          }
+          slim
+          title={t("detail.request")}
+        >
           <div className="p-4">
             <KeyValueGrid items={facts} />
           </div>
