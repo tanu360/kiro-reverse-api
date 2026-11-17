@@ -108,8 +108,9 @@ test.describe("app shell", () => {
   });
 
   test.describe("on a touch screen", () => {
-    // Phone header icons are 36 px under a fine pointer; a coarse pointer (touch emulation)
-    // grows every control to at least 40 px.
+    // Phone header icons are shadcn Nova's 32 px buttons, touch or not; on a coarse pointer
+    // (touch emulation) each one's invisible ::after hit box reaches 44 px. The sheet's rows
+    // and the command menu's options are 40 px tall.
     test.use({ hasTouch: true });
 
     test("phone touch targets in the sheet and the command menu are at least 40 px", async ({
@@ -118,8 +119,14 @@ test.describe("app shell", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       const search = page.getByRole("button", { name: "Search" });
       const searchBox = await search.boundingBox();
-      expect(searchBox?.width).toBeGreaterThanOrEqual(40);
-      expect(searchBox?.height).toBeGreaterThanOrEqual(40);
+      expect(searchBox?.width).toBeGreaterThanOrEqual(32);
+      expect(searchBox?.height).toBeGreaterThanOrEqual(32);
+      const hit = await search.evaluate((el) => {
+        const after = getComputedStyle(el, "::after");
+        return { width: Number.parseFloat(after.width), height: Number.parseFloat(after.height) };
+      });
+      expect(hit.width).toBeGreaterThanOrEqual(44);
+      expect(hit.height).toBeGreaterThanOrEqual(44);
 
       await page.getByRole("button", { name: "Toggle sidebar" }).click();
       const sheet = page.locator('[data-slot="sidebar"][data-mobile="true"]');
