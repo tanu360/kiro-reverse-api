@@ -792,11 +792,10 @@ export const handlers: HttpHandler[] = [
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
-    const times = mockDb.requests.map((r) => r.ts);
-    return HttpResponse.json({
-      ...mockDb.logRetention,
-      oldestRequestTs: times.length > 0 ? Math.min(...times) : 0,
-    });
+    // A loop, not Math.min(...ts): spreading 200k timestamps overflows the call stack.
+    let oldest = 0;
+    for (const r of mockDb.requests) if (oldest === 0 || r.ts < oldest) oldest = r.ts;
+    return HttpResponse.json({ ...mockDb.logRetention, oldestRequestTs: oldest });
   }),
 
   http.post(apiUrl("/log-retention"), async ({ request }) => {

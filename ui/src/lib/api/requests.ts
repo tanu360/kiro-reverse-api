@@ -6,8 +6,10 @@ import type { RecentRequestsParams, RecentRequestsResponse, RequestRecord } from
 /** Empty `search`/`status` are left out of the query string, like the old UI. */
 export async function getRecentRequests(
   params: RecentRequestsParams,
+  signal?: AbortSignal,
 ): Promise<RecentRequestsResponse> {
   const res = await apiRequest<RecentRequestsResponse>("/observe/recent-requests", {
+    signal,
     query: {
       page: params.page,
       pageSize: params.pageSize,
@@ -34,10 +36,10 @@ export interface RequestCounts {
 export function requestCountsQuery() {
   return queryOptions({
     queryKey: queryKeys.requests.counts(),
-    queryFn: async (): Promise<RequestCounts> => {
+    queryFn: async ({ signal }): Promise<RequestCounts> => {
       const [success, failed] = await Promise.all([
-        getRecentRequests({ page: 1, pageSize: 1, status: "success" }),
-        getRecentRequests({ page: 1, pageSize: 1, status: "failed" }),
+        getRecentRequests({ page: 1, pageSize: 1, status: "success" }, signal),
+        getRecentRequests({ page: 1, pageSize: 1, status: "failed" }, signal),
       ]);
       return { success: success.total, failed: failed.total };
     },
@@ -47,7 +49,8 @@ export function requestCountsQuery() {
 export function recentRequestsQuery(params: RecentRequestsParams) {
   return queryOptions({
     queryKey: queryKeys.requests.list(params),
-    queryFn: () => getRecentRequests(params),
+    // The signal lets TanStack cancel a page nobody waits for any more (paging or sorting fast).
+    queryFn: ({ signal }) => getRecentRequests(params, signal),
     placeholderData: keepPreviousData,
   });
 }
@@ -88,8 +91,10 @@ export interface Conversation {
 export function conversationQuery(id: string) {
   return queryOptions({
     queryKey: queryKeys.requests.conversation(id),
-    queryFn: () =>
-      apiRequest<Conversation>(`/observe/conversations/${encodeURIComponent(id)}`).then((res) => ({
+    queryFn: ({ signal }) =>
+      apiRequest<Conversation>(`/observe/conversations/${encodeURIComponent(id)}`, {
+        signal,
+      }).then((res) => ({
         ...res,
         turns: res.turns ?? [],
       })),
@@ -109,7 +114,7 @@ export interface RequestBody {
 export function requestBodyQuery(id: number) {
   return queryOptions({
     queryKey: queryKeys.requests.body(id),
-    queryFn: () => apiRequest<RequestBody>(`/observe/requests/${id}/body`),
+    queryFn: ({ signal }) => apiRequest<RequestBody>(`/observe/requests/${id}/body`, { signal }),
     staleTime: Number.POSITIVE_INFINITY,
   });
 }
