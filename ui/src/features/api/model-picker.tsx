@@ -33,7 +33,6 @@ export function ModelPicker({
   onSelectedChange,
   invalid,
   searchRef,
-  inline = false,
 }: {
   scope: ApiKeyModelScope;
   selected: readonly string[];
@@ -43,8 +42,6 @@ export function ModelPicker({
   invalid?: string;
   /** Where focus goes when the picks are invalid. */
   searchRef?: Ref<HTMLInputElement>;
-  /** The legend and both choices on one line (the create dialog, which keeps its height low). */
-  inline?: boolean;
 }): JSX.Element {
   const { t, lang } = useT("api");
   const { t: tc } = useT();
@@ -112,28 +109,20 @@ export function ModelPicker({
 
   return (
     <Fieldset className="flex min-w-0 flex-col gap-3">
-      {/* Inline (the create dialog): the legend and the two choices share one line. */}
-      <div className={inline ? "flex flex-wrap items-center justify-between gap-x-6" : "contents"}>
-        <FieldsetLegend>{t("form.allowedModels")}</FieldsetLegend>
-        <RadioGroup
-          aria-label={t("form.allowedModels")}
-          className={inline ? "flex-row flex-wrap gap-x-6 gap-y-0" : "gap-0"}
-          onValueChange={(value) => onScopeChange(value as ApiKeyModelScope)}
-          value={scope}
-        >
-          {SCOPES.map((value) => (
-            <Label
-              className="self-start"
-              htmlFor={`${baseId}-${value}`}
-              key={value}
-              variant="option"
-            >
-              <Radio id={`${baseId}-${value}`} value={value} />
-              {value === "all" ? t("form.modelsAll") : t("form.modelsSelected")}
-            </Label>
-          ))}
-        </RadioGroup>
-      </div>
+      <FieldsetLegend>{t("form.allowedModels")}</FieldsetLegend>
+      <RadioGroup
+        aria-label={t("form.allowedModels")}
+        className="gap-0"
+        onValueChange={(value) => onScopeChange(value as ApiKeyModelScope)}
+        value={scope}
+      >
+        {SCOPES.map((value) => (
+          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
+            <Radio id={`${baseId}-${value}`} value={value} />
+            {value === "all" ? t("form.modelsAll") : t("form.modelsSelected")}
+          </Label>
+        ))}
+      </RadioGroup>
       {scope === "selected" ? (
         <div className="flex min-w-0 flex-col gap-2">
           <InputGroup>

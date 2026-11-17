@@ -1,4 +1,10 @@
-import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import {
+  AlertCircleIcon,
+  Key01Icon,
+  KeyRoundIcon,
+  Route01Icon,
+  UserMultipleIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,6 +26,7 @@ import {
   ResponsiveSheetPanel,
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
+import { SectionCard } from "@/components/shared/section-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldHint, FieldLabel } from "@/components/ui/field";
@@ -43,10 +50,9 @@ import { createApiKey, updateApiKey } from "@/lib/api/api-keys";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { ApiKey, ApiKeyRoutingMode } from "@/lib/api/types";
-import { type TFunction, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { noSpaces } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { AccountPicker } from "./account-picker";
 import {
   type ApiKeyFormData,
@@ -65,13 +71,9 @@ import {
 } from "./api-key-form";
 import { ExpiryPicker } from "./expiry-picker";
 import { ModelPicker } from "./model-picker";
+import { SheetMark } from "./sheet-mark";
 
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
-
-/** The edit sheet's sections, in this order. */
-type Section = "general" | "accounts" | "routing";
-
-const SECTIONS: readonly Section[] = ["general", "accounts", "routing"];
 
 const CREDIT_FORMAT: Intl.NumberFormatOptions = {
   minimumFractionDigits: 2,
@@ -86,17 +88,6 @@ const LIMIT_ERRORS: Readonly<Record<ApiKeyLimitField, string>> = {
 };
 
 type ModelsError = "noModels" | "tooManyModels" | "modelTooLong";
-
-function sectionLabel(section: Section, t: TFunction): string {
-  switch (section) {
-    case "general":
-      return t("form.tabGeneral");
-    case "accounts":
-      return t("form.accounts");
-    case "routing":
-      return t("form.tabRouting");
-  }
-}
 
 interface KeyForm {
   editing: boolean;
@@ -226,16 +217,9 @@ function NameAndExpiry({ form }: { form: KeyForm }): JSX.Element {
   );
 }
 
-/** The custom key, with what an empty one means: under it, or as its placeholder when `compact`. */
-function CustomKeyField({
-  form,
-  compact = false,
-}: {
-  form: KeyForm;
-  compact?: boolean;
-}): JSX.Element {
+/** The custom key, with what an empty one means under it. */
+function CustomKeyField({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
-  const hint = form.editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder");
   return (
     <Field>
       <FieldLabel>{t("form.customKey")}</FieldLabel>
@@ -245,42 +229,36 @@ function CustomKeyField({
         autoComplete="off"
         autoCorrect="off"
         onValueChange={(value) => form.set("key", noSpaces(value))}
-        placeholder={compact ? hint : undefined}
         spellCheck={false}
         value={form.values.key}
       />
-      {compact ? null : <FieldDescription>{hint}</FieldDescription>}
+      <FieldDescription>
+        {form.editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder")}
+      </FieldDescription>
     </Field>
   );
 }
 
-/** Name and expiry, the custom key under them, then the four limits under a hairline. */
-function GeneralSection({ form }: { form: KeyForm }): JSX.Element {
-  return (
-    <>
-      <NameAndExpiry form={form} />
-      <CustomKeyField form={form} />
-      <LimitFields divider form={form} />
-    </>
-  );
-}
+const LIMIT_LABELS: Readonly<Record<ApiKeyLimitField, string>> = {
+  tokenLimit: "form.tokenLimit",
+  creditLimit: "form.creditLimit",
+  callLimit: "form.callLimit",
+  rpmLimit: "form.rpmLimit",
+};
 
-/** The four limits, two by two from sm up; `divider` sets them under a hairline. */
-function LimitFields({ form, divider = false }: { form: KeyForm; divider?: boolean }): JSX.Element {
+/** One limit's number field, with its error when it is the failed one. */
+function LimitField({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): JSX.Element {
   const { t } = useT("api");
-  const limit = (
-    field: ApiKeyLimitField,
-    label: string,
-    options: { max?: number; step?: number; format?: Intl.NumberFormatOptions } = {},
-  ) => (
+  return (
     <Field invalid={form.invalid === field}>
-      <FieldLabel>{label}</FieldLabel>
+      <FieldLabel>{t(LIMIT_LABELS[field])}</FieldLabel>
       <NumberField
-        format={options.format}
-        max={options.max}
+        // Two decimals for credits, as formatCredits shows them in the table and the cards.
+        format={field === "creditLimit" ? CREDIT_FORMAT : undefined}
+        max={field === "rpmLimit" ? MAX_KEY_RPM : undefined}
         min={0}
         onValueChange={(value) => form.set(field, value)}
-        step={options.step ?? 1}
+        step={field === "creditLimit" ? 0.01 : 1}
         value={form.values[field]}
       >
         <NumberFieldGroup>
@@ -296,38 +274,19 @@ function LimitFields({ form, divider = false }: { form: KeyForm; divider?: boole
       ) : null}
     </Field>
   );
-  return (
-    <div
-      className={cn(
-        "grid grid-cols-1 gap-4 sm:grid-cols-2",
-        divider && "border-border-subtle border-t pt-4",
-      )}
-    >
-      {limit("tokenLimit", t("form.tokenLimit"))}
-      {/* Two decimals, as formatCredits shows credits in the table and the cards. */}
-      {limit("creditLimit", t("form.creditLimit"), { format: CREDIT_FORMAT, step: 0.01 })}
-      {limit("callLimit", t("form.callLimit"))}
-      {limit("rpmLimit", t("form.rpmLimit"), { max: MAX_KEY_RPM })}
-      <FieldHint className="sm:col-span-2">{t("form.limitsHint")}</FieldHint>
-    </div>
-  );
 }
 
-/**
- * Which accounts the key reaches. In the sheet its section heading names it, so the legend is
- * for screen readers only; the create dialog shows it and puts the two choices on one line.
- */
-function AccountsSection({
+/** Which accounts the key reaches; `hideLegend` where a card title already says "Accounts". */
+function AccountsField({
   form,
-  compact = false,
+  hideLegend = false,
 }: {
   form: KeyForm;
-  compact?: boolean;
+  hideLegend?: boolean;
 }): JSX.Element {
   return (
     <AccountPicker
-      hideLegend={!compact}
-      inline={compact}
+      hideLegend={hideLegend}
       invalid={form.invalid === "accountIds"}
       onScopeChange={(scope) => form.set("accountScope", scope)}
       onSelectedChange={(ids) => form.set("accountIds", ids)}
@@ -340,14 +299,8 @@ function AccountsSection({
   );
 }
 
-/** The routing mode, then the models the key may call (choices on one line when `compact`). */
-function RoutingSection({
-  form,
-  compact = false,
-}: {
-  form: KeyForm;
-  compact?: boolean;
-}): JSX.Element {
+/** The routing mode select, its hint under it. */
+function RoutingField({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
   const globalMode = useRoutingMode();
   const routingItems = KEY_ROUTING_MODES.map((mode) => ({
@@ -357,7 +310,38 @@ function RoutingSection({
         ? t("form.routingInherit", { mode: t(ROUTING_MODE_LABEL[globalMode]) })
         : t(ROUTING_MODE_LABEL[mode]),
   }));
-  const modelsInvalid =
+  return (
+    <Field>
+      <FieldLabel>{t("form.routingMode")}</FieldLabel>
+      <Select
+        items={routingItems}
+        onValueChange={(next) => {
+          if (KEY_ROUTING_MODES.includes(next as ApiKeyRoutingMode)) {
+            form.set("routingMode", next as ApiKeyRoutingMode);
+          }
+        }}
+        value={form.values.routingMode}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectPopup>
+          {routingItems.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectPopup>
+      </Select>
+      <FieldDescription>{t("form.routingModeHint")}</FieldDescription>
+    </Field>
+  );
+}
+
+/** The models the key may call. */
+function ModelsField({ form }: { form: KeyForm }): JSX.Element {
+  const { t } = useT("api");
+  const invalid =
     form.invalid !== "allowedModels"
       ? undefined
       : form.modelsError === "noModels"
@@ -366,53 +350,15 @@ function RoutingSection({
           ? t("form.tooManyModels", { max: MAX_KEY_MODELS })
           : t("form.modelTooLong", { max: MAX_KEY_MODEL_LENGTH });
   return (
-    <>
-      <Field>
-        <FieldLabel>{t("form.routingMode")}</FieldLabel>
-        <Select
-          items={routingItems}
-          onValueChange={(next) => {
-            if (KEY_ROUTING_MODES.includes(next as ApiKeyRoutingMode)) {
-              form.set("routingMode", next as ApiKeyRoutingMode);
-            }
-          }}
-          value={form.values.routingMode}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectPopup>
-            {routingItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-        <FieldDescription>{t("form.routingModeHint")}</FieldDescription>
-      </Field>
-      <ModelPicker
-        inline={compact}
-        invalid={modelsInvalid}
-        onScopeChange={(scope) => form.set("modelScope", scope)}
-        onSelectedChange={(models) => form.set("allowedModels", models)}
-        scope={form.values.modelScope}
-        searchRef={form.refs.allowedModels}
-        selected={form.values.allowedModels}
-      />
-    </>
+    <ModelPicker
+      invalid={invalid}
+      onScopeChange={(scope) => form.set("modelScope", scope)}
+      onSelectedChange={(models) => form.set("allowedModels", models)}
+      scope={form.values.modelScope}
+      searchRef={form.refs.allowedModels}
+      selected={form.values.allowedModels}
+    />
   );
-}
-
-function SectionBody({ section, form }: { section: Section; form: KeyForm }): JSX.Element {
-  switch (section) {
-    case "general":
-      return <GeneralSection form={form} />;
-    case "accounts":
-      return <AccountsSection form={form} />;
-    case "routing":
-      return <RoutingSection form={form} />;
-  }
 }
 
 /** A server error (duplicate key, collision, limits), inside the form. */
@@ -448,9 +394,9 @@ function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }
 }
 
 /**
- * Create: the one dialog, every field in one scrolling form as before, kept low: name and expiry
- * share a line, the limits go two by two, and each "all / only selected" choice sits on one line,
- * with its list only under "only selected".
+ * Create: the app's dialog at its default width, one form: name and expiry, then the token, call
+ * and per-minute limits on one line, the accounts, the credit limit beside the routing mode, the
+ * models and the custom key.
  */
 function ApiKeyCreateDialog({
   open,
@@ -470,7 +416,6 @@ function ApiKeyCreateDialog({
       initialFocus={form.refs.name}
       onOpenChange={onOpenChange}
       open={open}
-      size="2xl"
       title={t("form.createTitle")}
     >
       <form
@@ -481,10 +426,19 @@ function ApiKeyCreateDialog({
         onSubmit={form.onSubmit}
       >
         <NameAndExpiry form={form} />
-        <LimitFields form={form} />
-        <AccountsSection compact form={form} />
-        <RoutingSection compact form={form} />
-        <CustomKeyField compact form={form} />
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
+          <LimitField field="tokenLimit" form={form} />
+          <LimitField field="callLimit" form={form} />
+          <LimitField field="rpmLimit" form={form} />
+          <FieldHint className="sm:col-span-3">{t("form.limitsHint")}</FieldHint>
+        </div>
+        <AccountsField form={form} />
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+          <LimitField field="creditLimit" form={form} />
+          <RoutingField form={form} />
+        </div>
+        <ModelsField form={form} />
+        <CustomKeyField form={form} />
         <ServerError form={form} />
       </form>
     </ResponsiveDialog>
@@ -492,8 +446,9 @@ function ApiKeyCreateDialog({
 }
 
 /**
- * Edit: the right-hand sheet (a bottom sheet below md), every section one under another under its
- * heading, with the actions in the sheet's foot.
+ * Edit: the detail sheet the account and usage sheets use: the key's mark on the avatar tile, the
+ * title and the masked key, then one card per part (General, Accounts, Routing & models), with
+ * Cancel and Save in the sheet's foot.
  */
 function ApiKeyEditSheet({
   open,
@@ -506,38 +461,56 @@ function ApiKeyEditSheet({
 }): JSX.Element {
   const { t } = useT("api");
   const form = useKeyForm({ mode: "edit", apiKey }, onOpenChange, () => {});
-  const headingId = useId();
 
   return (
     <ResponsiveSheet onOpenChange={onOpenChange} open={open}>
       <ResponsiveSheetHeader>
-        <ResponsiveSheetTitle>{t("form.editTitle")}</ResponsiveSheetTitle>
-        {apiKey.keyMasked ? (
-          <ResponsiveSheetDescription className="truncate font-mono">
-            {apiKey.keyMasked}
-          </ResponsiveSheetDescription>
-        ) : null}
+        <div className="flex items-start gap-3">
+          <SheetMark icon={KeyRoundIcon} />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <ResponsiveSheetTitle className="truncate">{t("form.editTitle")}</ResponsiveSheetTitle>
+            {apiKey.keyMasked ? (
+              <ResponsiveSheetDescription className="min-w-0 truncate font-mono">
+                {apiKey.keyMasked}
+              </ResponsiveSheetDescription>
+            ) : null}
+          </div>
+        </div>
       </ResponsiveSheetHeader>
       <ResponsiveSheetPanel>
         <form
           aria-busy={form.pending || undefined}
-          className="flex flex-col gap-6"
+          className="flex flex-col gap-4"
           id={form.formId}
           noValidate
           onSubmit={form.onSubmit}
         >
-          {SECTIONS.map((section) => (
-            <section
-              aria-labelledby={`${headingId}-${section}`}
-              className="flex flex-col gap-4 border-border-subtle border-t pt-6 first:border-t-0 first:pt-0"
-              key={section}
-            >
-              <h3 className="font-semibold text-heading" id={`${headingId}-${section}`}>
-                {sectionLabel(section, t)}
-              </h3>
-              <SectionBody form={form} section={section} />
-            </section>
-          ))}
+          <SectionCard
+            icon={Key01Icon}
+            panelClassName="flex flex-col gap-4"
+            title={t("form.tabGeneral")}
+          >
+            <NameAndExpiry form={form} />
+            <CustomKeyField form={form} />
+            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+              <LimitField field="tokenLimit" form={form} />
+              <LimitField field="creditLimit" form={form} />
+              <LimitField field="callLimit" form={form} />
+              <LimitField field="rpmLimit" form={form} />
+              <FieldHint className="sm:col-span-2">{t("form.limitsHint")}</FieldHint>
+            </div>
+          </SectionCard>
+          <SectionCard icon={UserMultipleIcon} title={t("form.accounts")}>
+            <AccountsField form={form} hideLegend />
+          </SectionCard>
+          <SectionCard
+            icon={Route01Icon}
+            panelClassName="flex flex-col gap-4"
+            title={t("form.tabRouting")}
+          >
+            <RoutingField form={form} />
+            <ModelsField form={form} />
+          </SectionCard>
           <ServerError form={form} />
         </form>
       </ResponsiveSheetPanel>
@@ -549,9 +522,8 @@ function ApiKeyEditSheet({
 }
 
 /**
- * Create opens the tabbed dialog, edit the sheet. The parent remounts it for every opening, so
- * each one starts from fresh values. Server errors (duplicate key, collision, limits) show
- * inside it.
+ * Create opens the dialog, edit the sheet. The parent remounts it for every opening, so each one
+ * starts from fresh values. Server errors (duplicate key, collision, limits) show inside it.
  */
 export function ApiKeyFormDialog({
   open,

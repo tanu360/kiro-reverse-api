@@ -1,5 +1,4 @@
 import { ChartLineData02Icon, KeyRoundIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, lazy, type ReactNode, Suspense, useMemo, useState } from "react";
 import { Skeleton as SkulletSkeleton } from "skullet/react";
@@ -66,6 +65,7 @@ import {
   seriesBars,
   type UsageMetric,
 } from "./key-usage-model";
+import { SheetMark } from "./sheet-mark";
 
 // The Overview's traffic chart: the same hatched bars, axes and tooltip.
 const TrafficChart = lazy(() => import("@/features/overview/traffic-chart"));
@@ -419,13 +419,7 @@ export function ApiKeyUsageSheet({
     <ResponsiveSheet onOpenChange={onOpenChange} open={open}>
       <ResponsiveSheetHeader>
         <div className="flex items-start gap-3">
-          {/* The row's mark on the account sheet's avatar tile. Decorative. */}
-          <span
-            aria-hidden="true"
-            className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-xl border border-border-subtle bg-surface-2"
-          >
-            <HugeiconsIcon className="size-5 text-muted-foreground" icon={shown.icon} />
-          </span>
+          <SheetMark icon={shown.icon} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <ResponsiveSheetTitle className="truncate">{shown.title}</ResponsiveSheetTitle>
             <ResponsiveSheetDescription

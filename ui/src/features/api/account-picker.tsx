@@ -77,7 +77,6 @@ export function AccountPicker({
   invalid,
   searchRef,
   hideLegend = false,
-  inline = false,
 }: {
   scope: ApiKeyAccountScope;
   selected: readonly string[];
@@ -92,8 +91,6 @@ export function AccountPicker({
   searchRef?: Ref<HTMLInputElement>;
   /** Keeps the legend for screen readers only, where a tab or heading already says "Accounts". */
   hideLegend?: boolean;
-  /** The legend and both choices on one line (the create dialog, which keeps its height low). */
-  inline?: boolean;
 }): JSX.Element {
   const { t, lang } = useT("api");
   const { t: ta } = useT("accounts");
@@ -198,31 +195,23 @@ export function AccountPicker({
 
   return (
     <Fieldset className="flex min-w-0 flex-col gap-3">
-      {/* Inline (the create dialog): the legend and the two choices share one line. */}
-      <div className={inline ? "flex flex-wrap items-center justify-between gap-x-6" : "contents"}>
-        <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
-          {t("form.accounts")}
-        </FieldsetLegend>
-        {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
-        <RadioGroup
-          aria-label={t("form.accounts")}
-          className={inline ? "flex-row flex-wrap gap-x-6 gap-y-0" : "gap-0"}
-          onValueChange={(value) => onScopeChange(value as ApiKeyAccountScope)}
-          value={scope}
-        >
-          {SCOPES.map((value) => (
-            <Label
-              className="self-start"
-              htmlFor={`${baseId}-${value}`}
-              key={value}
-              variant="option"
-            >
-              <Radio id={`${baseId}-${value}`} value={value} />
-              {value === "all" ? t("form.accountsAll") : t("form.accountsSelected")}
-            </Label>
-          ))}
-        </RadioGroup>
-      </div>
+      <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
+        {t("form.accounts")}
+      </FieldsetLegend>
+      {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
+      <RadioGroup
+        aria-label={t("form.accounts")}
+        className="gap-0"
+        onValueChange={(value) => onScopeChange(value as ApiKeyAccountScope)}
+        value={scope}
+      >
+        {SCOPES.map((value) => (
+          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
+            <Radio id={`${baseId}-${value}`} value={value} />
+            {value === "all" ? t("form.accountsAll") : t("form.accountsSelected")}
+          </Label>
+        ))}
+      </RadioGroup>
       {scope === "selected" ? (
         <div className="flex min-w-0 flex-col gap-2">
           {onTagsChange && tagRows.length > 0 ? (
