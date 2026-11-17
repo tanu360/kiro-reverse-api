@@ -11,7 +11,7 @@ import {
   Undo02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { type JSX, type ReactNode, useMemo } from "react";
+import { type JSX, type ReactNode, useCallback, useMemo } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { InfoHint } from "@/components/shared/info-hint";
 import { ListCard } from "@/components/shared/list-card";
@@ -291,6 +291,10 @@ function BackupCard({
   );
 }
 
+function backupRowId(entry: BackupEntry): string {
+  return entry.id;
+}
+
 export function BackupsTable({
   rows,
   loading,
@@ -356,6 +360,12 @@ export function BackupsTable({
     ],
     [t, lang, mask, actions],
   );
+  // The same function while the actions stay the same, as the columns, so the table's rows can
+  // skip a render that changes nothing in them.
+  const renderCard = useCallback(
+    (entry: BackupEntry) => <BackupCard actions={actions} entry={entry} />,
+    [actions],
+  );
 
   return (
     <DataTable
@@ -369,11 +379,11 @@ export function BackupsTable({
       data={rows}
       density="comfortable"
       emptyState={emptyState}
-      getRowId={(entry) => entry.id}
+      getRowId={backupRowId}
       inset
       loading={loading}
       pageSize={pageSize}
-      renderCard={(entry) => <BackupCard actions={actions} entry={entry} />}
+      renderCard={renderCard}
     />
   );
 }

@@ -236,6 +236,11 @@ export function BackupsPage(): JSX.Element {
     setRefocus(null);
   }, [refocus, rows]);
 
+  const emptyState = useMemo(
+    () => <EmptyState description={t("emptyBody")} icon={ArchiveIcon} inCard title={t("empty")} />,
+    [t],
+  );
+
   const uploadError = (error: unknown) => {
     if (isApiError(error) && isNotABackupMessage(error.serverMessage)) {
       toast.error(t("notABackup"), {
@@ -338,14 +343,7 @@ export function BackupsPage(): JSX.Element {
           <div className="min-w-0" ref={listRef}>
             <BackupsTable
               actions={actions}
-              emptyState={
-                <EmptyState
-                  description={t("emptyBody")}
-                  icon={ArchiveIcon}
-                  inCard
-                  title={t("empty")}
-                />
-              }
+              emptyState={emptyState}
               loading={list.isPending}
               pageSize={PAGE_SIZE}
               rows={pageRows}
