@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"math"
 	"sort"
 	"strings"
@@ -845,10 +846,16 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 }
 
 func (s *observeStore) RequestPage(q requestQuery) requestPage {
+	return s.RequestPageContext(context.Background(), q)
+}
+
+// RequestPageContext is RequestPage for a client request: once ctx ends the database query
+// stops, and nobody reads the page it falls back to.
+func (s *observeStore) RequestPageContext(ctx context.Context, q requestQuery) requestPage {
 	q = normalizeRequestQuery(q)
-	if page, err := queryPersistedRequests(q); err == nil && page.Persistent {
+	if page, err := queryPersistedRequestsContext(ctx, q); err == nil && page.Persistent {
 		return page
-	} else if err != nil {
+	} else if err != nil && ctx.Err() == nil {
 		logger.Warnf("[Observe] Query persisted requests failed: %v", err)
 	}
 	return s.memoryRequestPage(q)

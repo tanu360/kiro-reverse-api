@@ -1,9 +1,13 @@
 package proxy
 
 import (
+	"context"
 	"database/sql"
 	"kiro-proxy/textfmt"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
@@ -38,6 +42,7 @@ func addPersistedRequestCredits(id int64, credits float64) error {
 		return err
 	}
 	_, err = d.Exec(`UPDATE requests SET credits = credits + ? WHERE id = ?`, credits, id)
+	requestLogChanged()
 	return err
 }
 
@@ -66,16 +71,103 @@ type persistedRequestStats struct {
 	TotalErrorEvents int64
 }
 
+func (s *persistedRequestStats) add(o persistedRequestStats) {
+	s.TotalRequests += o.TotalRequests
+	s.SuccessRequests += o.SuccessRequests
+	s.FailedRequests += o.FailedRequests
+	s.TotalTokens += o.TotalTokens
+	s.TotalCredits += o.TotalCredits
+	s.SuccessTokens += o.SuccessTokens
+	s.SuccessInTokens += o.SuccessInTokens
+	s.SuccessOutTokens += o.SuccessOutTokens
+	s.SuccessCredits += o.SuccessCredits
+	s.TotalErrorEvents += o.TotalErrorEvents
+}
+
+// requestStatsSums sums the requests rows its FROM clause selects, in persistedRequestStats order.
+const requestStatsSums = `COUNT(*) AS total,
+COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0) AS ok,
+COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0) AS failed,
+COALESCE(SUM(total_tokens), 0) AS tokens,
+COALESCE(SUM(credits), 0) AS credits,
+COALESCE(SUM(CASE WHEN success = 1 THEN total_tokens ELSE 0 END), 0) AS ok_tokens,
+COALESCE(SUM(CASE WHEN success = 1 THEN in_tokens ELSE 0 END), 0) AS ok_in,
+COALESCE(SUM(CASE WHEN success = 1 THEN out_tokens ELSE 0 END), 0) AS ok_out,
+COALESCE(SUM(CASE WHEN success = 1 THEN credits ELSE 0 END), 0) AS ok_credits`
+
+// requestStatsCache keeps the all-time totals and the newest request and error ids they
+// include. /status asks every 10 seconds from each open admin page; summing the whole log
+// each time held the database's one connection, and so request logging, for a scan of it.
+// The cache adds only the rows logged since, and sums everything again after any other
+// change (requestLogChanged), on a new database handle, and once a minute regardless.
+var requestStatsCache struct {
+	mu sync.Mutex
+	//! Holding the handle keeps it from being freed, so a new handle never reuses its address.
+	db           *sql.DB
+	gen          uint64
+	at           time.Time
+	maxRequestID int64
+	maxErrorID   int64
+	stats        persistedRequestStats
+}
+
+// requestStatsMaxAge bounds how long the cached totals go without a full sum, so a change
+// to logged rows that does not call requestLogChanged is still counted within it.
+const requestStatsMaxAge = time.Minute
+
+var requestLogGen atomic.Uint64
+
+// requestLogChanged says logged rows changed other than by a new row: late credits, a
+// prune, a reset. Call it after the change is committed.
+func requestLogChanged() {
+	requestLogGen.Add(1)
+}
+
 func queryPersistedRequestStats() (persistedRequestStats, error) {
 	d, err := db.Get()
 	if err != nil {
 		return persistedRequestStats{}, err
+	}
+	c := &requestStatsCache
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	//! Read before the sums: a change committed while they run moves it on, and the next call sums again.
+	gen := requestLogGen.Load()
+	if c.db == d && c.gen == gen && time.Since(c.at) < requestStatsMaxAge {
+		var delta persistedRequestStats
+		var maxRequestID, maxErrorID int64
+		//! One statement, so the rows it adds and the ids it moves to are the same snapshot.
+		err := d.QueryRow(`SELECT r.total, r.ok, r.failed, r.tokens, r.credits, r.ok_tokens, r.ok_in, r.ok_out, r.ok_credits,
+e.total, r.max_id, e.max_id
+FROM (SELECT `+requestStatsSums+`, COALESCE(MAX(id), ?) AS max_id FROM requests WHERE id > ?) r,
+(SELECT COUNT(*) AS total, COALESCE(MAX(id), ?) AS max_id FROM errors WHERE id > ?) e`,
+			c.maxRequestID, c.maxRequestID, c.maxErrorID, c.maxErrorID).Scan(
+			&delta.TotalRequests,
+			&delta.SuccessRequests,
+			&delta.FailedRequests,
+			&delta.TotalTokens,
+			&delta.TotalCredits,
+			&delta.SuccessTokens,
+			&delta.SuccessInTokens,
+			&delta.SuccessOutTokens,
+			&delta.SuccessCredits,
+			&delta.TotalErrorEvents,
+			&maxRequestID,
+			&maxErrorID,
+		)
+		if err != nil {
+			return persistedRequestStats{}, err
+		}
+		c.stats.add(delta)
+		c.maxRequestID, c.maxErrorID = maxRequestID, maxErrorID
+		return c.stats, nil
 	}
 
 	//! One statement over the logs and the rollups of the rows log retention
 	//! pruned: it reads one snapshot, so a prune between two reads can neither
 	//! count a row twice nor miss it.
 	var stats persistedRequestStats
+	var maxRequestID, maxErrorID int64
 	err = d.QueryRow(`SELECT
 r.total + a.total,
 r.ok + a.ok,
@@ -86,17 +178,10 @@ r.ok_tokens + a.ok_tokens,
 r.ok_in + a.ok_in,
 r.ok_out + a.ok_out,
 r.ok_credits + a.ok_credits,
-(SELECT COUNT(*) FROM errors) + (SELECT COALESCE(SUM(error_count), 0) FROM error_rollup)
-FROM (SELECT
-COUNT(*) AS total,
-COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0) AS ok,
-COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0) AS failed,
-COALESCE(SUM(total_tokens), 0) AS tokens,
-COALESCE(SUM(credits), 0) AS credits,
-COALESCE(SUM(CASE WHEN success = 1 THEN total_tokens ELSE 0 END), 0) AS ok_tokens,
-COALESCE(SUM(CASE WHEN success = 1 THEN in_tokens ELSE 0 END), 0) AS ok_in,
-COALESCE(SUM(CASE WHEN success = 1 THEN out_tokens ELSE 0 END), 0) AS ok_out,
-COALESCE(SUM(CASE WHEN success = 1 THEN credits ELSE 0 END), 0) AS ok_credits
+(SELECT COUNT(*) FROM errors) + (SELECT COALESCE(SUM(error_count), 0) FROM error_rollup),
+(SELECT COALESCE(MAX(id), 0) FROM requests),
+(SELECT COALESCE(MAX(id), 0) FROM errors)
+FROM (SELECT `+requestStatsSums+`
 FROM requests) r, (SELECT
 COALESCE(SUM(request_count), 0) AS total,
 COALESCE(SUM(CASE WHEN success = 1 THEN request_count ELSE 0 END), 0) AS ok,
@@ -118,8 +203,16 @@ FROM request_rollup) a`).Scan(
 		&stats.SuccessOutTokens,
 		&stats.SuccessCredits,
 		&stats.TotalErrorEvents,
+		&maxRequestID,
+		&maxErrorID,
 	)
-	return stats, err
+	if err != nil {
+		c.db = nil
+		return stats, err
+	}
+	c.db, c.gen, c.at = d, gen, time.Now()
+	c.maxRequestID, c.maxErrorID, c.stats = maxRequestID, maxErrorID, stats
+	return stats, nil
 }
 
 func enqueuePersistRequestRecord(rec requestRecord) int64 {
@@ -163,7 +256,25 @@ func escapeSQLLike(s string) string {
 	return b.String()
 }
 
+// requestSortColumns is each sort's ORDER BY expression.
+var requestSortColumns = map[string]string{
+	"time":     "ts",
+	"status":   "success",
+	"account":  "LOWER(email || account_id)",
+	"api_key":  "LOWER(api_key || api_key_id)",
+	"model":    "model",
+	"tokens":   "total_tokens",
+	"credits":  "credits",
+	"duration": "duration_ms",
+}
+
 func queryPersistedRequests(q requestQuery) (requestPage, error) {
+	return queryPersistedRequestsContext(context.Background(), q)
+}
+
+// queryPersistedRequestsContext reads one page of the request log. Ending ctx (the client
+// went away) stops its queries, so an abandoned search does not keep the database busy.
+func queryPersistedRequestsContext(ctx context.Context, q requestQuery) (requestPage, error) {
 	q = normalizeRequestQuery(q)
 	d, err := db.Get()
 	if err != nil {
@@ -202,21 +313,7 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 		whereSQL = " WHERE " + strings.Join(where, " AND ")
 	}
 
-	var total int
-	if err := d.QueryRow("SELECT COUNT(*) FROM requests"+whereSQL, args...).Scan(&total); err != nil {
-		return requestPage{}, err
-	}
-
-	orderBy := map[string]string{
-		"time":     "ts",
-		"status":   "success",
-		"account":  "LOWER(email || account_id)",
-		"api_key":  "LOWER(api_key || api_key_id)",
-		"model":    "model",
-		"tokens":   "total_tokens",
-		"credits":  "credits",
-		"duration": "duration_ms",
-	}[q.Sort]
+	orderBy := requestSortColumns[q.Sort]
 	if orderBy == "" {
 		orderBy = "ts"
 	}
@@ -224,11 +321,16 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	if q.Order == "asc" {
 		order = "ASC"
 	}
+	orderSQL := ` ORDER BY ` + orderBy + ` ` + order + `, id ` + order
 	offset := (q.Page - 1) * q.PageSize
+
 	queryArgs := append([]interface{}{}, args...)
 	queryArgs = append(queryArgs, q.PageSize, offset)
-	rows, err := d.Query(`SELECT `+requestColumns+`
-FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? OFFSET ?`, queryArgs...)
+	//! The inner query picks the page's row ids and the outer one reads only those rows. A sort
+	//! SQLite has no index for keeps every candidate row in its sorter until the last one is in,
+	//! so sorting whole rows (every column, the body lookup) cost several times sorting ids.
+	rows, err := d.QueryContext(ctx, `SELECT `+requestColumns+`
+FROM requests WHERE id IN (SELECT id FROM requests`+whereSQL+orderSQL+` LIMIT ? OFFSET ?)`+orderSQL, queryArgs...)
 	if err != nil {
 		return requestPage{}, err
 	}
@@ -244,6 +346,16 @@ FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? O
 	}
 	if err := rows.Err(); err != nil {
 		return requestPage{}, err
+	}
+	rows.Close()
+
+	//! A page that is not full ends the list, so it gives the total without a second scan
+	//! of the log (a search that matches little would otherwise read the whole log twice).
+	total := offset + len(requests)
+	if n := len(requests); n == q.PageSize || (n == 0 && offset > 0) {
+		if err := d.QueryRowContext(ctx, "SELECT COUNT(*) FROM requests"+whereSQL, args...).Scan(&total); err != nil {
+			return requestPage{}, err
+		}
 	}
 
 	return requestPage{

@@ -18,7 +18,7 @@ func (h *Handler) apiObserveRecentRequests(w http.ResponseWriter, r *http.Reques
 	} else if parsed, err := strconv.Atoi(query.Get("limit")); err == nil && parsed > 0 {
 		pageSize = parsed
 	}
-	pageData := getObserveStore().RequestPage(requestQuery{
+	pageData := getObserveStore().RequestPageContext(r.Context(), requestQuery{
 		Page:     page,
 		PageSize: pageSize,
 		Search:   query.Get("search"),

@@ -212,6 +212,7 @@ last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
+	requestLogChanged()
 	return n, nil
 }
 
@@ -251,6 +252,7 @@ last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
+	requestLogChanged()
 	return n, nil
 }
 
@@ -271,7 +273,9 @@ func resetRequestLog() error {
 			return fmt.Errorf("clear %s: %w", table, err)
 		}
 	}
-	return tx.Commit()
+	err = tx.Commit()
+	requestLogChanged()
+	return err
 }
 
 type logRetentionStatus struct {

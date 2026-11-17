@@ -83,6 +83,11 @@ CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_success ON requests(success);
 CREATE INDEX IF NOT EXISTS idx_requests_lookup ON requests(email, account_id, model);
 CREATE INDEX IF NOT EXISTS idx_requests_api_key ON requests(api_key_id, api_key);
+-- A Requests status tab (proxy/observe_persist.go) reads its newest rows in order from this
+-- instead of sorting every row of that status, and counts them without reading the table.
+-- Each index on requests adds about 2 ms to every logged request (the journal syncs its
+-- pages), so the other sort columns have none: their pages sort only row ids.
+CREATE INDEX IF NOT EXISTS idx_requests_success_ts ON requests(success, ts DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS errors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -800,7 +800,7 @@ func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKey
 	if strings.EqualFold(strings.TrimSpace(q.Get("order")), "asc") {
 		order = "asc"
 	}
-	data := getObserveStore().RequestPage(requestQuery{Page: page, PageSize: pageSize, Status: status, Sort: sortBy, Order: order, APIKeyID: entry.ID})
+	data := getObserveStore().RequestPageContext(r.Context(), requestQuery{Page: page, PageSize: pageSize, Status: status, Sort: sortBy, Order: order, APIKeyID: entry.ID})
 	// The page's own total is one of the counts, so the tab in view always matches the pager.
 	var counts userRequestCounts
 	switch status {
