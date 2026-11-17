@@ -1,10 +1,5 @@
-import {
-  AlertCircleIcon,
-  Key01Icon,
-  Route01Icon,
-  UserMultipleIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type FormEvent,
@@ -36,7 +31,6 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from "@/components/ui/number-field";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectItem,
@@ -44,9 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { ROUTING_MODE_LABEL, useRoutingMode } from "@/features/accounts/use-routing-mode";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { createApiKey, updateApiKey } from "@/lib/api/api-keys";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -54,6 +46,7 @@ import type { ApiKey, ApiKeyRoutingMode } from "@/lib/api/types";
 import { type TFunction, useT } from "@/lib/i18n";
 import { noSpaces } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { AccountPicker } from "./account-picker";
 import {
   type ApiKeyFormData,
@@ -75,26 +68,10 @@ import { ModelPicker } from "./model-picker";
 
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
 
-/** The form's parts: the create dialog's tabs, the edit sheet's sections, in this order. */
+/** The edit sheet's sections, in this order. */
 type Section = "general" | "accounts" | "routing";
 
 const SECTIONS: readonly Section[] = ["general", "accounts", "routing"];
-
-const SECTION_ICON: Readonly<Record<Section, IconSvgElement>> = {
-  general: Key01Icon,
-  accounts: UserMultipleIcon,
-  routing: Route01Icon,
-};
-
-/** Where each field that can fail lives, so a failed submit opens its tab. */
-const FIELD_SECTION: Readonly<Record<ApiKeyFormField, Section>> = {
-  tokenLimit: "general",
-  creditLimit: "general",
-  callLimit: "general",
-  rpmLimit: "general",
-  accountIds: "accounts",
-  allowedModels: "routing",
-};
 
 const CREDIT_FORMAT: Intl.NumberFormatOptions = {
   minimumFractionDigits: 2,
@@ -139,14 +116,12 @@ interface KeyForm {
 
 /**
  * The form's state, request and validation, shared by the create dialog and the edit sheet. A
- * failed check marks its one field, tells `reveal` which section holds it (the dialog opens that
- * tab), then focuses the field once it is on screen.
+ * failed check marks its one field and focuses it.
  */
 function useKeyForm(
   target: ApiKeyDialogTarget,
   onOpenChange: (open: boolean) => void,
   onCreated: (key: string) => void,
-  reveal?: (section: Section) => void,
 ): KeyForm {
   const { t } = useT("api");
   const queryClient = useQueryClient();
@@ -157,7 +132,7 @@ function useKeyForm(
   // Base UI wires the failed field's FieldError into that input's aria-describedby.
   const [invalid, setInvalid] = useState<ApiKeyFormField | null>(null);
   const [modelsError, setModelsError] = useState<ModelsError>("noModels");
-  // Bumped on each failed submit, so the effect focuses the field after its tab is shown.
+  // Bumped on each failed submit, so the effect focuses the field once it is rendered invalid.
   const [focusTick, setFocusTick] = useState(0);
   const refs = {
     name: useRef<HTMLInputElement>(null),
@@ -206,7 +181,6 @@ function useKeyForm(
     if (!parsed.ok) {
       if (parsed.field === "allowedModels") setModelsError(parsed.error as ModelsError);
       setInvalid(parsed.field);
-      reveal?.(FIELD_SECTION[parsed.field]);
       // Straight to the bad field, so nobody has to hunt for the red one.
       setFocusTick((n) => n + 1);
       return;
@@ -228,53 +202,71 @@ function useKeyForm(
   };
 }
 
-/**
- * Name and expiry side by side (stacked on phones), the custom key under them, then the four
- * limits two by two.
- */
-function GeneralSection({ form }: { form: KeyForm }): JSX.Element {
+/** Name and expiry side by side (stacked on phones). */
+function NameAndExpiry({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
   return (
-    <>
-      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel>{t("form.name")}</FieldLabel>
-          <Input
-            maxLength={64}
-            autoComplete="off"
-            onValueChange={(value) => form.set("name", value)}
-            placeholder={t("form.namePlaceholder")}
-            ref={form.refs.name}
-            value={form.values.name}
-          />
-        </Field>
-        <ExpiryPicker
-          onChange={(value) => form.set("expiresAt", value)}
-          value={form.values.expiresAt}
-        />
-      </div>
+    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
       <Field>
-        <FieldLabel>{t("form.customKey")}</FieldLabel>
+        <FieldLabel>{t("form.name")}</FieldLabel>
         <Input
-          maxLength={128}
-          autoCapitalize="off"
+          maxLength={64}
           autoComplete="off"
-          autoCorrect="off"
-          onValueChange={(value) => form.set("key", noSpaces(value))}
-          spellCheck={false}
-          value={form.values.key}
+          onValueChange={(value) => form.set("name", value)}
+          placeholder={t("form.namePlaceholder")}
+          ref={form.refs.name}
+          value={form.values.name}
         />
-        <FieldDescription>
-          {form.editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder")}
-        </FieldDescription>
       </Field>
-      <LimitFields form={form} />
+      <ExpiryPicker
+        onChange={(value) => form.set("expiresAt", value)}
+        value={form.values.expiresAt}
+      />
+    </div>
+  );
+}
+
+/** The custom key, with what an empty one means: under it, or as its placeholder when `compact`. */
+function CustomKeyField({
+  form,
+  compact = false,
+}: {
+  form: KeyForm;
+  compact?: boolean;
+}): JSX.Element {
+  const { t } = useT("api");
+  const hint = form.editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder");
+  return (
+    <Field>
+      <FieldLabel>{t("form.customKey")}</FieldLabel>
+      <Input
+        maxLength={128}
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        onValueChange={(value) => form.set("key", noSpaces(value))}
+        placeholder={compact ? hint : undefined}
+        spellCheck={false}
+        value={form.values.key}
+      />
+      {compact ? null : <FieldDescription>{hint}</FieldDescription>}
+    </Field>
+  );
+}
+
+/** Name and expiry, the custom key under them, then the four limits under a hairline. */
+function GeneralSection({ form }: { form: KeyForm }): JSX.Element {
+  return (
+    <>
+      <NameAndExpiry form={form} />
+      <CustomKeyField form={form} />
+      <LimitFields divider form={form} />
     </>
   );
 }
 
-/** The four limits, two by two from sm up, under a hairline. */
-function LimitFields({ form }: { form: KeyForm }): JSX.Element {
+/** The four limits, two by two from sm up; `divider` sets them under a hairline. */
+function LimitFields({ form, divider = false }: { form: KeyForm; divider?: boolean }): JSX.Element {
   const { t } = useT("api");
   const limit = (
     field: ApiKeyLimitField,
@@ -305,7 +297,12 @@ function LimitFields({ form }: { form: KeyForm }): JSX.Element {
     </Field>
   );
   return (
-    <div className="grid grid-cols-1 gap-4 border-border-subtle border-t pt-4 sm:grid-cols-2">
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-4 sm:grid-cols-2",
+        divider && "border-border-subtle border-t pt-4",
+      )}
+    >
       {limit("tokenLimit", t("form.tokenLimit"))}
       {/* Two decimals, as formatCredits shows credits in the table and the cards. */}
       {limit("creditLimit", t("form.creditLimit"), { format: CREDIT_FORMAT, step: 0.01 })}
@@ -316,11 +313,21 @@ function LimitFields({ form }: { form: KeyForm }): JSX.Element {
   );
 }
 
-/** Which accounts the key reaches. The tab or the section heading names it. */
-function AccountsSection({ form }: { form: KeyForm }): JSX.Element {
+/**
+ * Which accounts the key reaches. In the sheet its section heading names it, so the legend is
+ * for screen readers only; the create dialog shows it and puts the two choices on one line.
+ */
+function AccountsSection({
+  form,
+  compact = false,
+}: {
+  form: KeyForm;
+  compact?: boolean;
+}): JSX.Element {
   return (
     <AccountPicker
-      hideLegend
+      hideLegend={!compact}
+      inline={compact}
       invalid={form.invalid === "accountIds"}
       onScopeChange={(scope) => form.set("accountScope", scope)}
       onSelectedChange={(ids) => form.set("accountIds", ids)}
@@ -333,8 +340,14 @@ function AccountsSection({ form }: { form: KeyForm }): JSX.Element {
   );
 }
 
-/** The routing mode, then the models the key may call. */
-function RoutingSection({ form }: { form: KeyForm }): JSX.Element {
+/** The routing mode, then the models the key may call (choices on one line when `compact`). */
+function RoutingSection({
+  form,
+  compact = false,
+}: {
+  form: KeyForm;
+  compact?: boolean;
+}): JSX.Element {
   const { t } = useT("api");
   const globalMode = useRoutingMode();
   const routingItems = KEY_ROUTING_MODES.map((mode) => ({
@@ -379,6 +392,7 @@ function RoutingSection({ form }: { form: KeyForm }): JSX.Element {
         <FieldDescription>{t("form.routingModeHint")}</FieldDescription>
       </Field>
       <ModelPicker
+        inline={compact}
         invalid={modelsInvalid}
         onScopeChange={(scope) => form.set("modelScope", scope)}
         onSelectedChange={(models) => form.set("allowedModels", models)}
@@ -433,16 +447,10 @@ function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }
   );
 }
 
-/*
- * The body under the header: a hairline, then one fixed height from sm up (480 px), so the dialog
- * keeps its size from tab to tab; on phones it takes what the 90dvh dialog leaves.
- */
-const CREATE_BODY = "min-h-0 flex-1 gap-0 border-border-subtle border-t sm:h-120 sm:flex-none";
-
 /**
- * Create: a settings-style dialog. From sm up the sections are a vertical tab list on the left
- * and one section on the right; on phones the tabs run along the top of a full-height dialog. A tab whose section has the
- * failed field carries a red dot, and a failed submit opens it.
+ * Create: the one dialog, every field in one scrolling form as before, kept low: name and expiry
+ * share a line, the limits go two by two, and each "all / only selected" choice sits on one line,
+ * with its list only under "only selected".
  */
 function ApiKeyCreateDialog({
   open,
@@ -454,68 +462,31 @@ function ApiKeyCreateDialog({
   onCreated: (key: string) => void;
 }): JSX.Element {
   const { t } = useT("api");
-  const phone = useMediaQuery("max-sm");
-  const [tab, setTab] = useState<Section>("general");
-  const form = useKeyForm({ mode: "create" }, onOpenChange, onCreated, setTab);
-  const failedSection = form.invalid ? FIELD_SECTION[form.invalid] : null;
+  const form = useKeyForm({ mode: "create" }, onOpenChange, onCreated);
 
   return (
     <ResponsiveDialog
-      // On phones the dialog fills its 90dvh box, so switching tabs never resizes it.
-      anchor={phone ? "top" : "center"}
       footer={<FormActions form={form} onCancel={() => onOpenChange(false)} />}
       initialFocus={form.refs.name}
       onOpenChange={onOpenChange}
       open={open}
-      panel={false}
       size="2xl"
       title={t("form.createTitle")}
     >
-      <Tabs
-        className={CREATE_BODY}
-        onValueChange={(value) => setTab(value as Section)}
-        orientation={phone ? "horizontal" : "vertical"}
-        value={tab}
+      <form
+        aria-busy={form.pending || undefined}
+        className="flex flex-col gap-4"
+        id={form.formId}
+        noValidate
+        onSubmit={form.onSubmit}
       >
-        <div className="min-w-0 shrink-0 max-sm:px-4 sm:w-48 sm:border-border-subtle sm:border-e sm:bg-sidebar sm:p-2">
-          <TabsList variant={phone ? "underline" : "nav"}>
-            {SECTIONS.map((section) => (
-              <TabsTab key={section} value={section}>
-                <HugeiconsIcon
-                  aria-hidden="true"
-                  className="max-sm:hidden"
-                  icon={SECTION_ICON[section]}
-                />
-                <span className="min-w-0 flex-1 truncate">{sectionLabel(section, t)}</span>
-                {failedSection === section ? (
-                  <span
-                    aria-hidden="true"
-                    className="size-1.5 shrink-0 rounded-full bg-destructive"
-                    data-slot="tab-error-dot"
-                  />
-                ) : null}
-              </TabsTab>
-            ))}
-          </TabsList>
-        </div>
-        {/* min-w-0: beside the vertical tabs a wide row (the sideways tag strip) must not widen it. */}
-        <ScrollArea className="min-h-0 min-w-0 flex-1" overscrollContain scrollFade>
-          <form
-            aria-busy={form.pending || undefined}
-            className="flex flex-col gap-4 p-4"
-            id={form.formId}
-            noValidate
-            onSubmit={form.onSubmit}
-          >
-            {SECTIONS.map((section) => (
-              <TabsPanel className="flex flex-col gap-4" keepMounted key={section} value={section}>
-                <SectionBody form={form} section={section} />
-              </TabsPanel>
-            ))}
-            <ServerError form={form} />
-          </form>
-        </ScrollArea>
-      </Tabs>
+        <NameAndExpiry form={form} />
+        <LimitFields form={form} />
+        <AccountsSection compact form={form} />
+        <RoutingSection compact form={form} />
+        <CustomKeyField compact form={form} />
+        <ServerError form={form} />
+      </form>
     </ResponsiveDialog>
   );
 }

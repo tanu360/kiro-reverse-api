@@ -153,12 +153,8 @@ describe("ApiPage", () => {
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
-    // Three tabs; the limits sit in General under the name, expiry and custom key.
-    expect(
-      within(dialog)
-        .getAllByRole("tab")
-        .map((tab) => tab.textContent),
-    ).toEqual(["General", "Accounts", "Routing & models"]);
+    // One form, no tabs: every field is on it.
+    expect(within(dialog).queryByRole("tab")).not.toBeInTheDocument();
     const tokenLimit = within(dialog).getByRole("textbox", { name: "Token limit" });
     await user.clear(tokenLimit);
     // A whole-number field refuses the decimal mark as it is typed...
@@ -168,14 +164,8 @@ describe("ApiPage", () => {
     await user.clear(tokenLimit);
     await user.click(tokenLimit);
     await user.paste("1.5");
-    // Submitted from another tab, the form opens the tab with the bad field.
-    await user.click(within(dialog).getByRole("tab", { name: "Accounts" }));
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     const error = await within(dialog).findByText("Token limit must be a whole number, 0 or more.");
-    expect(within(dialog).getByRole("tab", { name: "General" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
     // Only the failing field is marked and described; the credit limit stays untouched.
     expect(tokenLimit).toHaveAttribute("aria-invalid", "true");
     // Focus moves to the bad field.
@@ -280,7 +270,6 @@ describe("ApiPage", () => {
     const dana = mockDb.accounts[0];
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("tab", { name: "Accounts" }));
     await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
 
     // "Only selected" with nothing picked would mean every account: the form refuses it.
@@ -325,18 +314,15 @@ describe("ApiPage", () => {
     expect(within(dialog).getByRole("button", { name: /^Expires/ })).not.toHaveTextContent(
       "Never expires",
     );
-    await user.click(within(dialog).getByRole("tab", { name: "Accounts" }));
     await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
     // The tag picks accounts on its own: both spellings count, and the count says so.
     await user.click(within(dialog).getByRole("checkbox", { name: /team-eu/ }));
     expect(
       within(dialog).getByText(`2 of ${mockDb.accounts.length} accounts in scope`),
     ).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("tab", { name: "General" }));
     const rpm = within(dialog).getByRole("textbox", { name: "Requests per minute" });
     await user.clear(rpm);
     await user.type(rpm, "30");
-    await user.click(within(dialog).getByRole("tab", { name: "Routing & models" }));
     // "Only selected models" with none ticked is refused, like accounts.
     await user.click(within(dialog).getByRole("radio", { name: "Only selected models" }));
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
@@ -436,7 +422,7 @@ describe("ApiPage", () => {
     });
   });
 
-  it("shows tags and models under All too, and ticking one switches to Only selected", async () => {
+  it("shows tags, accounts and models only under Only selected", async () => {
     const first = mockDb.accounts[0];
     if (!first) throw new Error("missing seeded data");
     first.tags = ["team-eu"];
@@ -445,21 +431,13 @@ describe("ApiPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
     const sheet = await screen.findByRole("dialog");
     expect(within(sheet).getByRole("radio", { name: "All accounts" })).toBeChecked();
-    const tag = await within(sheet).findByRole("checkbox", { name: /team-eu/ });
-    expect(tag).not.toBeChecked();
-    await user.click(tag);
-    expect(within(sheet).getByRole("radio", { name: "Only selected accounts" })).toBeChecked();
-    expect(tag).toBeChecked();
-    expect(within(sheet).getByRole("radio", { name: "Every model" })).toBeChecked();
-    await user.click(await within(sheet).findByRole("checkbox", { name: "auto" }));
-    expect(within(sheet).getByRole("radio", { name: "Only selected models" })).toBeChecked();
-    await user.click(within(sheet).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(sent("PUT", `/api-keys/${mockDb.apiKeys[0]?.id}`)).toHaveLength(1));
-    expect(sent("PUT", `/api-keys/${mockDb.apiKeys[0]?.id}`)[0]?.body).toMatchObject({
-      accountIds: [],
-      accountTags: ["team-eu"],
-      allowedModels: ["auto"],
-    });
+    expect(within(sheet).queryByRole("searchbox", { name: "Search accounts" })).toBeNull();
+    expect(within(sheet).queryByRole("checkbox", { name: /team-eu/ })).toBeNull();
+    expect(within(sheet).queryByRole("searchbox", { name: "Search models" })).toBeNull();
+    await user.click(within(sheet).getByRole("radio", { name: "Only selected accounts" }));
+    expect(await within(sheet).findByRole("checkbox", { name: /team-eu/ })).toBeInTheDocument();
+    await user.click(within(sheet).getByRole("radio", { name: "Only selected models" }));
+    expect(await within(sheet).findByRole("checkbox", { name: "auto" })).toBeInTheDocument();
   });
 
   it("keeps a key's accounts while the account list fails to load", async () => {

@@ -66,11 +66,6 @@ export function scopedAccountIds(
  * Tags pick accounts too: every account carrying a picked tag joins the picked ones, now and
  * whenever an account is tagged later. A picked tag no account carries stays listed with a
  * warning, as such a key gets no account at all.
- *
- * The tags (one row that scrolls sideways) and the list show under both choices, so they are
- * there to find: while "All accounts" is on they show nothing picked, and ticking one switches
- * to "Only selected" with just that pick. Picks kept from before a switch to "All accounts"
- * come back only through the radio.
  */
 export function AccountPicker({
   scope,
@@ -82,6 +77,7 @@ export function AccountPicker({
   invalid,
   searchRef,
   hideLegend = false,
+  inline = false,
 }: {
   scope: ApiKeyAccountScope;
   selected: readonly string[];
@@ -96,6 +92,8 @@ export function AccountPicker({
   searchRef?: Ref<HTMLInputElement>;
   /** Keeps the legend for screen readers only, where a tab or heading already says "Accounts". */
   hideLegend?: boolean;
+  /** The legend and both choices on one line (the create dialog, which keeps its height low). */
+  inline?: boolean;
 }): JSX.Element {
   const { t, lang } = useT("api");
   const { t: ta } = useT("accounts");
@@ -109,12 +107,9 @@ export function AccountPicker({
   const loaded = accounts.data !== undefined;
   const list = accounts.data ?? [];
 
-  const active = scope === "selected";
-  const shownIds = active ? selected : [];
-  const shownTags = active ? tags : [];
-  const picked = new Set(shownIds);
+  const picked = useMemo(() => new Set(selected), [selected]);
   const known = useMemo(() => new Set(list.map((account) => account.id)), [list]);
-  const removed = loaded ? shownIds.filter((id) => !known.has(id)) : [];
+  const removed = loaded ? selected.filter((id) => !known.has(id)) : [];
   const needle = query.trim().toLowerCase();
   const matches = (text: string) => text.toLowerCase().includes(needle);
   const visible = needle
@@ -125,35 +120,22 @@ export function AccountPicker({
     : list;
   const visibleRemoved = needle ? removed.filter(matches) : removed;
 
-  const toggle = (id: string) => {
-    if (!active) {
-      onScopeChange("selected");
-      onSelectedChange([id]);
-      onTagsChange?.([]);
-      return;
-    }
+  const toggle = (id: string) =>
     onSelectedChange(picked.has(id) ? selected.filter((x) => x !== id) : [...selected, id]);
-  };
 
   const options = useMemo(() => tagOptions(list), [list]);
-  const pickedTags = new Set(shownTags.map(tagKey));
+  const pickedTags = new Set(tags.map(tagKey));
   const strayTags = loaded
-    ? shownTags.filter((tag) => !options.some((option) => tagKey(option.tag) === tagKey(tag)))
+    ? tags.filter((tag) => !options.some((option) => tagKey(option.tag) === tagKey(tag)))
     : [];
   const tagRows: TagOption[] = [...options, ...strayTags.map((tag) => ({ tag, count: 0 }))];
   const toggleTag = (tag: string) => {
     if (!onTagsChange) return;
-    if (!active) {
-      onScopeChange("selected");
-      onTagsChange([tag]);
-      onSelectedChange([]);
-      return;
-    }
     const key = tagKey(tag);
     if (pickedTags.has(key)) onTagsChange(tags.filter((x) => tagKey(x) !== key));
     else if (tags.length < MAX_KEY_TAGS) onTagsChange([...tags, tag]);
   };
-  const reached = scopedAccountIds(list, shownIds, shownTags);
+  const reached = scopedAccountIds(list, selected, tags);
   const reachedKnown = [...reached].filter((id) => known.has(id)).length;
 
   const description = (account: Account) =>
@@ -216,103 +198,113 @@ export function AccountPicker({
 
   return (
     <Fieldset className="flex min-w-0 flex-col gap-3">
-      <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
-        {t("form.accounts")}
-      </FieldsetLegend>
-      {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
-      <RadioGroup
-        aria-label={t("form.accounts")}
-        className="gap-0"
-        onValueChange={(value) => onScopeChange(value as ApiKeyAccountScope)}
-        value={scope}
-      >
-        {SCOPES.map((value) => (
-          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
-            <Radio id={`${baseId}-${value}`} value={value} />
-            {value === "all" ? t("form.accountsAll") : t("form.accountsSelected")}
-          </Label>
-        ))}
-      </RadioGroup>
-      <div className="flex min-w-0 flex-col gap-2">
-        {onTagsChange && tagRows.length > 0 ? (
-          <fieldset className="flex min-w-0 flex-col gap-1.5">
-            <legend className="mb-1.5 text-muted-foreground text-xs">
-              {t("form.accountTags")}
-            </legend>
-            {/* One row that scrolls sideways, its ends fading while more tags are past them. */}
-            <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
-              <div className="flex w-max gap-x-4">
-                {tagRows.map((option) => {
-                  const id = `${baseId}-tag-${tagKey(option.tag)}`;
-                  const checked = pickedTags.has(tagKey(option.tag));
-                  return (
-                    <Label
-                      className="min-w-0"
-                      htmlFor={id}
-                      key={tagKey(option.tag)}
-                      variant="option"
-                    >
-                      <Checkbox
-                        checked={checked}
-                        disabled={!checked && shownTags.length >= MAX_KEY_TAGS}
-                        id={id}
-                        onCheckedChange={() => toggleTag(option.tag)}
-                      />
-                      <span className="min-w-0 truncate">{mask(option.tag)}</span>
-                      <span className="shrink-0 text-muted-foreground tabular-nums">
-                        {option.count > 0
-                          ? t("form.accountTagCount", { n: option.count })
-                          : t("form.accountTagNone")}
-                      </span>
-                    </Label>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </fieldset>
-        ) : null}
-        <InputGroup>
-          <InputGroupAddon>
-            <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-describedby={invalid ? errorId : undefined}
-            aria-invalid={invalid || undefined}
-            aria-label={t("form.accountsSearch")}
-            autoComplete="off"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("form.accountsSearch")}
-            ref={searchRef}
-            type="search"
-            value={query}
-          />
-        </InputGroup>
-        {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
-        {invalid ? (
-          <p
-            className="text-destructive-foreground text-xs leading-normal"
-            id={errorId}
-            role="alert"
-          >
-            {t("form.accountsRequired")}
-          </p>
-        ) : null}
-        {rows}
-        {loaded && active ? (
-          <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-            {tags.length > 0
-              ? t("form.accountsReachedCount", {
-                  count: list.length,
-                  n: formatNumber(reachedKnown, lang),
-                  total: formatNumber(list.length, lang),
-                })
-              : t("form.accountsSelectedCount", {
-                  n: formatNumber(selected.length, lang),
-                  total: formatNumber(list.length + removed.length, lang),
-                })}
-          </p>
-        ) : null}
+      {/* Inline (the create dialog): the legend and the two choices share one line. */}
+      <div className={inline ? "flex flex-wrap items-center justify-between gap-x-6" : "contents"}>
+        <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
+          {t("form.accounts")}
+        </FieldsetLegend>
+        {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
+        <RadioGroup
+          aria-label={t("form.accounts")}
+          className={inline ? "flex-row flex-wrap gap-x-6 gap-y-0" : "gap-0"}
+          onValueChange={(value) => onScopeChange(value as ApiKeyAccountScope)}
+          value={scope}
+        >
+          {SCOPES.map((value) => (
+            <Label
+              className="self-start"
+              htmlFor={`${baseId}-${value}`}
+              key={value}
+              variant="option"
+            >
+              <Radio id={`${baseId}-${value}`} value={value} />
+              {value === "all" ? t("form.accountsAll") : t("form.accountsSelected")}
+            </Label>
+          ))}
+        </RadioGroup>
       </div>
+      {scope === "selected" ? (
+        <div className="flex min-w-0 flex-col gap-2">
+          {onTagsChange && tagRows.length > 0 ? (
+            <fieldset className="flex min-w-0 flex-col gap-1.5">
+              <legend className="mb-1.5 text-muted-foreground text-xs">
+                {t("form.accountTags")}
+              </legend>
+              {/* One row that scrolls sideways, its ends fading while more tags are past them. */}
+              <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
+                <div className="flex w-max gap-x-4">
+                  {tagRows.map((option) => {
+                    const id = `${baseId}-tag-${tagKey(option.tag)}`;
+                    const checked = pickedTags.has(tagKey(option.tag));
+                    return (
+                      <Label
+                        className="min-w-0"
+                        htmlFor={id}
+                        key={tagKey(option.tag)}
+                        variant="option"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={!checked && tags.length >= MAX_KEY_TAGS}
+                          id={id}
+                          onCheckedChange={() => toggleTag(option.tag)}
+                        />
+                        <span className="min-w-0 truncate">{mask(option.tag)}</span>
+                        <span className="shrink-0 text-muted-foreground tabular-nums">
+                          {option.count > 0
+                            ? t("form.accountTagCount", { n: option.count })
+                            : t("form.accountTagNone")}
+                        </span>
+                      </Label>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </fieldset>
+          ) : null}
+          <InputGroup>
+            <InputGroupAddon>
+              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-describedby={invalid ? errorId : undefined}
+              aria-invalid={invalid || undefined}
+              aria-label={t("form.accountsSearch")}
+              autoComplete="off"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t("form.accountsSearch")}
+              ref={searchRef}
+              type="search"
+              value={query}
+            />
+          </InputGroup>
+          {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
+          {invalid ? (
+            <p
+              className="text-destructive-foreground text-xs leading-normal"
+              id={errorId}
+              role="alert"
+            >
+              {t("form.accountsRequired")}
+            </p>
+          ) : null}
+          {rows}
+          {loaded ? (
+            <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
+              {tags.length > 0
+                ? t("form.accountsReachedCount", {
+                    count: list.length,
+                    n: formatNumber(reachedKnown, lang),
+                    total: formatNumber(list.length, lang),
+                  })
+                : t("form.accountsSelectedCount", {
+                    n: formatNumber(selected.length, lang),
+                    total: formatNumber(list.length + removed.length, lang),
+                  })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <FieldHint>{t("form.accountsHint")}</FieldHint>
     </Fieldset>
   );
