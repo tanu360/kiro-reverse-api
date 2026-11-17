@@ -82,11 +82,10 @@ async function renderPage() {
 
 type User = Awaited<ReturnType<typeof renderPage>>["user"];
 
-/** Next through the create wizard's steps to the last one (Access). */
+/** Next from the create wizard's first step to its last one (Access). */
 async function toAccessStep(user: User, dialog: HTMLElement): Promise<void> {
   await user.click(within(dialog).getByRole("button", { name: "Next" }));
-  await user.click(within(dialog).getByRole("button", { name: "Next" }));
-  expect(within(dialog).getByText("Step 3 of 3 · Access")).toBeInTheDocument();
+  expect(within(dialog).getByText("Step 2 of 2 · Access")).toBeInTheDocument();
 }
 
 describe("ApiPage", () => {
@@ -126,8 +125,8 @@ describe("ApiPage", () => {
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
-    // Three steps; the first has no Back.
-    expect(within(dialog).getByText("Step 1 of 3 · Basics")).toBeInTheDocument();
+    // Two steps; the first has no Back.
+    expect(within(dialog).getByText("Step 1 of 2 · Basics")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
     // Enter in a field moves on, and focus lands on the next step's first field. user-event
     // only presses a submit button inside the form, and Next sits in the footer, so the test
@@ -137,8 +136,8 @@ describe("ApiPage", () => {
     const form = name.closest("form");
     if (!form) throw new Error("no form");
     fireEvent.submit(form);
-    expect(within(dialog).getByText("Step 2 of 3 · Limits")).toBeInTheDocument();
-    expect(within(dialog).getByRole("textbox", { name: "Token limit" })).toHaveFocus();
+    expect(within(dialog).getByText("Step 2 of 2 · Access")).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: "All accounts" })).toHaveFocus();
     // Back keeps what was typed.
     await user.click(within(dialog).getByRole("button", { name: "Back" }));
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue("  laptop  ");
@@ -182,7 +181,6 @@ describe("ApiPage", () => {
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).queryByRole("tab")).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Next" }));
     const tokenLimit = within(dialog).getByRole("textbox", { name: "Token limit" });
     await user.clear(tokenLimit);
     // A whole-number field refuses the decimal mark as it is typed...
@@ -195,7 +193,7 @@ describe("ApiPage", () => {
     // Next checks the step's fields and stays on it.
     await user.click(within(dialog).getByRole("button", { name: "Next" }));
     const error = await within(dialog).findByText("Token limit must be a whole number, 0 or more.");
-    expect(within(dialog).getByText("Step 2 of 3 · Limits")).toBeInTheDocument();
+    expect(within(dialog).getByText("Step 1 of 2 · Basics")).toBeInTheDocument();
     // Only the failing field is marked and described; the credit limit stays untouched.
     expect(tokenLimit).toHaveAttribute("aria-invalid", "true");
     // Focus moves to the bad field.
@@ -346,7 +344,6 @@ describe("ApiPage", () => {
     expect(within(dialog).getByRole("button", { name: /^Expires/ })).not.toHaveTextContent(
       "Never expires",
     );
-    await user.click(within(dialog).getByRole("button", { name: "Next" }));
     const rpm = within(dialog).getByRole("textbox", { name: "Requests per minute" });
     await user.clear(rpm);
     await user.type(rpm, "30");

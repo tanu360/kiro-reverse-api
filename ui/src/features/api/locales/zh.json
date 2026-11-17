@@ -142,7 +142,6 @@
   "form.tabRouting": "路由与模型",
   "form.stepOf": "第 {step} 步，共 {total} 步 · {name}",
   "form.stepBasics": "基本信息",
-  "form.stepLimits": "限额",
   "form.stepAccess": "访问范围",
   "form.name": "名称",
   "form.namePlaceholder": "构建服务器",

@@ -418,24 +418,24 @@ function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }
 }
 
 /** The create wizard's steps, in order. */
-const CREATE_STEPS = ["form.stepBasics", "form.stepLimits", "form.stepAccess"] as const;
+const CREATE_STEPS = ["form.stepBasics", "form.stepAccess"] as const;
 const LAST_STEP = CREATE_STEPS.length - 1;
 
 /** The step each checked field sits on, so a failed check goes back to it. */
 const FIELD_STEP: Readonly<Record<ApiKeyFormField, number>> = {
-  tokenLimit: 1,
-  creditLimit: 1,
-  callLimit: 1,
-  rpmLimit: 1,
-  accountIds: 2,
-  allowedModels: 2,
+  tokenLimit: 0,
+  creditLimit: 0,
+  callLimit: 0,
+  rpmLimit: 0,
+  accountIds: 1,
+  allowedModels: 1,
 };
 
 /**
- * Create: the app's dialog at its default width, in three short steps: Basics (name, expiry,
- * custom key), Limits, then Access (accounts, routing mode, models). Next checks the fields up to
- * the current step; the last step creates the key. Hung from the top, as step flows are, so the
- * title stays put while the steps change height.
+ * Create: the app's dialog at its default width, in two steps: Basics (name, expiry, custom key
+ * and the limits), then Access (accounts, routing mode, models). Next checks the fields up to the
+ * current step; the last step creates the key. Both steps share one body height, so the dialog
+ * keeps its size between them, and a longer step scrolls inside it.
  */
 function ApiKeyCreateDialog({
   open,
@@ -465,9 +465,8 @@ function ApiKeyCreateDialog({
       const first =
         step === 0
           ? form.refs.name.current
-          : step === 1
-            ? form.refs.tokenLimit.current
-            : stepRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
+          : // The accounts' checked radio: Base UI sets the radios' tabindex only after mount.
+            stepRef.current?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]');
       first?.focus();
     }
   }, [step]);
@@ -540,7 +539,7 @@ function ApiKeyCreateDialog({
       panel={false}
       title={t("form.createTitle")}
     >
-      {/* The steps as three bars, done and current ones filled; the description names the step. */}
+      {/* One bar per step, done and current ones filled; the description names the step. */}
       <div aria-hidden="true" className="flex gap-2 px-4 pb-3">
         {CREATE_STEPS.map((name, index) => (
           <span
@@ -552,33 +551,35 @@ function ApiKeyCreateDialog({
           />
         ))}
       </div>
-      <DialogPanel>
-        <form
-          aria-busy={form.pending || undefined}
-          className="flex flex-col gap-4"
-          id={form.formId}
-          noValidate
-          onSubmit={onSubmit}
-        >
-          <div className="flex flex-col gap-4" ref={stepRef}>
-            {step === 0 ? (
-              <>
-                <NameAndExpiry form={form} />
-                <CustomKeyField form={form} />
-              </>
-            ) : step === 1 ? (
-              <LimitsGrid form={form} />
-            ) : (
-              <>
-                <AccountsField form={form} />
-                <RoutingField form={form} />
-                <ModelsField form={form} />
-              </>
-            )}
-          </div>
-          {last ? <ServerError form={form} /> : null}
-        </form>
-      </DialogPanel>
+      {/* One height from sm up for both steps, so Next and Back never resize the dialog. */}
+      <div className="flex min-h-0 flex-1 flex-col sm:h-120 sm:flex-initial">
+        <DialogPanel>
+          <form
+            aria-busy={form.pending || undefined}
+            className="flex flex-col gap-4"
+            id={form.formId}
+            noValidate
+            onSubmit={onSubmit}
+          >
+            <div className="flex flex-col gap-4" ref={stepRef}>
+              {step === 0 ? (
+                <>
+                  <NameAndExpiry form={form} />
+                  <CustomKeyField form={form} />
+                  <LimitsGrid form={form} />
+                </>
+              ) : (
+                <>
+                  <AccountsField form={form} />
+                  <RoutingField form={form} />
+                  <ModelsField form={form} />
+                </>
+              )}
+            </div>
+            {last ? <ServerError form={form} /> : null}
+          </form>
+        </DialogPanel>
+      </div>
     </ResponsiveDialog>
   );
 }

@@ -142,7 +142,6 @@
   "form.tabRouting": "ルーティングとモデル",
   "form.stepOf": "ステップ {step}/{total} · {name}",
   "form.stepBasics": "基本",
-  "form.stepLimits": "制限",
   "form.stepAccess": "アクセス",
   "form.name": "名前",
   "form.namePlaceholder": "ビルドサーバー",

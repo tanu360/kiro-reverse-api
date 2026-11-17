@@ -142,7 +142,6 @@
   "form.tabRouting": "Định tuyến và model",
   "form.stepOf": "Bước {step}/{total} · {name}",
   "form.stepBasics": "Cơ bản",
-  "form.stepLimits": "Giới hạn",
   "form.stepAccess": "Quyền truy cập",
   "form.name": "Tên",
   "form.namePlaceholder": "Máy chủ build",

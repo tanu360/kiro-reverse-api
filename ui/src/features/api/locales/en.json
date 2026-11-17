@@ -150,7 +150,6 @@
   "form.tabRouting": "Routing & models",
   "form.stepOf": "Step {step} of {total} · {name}",
   "form.stepBasics": "Basics",
-  "form.stepLimits": "Limits",
   "form.stepAccess": "Access",
   "form.name": "Name",
   "form.namePlaceholder": "Build server",
