@@ -6,7 +6,7 @@ import {
   UsersIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type JSX, type ReactNode, useMemo } from "react";
+import { type JSX, type ReactNode, useMemo, useRef } from "react";
 import {
   FilterBar,
   FilterTrigger,
@@ -25,6 +25,7 @@ import {
   MenuSeparator,
 } from "@/components/ui/menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useKeyShortcut } from "@/hooks/use-key-shortcut";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -196,6 +197,14 @@ export function AccountsToolbar({
 }: AccountsToolbarProps): JSX.Element {
   const { t, lang } = useT("accounts");
   const { t: tc } = useT();
+  const searchRef = useRef<HTMLInputElement>(null);
+  // "/" jumps to the search, as on GitHub and in the docs sites the admins know.
+  useKeyShortcut(["/"], (event) => {
+    if (!searchRef.current) return;
+    event.preventDefault();
+    searchRef.current.focus();
+    searchRef.current.select();
+  });
 
   const options = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
@@ -302,11 +311,13 @@ export function AccountsToolbar({
               <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
             </InputGroupAddon>
             <InputGroupInput
+              aria-keyshortcuts="/"
               aria-label={t("filter.search")}
               autoComplete="off"
               onChange={(event) => onFiltersChange({ q: event.target.value || undefined })}
               // Short, so it fits a phone's row; the label names every field.
               placeholder={t("filter.searchPlaceholder")}
+              ref={searchRef}
               type="search"
               value={filters.q ?? ""}
             />

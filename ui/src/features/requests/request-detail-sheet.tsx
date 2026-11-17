@@ -30,6 +30,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { scopedShortcuts } from "@/hooks/use-key-shortcut";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { RequestRecord } from "@/lib/api/types";
 import {
@@ -57,6 +58,10 @@ import {
   rowKey,
 } from "./request-model";
 import { type RequestViewOptions, StatusBadge } from "./requests-columns";
+
+/** The footer's previous and next record keys (KeyboardEvent.key, letters lower case). */
+const PREVIOUS_KEYS = ["ArrowLeft", "k"] as const;
+const NEXT_KEYS = ["ArrowRight", "j"] as const;
 
 // The account's own sheet opens over this one; its code stays out of the Requests chunk until then.
 const AccountDetailSheet = lazy(() =>
@@ -355,7 +360,16 @@ export function RequestDetailSheet({
   const canOpenAccount = accountId !== "" && !accountGone;
 
   return (
-    <ResponsiveSheet onOpenChange={onOpenChange} open={open}>
+    <ResponsiveSheet
+      onOpenChange={onOpenChange}
+      // The footer's chevrons from the keyboard: Left or K for the previous record, Right or J
+      // for the next, as their arrows point. Up and Down keep scrolling the sheet.
+      onKeyDown={scopedShortcuts([
+        { keys: PREVIOUS_KEYS, run: onPrevious },
+        { keys: NEXT_KEYS, run: onNext },
+      ])}
+      open={open}
+    >
       <ResponsiveSheetHeader className={record ? "gap-4" : undefined}>
         <div className="flex items-start gap-3">
           {/* The model maker's mark on the account sheet's avatar tile. Decorative. */}
@@ -434,12 +448,14 @@ export function RequestDetailSheet({
           <PagerChevronButton
             direction="previous"
             disabled={!onPrevious}
+            keyShortcuts="ArrowLeft K"
             label={t("detail.previous")}
             onClick={() => onPrevious?.()}
           />
           <PagerChevronButton
             direction="next"
             disabled={!onNext}
+            keyShortcuts="ArrowRight J"
             label={t("detail.next")}
             onClick={() => onNext?.()}
           />

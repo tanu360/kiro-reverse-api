@@ -1,4 +1,11 @@
-import { type ComponentProps, type JSX, type ReactNode, type RefObject, useRef } from "react";
+import {
+  type ComponentProps,
+  type JSX,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  useRef,
+} from "react";
 import {
   Sheet,
   SheetDescription,
@@ -23,6 +30,8 @@ interface ResponsiveSheetProps {
    */
   initialFocus?: RefObject<HTMLElement | null>;
   showCloseButton?: boolean;
+  /** Keys pressed while focus is in the sheet (its own shortcuts, hooks/use-key-shortcut). */
+  onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
 /**
@@ -37,6 +46,7 @@ export function ResponsiveSheet({
   className,
   initialFocus,
   showCloseButton = true,
+  onKeyDown,
 }: ResponsiveSheetProps): JSX.Element {
   const isMobile = useIsMobile();
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -51,6 +61,7 @@ export function ResponsiveSheet({
         )}
         data-responsive-side={isMobile ? "bottom" : "right"}
         initialFocus={initialFocus ?? popupRef}
+        onKeyDown={onKeyDown}
         ref={popupRef}
         showCloseButton={showCloseButton}
         side={isMobile ? "bottom" : "right"}

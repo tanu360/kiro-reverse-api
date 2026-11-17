@@ -50,6 +50,7 @@ export function PagerChevronButton({
   onClick,
   disabled = false,
   className,
+  keyShortcuts,
 }: {
   direction: "previous" | "next";
   label: string;
@@ -57,9 +58,12 @@ export function PagerChevronButton({
   disabled?: boolean;
   /** Layout only. */
   className?: string;
+  /** aria-keyshortcuts, when a shortcut also presses it ("ArrowRight J"). */
+  keyShortcuts?: string;
 }): JSX.Element {
   return (
     <Button
+      aria-keyshortcuts={keyShortcuts}
       aria-label={label}
       className={cn(PAGER_CHEVRON_CLASS, className)}
       disabled={disabled}

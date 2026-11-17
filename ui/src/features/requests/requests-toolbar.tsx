@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useElementWidth } from "@/hooks/use-element-width";
+import { useKeyShortcut } from "@/hooks/use-key-shortcut";
 import type { RequestCounts } from "@/lib/api/requests";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -101,6 +102,17 @@ export function RequestsToolbar({
   const [text, setText] = useState(search);
   const rowRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // "/" jumps to the search, as on GitHub and in the docs sites the admins know.
+  useKeyShortcut(
+    ["/"],
+    (event) => {
+      if (!inputRef.current) return;
+      event.preventDefault();
+      inputRef.current.focus();
+      inputRef.current.select();
+    },
+    searchable,
+  );
   const width = useElementWidth(rowRef);
   const latest = useRef({ search, onSearchChange });
   latest.current = { search, onSearchChange };
@@ -189,6 +201,7 @@ export function RequestsToolbar({
                   <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
                 </InputGroupAddon>
                 <InputGroupInput
+                  aria-keyshortcuts="/"
                   aria-label={t("search")}
                   autoComplete="off"
                   onChange={(event) => setText(event.currentTarget.value)}
