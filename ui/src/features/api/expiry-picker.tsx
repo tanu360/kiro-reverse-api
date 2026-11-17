@@ -87,13 +87,18 @@ export function ExpiryPicker({
           icon={ChevronDownIcon}
         />
       </PopoverTrigger>
-      <PopoverPopup align="start" flush>
+      {/*
+        On a phone the popup is the trigger's width: the days stretch to fill it (at most 44 px;
+        the popup's 1 px border and 8 px padding come off), and the presets sit under them in
+        three even columns. From sm up the presets are a column beside 32 px days.
+      */}
+      <PopoverPopup align="start" className="max-sm:w-(--anchor-width)" flush>
         <div className="flex max-sm:flex-col">
-          <div className="flex gap-0.5 max-sm:order-1 max-sm:mt-2 max-sm:flex-wrap max-sm:border-border-subtle max-sm:border-t max-sm:pt-2 sm:me-2 sm:flex-col sm:border-border-subtle sm:border-e sm:pe-2">
+          <div className="flex gap-0.5 max-sm:order-1 max-sm:mt-2 max-sm:grid max-sm:grid-cols-3 max-sm:border-border-subtle max-sm:border-t max-sm:pt-2 sm:me-2 sm:flex-col sm:border-border-subtle sm:border-e sm:pe-2">
             {presets.map((preset) => (
               <Button
                 aria-pressed={value === preset.value}
-                className="justify-start"
+                className="justify-start max-sm:justify-center"
                 key={preset.key}
                 onClick={() => pick(preset.value)}
                 size="sm"
@@ -104,6 +109,7 @@ export function ExpiryPicker({
             ))}
           </div>
           <Calendar
+            className="max-sm:w-full max-sm:[--cell-size:min(--spacing(11),calc((var(--anchor-width)-18px)/7))]"
             disabled={{ before: startOfToday() }}
             mode="single"
             month={month}
