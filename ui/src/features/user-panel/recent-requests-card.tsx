@@ -1,13 +1,16 @@
 import { InboxIcon, SearchXIcon } from "@hugeicons/core-free-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { type JSX, useCallback, useId, useMemo, useState } from "react";
+import { type JSX, useCallback, useId, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableSort } from "@/components/shared/data-table";
 import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Button } from "@/components/ui/button";
-import { RequestDetailSheet } from "@/features/requests/request-detail-sheet";
+import {
+  type RequestSheetHandle,
+  SteppedRequestSheet,
+} from "@/features/requests/request-detail-sheet";
 import { defaultSortDesc, PAGE_SIZES } from "@/features/requests/request-model";
 import {
   RequestCard,
@@ -40,11 +43,6 @@ type Status = "success" | "failed" | undefined;
  * caller, speed, tries and exact figures.
  */
 const HOLDER_VIEW = { accounts: false, messages: false, details: true } as const;
-
-interface Selection {
-  key: string;
-  record: RequestRecord;
-}
 
 function isUserSort(value: string): value is UserRequestSort {
   return (USER_REQUEST_SORTS as readonly string[]).includes(value);
@@ -115,29 +113,20 @@ export function RecentRequestsCard(): JSX.Element {
     placeholderData: keepPreviousData,
   });
   const columns = useRequestColumns(HOLDER_VIEW);
-  const [selection, setSelection] = useState<Selection | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // The sheet keeps the open row, so stepping through it never renders this card or its table.
+  const sheet = useRef<RequestSheetHandle>(null);
 
   const { data, error, isError } = query;
   const hasData = data !== undefined;
   const rows = useMemo(() => (data?.requests ?? []).map(toRecord), [data]);
-  const keys = useMemo(() => rows.map((row, index) => rowId(row, index)), [rows]);
-  // A refetch keeps the open request by its key; one that left the page stays open, unstepped.
-  const selectedIndex = selection ? keys.indexOf(selection.key) : -1;
-  const selectedRecord = selectedIndex >= 0 ? rows[selectedIndex] : (selection?.record ?? null);
-  const openRow = useCallback(
-    (row: RequestRecord) => {
-      const index = rows.indexOf(row);
-      if (index < 0) return;
-      setSelection({ key: keys[index], record: row });
-      setSheetOpen(true);
-    },
-    [rows, keys],
+  // Stable, so the table's memoized rows and cards keep their render across this card's renders.
+  const openRow = useCallback((row: RequestRecord) => sheet.current?.open(row), []);
+  const renderCard = useCallback(
+    (row: RequestRecord) => (
+      <RequestCard onOpen={() => openRow(row)} record={row} {...HOLDER_VIEW} />
+    ),
+    [openRow],
   );
-  const stepTo = (index: number) => {
-    const row = rows[index];
-    if (row) setSelection({ key: keys[index], record: row });
-  };
   // The server echoes the normalized paging values; they win over the local state.
   const shownPage = data?.page ?? page;
   const shownSize = data?.pageSize ?? pageSize;
@@ -272,9 +261,7 @@ export function RecentRequestsCard(): JSX.Element {
               pageSize={shownSize}
               rowDescription={requestSummary}
               rowLabel={(row) => tr("detail.open", { time: formatDateTime(row.ts, lang) })}
-              renderCard={(row) => (
-                <RequestCard onOpen={() => openRow(row)} record={row} {...HOLDER_VIEW} />
-              )}
+              renderCard={renderCard}
               sort={tableSort}
             />
           </div>
@@ -289,20 +276,13 @@ export function RecentRequestsCard(): JSX.Element {
           total={total}
         />
       ) : null}
-      <RequestDetailSheet
+      {/* A refetch keeps the open request by its key; one that left the page stays open, unstepped. */}
+      <SteppedRequestSheet
         {...HOLDER_VIEW}
         actions={false}
-        count={rows.length}
-        onNext={
-          selectedIndex >= 0 && selectedIndex < rows.length - 1
-            ? () => stepTo(selectedIndex + 1)
-            : undefined
-        }
-        onOpenChange={setSheetOpen}
-        onPrevious={selectedIndex > 0 ? () => stepTo(selectedIndex - 1) : undefined}
-        open={sheetOpen}
-        position={selectedIndex + 1}
-        record={selectedRecord}
+        getKey={rowId}
+        ref={sheet}
+        rows={rows}
       />
     </section>
   );

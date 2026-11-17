@@ -20,7 +20,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
 import { shortConversationId } from "./conversation-sheet";
-import { RequestDetailSheet } from "./request-detail-sheet";
+import { type RequestSheetHandle, SteppedRequestSheet } from "./request-detail-sheet";
 import {
   cleanSearch,
   DEFAULT_ORDER,
@@ -36,11 +36,6 @@ import {
 } from "./request-model";
 import { RequestCard, useRequestColumns, useRequestSummary } from "./requests-columns";
 import { RequestsToolbar } from "./requests-toolbar";
-
-interface Selection {
-  key: string;
-  record: RequestRecord;
-}
 
 export function RequestsPage(): JSX.Element {
   const { t, lang } = useT("requests");
@@ -59,8 +54,8 @@ export function RequestsPage(): JSX.Element {
   const query = useQuery(recentRequestsQuery(params));
   const countsQuery = useQuery(requestCountsQuery());
   const columns = useRequestColumns();
-  const [selection, setSelection] = useState<Selection | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // The sheet keeps the open row, so stepping through it never renders this page or its table.
+  const sheet = useRef<RequestSheetHandle>(null);
 
   const updateSearch = useCallback(
     (patch: RequestsSearch, options: { replace?: boolean } = {}) => {
@@ -92,7 +87,6 @@ export function RequestsPage(): JSX.Element {
   }, [isError, hasData, error, errorUpdatedAt, t]);
 
   const rows = data?.requests ?? [];
-  const keys = useMemo(() => rows.map((row, index) => rowKey(row, index)), [rows]);
   // The server echoes the normalized paging values; they win over the URL (gotcha 8).
   const page = data?.page ?? params.page ?? DEFAULT_PAGE;
   const pageSize = data?.pageSize ?? params.pageSize ?? DEFAULT_PAGE_SIZE;
@@ -100,23 +94,16 @@ export function RequestsPage(): JSX.Element {
   const filtered = hasFilters(search);
   const outOfRange = hasData && rows.length === 0 && total > 0 && page > 1;
 
-  const selectedIndex = selection ? keys.indexOf(selection.key) : -1;
-  const selectedRecord = selectedIndex >= 0 ? rows[selectedIndex] : (selection?.record ?? null);
-
-  const openRow = useCallback(
-    (row: RequestRecord) => {
-      const index = rows.indexOf(row);
-      if (index < 0) return;
-      setSelection({ key: keys[index], record: row });
-      setSheetOpen(true);
-    },
-    [rows, keys],
+  // Stable, so the table's memoized rows and cards keep their render across this page's renders.
+  const openRow = useCallback((row: RequestRecord) => sheet.current?.open(row), []);
+  const renderCard = useCallback(
+    (row: RequestRecord) => <RequestCard onOpen={() => openRow(row)} record={row} />,
+    [openRow],
   );
-
-  const stepTo = (index: number) => {
-    const row = rows[index];
-    if (row) setSelection({ key: keys[index], record: row });
-  };
+  const showConversation = useCallback(
+    (conversation: string) => updateSearch({ conversation, page: undefined }),
+    [updateSearch],
+  );
 
   const sort: DataTableSort = {
     id: params.sort ?? DEFAULT_SORT,
@@ -281,7 +268,7 @@ export function RequestsPage(): JSX.Element {
                 rowDescription={requestSummary}
                 rowLabel={(row) => t("detail.open", { time: formatDateTime(row.ts, lang) })}
                 pageSize={pageSize}
-                renderCard={(row) => <RequestCard onOpen={() => openRow(row)} record={row} />}
+                renderCard={renderCard}
                 sort={sort}
               />
             </div>
@@ -298,22 +285,11 @@ export function RequestsPage(): JSX.Element {
         ) : null}
       </div>
 
-      <RequestDetailSheet
-        count={rows.length}
-        onNext={
-          selectedIndex >= 0 && selectedIndex < rows.length - 1
-            ? () => stepTo(selectedIndex + 1)
-            : undefined
-        }
-        onOpenChange={setSheetOpen}
-        onPrevious={selectedIndex > 0 ? () => stepTo(selectedIndex - 1) : undefined}
-        onShowConversation={(conversation) => {
-          setSheetOpen(false);
-          updateSearch({ conversation, page: undefined });
-        }}
-        open={sheetOpen}
-        position={selectedIndex + 1}
-        record={selectedRecord}
+      <SteppedRequestSheet
+        getKey={rowKey}
+        onShowConversation={showConversation}
+        ref={sheet}
+        rows={rows}
       />
     </>
   );
