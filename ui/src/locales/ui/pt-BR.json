@@ -20,5 +20,7 @@
   "sidebar.description": "Exibe a barra lateral no celular.",
   "pagination.label": "Paginação",
   "pagination.more": "Mais páginas",
-  "breadcrumb.label": "Trilha de navegação"
+  "breadcrumb.label": "Trilha de navegação",
+  "calendar.previousMonth": "Mês anterior",
+  "calendar.nextMonth": "Próximo mês"
 }

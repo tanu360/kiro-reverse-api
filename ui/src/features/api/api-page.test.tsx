@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsPatch } from "@/lib/api/types";
@@ -7,6 +7,7 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
+import { endOfLocalDay, expiryInDays } from "./api-key-form";
 import { ApiPage } from "./api-page";
 import { ClientSnippetsCard } from "./client-snippets";
 import { EndpointsCard } from "./endpoints-card";
@@ -152,6 +153,7 @@ describe("ApiPage", () => {
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("tab", { name: "Limits" }));
     const tokenLimit = within(dialog).getByRole("textbox", { name: "Token limit" });
     await user.clear(tokenLimit);
     // A whole-number field refuses the decimal mark as it is typed...
@@ -161,8 +163,14 @@ describe("ApiPage", () => {
     await user.clear(tokenLimit);
     await user.click(tokenLimit);
     await user.paste("1.5");
+    // Submitted from another tab, the form opens the tab with the bad field.
+    await user.click(within(dialog).getByRole("tab", { name: "General" }));
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     const error = await within(dialog).findByText("Token limit must be a whole number, 0 or more.");
+    expect(within(dialog).getByRole("tab", { name: "Limits" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     // Only the failing field is marked and described; the credit limit stays untouched.
     expect(tokenLimit).toHaveAttribute("aria-invalid", "true");
     // Focus moves to the bad field.
@@ -267,6 +275,7 @@ describe("ApiPage", () => {
     const dana = mockDb.accounts[0];
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("tab", { name: "Accounts" }));
     await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
 
     // "Only selected" with nothing picked would mean every account: the form refuses it.
@@ -305,22 +314,33 @@ describe("ApiPage", () => {
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "scoped");
+    // The expiry presets count from today, each to the end of its day.
+    await user.click(within(dialog).getByRole("button", { name: /^Expires/ }));
+    await user.click(await screen.findByRole("button", { name: "In 7 days" }));
+    expect(within(dialog).getByRole("button", { name: /^Expires/ })).not.toHaveTextContent(
+      "Never expires",
+    );
+    await user.click(within(dialog).getByRole("tab", { name: "Accounts" }));
     await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
     // The tag picks accounts on its own: both spellings count, and the count says so.
     await user.click(within(dialog).getByRole("checkbox", { name: /team-eu/ }));
     expect(
       within(dialog).getByText(`2 of ${mockDb.accounts.length} accounts in scope`),
     ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("tab", { name: "Limits" }));
     const rpm = within(dialog).getByRole("textbox", { name: "Requests per minute" });
     await user.clear(rpm);
     await user.type(rpm, "30");
-    await user.type(
-      within(dialog).getByRole("textbox", { name: "Allowed models" }),
-      "claude-haiku-4.5, auto",
-    );
-    fireEvent.change(within(dialog).getByLabelText("Expires"), {
-      target: { value: "2031-05-06T07:08" },
-    });
+    await user.click(within(dialog).getByRole("tab", { name: "Routing & models" }));
+    // "Only selected models" with none ticked is refused, like accounts.
+    await user.click(within(dialog).getByRole("radio", { name: "Only selected models" }));
+    await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
+    expect(
+      await within(dialog).findByText("Pick at least one model, or choose Every model."),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("searchbox", { name: "Search models" })).toHaveFocus();
+    await user.click(await within(dialog).findByRole("checkbox", { name: "claude-haiku-4.5" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "auto" }));
     await user.click(within(dialog).getByRole("combobox", { name: "Routing mode" }));
     await user.click(await screen.findByRole("option", { name: "Reset first" }));
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
@@ -332,7 +352,7 @@ describe("ApiPage", () => {
       accountTags: ["team-eu"],
       allowedModels: ["claude-haiku-4.5", "auto"],
       rpmLimit: 30,
-      expiresAt: Math.floor(new Date(2031, 4, 6, 7, 8).getTime() / 1000),
+      expiresAt: expiryInDays(7),
       routingMode: "reset_first",
     });
     const created = row("scoped");
@@ -360,12 +380,55 @@ describe("ApiPage", () => {
     expect(
       within(dialog).getByText("This time has passed: clients get 401 as soon as you save."),
     ).toBeInTheDocument();
-    // Clearing the time lets the key work again.
-    fireEvent.change(within(dialog).getByLabelText("Expires"), { target: { value: "" } });
+    // Never lets the key work again.
+    await user.click(within(dialog).getByRole("button", { name: /^Expires/ }));
+    await user.click(await screen.findByRole("button", { name: "Never" }));
+    expect(within(dialog).getByRole("button", { name: /^Expires/ })).toHaveTextContent(
+      "Never expires",
+    );
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(sent("PUT", `/api-keys/${local.id}`)).toHaveLength(1));
     expect(sent("PUT", `/api-keys/${local.id}`)[0]?.body).toMatchObject({ expiresAt: 0 });
     expect(await within(row("local-dev")).findByText("Enabled")).toBeInTheDocument();
+  });
+
+  it("picks an expiry day from the calendar, which ends with that day", async () => {
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Create API key" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^Expires/ }));
+    await user.click(await screen.findByRole("button", { name: "Next month" }));
+    const now = new Date();
+    const day = new Date(now.getFullYear(), now.getMonth() + 1, 15);
+    const label = new Intl.DateTimeFormat("en-US", { dateStyle: "full" }).format(day);
+    await user.click(await screen.findByRole("button", { name: label }));
+    await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
+    await screen.findByTestId("created-key-panel");
+    expect(sent("POST", "/api-keys")[0]?.body).toMatchObject({ expiresAt: endOfLocalDay(day) });
+  });
+
+  it("edits a key in a sheet that keeps its models, including one no longer offered", async () => {
+    const teamA = mockDb.apiKeys[0];
+    if (!teamA) throw new Error("missing seeded key");
+    teamA.allowedModels = ["claude-haiku-4.5", "retired-model"];
+    const { user } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const sheet = await screen.findByRole("dialog");
+    // Every section at once, under its heading: no tabs in the sheet.
+    expect(within(sheet).queryByRole("tab")).not.toBeInTheDocument();
+    for (const heading of ["General", "Limits", "Accounts", "Routing & models"]) {
+      expect(within(sheet).getByRole("heading", { name: heading })).toBeInTheDocument();
+    }
+    expect(within(sheet).getByRole("radio", { name: "Only selected models" })).toBeChecked();
+    const retired = await within(sheet).findByRole("checkbox", { name: "retired-model" });
+    expect(retired).toBeChecked();
+    await user.click(retired);
+    await user.click(within(sheet).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(sent("PUT", `/api-keys/${teamA.id}`)).toHaveLength(1));
+    expect(sent("PUT", `/api-keys/${teamA.id}`)[0]?.body).toMatchObject({
+      allowedModels: ["claude-haiku-4.5"],
+    });
   });
 
   it("keeps a key's accounts while the account list fails to load", async () => {

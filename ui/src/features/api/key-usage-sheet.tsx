@@ -471,7 +471,7 @@ export function ApiKeyUsageSheet({
                     label: t("form.allowedModels"),
                     value: apiKey.allowedModels?.length
                       ? formatItems(apiKey.allowedModels, lang)
-                      : t("form.allowedModelsPlaceholder"),
+                      : t("form.modelsAll"),
                     // A list of models takes the full width; "Every model" pairs up.
                     span: apiKey.allowedModels?.length ? 2 : 1,
                   },

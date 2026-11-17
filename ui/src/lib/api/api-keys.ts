@@ -22,6 +22,22 @@ async function listApiKeys(): Promise<ApiKey[]> {
   return res.apiKeys ?? [];
 }
 
+/**
+ * The models a key can be limited to: what the accounts last reported (a built-in list before
+ * any did), then auto. Base names only; a key's check strips the thinking suffix first.
+ */
+async function listKeyModels(): Promise<string[]> {
+  const res = await apiRequest<{ models?: string[] }>("/models");
+  return res.models ?? [];
+}
+
+export function keyModelsQuery() {
+  return queryOptions({
+    queryKey: queryKeys.apiKeys.models(),
+    queryFn: listKeyModels,
+  });
+}
+
 export function apiKeysQuery() {
   return queryOptions({
     queryKey: queryKeys.apiKeys.list(),

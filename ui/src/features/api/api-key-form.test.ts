@@ -5,15 +5,15 @@ import {
   buildCreateRequest,
   buildUpdateRequest,
   EMPTY_API_KEY_FORM,
+  endOfLocalDay,
+  expiryInDays,
   flooredShare,
   formValuesFromKey,
-  fromLocalDateTimeInput,
   isKeyExpired,
   isLimitReached,
   limitReachedReason,
   parseApiKeyForm,
-  parseModelList,
-  toLocalDateTimeInput,
+  uniqueModels,
   wouldLockOutClients,
 } from "./api-key-form";
 
@@ -160,9 +160,10 @@ describe("formValuesFromKey", () => {
       accountScope: "all",
       accountIds: [],
       accountTags: [],
-      allowedModels: "",
+      modelScope: "all",
+      allowedModels: [],
       rpmLimit: 0,
-      expiresAt: "",
+      expiresAt: 0,
       routingMode: "inherit",
     });
     expect(formValuesFromKey(key())).toEqual(EMPTY_API_KEY_FORM);
@@ -275,22 +276,34 @@ describe("wouldLockOutClients", () => {
 });
 
 describe("key controls", () => {
-  it("parses models comma-separated, once each, and checks their count and length", () => {
-    expect(parseModelList(" claude-haiku-4.5, Claude-Haiku-4.5 ,auto,, ")).toEqual([
+  it("sends ticked models once each, and checks their count and length", () => {
+    expect(uniqueModels([" claude-haiku-4.5", "Claude-Haiku-4.5 ", "auto", "", " "])).toEqual([
       "claude-haiku-4.5",
       "auto",
     ]);
-    const many = Array.from({ length: 51 }, (_, i) => `model-${i}`).join(",");
-    expect(parseApiKeyForm(values({ allowedModels: many }))).toEqual({
-      ok: false,
-      error: "tooManyModels",
-      field: "allowedModels",
+    const picked = (allowedModels: string[]) =>
+      parseApiKeyForm(values({ modelScope: "selected", allowedModels }));
+    expect(picked(["auto", "AUTO"])).toMatchObject({
+      ok: true,
+      value: { allowedModels: ["auto"] },
     });
-    expect(parseApiKeyForm(values({ allowedModels: "m".repeat(129) }))).toEqual({
+    const many = Array.from({ length: 51 }, (_, i) => `model-${i}`);
+    expect(picked(many)).toEqual({ ok: false, error: "tooManyModels", field: "allowedModels" });
+    expect(picked(["m".repeat(129)])).toEqual({
       ok: false,
       error: "modelTooLong",
       field: "allowedModels",
     });
+  });
+
+  it("needs a ticked model for only-selected models, and drops picks kept for every model", () => {
+    expect(parseApiKeyForm(values({ modelScope: "selected" }))).toEqual({
+      ok: false,
+      error: "noModels",
+      field: "allowedModels",
+    });
+    const all = parseApiKeyForm(values({ modelScope: "all", allowedModels: ["auto"] }));
+    expect(all.ok && all.value.allowedModels).toEqual([]);
   });
 
   it("takes a whole RPM limit up to 10,000", () => {
@@ -307,17 +320,17 @@ describe("key controls", () => {
     }
   });
 
-  it("round-trips the expiry through the local datetime field", () => {
-    const at = Math.floor(new Date(2031, 4, 6, 7, 8).getTime() / 1000);
-    expect(toLocalDateTimeInput(at)).toBe("2031-05-06T07:08");
-    expect(fromLocalDateTimeInput("2031-05-06T07:08")).toBe(at);
-    expect(toLocalDateTimeInput(0)).toBe("");
-    expect(fromLocalDateTimeInput("  ")).toBe(0);
-    expect(fromLocalDateTimeInput("tomorrow")).toBeNull();
-    expect(parseApiKeyForm(values({ expiresAt: "2031-05-06" }))).toEqual({
-      ok: false,
-      error: "invalidExpiry",
-      field: "expiresAt",
+  it("counts a picked day to its last local second, and presets from today", () => {
+    const end = Math.floor(new Date(2031, 4, 6, 23, 59, 59).getTime() / 1000);
+    expect(endOfLocalDay(new Date(2031, 4, 6, 7, 8))).toBe(end);
+    expect(expiryInDays(7, new Date(2031, 3, 29, 10, 0))).toBe(end);
+    expect(parseApiKeyForm(values({ expiresAt: end }))).toMatchObject({
+      ok: true,
+      value: { expiresAt: end },
+    });
+    expect(parseApiKeyForm(values({ expiresAt: Number.NaN }))).toMatchObject({
+      ok: true,
+      value: { expiresAt: 0 },
     });
   });
 
@@ -326,9 +339,10 @@ describe("key controls", () => {
       values({
         accountScope: "selected",
         accountTags: ["team-eu", "team-eu"],
-        allowedModels: "claude-haiku-4.5",
+        modelScope: "selected",
+        allowedModels: ["claude-haiku-4.5"],
         rpmLimit: 12,
-        expiresAt: "2031-05-06T07:08",
+        expiresAt: endOfLocalDay(new Date(2031, 4, 6)),
         routingMode: "reset_first",
       }),
     );
@@ -338,7 +352,7 @@ describe("key controls", () => {
       accountTags: ["team-eu"],
       allowedModels: ["claude-haiku-4.5"],
       rpmLimit: 12,
-      expiresAt: fromLocalDateTimeInput("2031-05-06T07:08"),
+      expiresAt: endOfLocalDay(new Date(2031, 4, 6)),
       routingMode: "reset_first",
     });
     // Tags kept from before a switch to every account are not sent.
@@ -361,9 +375,10 @@ describe("key controls", () => {
     ).toMatchObject({
       accountScope: "selected",
       accountTags: ["eu"],
-      allowedModels: "a, b",
+      modelScope: "selected",
+      allowedModels: ["a", "b"],
       rpmLimit: 9,
-      expiresAt: "2031-01-02T03:04",
+      expiresAt: at,
       routingMode: "priority",
     });
   });

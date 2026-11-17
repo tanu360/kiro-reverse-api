@@ -75,6 +75,7 @@ export function AccountPicker({
   onTagsChange,
   invalid,
   searchRef,
+  hideLegend = false,
 }: {
   scope: ApiKeyAccountScope;
   selected: readonly string[];
@@ -87,6 +88,8 @@ export function AccountPicker({
   invalid: boolean;
   /** Where focus goes when the picks are invalid. */
   searchRef?: Ref<HTMLInputElement>;
+  /** Keeps the legend for screen readers only, where a tab or heading already says "Accounts". */
+  hideLegend?: boolean;
 }): JSX.Element {
   const { t, lang } = useT("api");
   const { t: ta } = useT("accounts");
@@ -191,7 +194,9 @@ export function AccountPicker({
 
   return (
     <Fieldset className="flex min-w-0 flex-col gap-3">
-      <FieldsetLegend>{t("form.accounts")}</FieldsetLegend>
+      <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
+        {t("form.accounts")}
+      </FieldsetLegend>
       {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
       <RadioGroup
         aria-label={t("form.accounts")}

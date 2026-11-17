@@ -17,5 +17,7 @@
   "sidebar.description": "モバイル用のサイドバーを表示します。",
   "pagination.label": "ページネーション",
   "pagination.more": "その他のページ",
-  "breadcrumb.label": "パンくずリスト"
+  "breadcrumb.label": "パンくずリスト",
+  "calendar.previousMonth": "前の月",
+  "calendar.nextMonth": "次の月"
 }

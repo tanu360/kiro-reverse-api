@@ -9,6 +9,7 @@ import type {
 import type { ApiKey, ApiKeyRoutingMode, RequestRecord } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
+import { makeCachedModelIds } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 import { lifetimeGrid } from "@/lib/mocks/lifetime";
 
@@ -407,6 +408,13 @@ export const handlers: HttpHandler[] = [
     }
     const tzOffset = Number(url.searchParams.get("tzOffset") || "0") || 0;
     return HttpResponse.json(buildBreakdown(mockNowUnix(), ref, range, spec, tzOffset));
+  }),
+
+  http.get(apiUrl("/models"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json({ models: [...makeCachedModelIds(), "auto"] });
   }),
 
   http.get(apiUrl("/api-keys"), async ({ request }) => {

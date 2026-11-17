@@ -17,5 +17,7 @@
   "sidebar.description": "显示移动端侧边栏。",
   "pagination.label": "分页",
   "pagination.more": "更多页",
-  "breadcrumb.label": "面包屑导航"
+  "breadcrumb.label": "面包屑导航",
+  "calendar.previousMonth": "上个月",
+  "calendar.nextMonth": "下个月"
 }

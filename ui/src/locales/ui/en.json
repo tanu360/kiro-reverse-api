@@ -20,5 +20,7 @@
   "sidebar.description": "Displays the mobile sidebar.",
   "pagination.label": "Pagination",
   "pagination.more": "More pages",
-  "breadcrumb.label": "Breadcrumb"
+  "breadcrumb.label": "Breadcrumb",
+  "calendar.previousMonth": "Previous month",
+  "calendar.nextMonth": "Next month"
 }

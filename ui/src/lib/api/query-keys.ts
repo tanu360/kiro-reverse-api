@@ -47,6 +47,8 @@ export const queryKeys = {
   apiKeys: {
     all: ["api-keys"] as const,
     list: () => ["api-keys", "list"] as const,
+    /** GET /models: the names a key's model list can hold (proxy/handler.go apiListModels). */
+    models: () => ["api-keys", "models"] as const,
   },
   settings: {
     all: ["settings"] as const,

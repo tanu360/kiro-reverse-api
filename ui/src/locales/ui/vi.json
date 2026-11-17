@@ -17,5 +17,7 @@
   "sidebar.description": "Hiển thị thanh bên trên thiết bị di động.",
   "pagination.label": "Phân trang",
   "pagination.more": "Các trang khác",
-  "breadcrumb.label": "Đường dẫn"
+  "breadcrumb.label": "Đường dẫn",
+  "calendar.previousMonth": "Tháng trước",
+  "calendar.nextMonth": "Tháng sau"
 }
