@@ -699,14 +699,6 @@ function ApiKeyCreateDialog({
       })}
       footer={
         <>
-          <Button
-            className="sm:me-auto"
-            key="cancel"
-            onClick={() => onOpenChange(false)}
-            variant="ghost"
-          >
-            {t("common:actions.cancel")}
-          </Button>
           {step > 0 ? (
             <Button
               disabled={form.pending}
@@ -727,6 +719,17 @@ function ApiKeyCreateDialog({
             type="submit"
           >
             {last ? t("form.submitCreate") : t("common:actions.next")}
+          </Button>
+          <Button
+            // Last in the markup, first on screen. On a phone after step 1 it gives way (the X
+            // still closes), so Back and Create share the footer's one row; the footer's
+            // odd-last-child span then falls on this hidden button.
+            className={cn("order-first sm:me-auto", step > 0 && "max-sm:hidden")}
+            key="cancel"
+            onClick={() => onOpenChange(false)}
+            variant="ghost"
+          >
+            {t("common:actions.cancel")}
           </Button>
         </>
       }
