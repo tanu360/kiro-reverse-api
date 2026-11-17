@@ -817,7 +817,7 @@ function ApiKeyCreateDialog({
         ))}
       </div>
       {/* One height from sm up for both steps, so Next and Back never resize the dialog. */}
-      <div className="flex min-h-0 flex-1 flex-col sm:h-140 sm:flex-initial">
+      <div className="flex min-h-0 flex-1 flex-col sm:h-134 sm:flex-initial">
         <DialogPanel>
           <form
             aria-busy={form.pending || undefined}
