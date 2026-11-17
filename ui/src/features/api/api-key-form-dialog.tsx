@@ -27,10 +27,9 @@ import {
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
 import { SectionCard } from "@/components/shared/section-card";
-import { SETTINGS_ROW_X, SettingsRow } from "@/components/shared/settings-rows";
+import { SettingsRow } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { DialogPanel } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldHint, FieldLabel } from "@/components/ui/field";
 import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
@@ -491,15 +490,40 @@ function ScopeSwitch<T extends string>({
   );
 }
 
-/** Create, step 1: the name, then the expiry and the custom key as rows, then the limits. */
+/*
+ * The create rows sit straight in the dialog, which is their card: no box round them, the
+ * dialog's padding as theirs (px-0), and the cards' hairline (border-subtle) between them.
+ */
+const ROW_LIST = "flex min-w-0 flex-col divide-y divide-border-subtle";
+const ROW = "px-0";
+
+/** Create, step 1: name, expiry and custom key as rows, then the four limits under a legend. */
 function BasicsRows({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
+  const nameId = useId();
   const keyId = useId();
   return (
     <>
-      <NameField form={form} />
-      <Card divided>
+      <div className={ROW_LIST}>
         <SettingsRow
+          className={ROW}
+          compact
+          control={
+            <Input
+              maxLength={64}
+              autoComplete="off"
+              id={nameId}
+              onValueChange={(value) => form.set("name", value)}
+              placeholder={t("form.namePlaceholder")}
+              ref={form.refs.name}
+              value={form.values.name}
+            />
+          }
+          htmlFor={nameId}
+          title={t("form.name")}
+        />
+        <SettingsRow
+          className={ROW}
           compact
           control={
             <ExpiryPicker
@@ -512,6 +536,7 @@ function BasicsRows({ form }: { form: KeyForm }): JSX.Element {
           title={t("form.expiresAt")}
         />
         <SettingsRow
+          className={ROW}
           compact
           control={
             <Input
@@ -529,17 +554,17 @@ function BasicsRows({ form }: { form: KeyForm }): JSX.Element {
           htmlFor={keyId}
           title={t("form.customKey")}
         />
-      </Card>
-      <Fieldset className="flex min-w-0 flex-col gap-2">
+      </div>
+      <Fieldset className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <FieldsetLegend>{t("form.limits")}</FieldsetLegend>
           <FieldHint>{t("form.limitsHint")}</FieldHint>
         </div>
-        <Card divided>
+        <div className={ROW_LIST}>
           {LIMIT_FIELDS.map((field) => (
             <LimitRow field={field} form={form} key={field} />
           ))}
-        </Card>
+        </div>
       </Fieldset>
     </>
   );
@@ -560,6 +585,7 @@ function LimitRow({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): 
     // One Field round the row: it marks the input invalid and ties the error to it.
     <Field className="items-stretch" invalid={form.invalid === field}>
       <SettingsRow
+        className={ROW}
         compact
         control={<LimitNumber field={field} form={form} id={id} />}
         controlWidth="number"
@@ -583,8 +609,9 @@ function AccessRows({ form }: { form: KeyForm }): JSX.Element {
   useQuery(keyModelsQuery());
   useQuery(accountsQuery());
   return (
-    <Card divided>
+    <div className={ROW_LIST}>
       <SettingsRow
+        className={ROW}
         compact
         control={<RoutingSelect form={form} />}
         // Under the text: "Same as Settings (Reset first)" is too long to sit beside it.
@@ -592,59 +619,66 @@ function AccessRows({ form }: { form: KeyForm }): JSX.Element {
         description={t("form.routingModeShort")}
         title={t("form.routingMode")}
       />
-      <SettingsRow
-        compact
-        control={
-          <ScopeSwitch
-            onChange={(scope) => form.set("modelScope", scope)}
-            options={[
-              { value: "all", label: t("form.modelsAll") },
-              { value: "selected", label: t("form.scopeSelected") },
-            ]}
-            value={form.values.modelScope}
-          />
-        }
-        description={t("form.allowedModelsShort")}
-        title={t("form.allowedModels")}
-      />
-      {form.values.modelScope === "selected" ? (
-        <div className={cn(SETTINGS_ROW_X, "py-3")}>
-          <ModelPicks
-            invalid={modelsError}
-            onSelectedChange={(models) => form.set("allowedModels", models)}
-            searchRef={form.refs.allowedModels}
-            selected={form.values.allowedModels}
-          />
-        </div>
-      ) : null}
-      <SettingsRow
-        compact
-        control={
-          <ScopeSwitch
-            onChange={(scope) => form.set("accountScope", scope)}
-            options={[
-              { value: "all", label: t("form.accountsAll") },
-              { value: "selected", label: t("form.scopeSelected") },
-            ]}
-            value={form.values.accountScope}
-          />
-        }
-        description={t("form.accountsShort")}
-        title={t("form.accounts")}
-      />
-      {form.values.accountScope === "selected" ? (
-        <div className={cn(SETTINGS_ROW_X, "py-3")}>
-          <AccountPicks
-            invalid={form.invalid === "accountIds"}
-            onSelectedChange={(ids) => form.set("accountIds", ids)}
-            onTagsChange={(tags) => form.set("accountTags", tags)}
-            searchRef={form.refs.accountIds}
-            selected={form.values.accountIds}
-            tags={form.values.accountTags}
-          />
-        </div>
-      ) : null}
-    </Card>
+      {/* A row and the picks it opens share one item, so no hairline parts them. */}
+      <div>
+        <SettingsRow
+          className={ROW}
+          compact
+          control={
+            <ScopeSwitch
+              onChange={(scope) => form.set("modelScope", scope)}
+              options={[
+                { value: "all", label: t("form.modelsAll") },
+                { value: "selected", label: t("form.scopeSelected") },
+              ]}
+              value={form.values.modelScope}
+            />
+          }
+          description={t("form.allowedModelsShort")}
+          title={t("form.allowedModels")}
+        />
+        {form.values.modelScope === "selected" ? (
+          <div className="pb-3">
+            <ModelPicks
+              invalid={modelsError}
+              onSelectedChange={(models) => form.set("allowedModels", models)}
+              searchRef={form.refs.allowedModels}
+              selected={form.values.allowedModels}
+            />
+          </div>
+        ) : null}
+      </div>
+      <div>
+        <SettingsRow
+          className={ROW}
+          compact
+          control={
+            <ScopeSwitch
+              onChange={(scope) => form.set("accountScope", scope)}
+              options={[
+                { value: "all", label: t("form.accountsAll") },
+                { value: "selected", label: t("form.scopeSelected") },
+              ]}
+              value={form.values.accountScope}
+            />
+          }
+          description={t("form.accountsShort")}
+          title={t("form.accounts")}
+        />
+        {form.values.accountScope === "selected" ? (
+          <div className="pb-3">
+            <AccountPicks
+              invalid={form.invalid === "accountIds"}
+              onSelectedChange={(ids) => form.set("accountIds", ids)}
+              onTagsChange={(tags) => form.set("accountTags", tags)}
+              searchRef={form.refs.accountIds}
+              selected={form.values.accountIds}
+              tags={form.values.accountTags}
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -664,8 +698,8 @@ const FIELD_STEP: Readonly<Record<ApiKeyFormField, number>> = {
 
 /**
  * Create: the app's dialog at its default width, in two steps of settings rows (the Settings
- * page's own): Basics (name, expiry, custom key and the limits), then Access (routing mode,
- * models, accounts). Next checks the fields up to the
+ * page's own, straight in the dialog): Basics (name, expiry, custom key and the limits), then
+ * Access (routing mode, models, accounts). Next checks the fields up to the
  * current step; the last step creates the key. Both steps share one body height, so the dialog
  * keeps its size between them, and a longer step scrolls inside it.
  */
