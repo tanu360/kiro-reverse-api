@@ -1,5 +1,5 @@
 {
-  "version": "4.0.4",
-  "changelog": "🔔 The update notice now waits until the new version's files are on its GitHub release. Before, it could show up a few minutes early, and Download update failed until the files were there.",
+  "version": "4.0.5",
+  "changelog": "📱 A tidier phone layout: smaller buttons and fields, descriptions across the full width, Refresh in the card's top corner, code snippets that no longer overlap, and no extra \"Copied\" notice where the phone shows its own. On a computer, ← and → (or K and J) move between requests in the request details, and / jumps to the search on Accounts and Requests.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
