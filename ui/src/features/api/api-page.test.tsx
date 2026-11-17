@@ -347,6 +347,8 @@ describe("ApiPage", () => {
     const rpm = within(dialog).getByRole("textbox", { name: "Requests per minute" });
     await user.clear(rpm);
     await user.type(rpm, "30");
+    await user.click(within(dialog).getByRole("combobox", { name: "Routing mode" }));
+    await user.click(await screen.findByRole("option", { name: "Reset first" }));
     await user.click(within(dialog).getByRole("button", { name: "Next" }));
     await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
     // The tag picks accounts on its own: both spellings count, and the count says so.
@@ -363,8 +365,6 @@ describe("ApiPage", () => {
     expect(within(dialog).getByRole("searchbox", { name: "Search models" })).toHaveFocus();
     await user.click(await within(dialog).findByRole("checkbox", { name: "claude-haiku-4.5" }));
     await user.click(within(dialog).getByRole("checkbox", { name: "auto" }));
-    await user.click(within(dialog).getByRole("combobox", { name: "Routing mode" }));
-    await user.click(await screen.findByRole("option", { name: "Reset first" }));
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
 
     await screen.findByTestId("created-key-panel");
