@@ -1,9 +1,9 @@
 import {
   AlertCircleIcon,
+  DashboardSpeed01Icon,
   Key01Icon,
   KeyRoundIcon,
-  Route01Icon,
-  UserMultipleIcon,
+  ShieldKeyIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,11 +27,11 @@ import {
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
 import { SectionCard } from "@/components/shared/section-card";
-import { SettingsRow } from "@/components/shared/settings-rows";
+import { SETTINGS_ROW_X, SettingsRow } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DialogPanel } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldHint, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldHint } from "@/components/ui/field";
 import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
 import {
@@ -60,7 +60,7 @@ import { useT } from "@/lib/i18n";
 import { noSpaces } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { AccountPicker, AccountPicks } from "./account-picker";
+import { AccountPicks } from "./account-picker";
 import {
   type ApiKeyFormData,
   type ApiKeyFormFailure,
@@ -78,7 +78,7 @@ import {
   parseApiKeyForm,
 } from "./api-key-form";
 import { ExpiryPicker } from "./expiry-picker";
-import { ModelPicker, ModelPicks } from "./model-picker";
+import { ModelPicks } from "./model-picker";
 import { SheetMark } from "./sheet-mark";
 
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
@@ -208,56 +208,88 @@ function useKeyForm(
   };
 }
 
-/** The key's name, its label above it. */
-function NameField({ form }: { form: KeyForm }): JSX.Element {
+type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
+
+/**
+ * Where a row sits: straight in the create dialog, whose padding is its own (no inline padding
+ * of the row's), or in one of the edit sheet's cards, which leave the row its 16 px.
+ */
+type RowPlace = "dialog" | "card";
+
+const rowClass = (place: RowPlace): string | undefined => (place === "dialog" ? "px-0" : undefined);
+
+/** A list opened under its row: the row's inline padding, 12 px below it. */
+const picksClass = (place: RowPlace): string => cn("pb-3", place === "card" && SETTINGS_ROW_X);
+
+/** The key's name. */
+function NameRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.Element {
   const { t } = useT("api");
+  const id = useId();
   return (
-    <Field>
-      <FieldLabel>{t("form.name")}</FieldLabel>
-      <Input
-        maxLength={64}
-        autoComplete="off"
-        onValueChange={(value) => form.set("name", value)}
-        placeholder={t("form.namePlaceholder")}
-        ref={form.refs.name}
-        value={form.values.name}
-      />
-    </Field>
+    <SettingsRow
+      className={rowClass(place)}
+      compact
+      control={
+        <Input
+          maxLength={64}
+          autoComplete="off"
+          id={id}
+          onValueChange={(value) => form.set("name", value)}
+          placeholder={t("form.namePlaceholder")}
+          ref={form.refs.name}
+          value={form.values.name}
+        />
+      }
+      htmlFor={id}
+      title={t("form.name")}
+    />
   );
 }
 
-/** Name and expiry side by side (stacked on phones). */
-function NameAndExpiry({ form }: { form: KeyForm }): JSX.Element {
+/** When the key stops working; a stored day that has passed (edit) says so instead of the hint. */
+function ExpiresRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.Element {
+  const { t } = useT("api");
+  const { expiresAt } = form.values;
+  const past = expiresAt > 0 && expiresAt <= Math.floor(Date.now() / 1000);
   return (
-    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-      <NameField form={form} />
-      <ExpiryPicker
-        onChange={(value) => form.set("expiresAt", value)}
-        value={form.values.expiresAt}
-      />
-    </div>
+    <SettingsRow
+      className={rowClass(place)}
+      compact
+      control={
+        <ExpiryPicker onChange={(value) => form.set("expiresAt", value)} value={expiresAt} />
+      }
+      description={past ? t("form.expiresAtPast") : t("form.expiresAtRowHint")}
+      title={t("form.expiresAt")}
+    />
   );
 }
 
-/** The custom key, with what an empty one means under it. */
-function CustomKeyField({ form }: { form: KeyForm }): JSX.Element {
+/** A key of the user's own; empty generates one (create) or keeps the current one (edit). */
+function CustomKeyRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.Element {
   const { t } = useT("api");
+  const id = useId();
   return (
-    <Field>
-      <FieldLabel>{t("form.customKey")}</FieldLabel>
-      <Input
-        maxLength={128}
-        autoCapitalize="off"
-        autoComplete="off"
-        autoCorrect="off"
-        onValueChange={(value) => form.set("key", noSpaces(value))}
-        spellCheck={false}
-        value={form.values.key}
-      />
-      <FieldDescription>
-        {form.editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder")}
-      </FieldDescription>
-    </Field>
+    <SettingsRow
+      className={rowClass(place)}
+      compact
+      control={
+        <Input
+          maxLength={128}
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          id={id}
+          onValueChange={(value) => form.set("key", noSpaces(value))}
+          spellCheck={false}
+          value={form.values.key}
+        />
+      }
+      description={
+        form.editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder")
+      }
+      htmlFor={id}
+      title={t("form.customKey")}
+    />
   );
 }
 
@@ -268,15 +300,20 @@ const LIMIT_LABELS: Readonly<Record<ApiKeyLimitField, string>> = {
   rpmLimit: "form.rpmLimit",
 };
 
-type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
+const LIMIT_FIELDS: readonly ApiKeyLimitField[] = [
+  "tokenLimit",
+  "creditLimit",
+  "callLimit",
+  "rpmLimit",
+];
 
-/** One limit's number field; a settings row's title and description go on its input. */
+/** One limit's number field; the row's title and description go on its input. */
 function LimitNumber({
   form,
   field,
   id,
   ...aria
-}: AriaProps & { form: KeyForm; field: ApiKeyLimitField; id?: string }): JSX.Element {
+}: AriaProps & { form: KeyForm; field: ApiKeyLimitField; id: string }): JSX.Element {
   return (
     <NumberField
       // Two decimals for credits, as formatCredits shows them in the table and the cards.
@@ -297,67 +334,40 @@ function LimitNumber({
   );
 }
 
-/** The limit's error, when it is the failed one. */
-function LimitError({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): ReactNode {
+/** One limit, its error under the title when it is the failed one. */
+function LimitRow({
+  form,
+  field,
+  place,
+}: {
+  form: KeyForm;
+  field: ApiKeyLimitField;
+  place: RowPlace;
+}): JSX.Element {
   const { t } = useT("api");
-  if (form.invalid !== field) return null;
+  const id = useId();
   return (
-    <FieldError match role="alert">
-      {t(LIMIT_ERRORS[field])}
-    </FieldError>
-  );
-}
-
-/** One limit's number field, with its error when it is the failed one. */
-function LimitField({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): JSX.Element {
-  const { t } = useT("api");
-  return (
-    <Field invalid={form.invalid === field}>
-      <FieldLabel>{t(LIMIT_LABELS[field])}</FieldLabel>
-      <LimitNumber field={field} form={form} />
-      <LimitError field={field} form={form} />
+    // One Field round the row: it marks the input invalid and ties the error to it.
+    <Field className="items-stretch" invalid={form.invalid === field}>
+      <SettingsRow
+        className={rowClass(place)}
+        compact
+        control={<LimitNumber field={field} form={form} id={id} />}
+        controlWidth="number"
+        htmlFor={id}
+        title={t(LIMIT_LABELS[field])}
+      >
+        {form.invalid === field ? (
+          <FieldError match role="alert">
+            {t(LIMIT_ERRORS[field])}
+          </FieldError>
+        ) : null}
+      </SettingsRow>
     </Field>
   );
 }
 
-/** The four limits two by two, with what 0 means under them. */
-function LimitsGrid({ form }: { form: KeyForm }): JSX.Element {
-  const { t } = useT("api");
-  return (
-    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-      <LimitField field="tokenLimit" form={form} />
-      <LimitField field="creditLimit" form={form} />
-      <LimitField field="callLimit" form={form} />
-      <LimitField field="rpmLimit" form={form} />
-      <FieldHint className="sm:col-span-2">{t("form.limitsHint")}</FieldHint>
-    </div>
-  );
-}
-
-/** Which accounts the key reaches; `hideLegend` where a card title already says "Accounts". */
-function AccountsField({
-  form,
-  hideLegend = false,
-}: {
-  form: KeyForm;
-  hideLegend?: boolean;
-}): JSX.Element {
-  return (
-    <AccountPicker
-      hideLegend={hideLegend}
-      invalid={form.invalid === "accountIds"}
-      onScopeChange={(scope) => form.set("accountScope", scope)}
-      onSelectedChange={(ids) => form.set("accountIds", ids)}
-      onTagsChange={(tags) => form.set("accountTags", tags)}
-      scope={form.values.accountScope}
-      searchRef={form.refs.accountIds}
-      selected={form.values.accountIds}
-      tags={form.values.accountTags}
-    />
-  );
-}
-
-/** The routing mode select; a settings row's title and description go on its trigger. */
+/** The routing mode select; the row's title and description go on its trigger. */
 function RoutingSelect({ form, ...aria }: AriaProps & { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
   const globalMode = useRoutingMode();
@@ -392,71 +402,19 @@ function RoutingSelect({ form, ...aria }: AriaProps & { form: KeyForm }): JSX.El
   );
 }
 
-/** The routing mode select, its hint under it. */
-function RoutingField({ form }: { form: KeyForm }): JSX.Element {
+/** How the key's requests pick an account; the select under the text, at the row's width. */
+function RoutingRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.Element {
   const { t } = useT("api");
   return (
-    <Field>
-      <FieldLabel>{t("form.routingMode")}</FieldLabel>
-      <RoutingSelect form={form} />
-      <FieldDescription>{t("form.routingModeHint")}</FieldDescription>
-    </Field>
-  );
-}
-
-/** Why the models were refused, when they are the failed field. */
-function useModelsError(form: KeyForm): string | undefined {
-  const { t } = useT("api");
-  if (form.invalid !== "allowedModels") return undefined;
-  if (form.modelsError === "noModels") return t("form.modelsRequired");
-  if (form.modelsError === "tooManyModels") return t("form.tooManyModels", { max: MAX_KEY_MODELS });
-  return t("form.modelTooLong", { max: MAX_KEY_MODEL_LENGTH });
-}
-
-/** The models the key may call. */
-function ModelsField({ form }: { form: KeyForm }): JSX.Element {
-  const invalid = useModelsError(form);
-  return (
-    <ModelPicker
-      invalid={invalid}
-      onScopeChange={(scope) => form.set("modelScope", scope)}
-      onSelectedChange={(models) => form.set("allowedModels", models)}
-      scope={form.values.modelScope}
-      searchRef={form.refs.allowedModels}
-      selected={form.values.allowedModels}
+    <SettingsRow
+      className={rowClass(place)}
+      compact
+      control={<RoutingSelect form={form} />}
+      // Under the text: "Same as Settings (Reset first)" is too long to sit beside it.
+      controlWidth="block"
+      description={t("form.routingModeShort")}
+      title={t("form.routingMode")}
     />
-  );
-}
-
-/** A server error (duplicate key, collision, limits), inside the form. */
-function ServerError({ form }: { form: KeyForm }): ReactNode {
-  const { t } = useT("api");
-  if (!form.error) return null;
-  return (
-    <Alert variant="error">
-      <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-      <AlertTitle>{form.editing ? t("form.saveFailed") : t("form.createFailed")}</AlertTitle>
-      <AlertDescription className="wrap-break-word">{errorMessage(form.error, t)}</AlertDescription>
-    </Alert>
-  );
-}
-
-function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }): JSX.Element {
-  const { t } = useT("api");
-  return (
-    <>
-      <Button onClick={onCancel} variant="ghost">
-        {t("common:actions.cancel")}
-      </Button>
-      <Button
-        form={form.formId}
-        loading={form.pending}
-        loadingText={form.editing ? t("common:actions.saving") : t("form.submitCreating")}
-        type="submit"
-      >
-        {form.editing ? t("common:actions.save") : t("form.submitCreate")}
-      </Button>
-    </>
   );
 }
 
@@ -490,70 +448,125 @@ function ScopeSwitch<T extends string>({
   );
 }
 
+/** Why the models were refused, when they are the failed field. */
+function useModelsError(form: KeyForm): string | undefined {
+  const { t } = useT("api");
+  if (form.invalid !== "allowedModels") return undefined;
+  if (form.modelsError === "noModels") return t("form.modelsRequired");
+  if (form.modelsError === "tooManyModels") return t("form.tooManyModels", { max: MAX_KEY_MODELS });
+  return t("form.modelTooLong", { max: MAX_KEY_MODEL_LENGTH });
+}
+
+/**
+ * The models the key may call: every model, or the ticked ones, listed under the row. The row
+ * and its list are one item, so no hairline parts them.
+ */
+function ModelsRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.Element {
+  const { t } = useT("api");
+  const invalid = useModelsError(form);
+  return (
+    <div>
+      <SettingsRow
+        className={rowClass(place)}
+        compact
+        control={
+          <ScopeSwitch
+            onChange={(scope) => form.set("modelScope", scope)}
+            options={[
+              { value: "all", label: t("form.modelsAll") },
+              { value: "selected", label: t("form.scopeSelected") },
+            ]}
+            value={form.values.modelScope}
+          />
+        }
+        description={t("form.allowedModelsShort")}
+        title={t("form.allowedModels")}
+      />
+      {form.values.modelScope === "selected" ? (
+        <div className={picksClass(place)}>
+          <ModelPicks
+            invalid={invalid}
+            onSelectedChange={(models) => form.set("allowedModels", models)}
+            searchRef={form.refs.allowedModels}
+            selected={form.values.allowedModels}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** The accounts the key's requests use: all, or the picked ones and tags, listed under the row. */
+function AccountsRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.Element {
+  const { t } = useT("api");
+  return (
+    <div>
+      <SettingsRow
+        className={rowClass(place)}
+        compact
+        control={
+          <ScopeSwitch
+            onChange={(scope) => form.set("accountScope", scope)}
+            options={[
+              { value: "all", label: t("form.accountsAll") },
+              { value: "selected", label: t("form.scopeSelected") },
+            ]}
+            value={form.values.accountScope}
+          />
+        }
+        description={t("form.accountsShort")}
+        title={t("form.accounts")}
+      />
+      {form.values.accountScope === "selected" ? (
+        <div className={picksClass(place)}>
+          <AccountPicks
+            invalid={form.invalid === "accountIds"}
+            onSelectedChange={(ids) => form.set("accountIds", ids)}
+            onTagsChange={(tags) => form.set("accountTags", tags)}
+            searchRef={form.refs.accountIds}
+            selected={form.values.accountIds}
+            tags={form.values.accountTags}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Loads the model and account lists while All is chosen, so Only selected opens on them. */
+function usePickLists(): void {
+  useQuery(keyModelsQuery());
+  useQuery(accountsQuery());
+}
+
+/** A server error (duplicate key, collision, limits), inside the form. */
+function ServerError({ form }: { form: KeyForm }): ReactNode {
+  const { t } = useT("api");
+  if (!form.error) return null;
+  return (
+    <Alert variant="error">
+      <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
+      <AlertTitle>{form.editing ? t("form.saveFailed") : t("form.createFailed")}</AlertTitle>
+      <AlertDescription className="wrap-break-word">{errorMessage(form.error, t)}</AlertDescription>
+    </Alert>
+  );
+}
+
 /*
- * The create rows sit straight in the dialog, which is their card: no box round them, the
- * dialog's padding as theirs (px-0), and the cards' hairline (border-subtle) between them.
+ * The create rows sit straight in the dialog, which is their card: no box round them, and the
+ * cards' hairline (border-subtle) between them.
  */
 const ROW_LIST = "flex min-w-0 flex-col divide-y divide-border-subtle";
-const ROW = "px-0";
 
 /** Create, step 1: name, expiry and custom key as rows, then the four limits under a legend. */
 function BasicsRows({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
-  const nameId = useId();
-  const keyId = useId();
   return (
     <>
       <div className={ROW_LIST}>
-        <SettingsRow
-          className={ROW}
-          compact
-          control={
-            <Input
-              maxLength={64}
-              autoComplete="off"
-              id={nameId}
-              onValueChange={(value) => form.set("name", value)}
-              placeholder={t("form.namePlaceholder")}
-              ref={form.refs.name}
-              value={form.values.name}
-            />
-          }
-          htmlFor={nameId}
-          title={t("form.name")}
-        />
-        <SettingsRow
-          className={ROW}
-          compact
-          control={
-            <ExpiryPicker
-              bare
-              onChange={(value) => form.set("expiresAt", value)}
-              value={form.values.expiresAt}
-            />
-          }
-          description={t("form.expiresAtRowHint")}
-          title={t("form.expiresAt")}
-        />
-        <SettingsRow
-          className={ROW}
-          compact
-          control={
-            <Input
-              maxLength={128}
-              autoCapitalize="off"
-              autoComplete="off"
-              autoCorrect="off"
-              id={keyId}
-              onValueChange={(value) => form.set("key", noSpaces(value))}
-              spellCheck={false}
-              value={form.values.key}
-            />
-          }
-          description={t("form.customKeyPlaceholder")}
-          htmlFor={keyId}
-          title={t("form.customKey")}
-        />
+        <NameRow form={form} place="dialog" />
+        <ExpiresRow form={form} place="dialog" />
+        <CustomKeyRow form={form} place="dialog" />
       </div>
       <Fieldset className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -562,7 +575,7 @@ function BasicsRows({ form }: { form: KeyForm }): JSX.Element {
         </div>
         <div className={ROW_LIST}>
           {LIMIT_FIELDS.map((field) => (
-            <LimitRow field={field} form={form} key={field} />
+            <LimitRow field={field} form={form} key={field} place="dialog" />
           ))}
         </div>
       </Fieldset>
@@ -570,115 +583,34 @@ function BasicsRows({ form }: { form: KeyForm }): JSX.Element {
   );
 }
 
-const LIMIT_FIELDS: readonly ApiKeyLimitField[] = [
-  "tokenLimit",
-  "creditLimit",
-  "callLimit",
-  "rpmLimit",
-];
-
-/** One limit as a settings row, its error under the title. */
-function LimitRow({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): JSX.Element {
-  const { t } = useT("api");
-  const id = useId();
+/** Create, step 2: the routing mode, the models and the accounts as rows. */
+function AccessRows({ form }: { form: KeyForm }): JSX.Element {
+  usePickLists();
   return (
-    // One Field round the row: it marks the input invalid and ties the error to it.
-    <Field className="items-stretch" invalid={form.invalid === field}>
-      <SettingsRow
-        className={ROW}
-        compact
-        control={<LimitNumber field={field} form={form} id={id} />}
-        controlWidth="number"
-        htmlFor={id}
-        title={t(LIMIT_LABELS[field])}
-      >
-        <LimitError field={field} form={form} />
-      </SettingsRow>
-    </Field>
+    <div className={ROW_LIST}>
+      <RoutingRow form={form} place="dialog" />
+      <ModelsRow form={form} place="dialog" />
+      <AccountsRow form={form} place="dialog" />
+    </div>
   );
 }
 
-/**
- * Create, step 2: the routing mode, the models and the accounts as rows; Only selected opens
- * its picks under its row.
- */
-function AccessRows({ form }: { form: KeyForm }): JSX.Element {
+function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }): JSX.Element {
   const { t } = useT("api");
-  const modelsError = useModelsError(form);
-  // Loads both lists while All is chosen, so Only selected opens on them.
-  useQuery(keyModelsQuery());
-  useQuery(accountsQuery());
   return (
-    <div className={ROW_LIST}>
-      <SettingsRow
-        className={ROW}
-        compact
-        control={<RoutingSelect form={form} />}
-        // Under the text: "Same as Settings (Reset first)" is too long to sit beside it.
-        controlWidth="block"
-        description={t("form.routingModeShort")}
-        title={t("form.routingMode")}
-      />
-      {/* A row and the picks it opens share one item, so no hairline parts them. */}
-      <div>
-        <SettingsRow
-          className={ROW}
-          compact
-          control={
-            <ScopeSwitch
-              onChange={(scope) => form.set("modelScope", scope)}
-              options={[
-                { value: "all", label: t("form.modelsAll") },
-                { value: "selected", label: t("form.scopeSelected") },
-              ]}
-              value={form.values.modelScope}
-            />
-          }
-          description={t("form.allowedModelsShort")}
-          title={t("form.allowedModels")}
-        />
-        {form.values.modelScope === "selected" ? (
-          <div className="pb-3">
-            <ModelPicks
-              invalid={modelsError}
-              onSelectedChange={(models) => form.set("allowedModels", models)}
-              searchRef={form.refs.allowedModels}
-              selected={form.values.allowedModels}
-            />
-          </div>
-        ) : null}
-      </div>
-      <div>
-        <SettingsRow
-          className={ROW}
-          compact
-          control={
-            <ScopeSwitch
-              onChange={(scope) => form.set("accountScope", scope)}
-              options={[
-                { value: "all", label: t("form.accountsAll") },
-                { value: "selected", label: t("form.scopeSelected") },
-              ]}
-              value={form.values.accountScope}
-            />
-          }
-          description={t("form.accountsShort")}
-          title={t("form.accounts")}
-        />
-        {form.values.accountScope === "selected" ? (
-          <div className="pb-3">
-            <AccountPicks
-              invalid={form.invalid === "accountIds"}
-              onSelectedChange={(ids) => form.set("accountIds", ids)}
-              onTagsChange={(tags) => form.set("accountTags", tags)}
-              searchRef={form.refs.accountIds}
-              selected={form.values.accountIds}
-              tags={form.values.accountTags}
-            />
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <>
+      <Button onClick={onCancel} variant="ghost">
+        {t("common:actions.cancel")}
+      </Button>
+      <Button
+        form={form.formId}
+        loading={form.pending}
+        loadingText={form.editing ? t("common:actions.saving") : t("form.submitCreating")}
+        type="submit"
+      >
+        {form.editing ? t("common:actions.save") : t("form.submitCreate")}
+      </Button>
+    </>
   );
 }
 
@@ -839,8 +771,8 @@ function ApiKeyCreateDialog({
 
 /**
  * Edit: the detail sheet the account and usage sheets use: the key's mark on the avatar tile, the
- * title and the masked key, then one card per part (General, Accounts, Routing & models), with
- * Cancel and Save in the sheet's foot.
+ * title and the masked key, then one card per part (General, Limits, Access) holding the create
+ * dialog's rows, with Cancel and Save in the sheet's foot.
  */
 function ApiKeyEditSheet({
   open,
@@ -853,6 +785,7 @@ function ApiKeyEditSheet({
 }): JSX.Element {
   const { t } = useT("api");
   const form = useKeyForm({ mode: "edit", apiKey }, onOpenChange, () => {});
+  usePickLists();
 
   return (
     <ResponsiveSheet onOpenChange={onOpenChange} open={open}>
@@ -877,25 +810,26 @@ function ApiKeyEditSheet({
           noValidate
           onSubmit={form.onSubmit}
         >
-          <SectionCard
-            icon={Key01Icon}
-            panelClassName="flex flex-col gap-4"
-            title={t("form.tabGeneral")}
-          >
-            <NameAndExpiry form={form} />
-            <CustomKeyField form={form} />
-            <LimitsGrid form={form} />
-          </SectionCard>
-          <SectionCard icon={UserMultipleIcon} title={t("form.accounts")}>
-            <AccountsField form={form} hideLegend />
+          <SectionCard icon={Key01Icon} slim title={t("form.tabGeneral")}>
+            <NameRow form={form} place="card" />
+            <ExpiresRow form={form} place="card" />
+            <CustomKeyRow form={form} place="card" />
           </SectionCard>
           <SectionCard
-            icon={Route01Icon}
-            panelClassName="flex flex-col gap-4"
-            title={t("form.tabRouting")}
+            description={t("form.limitsHint")}
+            descriptionVariant="inline"
+            icon={DashboardSpeed01Icon}
+            slim
+            title={t("form.limits")}
           >
-            <RoutingField form={form} />
-            <ModelsField form={form} />
+            {LIMIT_FIELDS.map((field) => (
+              <LimitRow field={field} form={form} key={field} place="card" />
+            ))}
+          </SectionCard>
+          <SectionCard icon={ShieldKeyIcon} slim title={t("form.stepAccess")}>
+            <RoutingRow form={form} place="card" />
+            <ModelsRow form={form} place="card" />
+            <AccountsRow form={form} place="card" />
           </SectionCard>
           <ServerError form={form} />
         </form>

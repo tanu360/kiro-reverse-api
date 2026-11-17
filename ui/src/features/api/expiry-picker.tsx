@@ -3,22 +3,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { FieldHint } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { selectTriggerIconClassName, selectTriggerVariants } from "@/components/ui/select";
 import { dateTimeFormat, formatRelativeTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { endOfLocalDay, expiryInDays } from "./api-key-form";
-
-/** The viewer's time zone name for the hint ("Europe/Ljubljana"); "" when unknown. */
-function localTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
-  } catch {
-    return "";
-  }
-}
 
 /** Preset spans, in days from today; the year preset is the same date a year on. */
 const PRESET_DAYS = [1, 7, 30, 90] as const;
@@ -32,28 +21,23 @@ function startOfToday(): Date {
  * When a key stops working, by day: presets (never, in 1, 7, 30 or 90 days, in a year) beside
  * the coss Calendar in a Popover, closing on a pick. A picked day counts to its last second in
  * the viewer's time zone. Days before today are disabled; a stored expiry that has passed (edit)
- * still shows, with the warning under it, until another day or Never is picked.
- *
- * `bare` leaves out the label and the hint, for a settings row whose title and description name
- * and describe the trigger (SettingsRow passes their ids as aria-labelledby and
- * aria-describedby).
+ * still shows until another day or Never is picked. It is a settings row's control: the row's
+ * title and description name and describe the trigger (SettingsRow passes their ids as
+ * aria-labelledby and aria-describedby), and the row says when the day has passed.
  */
 export function ExpiryPicker({
   value,
   onChange,
-  bare = false,
   "aria-labelledby": rowLabelledBy,
   "aria-describedby": rowDescribedBy,
 }: {
   /** unix s; 0 = never. */
   value: number;
   onChange: (value: number) => void;
-  bare?: boolean;
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
 }): JSX.Element {
   const { t, lang } = useT("api");
-  const labelId = useId();
   const valueId = useId();
   const [open, setOpen] = useState(false);
   const selected = value > 0 ? new Date(value * 1000) : undefined;
@@ -61,7 +45,6 @@ export function ExpiryPicker({
   const now = new Date();
   const nowSec = Math.floor(now.getTime() / 1000);
   const past = value > 0 && value <= nowSec;
-  const zone = localTimeZone();
 
   const yearOn = endOfLocalDay(new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()));
   const presets = [
@@ -80,11 +63,11 @@ export function ExpiryPicker({
     setOpen(false);
   };
 
-  const picker = (
+  return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger
         aria-describedby={rowDescribedBy}
-        aria-labelledby={`${bare ? (rowLabelledBy ?? "") : labelId} ${valueId}`.trim()}
+        aria-labelledby={`${rowLabelledBy ?? ""} ${valueId}`.trim()}
         className={selectTriggerVariants()}
       >
         <HugeiconsIcon aria-hidden="true" icon={Calendar03Icon} />
@@ -133,22 +116,5 @@ export function ExpiryPicker({
         </div>
       </PopoverPopup>
     </Popover>
-  );
-  if (bare) return picker;
-
-  return (
-    <div className="flex min-w-0 flex-col items-start gap-2" data-slot="expiry-picker">
-      <Label id={labelId} render={<span />}>
-        {t("form.expiresAt")}
-      </Label>
-      {picker}
-      {past ? (
-        <FieldHint>{t("form.expiresAtPast")}</FieldHint>
-      ) : selected ? (
-        <FieldHint>
-          {zone ? t("form.expiresAtHint", { zone }) : t("form.expiresAtHintNoZone")}
-        </FieldHint>
-      ) : null}
-    </div>
   );
 }

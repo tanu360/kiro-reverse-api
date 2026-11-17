@@ -5,11 +5,8 @@ import { type JSX, type Ref, useId, useMemo, useState } from "react";
 import { ChoiceCard, ChoiceList } from "@/components/shared/choice-card";
 import { ErrorState } from "@/components/shared/error-state";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FieldHint } from "@/components/ui/field";
-import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
-import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { accountMeta, useAccountName } from "@/features/accounts/account-cells";
 import { tagKey } from "@/features/accounts/account-metadata";
@@ -18,9 +15,7 @@ import type { Account } from "@/lib/api/types";
 import { compareText, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { type ApiKeyAccountScope, MAX_KEY_TAGS } from "./api-key-form";
-
-const SCOPES: readonly ApiKeyAccountScope[] = ["all", "selected"];
+import { MAX_KEY_TAGS } from "./api-key-form";
 
 /** One tag the picker offers: the first spelling seen, and how many accounts carry it. */
 interface TagOption {
@@ -55,58 +50,6 @@ export function scopedAccountIds(
   return out;
 }
 
-/**
- * Which accounts a key may use: every account, or the ones picked here. The list searches what
- * it shows (the email as privacy mode displays it, the nickname, the id), so under privacy a
- * search never matches the hidden part of an address. Picks of accounts deleted since stay as
- * "Removed account" rows until unchecked: they match nothing, and dropping them silently could
- * empty the list, which would mean every account. Until the list has loaded no pick counts as
- * removed, so a slow or failed load shows its state instead of every pick as removed.
- *
- * Tags pick accounts too: every account carrying a picked tag joins the picked ones, now and
- * whenever an account is tagged later. A picked tag no account carries stays listed with a
- * warning, as such a key gets no account at all.
- */
-export function AccountPicker({
-  scope,
-  onScopeChange,
-  hideLegend = false,
-  ...picks
-}: AccountPicksProps & {
-  scope: ApiKeyAccountScope;
-  onScopeChange: (scope: ApiKeyAccountScope) => void;
-  /** Keeps the legend for screen readers only, where a tab or heading already says "Accounts". */
-  hideLegend?: boolean;
-}): JSX.Element {
-  const { t } = useT("api");
-  const baseId = useId();
-  // Loads the list while All is chosen, so Only selected opens on it.
-  useQuery(accountsQuery());
-  return (
-    <Fieldset className="flex min-w-0 flex-col gap-3">
-      <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
-        {t("form.accounts")}
-      </FieldsetLegend>
-      {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
-      <RadioGroup
-        aria-label={t("form.accounts")}
-        className="gap-0"
-        onValueChange={(value) => onScopeChange(value as ApiKeyAccountScope)}
-        value={scope}
-      >
-        {SCOPES.map((value) => (
-          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
-            <Radio id={`${baseId}-${value}`} value={value} />
-            {value === "all" ? t("form.accountsAll") : t("form.accountsSelected")}
-          </Label>
-        ))}
-      </RadioGroup>
-      {scope === "selected" ? <AccountPicks {...picks} /> : null}
-      <FieldHint>{t("form.accountsHint")}</FieldHint>
-    </Fieldset>
-  );
-}
-
 export interface AccountPicksProps {
   selected: readonly string[];
   /** Picked account tags. */
@@ -120,8 +63,16 @@ export interface AccountPicksProps {
 }
 
 /**
- * The picks under Only selected: the tags in one sideways row, the search, the error, the
- * account list and the count.
+ * Which accounts a key may use: every account, or the ones picked here. The list searches what
+ * it shows (the email as privacy mode displays it, the nickname, the id), so under privacy a
+ * search never matches the hidden part of an address. Picks of accounts deleted since stay as
+ * "Removed account" rows until unchecked: they match nothing, and dropping them silently could
+ * empty the list, which would mean every account. Until the list has loaded no pick counts as
+ * removed, so a slow or failed load shows its state instead of every pick as removed.
+ *
+ * Tags pick accounts too: every account carrying a picked tag joins the picked ones, now and
+ * whenever an account is tagged later. A picked tag no account carries stays listed with a
+ * warning, as such a key gets no account at all.
  */
 export function AccountPicks({
   selected,

@@ -6,59 +6,13 @@ import { ChoiceCard, ChoiceList } from "@/components/shared/choice-card";
 import { ErrorState } from "@/components/shared/error-state";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FieldHint } from "@/components/ui/field";
-import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
-import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { keyModelsQuery } from "@/lib/api/api-keys";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { type ApiKeyModelScope, MAX_KEY_MODELS } from "./api-key-form";
-
-const SCOPES: readonly ApiKeyModelScope[] = ["all", "selected"];
+import { MAX_KEY_MODELS } from "./api-key-form";
 
 const lower = (model: string) => model.toLowerCase();
-
-/**
- * Which models a key may call: every model, or the ticked ones. The list is what the server
- * offers (GET /models: the accounts' models, then auto); a ticked name it no longer offers stays
- * listed, ticked, until unticked, so editing a key never drops one silently. Names compare
- * case-insensitively, as the server's check does. At most MAX_KEY_MODELS can be ticked.
- */
-export function ModelPicker({
-  scope,
-  onScopeChange,
-  ...picks
-}: ModelPicksProps & {
-  scope: ApiKeyModelScope;
-  onScopeChange: (scope: ApiKeyModelScope) => void;
-}): JSX.Element {
-  const { t } = useT("api");
-  const baseId = useId();
-  // Loads the list while Every model is chosen, so Only selected opens on it.
-  useQuery(keyModelsQuery());
-  return (
-    <Fieldset className="flex min-w-0 flex-col gap-3">
-      <FieldsetLegend>{t("form.allowedModels")}</FieldsetLegend>
-      <RadioGroup
-        aria-label={t("form.allowedModels")}
-        className="gap-0"
-        onValueChange={(value) => onScopeChange(value as ApiKeyModelScope)}
-        value={scope}
-      >
-        {SCOPES.map((value) => (
-          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
-            <Radio id={`${baseId}-${value}`} value={value} />
-            {value === "all" ? t("form.modelsAll") : t("form.modelsSelected")}
-          </Label>
-        ))}
-      </RadioGroup>
-      {scope === "selected" ? <ModelPicks {...picks} /> : null}
-      <FieldHint>{t("form.allowedModelsHint")}</FieldHint>
-    </Fieldset>
-  );
-}
 
 export interface ModelPicksProps {
   selected: readonly string[];
@@ -69,7 +23,12 @@ export interface ModelPicksProps {
   searchRef?: Ref<HTMLInputElement>;
 }
 
-/** The picks under Only selected: the search, the error, the model list and the count. */
+/**
+ * Which models a key may call: every model, or the ticked ones. The list is what the server
+ * offers (GET /models: the accounts' models, then auto); a ticked name it no longer offers stays
+ * listed, ticked, until unticked, so editing a key never drops one silently. Names compare
+ * case-insensitively, as the server's check does. At most MAX_KEY_MODELS can be ticked.
+ */
 export function ModelPicks({
   selected,
   onSelectedChange,

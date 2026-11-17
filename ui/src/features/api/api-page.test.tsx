@@ -447,10 +447,10 @@ describe("ApiPage", () => {
     const sheet = await screen.findByRole("dialog");
     // Every section at once, under its heading: no tabs in the sheet.
     expect(within(sheet).queryByRole("tab")).not.toBeInTheDocument();
-    for (const heading of ["General", "Accounts", "Routing & models"]) {
+    for (const heading of ["General", "Limits", "Access"]) {
       expect(within(sheet).getByRole("heading", { name: heading })).toBeInTheDocument();
     }
-    expect(within(sheet).getByRole("radio", { name: "Only selected models" })).toBeChecked();
+    expect(scopeRadio(sheet, "Allowed models", "Only selected")).toBeChecked();
     const retired = await within(sheet).findByRole("checkbox", { name: "retired-model" });
     expect(retired).toBeChecked();
     await user.click(retired);
@@ -469,13 +469,13 @@ describe("ApiPage", () => {
     await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
     const sheet = await screen.findByRole("dialog");
-    expect(within(sheet).getByRole("radio", { name: "All accounts" })).toBeChecked();
+    expect(scopeRadio(sheet, "Accounts", "All accounts")).toBeChecked();
     expect(within(sheet).queryByRole("searchbox", { name: "Search accounts" })).toBeNull();
     expect(within(sheet).queryByRole("checkbox", { name: /team-eu/ })).toBeNull();
     expect(within(sheet).queryByRole("searchbox", { name: "Search models" })).toBeNull();
-    await user.click(within(sheet).getByRole("radio", { name: "Only selected accounts" }));
+    await user.click(scopeRadio(sheet, "Accounts", "Only selected"));
     expect(await within(sheet).findByRole("checkbox", { name: /team-eu/ })).toBeInTheDocument();
-    await user.click(within(sheet).getByRole("radio", { name: "Only selected models" }));
+    await user.click(scopeRadio(sheet, "Allowed models", "Only selected"));
     expect(await within(sheet).findByRole("checkbox", { name: "auto" })).toBeInTheDocument();
   });
 
@@ -495,7 +495,8 @@ describe("ApiPage", () => {
     // Unknown until the list loads: the picks must not look like deleted accounts.
     expect(await within(dialog).findByText("Could not load accounts")).toBeInTheDocument();
     expect(within(dialog).queryByText("Deleted account")).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/ selected$/)).not.toBeInTheDocument();
+    // The count line ("2 of 7 selected"), not the Only selected switches.
+    expect(within(dialog).queryByText(/ of \d+ selected$/)).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(sent("PUT", `/api-keys/${teamA.id}`)).toHaveLength(1));
