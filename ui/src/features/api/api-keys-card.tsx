@@ -452,7 +452,10 @@ export function ApiKeysCard(): JSX.Element {
     >
       {/* The limit badge sits in the body, so the title keeps the header width beside one badge. */}
       <div className="flex flex-col items-start gap-2">
-        <AccessBadges apiKey={apiKey} />
+        {/* On a phone the badges share lines, wrapping as the card narrows, not one a line. */}
+        <div className="flex flex-col items-start gap-2 empty:hidden max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:gap-1.5">
+          <AccessBadges apiKey={apiKey} />
+        </div>
         <KeyUsage apiKey={apiKey} labelled />
       </div>
     </ListCard>

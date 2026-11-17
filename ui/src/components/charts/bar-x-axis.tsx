@@ -118,14 +118,24 @@ const BarXAxisInner = memo(function BarXAxisInner({
       return { label, x };
     });
 
-    // If showAllLabels is true or we have fewer than maxLabels, show all
-    if (showAllLabels || allLabels.length <= resolvedMaxLabels) {
+    if (showAllLabels) {
       return allLabels;
     }
 
-    // Otherwise, skip some labels to avoid crowding
-    const step = Math.ceil(allLabels.length / Math.max(1, resolvedMaxLabels));
-    return allLabels.filter((_, i) => i % step === 0);
+    // Skip labels to stay within maxLabels, and further on a narrow plot (a chart in a phone's
+    // sheet) so no two labels touch. Two shown labels need 1.5 widths of the longest label plus
+    // a 12 px gap between their bars: an end label is shifted inside the plot, so it can reach
+    // a whole width toward its neighbour. Ticks are 11 px mono, about 0.6 em a character.
+    const longest = Math.max(...allLabels.map((item) => item.label.length));
+    const minSpacing = longest * 11 * 0.6 * 1.5 + 12;
+    const pitch = allLabels.length > 1 ? allLabels[1].x - allLabels[0].x : Number.POSITIVE_INFINITY;
+    const fitStep = pitch > 0 ? Math.ceil(minSpacing / pitch) : 1;
+    const countStep =
+      allLabels.length <= resolvedMaxLabels
+        ? 1
+        : Math.ceil(allLabels.length / Math.max(1, resolvedMaxLabels));
+    const step = Math.max(countStep, fitStep);
+    return step <= 1 ? allLabels : allLabels.filter((_, i) => i % step === 0);
   }, [barScale, bandWidth, barXAccessor, data, margin.left, showAllLabels, resolvedMaxLabels]);
 
   const isHovering = tooltipData !== null;

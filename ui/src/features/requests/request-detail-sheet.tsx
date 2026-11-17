@@ -371,9 +371,10 @@ export function RequestDetailSheet({
               {record?.model || t("detail.title")}
             </ResponsiveSheetTitle>
             {/* The result leads the time, as the status pill leads the account sheet's meta line. */}
-            <div className="flex min-w-0 items-center gap-2">
+            {/* On a phone the time moves under the badge when both do not fit, never split. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               {record ? <StatusBadge record={record} size="sm" /> : null}
-              <ResponsiveSheetDescription className="min-w-0 truncate">
+              <ResponsiveSheetDescription className="min-w-0 truncate text-nowrap">
                 {record ? exactTime(record.ts, lang) : EMPTY}
               </ResponsiveSheetDescription>
             </div>
@@ -382,9 +383,10 @@ export function RequestDetailSheet({
         {record && actions ? (
           /*
             The header keeps 48 px at its end for the close button; the actions sit under it, so
-            they run out to the cards' 16 px edge instead (as on the account sheet).
+            they run out to the cards' 16 px edge instead (as on the account sheet). On a phone
+            (whose header keeps no room) they are two equal columns, not a ragged wrap.
           */
-          <div className="flex flex-wrap items-center gap-2 -me-8">
+          <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0 max-sm:grid max-sm:grid-cols-2">
             {canOpenAccount ? (
               <Button
                 onClick={() =>
@@ -414,7 +416,7 @@ export function RequestDetailSheet({
               </Button>
             ) : null}
             <CopyButton
-              className="ms-auto"
+              className="ms-auto max-sm:ms-0"
               label={t("detail.copyJson")}
               showLabel
               value={() => Promise.resolve(recordJson(record, maskText))}

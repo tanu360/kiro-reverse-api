@@ -203,7 +203,7 @@ const LANGUAGE_CHIP =
 // outer ring or glow, no dark outline. The keyboard's focus outline sits 2 px out. Phones drop
 // the logo so "Completions" fits a third of the row.
 const API_TILE =
-  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm transition-shadow [--tile-edge:color-mix(in_oklab,var(--tile-fg)_50%,var(--tile-bg))] focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_1.5px_var(--tile-edge)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_32%,transparent)] max-sm:px-2";
+  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm transition-shadow [--tile-edge:color-mix(in_oklab,var(--tile-fg)_50%,var(--tile-bg))] focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_1.5px_var(--tile-edge)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_32%,transparent)] max-sm:flex-auto max-sm:px-2";
 
 /*
  * Pick an API and a language; in Python and Node.js a switch in the code block's strip trades
@@ -230,7 +230,9 @@ function RequestBuilder({ origin, model }: { origin: string; model?: string }): 
     <div className="flex min-w-0 flex-col gap-4 xl:flex-1">
       <RadioGroupPrimitive
         aria-label={t("snippets.endpoint")}
-        className="grid grid-cols-3 gap-2"
+        // Phones: each tile as wide as its name, sharing out the spare width, and a tile that
+        // does not fit wraps to a second line instead of cutting a name ("Completi…").
+        className="grid grid-cols-3 gap-2 max-sm:flex max-sm:flex-wrap"
         onValueChange={(api) => update({ api: api as SnippetApi })}
         value={choice.api}
       >

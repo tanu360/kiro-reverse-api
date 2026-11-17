@@ -177,8 +177,9 @@ export function DialogHeader({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      // 16 px round, 12 px above a panel; clear of the close X.
-      "flex flex-col gap-2 p-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 in-[[data-slot=dialog-popup]:has(>[data-slot=dialog-dismiss])]:pe-12",
+      // 16 px round, 12 px above a panel; clear of the close X. On a phone only the title
+      // keeps clear of it (DialogTitle), so the description and actions use the full width.
+      "flex flex-col gap-2 p-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 sm:in-[[data-slot=dialog-popup]:has(>[data-slot=dialog-dismiss])]:pe-12",
       className,
     ),
     "data-slot": "dialog-header",
@@ -231,7 +232,10 @@ export function DialogTitle({
 }: DialogPrimitive.Title.Props): React.ReactElement {
   return (
     <DialogPrimitive.Title
-      className={cn("wrap-anywhere font-semibold text-subtitle", className)}
+      className={cn(
+        "wrap-anywhere font-semibold text-subtitle max-sm:in-[[data-slot=dialog-popup]:has(>[data-slot=dialog-dismiss])]:pe-8",
+        className,
+      )}
       data-slot="dialog-title"
       {...props}
     />

@@ -134,9 +134,10 @@ export function SheetHeader({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      // 16 px round, 12 px above a panel. Once the
+      // 16 px round, 12 px above a panel; clear of the close X (on a phone only the title, as
+      // in DialogHeader, so the description and actions use the full width). Once the
       // panel scrolls, a hairline under the header marks where the content runs beneath it.
-      "flex flex-col gap-2 border-transparent border-b p-4 transition-colors in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 in-[[data-slot=sheet-popup]:has([data-slot=scroll-area-content][data-overflow-y-start]>[data-slot=sheet-panel])]:border-border-subtle in-[[data-slot=sheet-popup]:has(>[data-slot=sheet-dismiss])]:pe-12",
+      "flex flex-col gap-2 border-transparent border-b p-4 transition-colors in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 in-[[data-slot=sheet-popup]:has([data-slot=scroll-area-content][data-overflow-y-start]>[data-slot=sheet-panel])]:border-border-subtle sm:in-[[data-slot=sheet-popup]:has(>[data-slot=sheet-dismiss])]:pe-12",
       className,
     ),
     "data-slot": "sheet-header",
@@ -191,7 +192,10 @@ export function SheetTitle({
 }: SheetPrimitive.Title.Props): React.ReactElement {
   return (
     <SheetPrimitive.Title
-      className={cn("wrap-anywhere font-semibold text-subtitle", className)}
+      className={cn(
+        "wrap-anywhere font-semibold text-subtitle max-sm:in-[[data-slot=sheet-popup]:has(>[data-slot=sheet-dismiss])]:pe-8",
+        className,
+      )}
       data-slot="sheet-title"
       {...props}
     />

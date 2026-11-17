@@ -130,12 +130,12 @@ export function ConversationSheet({
       <ResponsiveSheetHeader className="gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <ResponsiveSheetTitle>{t("conversation.title")}</ResponsiveSheetTitle>
-          <ResponsiveSheetDescription className="truncate font-mono" translate="no">
+          <ResponsiveSheetDescription className="truncate text-nowrap font-mono" translate="no">
             {conversationId}
           </ResponsiveSheetDescription>
         </div>
         {onShowInLog ? (
-          <div className="flex flex-wrap items-center gap-2 -me-8">
+          <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0">
             <Button onClick={() => onShowInLog(conversationId)} size="sm" variant="secondary">
               <HugeiconsIcon aria-hidden="true" icon={FilterHorizontalIcon} />
               {t("conversation.showInLog")}

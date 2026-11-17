@@ -150,14 +150,24 @@ const CARD_SWITCH: Record<CardsBelow, { cards: string; table: string }> = {
   "4xl": { cards: "@4xl/data-table:hidden", table: "hidden @4xl/data-table:block" },
   "5xl": { cards: "@5xl/data-table:hidden", table: "hidden @5xl/data-table:block" },
 };
+/*
+ * A one-column grid (below its 42rem two-column step) would be cards inside the table's card:
+ * there the cards turn into divided rows instead, as a divided list's (a ListCard row's 16 px
+ * padding and 12 px gap, no border or radius), and the list loses its padding.
+ */
+const GRID_ROWS_BELOW_2XL =
+  "@max-2xl:gap-0 @max-2xl:divide-y @max-2xl:divide-border-subtle @max-2xl:*:*:gap-3 @max-2xl:*:*:rounded-none @max-2xl:*:*:border-0 @max-2xl:*:*:p-4";
 const CARD_LIST_CLASS = {
   stack: "flex flex-col gap-2",
-  grid: CARD_GRID_CLASS,
+  grid: cn(CARD_GRID_CLASS, GRID_ROWS_BELOW_2XL),
   divided: "flex flex-col divide-y divide-border-subtle",
 } as const;
 // Stacked or gridded cards need room around them inside an edge-to-edge table's card (the
-// card's panel padding); divided rows carry their own.
-const CARD_LIST_PAD = { inset: "p-4", bleed: "px-4" } as const;
+// card's panel padding); divided rows carry their own, and so does a one-column grid.
+const CARD_LIST_PAD = {
+  stack: { inset: "p-4", bleed: "px-4" },
+  grid: { inset: "@2xl:p-4", bleed: "@2xl:px-4" },
+} as const;
 
 // Row-level click and key handlers ignore events that start inside these.
 const INTERACTIVE_SELECTOR =
@@ -353,8 +363,14 @@ export function DataTable<T>({
     : undefined;
   const cardListClass = cn(
     CARD_LIST_CLASS[cardLayout],
-    cardLayout !== "divided" && (bleed ? CARD_LIST_PAD.bleed : inset && CARD_LIST_PAD.inset),
+    cardLayout !== "divided" &&
+      (bleed ? CARD_LIST_PAD[cardLayout].bleed : inset && CARD_LIST_PAD[cardLayout].inset),
   );
+  // The loading cards keep the padded stack at every width: plain bars, not rows.
+  const skeletonListClass =
+    cardLayout === "grid"
+      ? cn(CARD_GRID_CLASS, bleed ? CARD_LIST_PAD.stack.bleed : inset && CARD_LIST_PAD.stack.inset)
+      : cardListClass;
 
   const cards =
     cardRenderer && cardSwitch && !showEmpty ? (
@@ -362,7 +378,7 @@ export function DataTable<T>({
         {showSkeleton ? (
           // Divided rows are as many as the table's placeholder rows (a page, at most 10), in
           // a ListCard row's geometry, so the list does not jump when the data arrives.
-          <div aria-busy="true" className={cardListClass}>
+          <div aria-busy="true" className={skeletonListClass}>
             {placeholderKeys("card", cardLayout === "divided" ? skeletonRows : SKELETON_CARDS).map(
               (key) => (
                 <Fragment key={key}>

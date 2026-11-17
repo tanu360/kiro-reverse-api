@@ -1391,6 +1391,32 @@
   body {
     background-color: var(--app-chrome-background);
   }
+  /*
+   * Touch screens: no grey flash over a tapped control (every control draws its own pressed
+   * state), and no double-tap zoom on controls, so a tap answers at once instead of after the
+   * browser's wait for a second tap. Pinch zoom still works everywhere.
+   */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    label,
+    summary,
+    [role="button"],
+    [role="checkbox"],
+    [role="menuitem"],
+    [role="option"],
+    [role="radio"],
+    [role="switch"],
+    [role="tab"]
+  ) {
+    touch-action: manipulation;
+  }
   body {
     @apply text-foreground font-sans antialiased surface-grain;
   }

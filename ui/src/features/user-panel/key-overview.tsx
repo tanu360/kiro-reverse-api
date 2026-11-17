@@ -8,7 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
-import { PageHeader, RefreshButton } from "@/components/shared/page-header";
+import { PageHeader, PageHeaderLayout, RefreshButton } from "@/components/shared/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,19 +84,18 @@ export function KeyHeading({
       // PageHeader's frame (a 36 px title row over the description), with bars for the name,
       // the masked key and the status that wrap as they do: the status takes a second line on
       // a phone, so the cards below stay put when the key arrives.
-      <div aria-busy="true" className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-        <div className="flex min-w-48 grow basis-0 flex-col gap-1.5">
-          <div className="flex min-h-9 flex-wrap items-center gap-x-2.5 gap-y-1 pointer-coarse:min-h-10">
+      <PageHeaderLayout
+        actions={refresh}
+        busy
+        description={t("description")}
+        heading={
+          <>
             <Skeleton className="h-7 w-28" />
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-6 w-18 rounded-full" />
-          </div>
-          <p className="text-pretty text-muted-foreground text-sm leading-relaxed">
-            {t("description")}
-          </p>
-        </div>
-        {refresh}
-      </div>
+          </>
+        }
+      />
     );
   }
   return (
