@@ -27,6 +27,12 @@ export async function startMockWorker(): Promise<void> {
       `${mockDb.backups.length} backups. Switch with ?mock=full|small|empty; server ${mockDb.server} (?server=binary|docker|windows|readonly|fail).`,
   );
   const worker = setupWorker(...allHandlers);
+  // No service worker (plain http on an IP): MSW intercepts fetch in the page, so the app's
+  // events stream goes through fetch too. The handlers above are already built.
+  if (!navigator.serviceWorker) {
+    const { FetchEventSource } = await import("./fetch-event-source");
+    window.EventSource = FetchEventSource as unknown as typeof EventSource;
+  }
   await worker.start({
     serviceWorker: { url: "/mockServiceWorker.js", options: { scope: "/" } },
     // MSW 3 renamed onUnhandledRequest to onUnhandledFrame.
@@ -47,7 +53,11 @@ const RELOAD_KEY = "kiro_mock_worker_reload";
  * when the worker cannot take control at all (Bypass for network left on).
  */
 function reloadIfUncontrolled(): void {
-  if (navigator.serviceWorker?.controller) {
+  // Plain http on a LAN or public IP (a phone opening the dev server) is not a secure context:
+  // there is no service worker at all, MSW intercepts in the page instead, and a reload would
+  // only load the page twice.
+  if (!navigator.serviceWorker) return;
+  if (navigator.serviceWorker.controller) {
     sessionStorage.removeItem(RELOAD_KEY);
     return;
   }
