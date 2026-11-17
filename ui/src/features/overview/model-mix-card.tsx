@@ -1,6 +1,16 @@
 import { AiBrain01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, type ReactNode, Suspense, useMemo, useState } from "react";
+import {
+  createContext,
+  type JSX,
+  lazy,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import { ShareBar } from "@/components/charts/share-bar";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -60,6 +70,38 @@ interface MixRow {
   color: string;
   /** This row's part of the total (credits, or requests), 0..1. */
   share: number;
+}
+
+const mixRowId = (row: MixRow): string => row.item.id;
+
+/**
+ * The index of the row or slice under the pointer. Read by each cell's wrapper, so a hover
+ * re-renders those wrappers instead of the whole table.
+ */
+const MixHoverContext = createContext<number | null>(null);
+
+/** A cell's content, dimmed while another row or slice is hovered. */
+function MixFocus({
+  index,
+  className,
+  children,
+}: {
+  index: number;
+  className: string | undefined;
+  children: ReactNode;
+}): JSX.Element {
+  const hovered = useContext(MixHoverContext);
+  return (
+    <div
+      className={cn(
+        "transition-opacity",
+        hovered !== null && hovered !== index && "opacity-50",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 function ColorDot({ color }: { color: string }): JSX.Element {
@@ -242,15 +284,9 @@ export function ModelMixPanel({
   const columns = useMemo<DataTableColumn<MixRow>[]>(() => {
     // While a slice or row is hovered, every cell of the other rows dims.
     const focus = (index: number, className: string | undefined, children: ReactNode) => (
-      <div
-        className={cn(
-          "transition-opacity",
-          hovered !== null && hovered !== index && "opacity-50",
-          className,
-        )}
-      >
+      <MixFocus className={className} index={index}>
         {children}
-      </div>
+      </MixFocus>
     );
     return [
       {
@@ -296,28 +332,35 @@ export function ModelMixPanel({
         cell: (row, index) => focus(index, "font-medium", formatCredits(row.item.credits)),
       },
     ];
-  }, [t, lang, hovered, nameHeader, renderName]);
+  }, [t, lang, nameHeader, renderName]);
 
-  const renderCard = (row: MixRow) => (
-    <ListCard title={<ModelName renderName={renderName} row={row} />} variant="row">
-      <ShareBar className="max-w-40" color={row.color} value={row.share} />
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-meta">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <dt className="text-muted-foreground">{t("modelMix.requests")}</dt>
-          <dd className="tabular-nums">{formatNumber(row.item.reqs, lang)}</dd>
-        </div>
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <dt className="text-muted-foreground">{t("modelMix.credits")}</dt>
-          <dd className="tabular-nums">{formatCredits(row.item.credits)}</dd>
-        </div>
-        <div className="col-span-2 flex min-w-0 flex-col gap-0.5">
-          <dt className="text-muted-foreground">{t("modelMix.tokens")}</dt>
-          <dd className="min-w-0">
-            <Tokens tokens={row.item.tokens} />
-          </dd>
-        </div>
-      </dl>
-    </ListCard>
+  const onRowHover = useCallback(
+    (row: MixRow | null) => setHovered(row ? mix.rows.indexOf(row) : null),
+    [mix.rows],
+  );
+  const renderCard = useCallback(
+    (row: MixRow) => (
+      <ListCard title={<ModelName renderName={renderName} row={row} />} variant="row">
+        <ShareBar className="max-w-40" color={row.color} value={row.share} />
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-meta">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <dt className="text-muted-foreground">{t("modelMix.requests")}</dt>
+            <dd className="tabular-nums">{formatNumber(row.item.reqs, lang)}</dd>
+          </div>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <dt className="text-muted-foreground">{t("modelMix.credits")}</dt>
+            <dd className="tabular-nums">{formatCredits(row.item.credits)}</dd>
+          </div>
+          <div className="col-span-2 flex min-w-0 flex-col gap-0.5">
+            <dt className="text-muted-foreground">{t("modelMix.tokens")}</dt>
+            <dd className="min-w-0">
+              <Tokens tokens={row.item.tokens} />
+            </dd>
+          </div>
+        </dl>
+      </ListCard>
+    ),
+    [renderName, t, lang],
   );
 
   const credits = mix.metric === "credits";
@@ -352,18 +395,20 @@ export function ModelMixPanel({
         the ring: down the card's full height beside it, across the card when stacked.
       */}
       <div className={cn("min-w-0 flex-1 border-border-subtle border-t", BESIDE[besideFrom].table)}>
-        <DataTable
-          caption={caption}
-          cardLayout="divided"
-          cardsBelow="xs"
-          columns={columns}
-          data={mix.rows}
-          density="comfortable"
-          getRowId={(row) => row.item.id}
-          inset
-          onRowHover={(row) => setHovered(row ? mix.rows.indexOf(row) : null)}
-          renderCard={renderCard}
-        />
+        <MixHoverContext.Provider value={hovered}>
+          <DataTable
+            caption={caption}
+            cardLayout="divided"
+            cardsBelow="xs"
+            columns={columns}
+            data={mix.rows}
+            density="comfortable"
+            getRowId={mixRowId}
+            inset
+            onRowHover={onRowHover}
+            renderCard={renderCard}
+          />
+        </MixHoverContext.Provider>
       </div>
     </div>
   );

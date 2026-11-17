@@ -148,10 +148,15 @@ export function TrafficCard(): JSX.Element {
     [past, bars],
   );
   const earlier = past?.earlier ? past.earlier.succeeded + past.earlier.failed : 0;
-  // All time's bars and title follow the bucket the server picked for the span of the log.
-  const period = past
-    ? { bucket: past.bucket, bucketSeconds: past.bucketSeconds, tzOffset: past.tzOffset }
-    : undefined;
+  // All time's bars and title follow the bucket the server picked for the span of the log. Kept
+  // per response, so the chart's rows are not rebuilt on every render of the card.
+  const period = useMemo(
+    () =>
+      past
+        ? { bucket: past.bucket, bucketSeconds: past.bucketSeconds, tzOffset: past.tzOffset }
+        : undefined,
+    [past],
+  );
   // Empty only when nothing at all is drawn: in the 1 h view the previous hour's dashed line
   // alone is still traffic to show, so it keeps the chart instead of "No traffic yet".
   const empty = totals.succeeded + totals.retried + totals.failed + totals.previous === 0;

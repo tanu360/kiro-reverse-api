@@ -32,6 +32,10 @@ import { useDialogTarget } from "./needs-attention";
 /** Rows the card lists; the footer link opens every account, busiest first. */
 const LIMIT = 5;
 
+// Module-level, so the table's row props stay the same from one render to the next.
+const topAccountId = (account: Account): string => account.id;
+const renderTopAccountSkeleton = () => <ListCardSkeleton action leading meter variant="row" />;
+
 /** The busiest accounts since the last statistics reset, most requests first. */
 export function topAccounts(accounts: readonly Account[], limit = LIMIT): Account[] {
   return [...accounts]
@@ -272,6 +276,28 @@ export function TopAccounts(): JSX.Element {
     [t, ta, tc, onDetails, onTest],
   );
 
+  const renderCard = useCallback(
+    (account: Account) => (
+      <TopAccountCard account={account} onDetails={onDetails} onTest={onTest} />
+    ),
+    [onDetails, onTest],
+  );
+  const rowLabel = useCallback(
+    (account: Account) => ta("openDetails", { email: accountName(account).text }),
+    [ta, accountName],
+  );
+  const emptyState = useMemo(
+    () => (
+      <EmptyState
+        description={t("topAccounts.emptyBody")}
+        icon={UserGroupIcon}
+        title={t("topAccounts.empty")}
+        variant="compact"
+      />
+    ),
+    [t],
+  );
+
   const total = accounts?.length ?? 0;
   let body: JSX.Element;
   if (query.isError && !accounts) {
@@ -294,24 +320,15 @@ export function TopAccounts(): JSX.Element {
         columns={columns}
         data={rows}
         density="comfortable"
-        emptyState={
-          <EmptyState
-            description={t("topAccounts.emptyBody")}
-            icon={UserGroupIcon}
-            title={t("topAccounts.empty")}
-            variant="compact"
-          />
-        }
-        getRowId={(account) => account.id}
+        emptyState={emptyState}
+        getRowId={topAccountId}
         inset
         loading={query.isPending}
         onRowClick={onDetails}
         pageSize={LIMIT}
-        renderCard={(account) => (
-          <TopAccountCard account={account} onDetails={onDetails} onTest={onTest} />
-        )}
-        renderCardSkeleton={() => <ListCardSkeleton action leading meter variant="row" />}
-        rowLabel={(account) => ta("openDetails", { email: accountName(account).text })}
+        renderCard={renderCard}
+        renderCardSkeleton={renderTopAccountSkeleton}
+        rowLabel={rowLabel}
       />
     );
   }
