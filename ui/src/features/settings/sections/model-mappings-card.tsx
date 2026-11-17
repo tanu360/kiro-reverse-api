@@ -482,7 +482,7 @@ function MappingRowItem({
     >
       {filtering ? (
         // The grip's footprint (icon-sm), so the columns keep their place while filtered.
-        <span aria-hidden="true" className="size-8 pointer-coarse:size-9" />
+        <span aria-hidden="true" className="size-7 sm:size-8 sm:pointer-coarse:size-9" />
       ) : (
         <Tooltip>
           <TooltipTrigger

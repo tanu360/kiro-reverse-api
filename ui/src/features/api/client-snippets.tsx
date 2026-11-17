@@ -195,7 +195,7 @@ function Hint({ children }: { children: JSX.Element | string }): JSX.Element {
 // text and logo, so all eight fit one line of the half-width card at 1440 px: the picked one
 // inverted. A touch screen keeps the 32 px target.
 const LANGUAGE_CHIP =
-  "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 font-medium text-xs transition-colors focus-visible:focus-outline pointer-coarse:h-8 pointer-coarse:px-3 data-checked:bg-foreground data-checked:text-background data-unchecked:text-muted-foreground data-unchecked:shadow-[inset_0_0_0_1px_var(--border)] data-unchecked:hover:bg-accent data-unchecked:hover:text-foreground";
+  "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 font-medium text-xs transition-colors focus-visible:focus-outline pointer-coarse:h-7 sm:pointer-coarse:h-8 sm:pointer-coarse:px-3 data-checked:bg-foreground data-checked:text-background data-unchecked:text-muted-foreground data-unchecked:shadow-[inset_0_0_0_1px_var(--border)] data-unchecked:hover:bg-accent data-unchecked:hover:text-foreground";
 
 // One 36 px line (the default control height) in the API's sticker colours, as the sign-in
 // showcase's labels: the pastel fill and its dark label. The others have no edge (a faint one on
@@ -203,7 +203,7 @@ const LANGUAGE_CHIP =
 // outer ring or glow, no dark outline. The keyboard's focus outline sits 2 px out. Phones drop
 // the logo so "Completions" fits a third of the row.
 const API_TILE =
-  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm transition-shadow [--tile-edge:color-mix(in_oklab,var(--tile-fg)_50%,var(--tile-bg))] focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_1.5px_var(--tile-edge)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_32%,transparent)] max-sm:flex-auto max-sm:px-2";
+  "flex h-8 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) sm:h-9 px-3 font-medium text-(--tile-fg) text-sm transition-shadow [--tile-edge:color-mix(in_oklab,var(--tile-fg)_50%,var(--tile-bg))] focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_1.5px_var(--tile-edge)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_32%,transparent)] max-sm:flex-auto max-sm:px-2";
 
 /*
  * Pick an API and a language; in Python and Node.js a switch in the code block's strip trades

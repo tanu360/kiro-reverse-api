@@ -326,7 +326,7 @@ export function AccountsToolbar({
       >
         {loading ? (
           // The filter row's height: a control's.
-          <Skeleton className="h-9 w-40 pointer-coarse:h-10" />
+          <Skeleton className="h-8 w-40 sm:h-9 sm:pointer-coarse:h-10" />
         ) : (
           <>
             {showSort ? (

@@ -97,14 +97,14 @@ const descriptionVariants = cva("", {
 });
 /*
  * A 24 px minimum gap between the heading and the actions (12 px row gap + the heading's 12 px
- * end padding). Beside the title, the actions centre in a 40 px box (44 px on a coarse pointer,
- * the tallest header control) pulled back to the 24 px title line, so any sm control, segmented
+ * end padding). Beside the title, the actions centre in a 40 px box (44 px on a touch tablet,
+ * 32 px on a phone: the tallest header control) pulled back to the 24 px title line, so any sm control, segmented
  * range or option row centres on the title without growing the header. On a row of their own
  * (data-wrapped, a narrow card) they drop that pull, keep the header's 12 px spacing above and
  * below, and start flush with the chip.
  */
 const ACTION_CLASS =
-  "-my-2 ms-auto flex min-h-10 max-w-full shrink-0 flex-wrap items-center gap-2 pointer-coarse:-my-2.5 pointer-coarse:min-h-11 data-wrapped:my-0 data-wrapped:ms-0 data-wrapped:min-h-0";
+  "-my-1 ms-auto flex min-h-8 max-w-full shrink-0 flex-wrap items-center gap-2 sm:-my-2 sm:min-h-10 sm:pointer-coarse:-my-2.5 sm:pointer-coarse:min-h-11 data-wrapped:my-0! data-wrapped:ms-0 data-wrapped:min-h-0!";
 
 /**
  * Whether a header's actions sit on a row of their own: they start below the heading. Measured

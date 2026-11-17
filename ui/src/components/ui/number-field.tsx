@@ -181,9 +181,9 @@ export function NumberFieldInput({
         onBeforeInput?.(event);
       }}
       className={cn(
-        // The field heights of input.tsx, border included: 36 by default and 32 sm on phones and
-        // desktops alike, 44 / 40 lg, and 40 / 36 on a coarse pointer (44 lg).
-        "h-8.5 in-data-[size=lg]:h-10.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums outline-none [transition:background-color_5000000s_ease-in-out_0s] sm:in-data-[size=lg]:h-9.5 pointer-coarse:h-9.5 pointer-coarse:in-data-[size=sm]:h-8.5 pointer-coarse:in-data-[size=lg]:h-10.5",
+        // The field heights of input.tsx, border included: 32 by default, 28 sm and 40 lg on
+        // phones; 36 / 32 / 40 from sm up, and 40 / 36 / 44 on a touch tablet.
+        "h-7.5 in-data-[size=lg]:h-9.5 in-data-[size=sm]:h-6.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums outline-none [transition:background-color_5000000s_ease-in-out_0s] sm:h-8.5 sm:in-data-[size=sm]:h-7.5 sm:in-data-[size=lg]:h-9.5 sm:pointer-coarse:h-9.5 sm:pointer-coarse:in-data-[size=sm]:h-8.5 sm:pointer-coarse:in-data-[size=lg]:h-10.5",
         className,
       )}
       data-slot="number-field-input"

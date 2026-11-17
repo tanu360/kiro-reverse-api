@@ -109,11 +109,11 @@ export function PageHeaderLayout({
     >
       <div className="flex min-w-48 grow basis-0 flex-col gap-1.5 max-sm:contents">
         {/*
-          The title row is always the buttons' height (36 / coarse 40, the default Button
-          step), so the title centres on the actions beside it and the first card starts at the
+          The title row is always the buttons' height (32 on phones, 36, 40 on a touch tablet:
+          the default Button step), so the title centres on the actions beside it and the first card starts at the
           same height on every page, with or without actions.
         */}
-        <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 pointer-coarse:min-h-10 max-sm:col-start-1 max-sm:row-start-1">
+        <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 sm:min-h-9 sm:pointer-coarse:min-h-10 max-sm:col-start-1 max-sm:row-start-1">
           {heading}
         </div>
         {description ? (

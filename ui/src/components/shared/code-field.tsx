@@ -68,7 +68,7 @@ function breakAtWords(value: string): ReactNode {
  * field's height (36 / coarse 40, border included), so one line measures exactly like an
  * input beside it and the box grows only when the value wraps.
  */
-const MULTILINE_GROUP = "min-h-9 pointer-coarse:min-h-10";
+const MULTILINE_GROUP = "min-h-8 sm:min-h-9 sm:pointer-coarse:min-h-10";
 const MULTILINE_TEXT =
   "block min-w-0 flex-1 cursor-text select-all whitespace-normal ps-3 text-foreground text-meta leading-5 outline-none";
 
@@ -87,7 +87,7 @@ const OUTLINE_CELL = "flex items-center self-stretch border-input border-s px-0.
  * below fills the 36 px field (40 on touch, centred); the copy button sits in its own cell behind
  * the field's hairline, so the text scrolls under the cell's edge and never under the button.
  */
-const CODE_GROUP = "min-h-9 items-stretch pointer-coarse:min-h-10";
+const CODE_GROUP = "min-h-8 items-stretch sm:min-h-9 sm:pointer-coarse:min-h-10";
 const CODE_TEXT =
   "scroll-fade-x block min-w-0 flex-1 cursor-text select-all self-center overflow-x-auto overscroll-x-contain text-clip whitespace-pre py-[7px] ps-3 pe-3 font-mono text-foreground text-meta leading-5 outline-none";
 const CODE_CELL = "flex items-center self-stretch border-field-border border-s px-0.5";

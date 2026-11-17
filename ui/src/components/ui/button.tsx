@@ -57,15 +57,18 @@ export const buttonVariants = cva(
        * 44 px ::after hit area, so no call site sizes for touch.
        */
       size: {
+        // Phones (below sm) take shadcn Nova's compact steps: 32 default, 28 sm, 36 lg, the
+        // same with or without touch (the ::after hit box keeps a 44 px tap). From sm up: 36 /
+        // 32, and 40 / 36 on a coarse pointer (a touch tablet).
         default:
-          "h-9 px-[calc(--spacing(4)-1px)] has-[>svg]:px-[calc(--spacing(3)-1px)] pointer-coarse:h-10",
-        icon: "size-9 pointer-coarse:size-10",
-        "icon-lg": "size-10 pointer-coarse:size-11",
-        "icon-sm": "size-8 pointer-coarse:size-9",
+          "h-8 px-[calc(--spacing(3)-1px)] has-[>svg]:px-[calc(--spacing(2.5)-1px)] sm:h-9 sm:px-[calc(--spacing(4)-1px)] sm:has-[>svg]:px-[calc(--spacing(3)-1px)] sm:pointer-coarse:h-10",
+        icon: "size-8 sm:size-9 sm:pointer-coarse:size-10",
+        "icon-lg": "size-9 sm:size-10 sm:pointer-coarse:size-11",
+        "icon-sm": "size-7 sm:size-8 sm:pointer-coarse:size-9",
         "icon-xs": "size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3",
         // The sign-in button keeps the larger text (16 px on phones, 14 px from sm up).
-        lg: "h-11 px-[calc(--spacing(3.5)-1px)] text-control sm:h-10 pointer-coarse:h-11",
-        sm: "h-8 gap-1.5 px-[calc(--spacing(3)-1px)] has-[>svg]:px-[calc(--spacing(2.5)-1px)] pointer-coarse:h-9",
+        lg: "h-10 px-[calc(--spacing(3.5)-1px)] text-control sm:pointer-coarse:h-11",
+        sm: "h-7 gap-1.5 px-[calc(--spacing(2.5)-1px)] has-[>svg]:px-[calc(--spacing(2)-1px)] sm:h-8 sm:px-[calc(--spacing(3)-1px)] sm:has-[>svg]:px-[calc(--spacing(2.5)-1px)] sm:pointer-coarse:h-9",
         xs: "h-6 gap-1 px-[calc(--spacing(2)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3",
       },
       // Hover is the guarded `hover:` variant (only where the pointer can hover), never a bare

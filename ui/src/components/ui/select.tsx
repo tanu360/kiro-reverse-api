@@ -43,9 +43,9 @@ export const selectTriggerVariants = cva(
       size: {
         // Touch screens get a real 40 / 36 px trigger, as the input (pointer-coarse sorts after
         // sm:).
-        default: "min-h-9 px-[calc(--spacing(3)-1px)] pointer-coarse:min-h-10",
-        lg: "min-h-11 px-[calc(--spacing(3)-1px)] sm:min-h-10 pointer-coarse:min-h-11",
-        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] pointer-coarse:min-h-9",
+        default: "min-h-8 px-[calc(--spacing(3)-1px)] sm:min-h-9 sm:pointer-coarse:min-h-10",
+        lg: "min-h-10 px-[calc(--spacing(3)-1px)] sm:pointer-coarse:min-h-11",
+        sm: "min-h-7 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-8 sm:pointer-coarse:min-h-9",
       },
     },
   },

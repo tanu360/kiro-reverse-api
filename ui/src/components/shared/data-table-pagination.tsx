@@ -36,7 +36,7 @@ const PAGER_CHEVRON_CLASS =
  * medium weight; the current page is the one in the text colour. Proportional digits: Geist's
  * tabular 1 has a foot that reads as another typeface.
  */
-const PAGE_BOX = "min-w-9 pointer-coarse:min-w-10";
+const PAGE_BOX = "min-w-8 sm:min-w-9 sm:pointer-coarse:min-w-10";
 const PAGE = cn(PAGE_BOX, "rounded-full px-1.5 before:rounded-full");
 const PAGE_ACTIVE = "text-foreground";
 

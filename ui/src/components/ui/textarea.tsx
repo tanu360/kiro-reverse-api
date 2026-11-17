@@ -57,7 +57,10 @@ export function Textarea({
               // It grows with its text up to 16rem (field-sizing), so it has no resize grip.
               "field-sizing-content max-h-64 w-full resize-none rounded-[inherit] px-[calc(--spacing(3)-1px)] py-[calc(--spacing(1.5)-1px)] text-foreground outline-none placeholder:text-placeholder",
               !singleLine && "min-h-17.5 max-sm:min-h-20.5",
-              singleLine && size === "default" && "pointer-coarse:py-[calc(--spacing(2)-1px)]",
+              // One line on a phone is the 32 px input; 40 px on a touch tablet.
+              singleLine &&
+                size === "default" &&
+                "max-sm:py-[calc(--spacing(1)-1px)] sm:pointer-coarse:py-[calc(--spacing(2)-1px)]",
               props.wrap === "off" ? "overflow-x-auto whitespace-pre" : "wrap-anywhere",
               variant === "mono" && "font-mono",
               size === "sm" && "px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1)-1px)]",

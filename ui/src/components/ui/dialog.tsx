@@ -106,7 +106,7 @@ export const DIALOG_POPUP_CLASS =
  * a coarse pointer, 8 and 4).
  */
 export const OVERLAY_CLOSE_CLASS =
-  "absolute inset-e-1.5 top-2.5 z-1 pointer-coarse:inset-e-1 pointer-coarse:top-2";
+  "absolute inset-e-1.5 top-2.5 z-1 sm:pointer-coarse:inset-e-1 sm:pointer-coarse:top-2";
 
 export function DialogPopup({
   className,

@@ -9,24 +9,24 @@ export type SegmentedControlSize = "default" | "lg" | "sm" | "icon";
 
 /**
  * Item heights; the track adds its 1 px padding and 1 px border on each side (+4 px), so each
- * size is the height of the matching button, on phones and desktops alike (coarse pointer in
- * brackets; lg is phone / sm and up / coarse pointer, as the sign-in button):
- *   sm       items 28 (28)        track 32 (32)        (the sm and icon-sm buttons beside it)
- *   default  items 32 (36)        track 36 (40)        (the default button)
- *   lg       items 40 / 36 / 40   track 44 / 40 / 44   (the sign-in button)
+ * size is the height of the matching button: phone / sm and up / touch tablet (shadcn Nova's
+ * compact steps on phones, the same with or without touch):
+ *   sm       items 24 / 28 / 28   track 28 / 32 / 32   (the sm and icon-sm buttons beside it)
+ *   default  items 28 / 32 / 36   track 32 / 36 / 40   (the default button)
+ *   lg       items 36 / 36 / 40   track 40 / 40 / 44   (the sign-in button)
  *   icon     square default items, for icon-only segments (the sign-in theme toggle)
- * Labels are 14 px (sm: 12 px on phones), icons 16 px. On a coarse pointer the default and lg
+ * Labels are 14 px (sm: 12 px on phones), icons 16 px. On a touch tablet the default and lg
  * strips are 40 px or more, a finger's tap. sm stays a 32 px strip there (iOS's segmented
  * height): it sits in card headers beside the title, where a 40 px strip crowded the title onto
  * two lines. A real height, not an ::after hit box: content after a tab list would paint over an
- * overflowing box. pointer-coarse sorts after the sm: sizes, so it wins on touch tablets too.
+ * overflowing box. sm:pointer-coarse sorts after the sm: sizes, so it wins on touch tablets.
  */
 export const segmentedControlItemSizeClassNames: Record<SegmentedControlSize, string> = {
-  default: "h-8 px-[calc(--spacing(3)-1px)] pointer-coarse:h-9",
-  icon: "size-8 p-0 pointer-coarse:size-9",
-  lg: "h-10 px-[calc(--spacing(3.5)-1px)] sm:h-9 pointer-coarse:h-10",
+  default: "h-7 px-[calc(--spacing(3)-1px)] sm:h-8 sm:pointer-coarse:h-9",
+  icon: "size-7 p-0 sm:size-8 sm:pointer-coarse:size-9",
+  lg: "h-9 px-[calc(--spacing(3.5)-1px)] sm:pointer-coarse:h-10",
   // Phones: 12 px labels, so a two-word switch and a card title share a 390 px header line.
-  sm: "h-7 px-[calc(--spacing(2)-1px)] max-sm:text-xs pointer-coarse:h-7",
+  sm: "h-6 px-[calc(--spacing(2)-1px)] max-sm:text-xs sm:h-7",
 };
 
 export const segmentedControlItemLayoutClassName =
