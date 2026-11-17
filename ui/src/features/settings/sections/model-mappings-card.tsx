@@ -31,7 +31,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type JSX, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { SETTINGS_ROW_X, SettingsEmptyRow } from "@/components/shared/settings-rows";
@@ -81,6 +81,14 @@ const FILTER_FROM = 8;
 const LIST_COLUMNS =
   "grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto]";
 const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4";
+
+/*
+ * The sensors' options, made once: dnd-kit memoises each sensor on its options object, and a new
+ * object each render gave every sortable row a new context, so any render of the card (a filter
+ * keystroke, the editor opening) rendered every row again.
+ */
+const POINTER_OPTIONS = { activationConstraint: { distance: 4 } };
+const KEYBOARD_OPTIONS = { coordinateGetter: sortableKeyboardCoordinates };
 
 /** The mapping being added (`rowId` null) or edited; `session` remounts the form per open. */
 interface EditorState {
@@ -133,10 +141,10 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
     else menuButtons.current.get(pendingFocus.rowId)?.focus();
   }, [pendingFocus]);
 
-  const register = (rowId: string) => (element: HTMLElement | null) => {
+  const register = useCallback((rowId: string, element: HTMLElement | null) => {
     if (element) menuButtons.current.set(rowId, element);
     else menuButtons.current.delete(rowId);
-  };
+  }, []);
 
   const clearError = () => {
     setErrorRowId(null);
@@ -221,14 +229,21 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
   // A long list can be filtered by either side; reordering waits until the filter is cleared.
   const [filter, setFilter] = useState("");
   const needle = filter.trim().toLowerCase();
-  const shown = rows
-    .map((row, index) => ({ row, index }))
-    .filter(
-      ({ row }) =>
-        !needle ||
-        row.key.toLowerCase().includes(needle) ||
-        row.value.toLowerCase().includes(needle),
-    );
+  const shown = useMemo(
+    () =>
+      rows
+        .map((row, index) => ({ row, index }))
+        .filter(
+          ({ row }) =>
+            !needle ||
+            row.key.toLowerCase().includes(needle) ||
+            row.value.toLowerCase().includes(needle),
+        ),
+    [rows, needle],
+  );
+  // Every row's id, also while the list is filtered: no row can be dragged then, and a list that
+  // stays the same as the filter narrows keeps the rows from rendering again on each keystroke.
+  const sortableIds = useMemo(() => rows.map((row) => row.id), [rows]);
 
   // Local only until Save. It replaces the whole list, so a list with rules of its own asks
   // first; a list that already is the defaults has nothing to reset.
@@ -259,9 +274,17 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(PointerSensor, POINTER_OPTIONS),
+    useSensor(KeyboardSensor, KEYBOARD_OPTIONS),
   );
+
+  // The rows get handlers that stay the same from render to render and call the latest ones, so
+  // a memoised row renders again only when its own mapping, place or error changes.
+  const latest = useRef({ removeRow, openEditor, move });
+  latest.current = { removeRow, openEditor, move };
+  const onRowDelete = useCallback((rowId: string) => latest.current.removeRow(rowId), []);
+  const onRowEdit = useCallback((row: MappingRow) => latest.current.openEditor(row), []);
+  const onRowMove = useCallback((from: number, to: number) => latest.current.move(from, to), []);
 
   const position = (id: UniqueIdentifier | undefined) =>
     id === undefined ? 0 : rows.findIndex((row) => row.id === id) + 1;
@@ -374,10 +397,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             onDragEnd={onDragEnd}
             sensors={sensors}
           >
-            <SortableContext
-              items={shown.map(({ row }) => row.id)}
-              strategy={verticalListSortingStrategy}
-            >
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
               <ol className="col-span-full grid grid-cols-subgrid [&>li+li]:border-border-subtle [&>li+li]:border-t">
                 {shown.map(({ row, index }) => (
                   <MappingRowItem
@@ -386,10 +406,10 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
                     filtering={needle !== ""}
                     index={index}
                     key={row.id}
-                    onDelete={() => removeRow(row.id)}
-                    onEdit={() => openEditor(row)}
-                    onMove={(to) => move(index, to)}
-                    register={register(row.id)}
+                    onDelete={onRowDelete}
+                    onEdit={onRowEdit}
+                    onMove={onRowMove}
+                    register={register}
                     row={row}
                   />
                 ))}
@@ -422,7 +442,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
  * wins), what it matches and what that becomes, and its menu (Edit, Move up, Move down, Delete).
  * On phones the target sits under the match.
  */
-function MappingRowItem({
+const MappingRowItem = memo(function MappingRowItem({
   row,
   index,
   count,
@@ -440,12 +460,17 @@ function MappingRowItem({
   error: string | null;
   /** While the list is filtered, rows cannot be reordered. */
   filtering: boolean;
-  onEdit: () => void;
-  onMove: (to: number) => void;
-  onDelete: () => void;
-  register: (element: HTMLElement | null) => void;
+  onEdit: (row: MappingRow) => void;
+  onMove: (from: number, to: number) => void;
+  onDelete: (rowId: string) => void;
+  register: (rowId: string, element: HTMLElement | null) => void;
 }): JSX.Element {
   const { t } = useT("settings");
+  const rowId = row.id;
+  const menuRef = useCallback(
+    (element: HTMLElement | null) => register(rowId, element),
+    [register, rowId],
+  );
   const reduceMotion = usePrefersReducedMotion();
   const {
     attributes,
@@ -538,7 +563,7 @@ function MappingRowItem({
           render={
             <Button
               aria-label={t("modelMappings.rowActions", { n })}
-              ref={register}
+              ref={menuRef}
               size="icon-sm"
               variant="quiet"
             />
@@ -547,20 +572,23 @@ function MappingRowItem({
           <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
         </MenuTrigger>
         <MenuPopup align="end" className="min-w-44">
-          <MenuItem onClick={onEdit}>
+          <MenuItem onClick={() => onEdit(row)}>
             <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
             {t("modelMappings.edit")}
           </MenuItem>
-          <MenuItem disabled={filtering || index === 0} onClick={() => onMove(index - 1)}>
+          <MenuItem disabled={filtering || index === 0} onClick={() => onMove(index, index - 1)}>
             <HugeiconsIcon icon={ArrowUp02Icon} aria-hidden="true" />
             {t("modelMappings.moveUp")}
           </MenuItem>
-          <MenuItem disabled={filtering || index === count - 1} onClick={() => onMove(index + 1)}>
+          <MenuItem
+            disabled={filtering || index === count - 1}
+            onClick={() => onMove(index, index + 1)}
+          >
             <HugeiconsIcon icon={ArrowDown02Icon} aria-hidden="true" />
             {t("modelMappings.moveDown")}
           </MenuItem>
           <MenuSeparator />
-          <MenuItem onClick={onDelete} variant="destructive">
+          <MenuItem onClick={() => onDelete(rowId)} variant="destructive">
             <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
             {t("modelMappings.delete")}
           </MenuItem>
@@ -576,7 +604,7 @@ function MappingRowItem({
       ) : null}
     </li>
   );
-}
+});
 
 /**
  * The mapping editor: the text to look for in the client's model name and the Kiro model ID it
