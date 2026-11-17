@@ -55,17 +55,18 @@ const CONTROL_WIDTH: Record<ControlWidth, string> = {
  * Compact rows (a dialog or a sheet, about 450 px wide): 12 px above and below, a 24 px gap, and
  * the control beside the text as soon as both fit, under it before that. A field (14rem) keeps
  * the text 10rem, so it goes under on a phone. A number (11rem: "2,000,000" fits between the −
- * and + buttons) keeps the text 7rem, as its titles are short ("Requests per minute" takes two
- * lines), so it stays beside the text on a phone too. The breakpoints are text + gap + control.
+ * and + buttons) keeps the text 5rem, as its titles are short ("Requests per minute" takes two
+ * lines), so it stays beside the text on a phone too, even in a sheet's card (a 283 px row).
+ * The breakpoints are text + gap + control.
  */
 const COMPACT_CONTROL_WIDTH: Partial<Record<ControlWidth, string>> = {
   field: "w-full @min-[25.5rem]/settings-row:w-56",
-  number: "w-full @min-[19.5rem]/settings-row:w-44",
+  number: "w-full @min-[17.5rem]/settings-row:w-44",
 };
 
 /** The compact text column's least width, by control (COMPACT_CONTROL_WIDTH). */
 const COMPACT_TEXT_BASIS: Partial<Record<ControlWidth, string>> = {
-  number: "basis-28",
+  number: "basis-20",
 };
 
 /** A row title: a Label for the control when `htmlFor` is set, red in a danger row. */
