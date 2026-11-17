@@ -6,7 +6,7 @@ import {
   UserMultipleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type FormEvent,
   type JSX,
@@ -27,10 +27,13 @@ import {
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
 import { SectionCard } from "@/components/shared/section-card";
+import { SETTINGS_ROW_X, SettingsRow } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { DialogPanel } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldHint, FieldLabel } from "@/components/ui/field";
+import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
 import {
   NumberField,
@@ -39,6 +42,8 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from "@/components/ui/number-field";
+import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
+import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
   Select,
   SelectItem,
@@ -47,7 +52,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ROUTING_MODE_LABEL, useRoutingMode } from "@/features/accounts/use-routing-mode";
-import { createApiKey, updateApiKey } from "@/lib/api/api-keys";
+import { accountsQuery } from "@/lib/api/accounts";
+import { createApiKey, keyModelsQuery, updateApiKey } from "@/lib/api/api-keys";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { ApiKey, ApiKeyRoutingMode } from "@/lib/api/types";
@@ -55,7 +61,7 @@ import { useT } from "@/lib/i18n";
 import { noSpaces } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { AccountPicker } from "./account-picker";
+import { AccountPicker, AccountPicks } from "./account-picker";
 import {
   type ApiKeyFormData,
   type ApiKeyFormFailure,
@@ -73,7 +79,7 @@ import {
   parseApiKeyForm,
 } from "./api-key-form";
 import { ExpiryPicker } from "./expiry-picker";
-import { ModelPicker } from "./model-picker";
+import { ModelPicker, ModelPicks } from "./model-picker";
 import { SheetMark } from "./sheet-mark";
 
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
@@ -203,22 +209,29 @@ function useKeyForm(
   };
 }
 
-/** Name and expiry side by side (stacked on phones). */
-function NameAndExpiry({ form }: { form: KeyForm }): JSX.Element {
+/** The key's name, its label above it. */
+function NameField({ form }: { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
   return (
+    <Field>
+      <FieldLabel>{t("form.name")}</FieldLabel>
+      <Input
+        maxLength={64}
+        autoComplete="off"
+        onValueChange={(value) => form.set("name", value)}
+        placeholder={t("form.namePlaceholder")}
+        ref={form.refs.name}
+        value={form.values.name}
+      />
+    </Field>
+  );
+}
+
+/** Name and expiry side by side (stacked on phones). */
+function NameAndExpiry({ form }: { form: KeyForm }): JSX.Element {
+  return (
     <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-      <Field>
-        <FieldLabel>{t("form.name")}</FieldLabel>
-        <Input
-          maxLength={64}
-          autoComplete="off"
-          onValueChange={(value) => form.set("name", value)}
-          placeholder={t("form.namePlaceholder")}
-          ref={form.refs.name}
-          value={form.values.name}
-        />
-      </Field>
+      <NameField form={form} />
       <ExpiryPicker
         onChange={(value) => form.set("expiresAt", value)}
         value={form.values.expiresAt}
@@ -256,32 +269,54 @@ const LIMIT_LABELS: Readonly<Record<ApiKeyLimitField, string>> = {
   rpmLimit: "form.rpmLimit",
 };
 
+type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
+
+/** One limit's number field; a settings row's title and description go on its input. */
+function LimitNumber({
+  form,
+  field,
+  id,
+  ...aria
+}: AriaProps & { form: KeyForm; field: ApiKeyLimitField; id?: string }): JSX.Element {
+  return (
+    <NumberField
+      // Two decimals for credits, as formatCredits shows them in the table and the cards.
+      format={field === "creditLimit" ? CREDIT_FORMAT : undefined}
+      id={id}
+      max={field === "rpmLimit" ? MAX_KEY_RPM : undefined}
+      min={0}
+      onValueChange={(value) => form.set(field, value)}
+      step={field === "creditLimit" ? 0.01 : 1}
+      value={form.values[field]}
+    >
+      <NumberFieldGroup>
+        <NumberFieldDecrement />
+        <NumberFieldInput ref={form.refs[field]} {...aria} />
+        <NumberFieldIncrement />
+      </NumberFieldGroup>
+    </NumberField>
+  );
+}
+
+/** The limit's error, when it is the failed one. */
+function LimitError({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): ReactNode {
+  const { t } = useT("api");
+  if (form.invalid !== field) return null;
+  return (
+    <FieldError match role="alert">
+      {t(LIMIT_ERRORS[field])}
+    </FieldError>
+  );
+}
+
 /** One limit's number field, with its error when it is the failed one. */
 function LimitField({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): JSX.Element {
   const { t } = useT("api");
   return (
     <Field invalid={form.invalid === field}>
       <FieldLabel>{t(LIMIT_LABELS[field])}</FieldLabel>
-      <NumberField
-        // Two decimals for credits, as formatCredits shows them in the table and the cards.
-        format={field === "creditLimit" ? CREDIT_FORMAT : undefined}
-        max={field === "rpmLimit" ? MAX_KEY_RPM : undefined}
-        min={0}
-        onValueChange={(value) => form.set(field, value)}
-        step={field === "creditLimit" ? 0.01 : 1}
-        value={form.values[field]}
-      >
-        <NumberFieldGroup>
-          <NumberFieldDecrement />
-          <NumberFieldInput ref={form.refs[field]} />
-          <NumberFieldIncrement />
-        </NumberFieldGroup>
-      </NumberField>
-      {form.invalid === field ? (
-        <FieldError match role="alert">
-          {t(LIMIT_ERRORS[field])}
-        </FieldError>
-      ) : null}
+      <LimitNumber field={field} form={form} />
+      <LimitError field={field} form={form} />
     </Field>
   );
 }
@@ -323,8 +358,8 @@ function AccountsField({
   );
 }
 
-/** The routing mode select, its hint under it. */
-function RoutingField({ form }: { form: KeyForm }): JSX.Element {
+/** The routing mode select; a settings row's title and description go on its trigger. */
+function RoutingSelect({ form, ...aria }: AriaProps & { form: KeyForm }): JSX.Element {
   const { t } = useT("api");
   const globalMode = useRoutingMode();
   const routingItems = KEY_ROUTING_MODES.map((mode) => ({
@@ -335,44 +370,53 @@ function RoutingField({ form }: { form: KeyForm }): JSX.Element {
         : t(ROUTING_MODE_LABEL[mode]),
   }));
   return (
+    <Select
+      items={routingItems}
+      onValueChange={(next) => {
+        if (KEY_ROUTING_MODES.includes(next as ApiKeyRoutingMode)) {
+          form.set("routingMode", next as ApiKeyRoutingMode);
+        }
+      }}
+      value={form.values.routingMode}
+    >
+      <SelectTrigger {...aria}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectPopup>
+        {routingItems.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
+  );
+}
+
+/** The routing mode select, its hint under it. */
+function RoutingField({ form }: { form: KeyForm }): JSX.Element {
+  const { t } = useT("api");
+  return (
     <Field>
       <FieldLabel>{t("form.routingMode")}</FieldLabel>
-      <Select
-        items={routingItems}
-        onValueChange={(next) => {
-          if (KEY_ROUTING_MODES.includes(next as ApiKeyRoutingMode)) {
-            form.set("routingMode", next as ApiKeyRoutingMode);
-          }
-        }}
-        value={form.values.routingMode}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectPopup>
-          {routingItems.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectPopup>
-      </Select>
+      <RoutingSelect form={form} />
       <FieldDescription>{t("form.routingModeHint")}</FieldDescription>
     </Field>
   );
 }
 
+/** Why the models were refused, when they are the failed field. */
+function useModelsError(form: KeyForm): string | undefined {
+  const { t } = useT("api");
+  if (form.invalid !== "allowedModels") return undefined;
+  if (form.modelsError === "noModels") return t("form.modelsRequired");
+  if (form.modelsError === "tooManyModels") return t("form.tooManyModels", { max: MAX_KEY_MODELS });
+  return t("form.modelTooLong", { max: MAX_KEY_MODEL_LENGTH });
+}
+
 /** The models the key may call. */
 function ModelsField({ form }: { form: KeyForm }): JSX.Element {
-  const { t } = useT("api");
-  const invalid =
-    form.invalid !== "allowedModels"
-      ? undefined
-      : form.modelsError === "noModels"
-        ? t("form.modelsRequired")
-        : form.modelsError === "tooManyModels"
-          ? t("form.tooManyModels", { max: MAX_KEY_MODELS })
-          : t("form.modelTooLong", { max: MAX_KEY_MODEL_LENGTH });
+  const invalid = useModelsError(form);
   return (
     <ModelPicker
       invalid={invalid}
@@ -417,6 +461,193 @@ function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }
   );
 }
 
+/** All or Only selected, as a segmented switch filling a settings row's control slot. */
+function ScopeSwitch<T extends string>({
+  value,
+  onChange,
+  options,
+  ...aria
+}: AriaProps & {
+  value: T;
+  onChange: (value: T) => void;
+  options: ReadonlyArray<{ value: T; label: string }>;
+}): JSX.Element {
+  return (
+    <SegmentedControl
+      className="w-full"
+      render={<RadioGroupPrimitive onValueChange={(next) => onChange(next as T)} value={value} />}
+      {...aria}
+    >
+      {options.map((option) => (
+        <SegmentedControlItem
+          className="flex-1"
+          key={option.value}
+          render={<RadioPrimitive.Root value={option.value} />}
+        >
+          {option.label}
+        </SegmentedControlItem>
+      ))}
+    </SegmentedControl>
+  );
+}
+
+/** Create, step 1: the name, then the expiry and the custom key as rows, then the limits. */
+function BasicsRows({ form }: { form: KeyForm }): JSX.Element {
+  const { t } = useT("api");
+  const keyId = useId();
+  return (
+    <>
+      <NameField form={form} />
+      <Card divided>
+        <SettingsRow
+          compact
+          control={
+            <ExpiryPicker
+              bare
+              onChange={(value) => form.set("expiresAt", value)}
+              value={form.values.expiresAt}
+            />
+          }
+          description={t("form.expiresAtRowHint")}
+          title={t("form.expiresAt")}
+        />
+        <SettingsRow
+          compact
+          control={
+            <Input
+              maxLength={128}
+              autoCapitalize="off"
+              autoComplete="off"
+              autoCorrect="off"
+              id={keyId}
+              onValueChange={(value) => form.set("key", noSpaces(value))}
+              spellCheck={false}
+              value={form.values.key}
+            />
+          }
+          description={t("form.customKeyPlaceholder")}
+          htmlFor={keyId}
+          title={t("form.customKey")}
+        />
+      </Card>
+      <Fieldset className="flex min-w-0 flex-col gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <FieldsetLegend>{t("form.limits")}</FieldsetLegend>
+          <FieldHint>{t("form.limitsHint")}</FieldHint>
+        </div>
+        <Card divided>
+          {LIMIT_FIELDS.map((field) => (
+            <LimitRow field={field} form={form} key={field} />
+          ))}
+        </Card>
+      </Fieldset>
+    </>
+  );
+}
+
+const LIMIT_FIELDS: readonly ApiKeyLimitField[] = [
+  "tokenLimit",
+  "creditLimit",
+  "callLimit",
+  "rpmLimit",
+];
+
+/** One limit as a settings row, its error under the title. */
+function LimitRow({ form, field }: { form: KeyForm; field: ApiKeyLimitField }): JSX.Element {
+  const { t } = useT("api");
+  const id = useId();
+  return (
+    // One Field round the row: it marks the input invalid and ties the error to it.
+    <Field className="items-stretch" invalid={form.invalid === field}>
+      <SettingsRow
+        compact
+        control={<LimitNumber field={field} form={form} id={id} />}
+        controlWidth="number"
+        htmlFor={id}
+        title={t(LIMIT_LABELS[field])}
+      >
+        <LimitError field={field} form={form} />
+      </SettingsRow>
+    </Field>
+  );
+}
+
+/**
+ * Create, step 2: the routing mode, the models and the accounts as rows; Only selected opens
+ * its picks under its row.
+ */
+function AccessRows({ form }: { form: KeyForm }): JSX.Element {
+  const { t } = useT("api");
+  const modelsError = useModelsError(form);
+  // Loads both lists while All is chosen, so Only selected opens on them.
+  useQuery(keyModelsQuery());
+  useQuery(accountsQuery());
+  return (
+    <Card divided>
+      <SettingsRow
+        compact
+        control={<RoutingSelect form={form} />}
+        // Under the text: "Same as Settings (Reset first)" is too long to sit beside it.
+        controlWidth="block"
+        description={t("form.routingModeShort")}
+        title={t("form.routingMode")}
+      />
+      <SettingsRow
+        compact
+        control={
+          <ScopeSwitch
+            onChange={(scope) => form.set("modelScope", scope)}
+            options={[
+              { value: "all", label: t("form.modelsAll") },
+              { value: "selected", label: t("form.scopeSelected") },
+            ]}
+            value={form.values.modelScope}
+          />
+        }
+        description={t("form.allowedModelsShort")}
+        title={t("form.allowedModels")}
+      />
+      {form.values.modelScope === "selected" ? (
+        <div className={cn(SETTINGS_ROW_X, "py-3")}>
+          <ModelPicks
+            invalid={modelsError}
+            onSelectedChange={(models) => form.set("allowedModels", models)}
+            searchRef={form.refs.allowedModels}
+            selected={form.values.allowedModels}
+          />
+        </div>
+      ) : null}
+      <SettingsRow
+        compact
+        control={
+          <ScopeSwitch
+            onChange={(scope) => form.set("accountScope", scope)}
+            options={[
+              { value: "all", label: t("form.accountsAll") },
+              { value: "selected", label: t("form.scopeSelected") },
+            ]}
+            value={form.values.accountScope}
+          />
+        }
+        description={t("form.accountsShort")}
+        title={t("form.accounts")}
+      />
+      {form.values.accountScope === "selected" ? (
+        <div className={cn(SETTINGS_ROW_X, "py-3")}>
+          <AccountPicks
+            invalid={form.invalid === "accountIds"}
+            onSelectedChange={(ids) => form.set("accountIds", ids)}
+            onTagsChange={(tags) => form.set("accountTags", tags)}
+            searchRef={form.refs.accountIds}
+            selected={form.values.accountIds}
+            tags={form.values.accountTags}
+          />
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 /** The create wizard's steps, in order. */
 const CREATE_STEPS = ["form.stepBasics", "form.stepAccess"] as const;
 const LAST_STEP = CREATE_STEPS.length - 1;
@@ -432,8 +663,9 @@ const FIELD_STEP: Readonly<Record<ApiKeyFormField, number>> = {
 };
 
 /**
- * Create: the app's dialog at its default width, in two steps: Basics (name, expiry, custom key
- * and the limits), then Access (routing mode, models, accounts). Next checks the fields up to the
+ * Create: the app's dialog at its default width, in two steps of settings rows (the Settings
+ * page's own): Basics (name, expiry, custom key and the limits), then Access (routing mode,
+ * models, accounts). Next checks the fields up to the
  * current step; the last step creates the key. Both steps share one body height, so the dialog
  * keeps its size between them, and a longer step scrolls inside it.
  */
@@ -551,7 +783,7 @@ function ApiKeyCreateDialog({
         ))}
       </div>
       {/* One height from sm up for both steps, so Next and Back never resize the dialog. */}
-      <div className="flex min-h-0 flex-1 flex-col sm:h-120 sm:flex-initial">
+      <div className="flex min-h-0 flex-1 flex-col sm:h-140 sm:flex-initial">
         <DialogPanel>
           <form
             aria-busy={form.pending || undefined}
@@ -561,19 +793,7 @@ function ApiKeyCreateDialog({
             onSubmit={onSubmit}
           >
             <div className="flex flex-col gap-4" ref={stepRef}>
-              {step === 0 ? (
-                <>
-                  <NameAndExpiry form={form} />
-                  <CustomKeyField form={form} />
-                  <LimitsGrid form={form} />
-                </>
-              ) : (
-                <>
-                  <RoutingField form={form} />
-                  <ModelsField form={form} />
-                  <AccountsField form={form} />
-                </>
-              )}
+              {step === 0 ? <BasicsRows form={form} /> : <AccessRows form={form} />}
             </div>
             {last ? <ServerError form={form} /> : null}
           </form>

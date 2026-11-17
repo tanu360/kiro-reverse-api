@@ -69,29 +69,68 @@ export function scopedAccountIds(
  */
 export function AccountPicker({
   scope,
-  selected,
-  tags = [],
   onScopeChange,
-  onSelectedChange,
-  onTagsChange,
-  invalid,
-  searchRef,
   hideLegend = false,
-}: {
+  ...picks
+}: AccountPicksProps & {
   scope: ApiKeyAccountScope;
+  onScopeChange: (scope: ApiKeyAccountScope) => void;
+  /** Keeps the legend for screen readers only, where a tab or heading already says "Accounts". */
+  hideLegend?: boolean;
+}): JSX.Element {
+  const { t } = useT("api");
+  const baseId = useId();
+  // Loads the list while All is chosen, so Only selected opens on it.
+  useQuery(accountsQuery());
+  return (
+    <Fieldset className="flex min-w-0 flex-col gap-3">
+      <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
+        {t("form.accounts")}
+      </FieldsetLegend>
+      {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
+      <RadioGroup
+        aria-label={t("form.accounts")}
+        className="gap-0"
+        onValueChange={(value) => onScopeChange(value as ApiKeyAccountScope)}
+        value={scope}
+      >
+        {SCOPES.map((value) => (
+          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
+            <Radio id={`${baseId}-${value}`} value={value} />
+            {value === "all" ? t("form.accountsAll") : t("form.accountsSelected")}
+          </Label>
+        ))}
+      </RadioGroup>
+      {scope === "selected" ? <AccountPicks {...picks} /> : null}
+      <FieldHint>{t("form.accountsHint")}</FieldHint>
+    </Fieldset>
+  );
+}
+
+export interface AccountPicksProps {
   selected: readonly string[];
   /** Picked account tags. */
   tags?: readonly string[];
-  onScopeChange: (scope: ApiKeyAccountScope) => void;
   onSelectedChange: (ids: string[]) => void;
   onTagsChange?: (tags: string[]) => void;
   /** "Only selected" with nothing picked. */
   invalid: boolean;
   /** Where focus goes when the picks are invalid. */
   searchRef?: Ref<HTMLInputElement>;
-  /** Keeps the legend for screen readers only, where a tab or heading already says "Accounts". */
-  hideLegend?: boolean;
-}): JSX.Element {
+}
+
+/**
+ * The picks under Only selected: the tags in one sideways row, the search, the error, the
+ * account list and the count.
+ */
+export function AccountPicks({
+  selected,
+  tags = [],
+  onSelectedChange,
+  onTagsChange,
+  invalid,
+  searchRef,
+}: AccountPicksProps): JSX.Element {
   const { t, lang } = useT("api");
   const { t: ta } = useT("accounts");
   const { t: tc } = useT();
@@ -194,107 +233,74 @@ export function AccountPicker({
   );
 
   return (
-    <Fieldset className="flex min-w-0 flex-col gap-3">
-      <FieldsetLegend className={hideLegend ? "sr-only" : undefined}>
-        {t("form.accounts")}
-      </FieldsetLegend>
-      {/* The option rows are 40 px tall (44 px on touch), so they need no gap between them. */}
-      <RadioGroup
-        aria-label={t("form.accounts")}
-        className="gap-0"
-        onValueChange={(value) => onScopeChange(value as ApiKeyAccountScope)}
-        value={scope}
-      >
-        {SCOPES.map((value) => (
-          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
-            <Radio id={`${baseId}-${value}`} value={value} />
-            {value === "all" ? t("form.accountsAll") : t("form.accountsSelected")}
-          </Label>
-        ))}
-      </RadioGroup>
-      {scope === "selected" ? (
-        <div className="flex min-w-0 flex-col gap-2">
-          {onTagsChange && tagRows.length > 0 ? (
-            <fieldset className="flex min-w-0 flex-col gap-1.5">
-              <legend className="mb-1.5 text-muted-foreground text-xs">
-                {t("form.accountTags")}
-              </legend>
-              {/* One row that scrolls sideways, its ends fading while more tags are past them. */}
-              <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
-                <div className="flex w-max gap-x-4">
-                  {tagRows.map((option) => {
-                    const id = `${baseId}-tag-${tagKey(option.tag)}`;
-                    const checked = pickedTags.has(tagKey(option.tag));
-                    return (
-                      <Label
-                        className="min-w-0"
-                        htmlFor={id}
-                        key={tagKey(option.tag)}
-                        variant="option"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          disabled={!checked && tags.length >= MAX_KEY_TAGS}
-                          id={id}
-                          onCheckedChange={() => toggleTag(option.tag)}
-                        />
-                        <span className="min-w-0 truncate">{mask(option.tag)}</span>
-                        <span className="shrink-0 text-muted-foreground tabular-nums">
-                          {option.count > 0
-                            ? t("form.accountTagCount", { n: option.count })
-                            : t("form.accountTagNone")}
-                        </span>
-                      </Label>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </fieldset>
-          ) : null}
-          <InputGroup>
-            <InputGroupAddon>
-              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-describedby={invalid ? errorId : undefined}
-              aria-invalid={invalid || undefined}
-              aria-label={t("form.accountsSearch")}
-              autoComplete="off"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("form.accountsSearch")}
-              ref={searchRef}
-              type="search"
-              value={query}
-            />
-          </InputGroup>
-          {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
-          {invalid ? (
-            <p
-              className="text-destructive-foreground text-xs leading-normal"
-              id={errorId}
-              role="alert"
-            >
-              {t("form.accountsRequired")}
-            </p>
-          ) : null}
-          {rows}
-          {loaded ? (
-            <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-              {tags.length > 0
-                ? t("form.accountsReachedCount", {
-                    count: list.length,
-                    n: formatNumber(reachedKnown, lang),
-                    total: formatNumber(list.length, lang),
-                  })
-                : t("form.accountsSelectedCount", {
-                    n: formatNumber(selected.length, lang),
-                    total: formatNumber(list.length + removed.length, lang),
-                  })}
-            </p>
-          ) : null}
-        </div>
+    <div className="flex min-w-0 flex-col gap-2">
+      {onTagsChange && tagRows.length > 0 ? (
+        <fieldset className="flex min-w-0 flex-col gap-1.5">
+          <legend className="mb-1.5 text-muted-foreground text-xs">{t("form.accountTags")}</legend>
+          {/* One row that scrolls sideways, its ends fading while more tags are past them. */}
+          <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
+            <div className="flex w-max gap-x-4">
+              {tagRows.map((option) => {
+                const id = `${baseId}-tag-${tagKey(option.tag)}`;
+                const checked = pickedTags.has(tagKey(option.tag));
+                return (
+                  <Label className="min-w-0" htmlFor={id} key={tagKey(option.tag)} variant="option">
+                    <Checkbox
+                      checked={checked}
+                      disabled={!checked && tags.length >= MAX_KEY_TAGS}
+                      id={id}
+                      onCheckedChange={() => toggleTag(option.tag)}
+                    />
+                    <span className="min-w-0 truncate">{mask(option.tag)}</span>
+                    <span className="shrink-0 text-muted-foreground tabular-nums">
+                      {option.count > 0
+                        ? t("form.accountTagCount", { n: option.count })
+                        : t("form.accountTagNone")}
+                    </span>
+                  </Label>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </fieldset>
       ) : null}
-      <FieldHint>{t("form.accountsHint")}</FieldHint>
-    </Fieldset>
+      <InputGroup>
+        <InputGroupAddon>
+          <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupInput
+          aria-describedby={invalid ? errorId : undefined}
+          aria-invalid={invalid || undefined}
+          aria-label={t("form.accountsSearch")}
+          autoComplete="off"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("form.accountsSearch")}
+          ref={searchRef}
+          type="search"
+          value={query}
+        />
+      </InputGroup>
+      {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
+      {invalid ? (
+        <p className="text-destructive-foreground text-xs leading-normal" id={errorId} role="alert">
+          {t("form.accountsRequired")}
+        </p>
+      ) : null}
+      {rows}
+      {loaded ? (
+        <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
+          {tags.length > 0
+            ? t("form.accountsReachedCount", {
+                count: list.length,
+                n: formatNumber(reachedKnown, lang),
+                total: formatNumber(list.length, lang),
+              })
+            : t("form.accountsSelectedCount", {
+                n: formatNumber(selected.length, lang),
+                total: formatNumber(list.length + removed.length, lang),
+              })}
+        </p>
+      ) : null}
+    </div>
   );
 }

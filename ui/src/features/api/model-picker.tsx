@@ -28,21 +28,54 @@ const lower = (model: string) => model.toLowerCase();
  */
 export function ModelPicker({
   scope,
-  selected,
   onScopeChange,
-  onSelectedChange,
-  invalid,
-  searchRef,
-}: {
+  ...picks
+}: ModelPicksProps & {
   scope: ApiKeyModelScope;
-  selected: readonly string[];
   onScopeChange: (scope: ApiKeyModelScope) => void;
+}): JSX.Element {
+  const { t } = useT("api");
+  const baseId = useId();
+  // Loads the list while Every model is chosen, so Only selected opens on it.
+  useQuery(keyModelsQuery());
+  return (
+    <Fieldset className="flex min-w-0 flex-col gap-3">
+      <FieldsetLegend>{t("form.allowedModels")}</FieldsetLegend>
+      <RadioGroup
+        aria-label={t("form.allowedModels")}
+        className="gap-0"
+        onValueChange={(value) => onScopeChange(value as ApiKeyModelScope)}
+        value={scope}
+      >
+        {SCOPES.map((value) => (
+          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
+            <Radio id={`${baseId}-${value}`} value={value} />
+            {value === "all" ? t("form.modelsAll") : t("form.modelsSelected")}
+          </Label>
+        ))}
+      </RadioGroup>
+      {scope === "selected" ? <ModelPicks {...picks} /> : null}
+      <FieldHint>{t("form.allowedModelsHint")}</FieldHint>
+    </Fieldset>
+  );
+}
+
+export interface ModelPicksProps {
+  selected: readonly string[];
   onSelectedChange: (models: string[]) => void;
   /** "Only selected models" with nothing ticked, or too many. */
   invalid?: string;
   /** Where focus goes when the picks are invalid. */
   searchRef?: Ref<HTMLInputElement>;
-}): JSX.Element {
+}
+
+/** The picks under Only selected: the search, the error, the model list and the count. */
+export function ModelPicks({
+  selected,
+  onSelectedChange,
+  invalid,
+  searchRef,
+}: ModelPicksProps): JSX.Element {
   const { t, lang } = useT("api");
   const { t: tc } = useT();
   const models = useQuery(keyModelsQuery());
@@ -108,64 +141,41 @@ export function ModelPicker({
     );
 
   return (
-    <Fieldset className="flex min-w-0 flex-col gap-3">
-      <FieldsetLegend>{t("form.allowedModels")}</FieldsetLegend>
-      <RadioGroup
-        aria-label={t("form.allowedModels")}
-        className="gap-0"
-        onValueChange={(value) => onScopeChange(value as ApiKeyModelScope)}
-        value={scope}
-      >
-        {SCOPES.map((value) => (
-          <Label className="self-start" htmlFor={`${baseId}-${value}`} key={value} variant="option">
-            <Radio id={`${baseId}-${value}`} value={value} />
-            {value === "all" ? t("form.modelsAll") : t("form.modelsSelected")}
-          </Label>
-        ))}
-      </RadioGroup>
-      {scope === "selected" ? (
-        <div className="flex min-w-0 flex-col gap-2">
-          <InputGroup>
-            <InputGroupAddon>
-              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-describedby={invalid ? errorId : undefined}
-              aria-invalid={invalid ? true : undefined}
-              aria-label={t("form.modelsSearch")}
-              autoCapitalize="off"
-              autoComplete="off"
-              autoCorrect="off"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("form.modelsSearch")}
-              ref={searchRef}
-              spellCheck={false}
-              type="search"
-              value={query}
-            />
-          </InputGroup>
-          {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
-          {invalid ? (
-            <p
-              className="text-destructive-foreground text-xs leading-normal"
-              id={errorId}
-              role="alert"
-            >
-              {invalid}
-            </p>
-          ) : null}
-          {list}
-          {models.data !== undefined ? (
-            <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-              {t("form.accountsSelectedCount", {
-                n: formatNumber(selected.length, lang),
-                total: formatNumber(rows.length, lang),
-              })}
-            </p>
-          ) : null}
-        </div>
+    <div className="flex min-w-0 flex-col gap-2">
+      <InputGroup>
+        <InputGroupAddon>
+          <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupInput
+          aria-describedby={invalid ? errorId : undefined}
+          aria-invalid={invalid ? true : undefined}
+          aria-label={t("form.modelsSearch")}
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("form.modelsSearch")}
+          ref={searchRef}
+          spellCheck={false}
+          type="search"
+          value={query}
+        />
+      </InputGroup>
+      {/* Under the search, which takes focus on the error, so it is in view on a phone. */}
+      {invalid ? (
+        <p className="text-destructive-foreground text-xs leading-normal" id={errorId} role="alert">
+          {invalid}
+        </p>
       ) : null}
-      <FieldHint>{t("form.allowedModelsHint")}</FieldHint>
-    </Fieldset>
+      {list}
+      {models.data !== undefined ? (
+        <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
+          {t("form.accountsSelectedCount", {
+            n: formatNumber(selected.length, lang),
+            total: formatNumber(rows.length, lang),
+          })}
+        </p>
+      ) : null}
+    </div>
   );
 }

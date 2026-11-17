@@ -82,6 +82,13 @@ async function renderPage() {
 
 type User = Awaited<ReturnType<typeof renderPage>>["user"];
 
+/** A create row's All / Only selected switch (a radio group named by the row's title). */
+function scopeRadio(dialog: HTMLElement, group: string, name: string): HTMLElement {
+  return within(within(dialog).getByRole("radiogroup", { name: group })).getByRole("radio", {
+    name,
+  });
+}
+
 /** Next from the create wizard's first step to its last one (Access). */
 async function toAccessStep(user: User, dialog: HTMLElement): Promise<void> {
   await user.click(within(dialog).getByRole("button", { name: "Next" }));
@@ -300,7 +307,7 @@ describe("ApiPage", () => {
     await user.click(screen.getByRole("button", { name: "Create API key" }));
     const dialog = await screen.findByRole("dialog");
     await toAccessStep(user, dialog);
-    await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
+    await user.click(scopeRadio(dialog, "Accounts", "Only selected"));
 
     // "Only selected" with nothing picked would mean every account: the form refuses it.
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
@@ -348,14 +355,14 @@ describe("ApiPage", () => {
     await user.clear(rpm);
     await user.type(rpm, "30");
     await user.click(within(dialog).getByRole("button", { name: "Next" }));
-    await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
+    await user.click(scopeRadio(dialog, "Accounts", "Only selected"));
     // The tag picks accounts on its own: both spellings count, and the count says so.
     await user.click(within(dialog).getByRole("checkbox", { name: /team-eu/ }));
     expect(
       within(dialog).getByText(`2 of ${mockDb.accounts.length} accounts in scope`),
     ).toBeInTheDocument();
     // "Only selected models" with none ticked is refused, like accounts.
-    await user.click(within(dialog).getByRole("radio", { name: "Only selected models" }));
+    await user.click(scopeRadio(dialog, "Allowed models", "Only selected"));
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     expect(
       await within(dialog).findByText("Pick at least one model, or choose Every model."),

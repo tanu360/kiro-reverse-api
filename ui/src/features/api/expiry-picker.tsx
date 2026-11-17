@@ -33,14 +33,24 @@ function startOfToday(): Date {
  * the coss Calendar in a Popover, closing on a pick. A picked day counts to its last second in
  * the viewer's time zone. Days before today are disabled; a stored expiry that has passed (edit)
  * still shows, with the warning under it, until another day or Never is picked.
+ *
+ * `bare` leaves out the label and the hint, for a settings row whose title and description name
+ * and describe the trigger (SettingsRow passes their ids as aria-labelledby and
+ * aria-describedby).
  */
 export function ExpiryPicker({
   value,
   onChange,
+  bare = false,
+  "aria-labelledby": rowLabelledBy,
+  "aria-describedby": rowDescribedBy,
 }: {
   /** unix s; 0 = never. */
   value: number;
   onChange: (value: number) => void;
+  bare?: boolean;
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
 }): JSX.Element {
   const { t, lang } = useT("api");
   const labelId = useId();
@@ -70,62 +80,68 @@ export function ExpiryPicker({
     setOpen(false);
   };
 
+  const picker = (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger
+        aria-describedby={rowDescribedBy}
+        aria-labelledby={`${bare ? (rowLabelledBy ?? "") : labelId} ${valueId}`.trim()}
+        className={selectTriggerVariants()}
+      >
+        <HugeiconsIcon aria-hidden="true" icon={Calendar03Icon} />
+        <span className="min-w-0 flex-1 truncate" id={valueId}>
+          {selected
+            ? dateTimeFormat(lang, { dateStyle: "medium" }).format(selected)
+            : t("form.expiryNone")}
+        </span>
+        {selected && !past ? (
+          <span className="shrink-0 text-muted-foreground text-xs">
+            {formatRelativeTime(value, lang)}
+          </span>
+        ) : null}
+        <HugeiconsIcon
+          aria-hidden="true"
+          className={selectTriggerIconClassName}
+          icon={ChevronDownIcon}
+        />
+      </PopoverTrigger>
+      <PopoverPopup align="start" flush>
+        <div className="flex max-sm:flex-col">
+          <div className="flex gap-0.5 max-sm:order-1 max-sm:mt-2 max-sm:flex-wrap max-sm:border-border-subtle max-sm:border-t max-sm:pt-2 sm:me-2 sm:flex-col sm:border-border-subtle sm:border-e sm:pe-2">
+            {presets.map((preset) => (
+              <Button
+                aria-pressed={value === preset.value}
+                className="justify-start"
+                key={preset.key}
+                onClick={() => pick(preset.value)}
+                size="sm"
+                variant="quiet"
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+          <Calendar
+            disabled={{ before: startOfToday() }}
+            mode="single"
+            month={month}
+            onMonthChange={setMonth}
+            onSelect={(day: Date | undefined) => {
+              if (day) pick(endOfLocalDay(day));
+            }}
+            selected={selected}
+          />
+        </div>
+      </PopoverPopup>
+    </Popover>
+  );
+  if (bare) return picker;
+
   return (
     <div className="flex min-w-0 flex-col items-start gap-2" data-slot="expiry-picker">
       <Label id={labelId} render={<span />}>
         {t("form.expiresAt")}
       </Label>
-      <Popover onOpenChange={setOpen} open={open}>
-        <PopoverTrigger
-          aria-labelledby={`${labelId} ${valueId}`}
-          className={selectTriggerVariants()}
-        >
-          <HugeiconsIcon aria-hidden="true" icon={Calendar03Icon} />
-          <span className="min-w-0 flex-1 truncate" id={valueId}>
-            {selected
-              ? dateTimeFormat(lang, { dateStyle: "medium" }).format(selected)
-              : t("form.expiryNone")}
-          </span>
-          {selected && !past ? (
-            <span className="shrink-0 text-muted-foreground text-xs">
-              {formatRelativeTime(value, lang)}
-            </span>
-          ) : null}
-          <HugeiconsIcon
-            aria-hidden="true"
-            className={selectTriggerIconClassName}
-            icon={ChevronDownIcon}
-          />
-        </PopoverTrigger>
-        <PopoverPopup align="start" flush>
-          <div className="flex max-sm:flex-col">
-            <div className="flex gap-0.5 max-sm:order-1 max-sm:mt-2 max-sm:flex-wrap max-sm:border-border-subtle max-sm:border-t max-sm:pt-2 sm:me-2 sm:flex-col sm:border-border-subtle sm:border-e sm:pe-2">
-              {presets.map((preset) => (
-                <Button
-                  aria-pressed={value === preset.value}
-                  className="justify-start"
-                  key={preset.key}
-                  onClick={() => pick(preset.value)}
-                  size="sm"
-                  variant="quiet"
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-            <Calendar
-              disabled={{ before: startOfToday() }}
-              mode="single"
-              month={month}
-              onMonthChange={setMonth}
-              onSelect={(day: Date | undefined) => {
-                if (day) pick(endOfLocalDay(day));
-              }}
-              selected={selected}
-            />
-          </div>
-        </PopoverPopup>
-      </Popover>
+      {picker}
       {past ? (
         <FieldHint>{t("form.expiresAtPast")}</FieldHint>
       ) : selected ? (

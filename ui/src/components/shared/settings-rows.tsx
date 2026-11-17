@@ -27,7 +27,7 @@ export const ROW_DESCRIPTION = "max-w-2xl text-pretty text-muted-foreground text
 /** A row's inline padding (the card's), for a row element that is not a SettingsRow. */
 export const SETTINGS_ROW_X = "min-w-0 px-4";
 
-type ControlWidth = "field" | "number" | "actions" | "value" | "auto";
+type ControlWidth = "field" | "number" | "actions" | "value" | "block" | "auto";
 
 /*
  * The control sits beside the text once the row has room for both (the text column's 16rem, the
@@ -43,9 +43,23 @@ const CONTROL_WIDTH: Record<ControlWidth, string> = {
   // A value to copy (the public link): its own width beside the text, up to 28rem, then it
   // wraps inside; under the text on a narrow row.
   value: "w-full @xl/settings-row:w-auto @xl/settings-row:max-w-md",
+  // Always under the text at the row's full width: a select whose options are too long to sit
+  // beside the text in a narrow card (a dialog's).
+  block: "w-full",
   // A switch or one button, centred on the title and description beside it, however many lines
   // they take.
   auto: "col-start-2 row-start-1 flex shrink-0 items-center justify-end self-center",
+};
+
+/*
+ * Compact rows (a dialog or a sheet, about 450 px wide): 12 px above and below, the text keeps
+ * 10rem, the gap is 24 px, and a field (14rem) or a number (9rem) goes beside the text as soon as
+ * both fit, under it before that (on a phone). The breakpoints are text + gap + control, so the
+ * control never wraps at its narrow width.
+ */
+const COMPACT_CONTROL_WIDTH: Partial<Record<ControlWidth, string>> = {
+  field: "w-full @min-[25.5rem]/settings-row:w-56",
+  number: "w-full @min-[20.5rem]/settings-row:w-36",
 };
 
 /** A row title: a Label for the control when `htmlFor` is set, red in a danger row. */
@@ -107,6 +121,7 @@ export function SettingsRow({
   control,
   controlWidth = "field",
   labelControl,
+  compact = false,
   children,
   className,
 }: {
@@ -124,6 +139,11 @@ export function SettingsRow({
    * whose own label is its name.
    */
   labelControl?: boolean;
+  /**
+   * For rows in a dialog or a sheet: less padding, and a `field` or `number` control goes beside
+   * the text from a narrower row up (COMPACT_CONTROL_WIDTH).
+   */
+  compact?: boolean;
   children?: ReactNode;
   /** Layout only. */
   className?: string;
@@ -160,7 +180,8 @@ export function SettingsRow({
       {description}
     </p>
   ) : null;
-  const slot = wired ? <div className={CONTROL_WIDTH[controlWidth]}>{wired}</div> : null;
+  const width = (compact && COMPACT_CONTROL_WIDTH[controlWidth]) || CONTROL_WIDTH[controlWidth];
+  const slot = wired ? <div className={width}>{wired}</div> : null;
 
   if (controlWidth === "auto") {
     // Two columns: the title and description beside the control, which sits centred on them;
@@ -193,13 +214,16 @@ export function SettingsRow({
     <HeadingIdContext.Provider value={titleId}>
       <div
         className={cn(
-          "@container/settings-row flex flex-wrap items-center justify-between gap-x-8 gap-y-3 py-4",
+          "@container/settings-row flex flex-wrap items-center justify-between gap-y-3",
+          compact ? "gap-x-6 py-3" : "gap-x-8 py-4",
           SETTINGS_ROW_X,
           className,
         )}
         data-slot="settings-row"
       >
-        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+        <div
+          className={cn("flex min-w-0 flex-1 flex-col gap-1", compact ? "basis-40" : "basis-64")}
+        >
           {titleRow}
           {hint}
           {children}
