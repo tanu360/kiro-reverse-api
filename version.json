@@ -1,5 +1,5 @@
 {
-  "version": "4.0.5",
-  "changelog": "📱 A tidier phone layout: smaller buttons and fields, descriptions across the full width, Refresh in the card's top corner, code snippets that no longer overlap, and no extra \"Copied\" notice where the phone shows its own. On a computer, ← and → (or K and J) move between requests in the request details, and / jumps to the search on Accounts and Requests.",
+  "version": "4.0.6",
+  "changelog": "🔑 A new Create API key form in two steps, Basics and Access, laid out like the Settings page. Expiry dates come from a calendar, and a key can be limited to models picked from a list. Edit opens the same rows in a side sheet. Long tables and the request log also load and redraw faster, and admin pages no longer hold up proxy requests while reading the database.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
