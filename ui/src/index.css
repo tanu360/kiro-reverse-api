@@ -552,6 +552,18 @@
   padding: 0.125rem 0.25rem;
   font-family: var(--font-mono);
   font-size: max(0.85em, 0.75rem);
+
+  /*
+   * Phones, where hints wrap and two chips land on neighbouring lines: a 20 px chip in an 18 px
+   * (or 16 px) line overlapped the chip above. Here the chip is an inline block about 16 px tall
+   * (1.2 line height, 1 px above and below), so it fits its line, and a line holding a taller one
+   * grows instead of overlapping.
+   */
+  @media (width < 40rem) {
+    display: inline-block;
+    padding-block: 0.0625rem;
+    line-height: 1.2;
+  }
 }
 
 /* Chart axis ticks: small mono figures in the chart label grey, for SVG text (fill) and HTML. */
