@@ -10,6 +10,7 @@ import {
   AdminEventsProvider,
   CHANGE_DEBOUNCE_MS,
   type EventSourceLike,
+  MAX_RECONNECT_DELAY_MS,
   useAdminEvent,
   useAdminEventsStatus,
 } from "./admin-events";
@@ -188,6 +189,32 @@ describe("AdminEventsProvider", () => {
     expect(FakeEventSource.instances).toHaveLength(2);
     expect(latest().url).toMatch(/\?ticket=ticket-\d+$/);
     expect(latest().url).not.toBe(first.url);
+  });
+
+  it("backs off while the stream keeps failing and starts over once it opens", async () => {
+    renderProvider();
+    await flush();
+    const fail = () => act(() => latest().onerror?.(new Event("error")));
+
+    fail();
+    await advance(5000);
+    expect(FakeEventSource.instances).toHaveLength(2);
+    fail();
+    await advance(9999);
+    expect(FakeEventSource.instances).toHaveLength(2);
+    await advance(1);
+    expect(FakeEventSource.instances).toHaveLength(3);
+    fail();
+    await advance(20_000);
+    expect(FakeEventSource.instances).toHaveLength(4);
+    fail();
+    await advance(MAX_RECONNECT_DELAY_MS);
+    expect(FakeEventSource.instances).toHaveLength(5);
+
+    act(() => latest().emit("hello"));
+    fail();
+    await advance(5000);
+    expect(FakeEventSource.instances).toHaveLength(6);
   });
 
   it("closes the stream when the session ends", async () => {

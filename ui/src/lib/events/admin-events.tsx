@@ -46,6 +46,8 @@ const EVENT_TYPES: readonly AdminEventType[] = [
 ];
 
 const OBSERVE_DEBOUNCE_MS = 1200;
+/** Failed reconnects back off (5 s, 10 s, 20 s) up to this; an open stream starts over. */
+export const MAX_RECONNECT_DELAY_MS = 30_000;
 /** A batch action or a background sweep sends one change event per row; refetch once. */
 export const CHANGE_DEBOUNCE_MS = 300;
 
@@ -143,6 +145,8 @@ export function AdminEventsProvider(props: {
     let source: EventSourceLike | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let observeTimer: ReturnType<typeof setTimeout> | null = null;
+    // Reconnects in a row without the stream opening, for the backoff.
+    let failures = 0;
     // The observe store's change counter from the last observe_tick on this connection.
     let observeSeq: string | undefined;
     const changeTimers = new Map<ChangeEventType, ReturnType<typeof setTimeout>>();
@@ -168,6 +172,7 @@ export function AdminEventsProvider(props: {
       }
       switch (event.type) {
         case "hello":
+          failures = 0;
           setStatus("open");
           break;
         case "observe_tick":
@@ -206,10 +211,13 @@ export function AdminEventsProvider(props: {
 
     const scheduleReconnect = () => {
       if (disposed || reconnectTimer) return;
+      // A server that stays down is asked for a ticket less and less often, not every 5 s.
+      const delay = Math.min(reconnectDelayMs * 2 ** failures, MAX_RECONNECT_DELAY_MS);
+      failures += 1;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
         void connect();
-      }, reconnectDelayMs);
+      }, delay);
     };
 
     const connect = async () => {
@@ -231,7 +239,9 @@ export function AdminEventsProvider(props: {
       source = es;
       observeSeq = undefined;
       es.onopen = () => {
-        if (source === es) setStatus("open");
+        if (source !== es) return;
+        failures = 0;
+        setStatus("open");
       };
       es.onerror = () => {
         es.close();
