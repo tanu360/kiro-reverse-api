@@ -15,22 +15,24 @@ import (
 const fileName = "kiro.db"
 
 var (
+	// mu guards every variable here. Get, Read and Close open and close under it, so a Close
+	// racing a first Get or Read never leaves a half-made or closed handle behind.
 	mu      sync.RWMutex
 	dataDir string
-	once    sync.Once
 	handle  *sql.DB
 	openErr error
 	// walMode is true once the open handle runs in WAL mode; only then does Read hand out
 	// connections of its own.
 	walMode bool
-
-	readOnce sync.Once
-	reader   *sql.DB
-	readErr  error
+	reader  *sql.DB
 )
 
 // readConns bounds the read pool: a few admin pages and polls reading at once.
 const readConns = 4
+
+// walSwitchWait is how long a start keeps trying to turn an older file to WAL while another
+// program holds it.
+const walSwitchWait = 5 * time.Second
 
 const ddl = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -92,7 +94,9 @@ CREATE TABLE IF NOT EXISTS requests (
   attempts_json TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts DESC, id DESC);
-CREATE INDEX IF NOT EXISTS idx_requests_success ON requests(success);
+-- idx_requests_success_ts below serves every status query; the old one-column index only cost
+-- every logged request a write.
+DROP INDEX IF EXISTS idx_requests_success;
 CREATE INDEX IF NOT EXISTS idx_requests_lookup ON requests(email, account_id, model);
 CREATE INDEX IF NOT EXISTS idx_requests_api_key ON requests(api_key_id, api_key);
 -- A Requests status tab (proxy/observe_persist.go) reads its newest rows in order from this
@@ -216,18 +220,12 @@ CREATE TABLE IF NOT EXISTS error_rollup_daily (
 );
 `
 
-// WAL lets the read pool (Read) query beside the one writer, so an admin search or a usage
-// chart never holds up request logging or a settings save. With synchronous=NORMAL a commit
+// writeParams sets up every writer connection (the driver runs busy_timeout first), so a
+// connection database/sql opens again keeps them too. With synchronous=NORMAL a WAL commit
 // does not wait for the disk: an app crash or restart loses nothing, and a power cut or a
-// host crash can lose the last few seconds of commits, never the file. The mode is kept in
-// the file; journal_size_limit trims the -wal file back after a checkpoint.
-const pragmas = `
-PRAGMA journal_mode=WAL;
-PRAGMA synchronous=NORMAL;
-PRAGMA journal_size_limit=67108864;
-PRAGMA busy_timeout=5000;
-PRAGMA foreign_keys=ON;
-`
+// host crash can lose the last few seconds of commits, never the file. journal_size_limit
+// trims the -wal file back after a checkpoint.
+const writeParams = "?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(67108864)&_pragma=synchronous(1)"
 
 // readParams opens a read connection: query_only refuses any write on it.
 const readParams = "?_pragma=busy_timeout(5000)&_pragma=query_only(1)"
@@ -235,9 +233,10 @@ const readParams = "?_pragma=busy_timeout(5000)&_pragma=query_only(1)"
 func Init(dir string) error {
 	mu.RLock()
 	current := dataDir
-	hasHandle := handle != nil
 	mu.RUnlock()
-	if hasHandle && current != dir {
+	// Another folder starts over: its handles close, and an error from opening the old one
+	// (a folder since deleted) is not kept for the new one.
+	if current != dir {
 		if err := Close(); err != nil {
 			return err
 		}
@@ -259,67 +258,73 @@ func Path() string {
 	return filepath.Join(DataDir(), fileName)
 }
 
+// Get returns the writer: one connection, so writes never wait on each other's locks.
 func Get() (*sql.DB, error) {
-	once.Do(func() {
-		dir := DataDir()
-		if dir == "" {
-			openErr = fmt.Errorf("db: data dir not set, call db.Init first")
-			return
-		}
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			openErr = err
-			return
-		}
-		db, err := sql.Open("sqlite", filepath.Join(dir, fileName))
-		if err != nil {
-			openErr = err
-			return
-		}
-		db.SetMaxOpenConns(1)
-		if _, err := db.Exec(pragmas); err != nil {
-			_ = db.Close()
-			openErr = err
-			return
-		}
-		//! A file system without shared memory (a network share) keeps the old journal: then
-		//! Read hands out this handle, since a separate reader would lock the writer out.
-		var mode string
-		if err := db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil {
-			_ = db.Close()
-			openErr = err
-			return
-		}
-		walMode = strings.EqualFold(mode, "wal")
-		if _, err := db.Exec(ddl); err != nil {
-			_ = db.Close()
-			openErr = err
-			return
-		}
-		if err := addMissingColumns(db, "requests", requestColumnMigrations); err != nil {
-			_ = db.Close()
-			openErr = err
-			return
-		}
-		//! After the column migration: a table from before conversation_id has no column to index yet.
-		if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_requests_conversation ON requests(conversation_id, ts)`); err != nil {
-			_ = db.Close()
-			openErr = err
-			return
-		}
-		if err := addMissingColumns(db, "cooldowns", cooldownColumnMigrations); err != nil {
-			_ = db.Close()
-			openErr = err
-			return
-		}
-		handle = db
-	})
-	if openErr != nil {
-		return nil, openErr
+	mu.RLock()
+	h, err := handle, openErr
+	mu.RUnlock()
+	if h != nil || err != nil {
+		return h, err
 	}
-	if handle == nil {
-		return nil, fmt.Errorf("db: handle nil")
+	mu.Lock()
+	defer mu.Unlock()
+	if handle != nil || openErr != nil {
+		return handle, openErr
 	}
-	return handle, nil
+	handle, walMode, openErr = open(dataDir)
+	return handle, openErr
+}
+
+// open opens the database in dir and brings its schema up to date. It runs under mu.
+func open(dir string) (*sql.DB, bool, error) {
+	if dir == "" {
+		return nil, false, fmt.Errorf("db: data dir not set, call db.Init first")
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, false, err
+	}
+	db, err := sql.Open("sqlite", filepath.Join(dir, fileName)+writeParams)
+	if err != nil {
+		return nil, false, err
+	}
+	db.SetMaxOpenConns(1)
+	fail := func(err error) (*sql.DB, bool, error) {
+		_ = db.Close()
+		return nil, false, err
+	}
+	// WAL lets the read pool (Read) query beside the writer, so an admin search or a usage
+	// chart never holds up request logging or a settings save. The mode is kept in the file.
+	//! Not fatal: turning an older file to WAL needs it to itself for a moment, and another
+	//! program holding it open past busy_timeout (sqlite3, a backup tool) only means this run
+	//! keeps the old journal; the next start tries again. A file system without shared memory
+	//! (a network share) keeps the old journal too, and Read then hands out the writer.
+	//! A retry loop, not busy_timeout alone: SQLite answers SQLITE_BUSY at once, without
+	//! waiting, while another connection holds a write lock the switch would deadlock on.
+	for deadline := time.Now().Add(walSwitchWait); ; {
+		_, err := db.Exec(`PRAGMA journal_mode=WAL`)
+		if err == nil || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	var mode string
+	if err := db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil {
+		return fail(err)
+	}
+	if _, err := db.Exec(ddl); err != nil {
+		return fail(err)
+	}
+	if err := addMissingColumns(db, "requests", requestColumnMigrations); err != nil {
+		return fail(err)
+	}
+	//! After the column migration: a table from before conversation_id has no column to index yet.
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_requests_conversation ON requests(conversation_id, ts)`); err != nil {
+		return fail(err)
+	}
+	if err := addMissingColumns(db, "cooldowns", cooldownColumnMigrations); err != nil {
+		return fail(err)
+	}
+	return db, strings.EqualFold(mode, "wal"), nil
 }
 
 // requestColumnMigrations lists requests columns added after the first
@@ -382,51 +387,56 @@ func addMissingColumns(db *sql.DB, table string, columns []struct{ name, definit
 // beside the writer's one, so a slow read never queues request logging or a save behind it;
 // a read sees every commit made before it starts. Without WAL it is Get's handle.
 func Read() (*sql.DB, error) {
-	w, err := Get()
+	mu.RLock()
+	r := reader
+	mu.RUnlock()
+	if r != nil {
+		return r, nil
+	}
+	if _, err := Get(); err != nil {
+		return nil, err
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if reader != nil {
+		return reader, nil
+	}
+	if handle == nil {
+		// Closed again between Get and here.
+		return nil, fmt.Errorf("db: closed")
+	}
+	if !walMode {
+		reader = handle
+		return reader, nil
+	}
+	r, err := sql.Open("sqlite", filepath.Join(dataDir, fileName)+readParams)
 	if err != nil {
 		return nil, err
 	}
-	readOnce.Do(func() {
-		if !walMode {
-			reader = w
-			return
-		}
-		r, err := sql.Open("sqlite", filepath.Join(DataDir(), fileName)+readParams)
-		if err != nil {
-			readErr = err
-			return
-		}
-		r.SetMaxOpenConns(readConns)
-		r.SetMaxIdleConns(readConns)
-		// An idle connection keeps its page cache; a quiet admin gives it back.
-		r.SetConnMaxIdleTime(5 * time.Minute)
-		reader = r
-	})
-	if readErr != nil {
-		return nil, readErr
-	}
+	r.SetMaxOpenConns(readConns)
+	r.SetMaxIdleConns(readConns)
+	// An idle connection keeps its page cache; a quiet admin gives it back.
+	r.SetConnMaxIdleTime(5 * time.Minute)
+	reader = r
 	return reader, nil
 }
 
+// Close closes both handles; the next Get or Read opens the database again. The read pool
+// closes first, so the writer is the last connection and folds the WAL back into the file.
 func Close() error {
 	mu.Lock()
-	defer mu.Unlock()
+	r, h := reader, handle
+	reader, handle, openErr, walMode = nil, nil, nil, false
+	mu.Unlock()
 	var err error
-	if reader != nil && reader != handle {
-		err = reader.Close()
+	if r != nil && r != h {
+		err = r.Close()
 	}
-	reader = nil
-	readOnce = sync.Once{}
-	readErr = nil
-	if handle != nil {
-		if cerr := handle.Close(); err == nil {
+	if h != nil {
+		if cerr := h.Close(); err == nil {
 			err = cerr
 		}
-		handle = nil
 	}
-	walMode = false
-	once = sync.Once{}
-	openErr = nil
 	return err
 }
 

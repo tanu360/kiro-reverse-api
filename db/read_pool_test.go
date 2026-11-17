@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -94,4 +95,91 @@ func ResetForTestKeep(dir string) error {
 	dataDir = dir
 	mu.Unlock()
 	return nil
+}
+
+// The first start after the upgrade waits for another program's lock (busy_timeout) instead
+// of failing, and still turns the file to WAL.
+func TestWALSwitchWaitsForAnotherConnection(t *testing.T) {
+	dir := t.TempDir()
+	other, err := sql.Open("sqlite", filepath.Join(dir, fileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	other.SetMaxOpenConns(1)
+	if _, err := other.Exec(`PRAGMA journal_mode=DELETE; CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := other.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`INSERT INTO settings VALUES ('held', 'lock')`); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		_ = tx.Commit()
+	}()
+
+	if err := ResetForTestKeep(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Close() })
+	w, err := Get()
+	if err != nil {
+		t.Fatalf("Get while another connection held a write lock: %v", err)
+	}
+	var mode string
+	if err := w.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil || mode != "wal" {
+		t.Fatalf("journal_mode = %q, %v; want wal", mode, err)
+	}
+}
+
+// Close racing Get and Read (a stop while background jobs still query) never crashes and
+// never hands out a closed or nil handle once it settles. Run with -race.
+func TestCloseRacesGetAndRead(t *testing.T) {
+	dir := t.TempDir()
+	if err := ResetForTest(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Close() })
+	if _, err := Get(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+				if r, err := Read(); err == nil && r == nil {
+					panic("Read returned a nil handle without an error")
+				}
+				if w, err := Get(); err == nil && w == nil {
+					panic("Get returned a nil handle without an error")
+				}
+			}
+		}()
+	}
+	for i := 0; i < 50; i++ {
+		_ = Close()
+	}
+	close(done)
+	// The goroutines stop before the test ends, so none opens this folder after it is deleted.
+	wg.Wait()
+	r, err := Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := r.QueryRow(`SELECT COUNT(*) FROM settings`).Scan(&n); err != nil {
+		t.Fatalf("read after the races: %v", err)
+	}
 }

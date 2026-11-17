@@ -131,7 +131,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 ### 🧩 Armazenamento
 
-- Banco de dados SQLite em arquivo único (`modernc.org/sqlite`) em `kiro.db`, no modo de journal DELETE.
+- Banco de dados SQLite em arquivo único (`modernc.org/sqlite`) em `kiro.db`, no modo WAL: as páginas de administração leem ao lado da escrita, então nunca atrasam o registro das requisições. Uma parada normal incorpora o arquivo `kiro.db-wal` de volta ao `kiro.db`; com o servidor rodando, copie também o `kiro.db-wal`.
 - As linhas finais de requisição, mais um resumo das linhas que a retenção de logs removeu, são a fonte da verdade para os totais de requisições, tokens, créditos, sucessos e falhas do painel.
 - Retenção de logs: linhas do log de requisições e de erros com mais de 90 dias (de 1 a 365, ou 0 para guardar para sempre) são excluídas em pequenos lotes, dois minutos depois da inicialização e depois uma vez por dia.
 - Retenção de 30 dias para respostas armazenadas, com gravações assíncronas fora do caminho crítico da requisição.
