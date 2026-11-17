@@ -40,15 +40,17 @@ describe("CopyButton", () => {
   it("is an icon button sized by the Button, with no touch-size override", () => {
     renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);
     const button = screen.getByRole("button", { name: "Copy key" });
+    // The Button's icon size: 32 px on a phone, 36 px from sm up.
     expect(button).not.toHaveClass("size-10");
     expect(button).not.toHaveClass("md:size-8");
-    expect(button).toHaveClass("size-9");
-    expect(button).not.toHaveClass("sm:size-8");
+    expect(button).toHaveClass("size-8");
+    expect(button).toHaveClass("sm:size-9");
   });
 
   it("passes a smaller icon size through", () => {
     renderWithProviders(<CopyButton label="Copy key" size="icon-sm" value="sk-123" />);
-    expect(screen.getByRole("button", { name: "Copy key" })).toHaveClass("size-8");
+    // icon-sm: 28 px on a phone, 32 px from sm up.
+    expect(screen.getByRole("button", { name: "Copy key" })).toHaveClass("size-7", "sm:size-8");
   });
 
   it("shows its label as a small outline button", async () => {
@@ -58,7 +60,8 @@ describe("CopyButton", () => {
     );
     const button = screen.getByRole("button", { name: "Copy link" });
     expect(button).not.toHaveAttribute("aria-label");
-    expect(button).toHaveClass("h-8");
+    // The Button's sm: 28 px on a phone, 32 px from sm up.
+    expect(button).toHaveClass("h-7", "sm:h-8");
     await user.click(button);
     await waitFor(() => expect(button).toHaveAttribute("data-copied"));
   });

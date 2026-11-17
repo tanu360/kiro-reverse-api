@@ -22,7 +22,8 @@ describe("OpenLinkButton", () => {
     );
     const open = screen.getByRole("link", { name: "Open link" });
     const copy = screen.getByRole("button", { name: "Copy link" });
-    expect(open).toHaveClass("size-8");
+    // icon-sm: 28 px on a phone, 32 px from sm up.
+    expect(open).toHaveClass("size-7", "sm:size-8");
     expect(open.className).toBe(copy.className);
   });
 });

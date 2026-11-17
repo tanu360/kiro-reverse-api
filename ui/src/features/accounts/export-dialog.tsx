@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { exportAccounts } from "@/lib/api/accounts";
 import type { Account, ExportData } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
+import { copiedToastWanted } from "@/lib/copy-toast";
 import { saveJson } from "@/lib/download";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
@@ -225,8 +226,9 @@ export function ExportDialog({
     );
     void withBusy("copy", async () => {
       const ok = await copyText(text);
-      if (ok) toast.success(t("export.copied"));
-      else if (failure) toastError(failure, t);
+      if (ok) {
+        if (copiedToastWanted({ marksItself: false })) toast.success(t("export.copied"));
+      } else if (failure) toastError(failure, t);
       else toast.error(tc("toast.copyFailed"));
     });
   };

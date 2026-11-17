@@ -6,6 +6,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
+import { copiedToastWanted } from "@/lib/copy-toast";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
@@ -79,8 +80,9 @@ export function useCopyAccountJson(): (accountId: string) => Promise<boolean> {
         JSON.stringify(buildCopyJson(full), null, 2),
       );
       const ok = await copyText(json);
-      if (ok) toast.success(t("copyJsonSuccess"));
-      else toast.error(t("copyJsonFailed"));
+      if (ok) {
+        if (copiedToastWanted({ marksItself: false })) toast.success(t("copyJsonSuccess"));
+      } else toast.error(t("copyJsonFailed"));
       return ok;
     },
     [t],

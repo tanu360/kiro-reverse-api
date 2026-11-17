@@ -4,6 +4,7 @@ import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
+import { copiedToastWanted } from "@/lib/copy-toast";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,8 @@ import { cn } from "@/lib/utils";
 const COPIED_MS = 2000;
 
 /**
- * Copies a value and says so: a toast, and a tick in place of the copy icon for two seconds.
+ * Copies a value and says so: a tick in place of the copy icon for two seconds, and a toast
+ * except on a phone, where the tick is enough (and Android shows its own "Copied").
  * Icon-only by default, with `label` as its accessible name and tooltip; the touch sizes come
  * from the Button's icon sizes. `showLabel` makes it a small outline button with the label.
  */
@@ -53,7 +55,9 @@ export function CopyButton({
       toast.error(t("toast.copyFailed"));
       return;
     }
-    toast.success(copiedMessage ?? t("toast.copiedToClipboard"));
+    if (copiedToastWanted({ marksItself: true })) {
+      toast.success(copiedMessage ?? t("toast.copiedToClipboard"));
+    }
     setCopied(true);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
