@@ -39,8 +39,9 @@ type SwipeDirection = "up" | "down" | "left" | "right";
  * modal's buttons; the modal's backdrop dims them like the rest of the page. Anchored popups
  * (menus, selects, popovers, tooltips) sit above both at z-70, so a toast never covers one.
  */
-const UNDER_MODALS =
-  "[body:has([data-slot=dialog-popup],[data-slot=alert-dialog-popup],[data-slot=sheet-popup],[data-slot=drawer-popup],[data-slot=command-dialog-popup],[data-slot=sidebar][data-mobile=true])_&]:z-40";
+// The layer comes from index.css (--toast-layer, 40 while a modal is open): a
+// `body:has(…) &` variant here restyled the whole page on every DOM change.
+const UNDER_MODALS = "z-[var(--toast-layer,60)]";
 
 /**
  * The toast's tone: the status icon and the title share one text colour, the type's readable
@@ -145,7 +146,7 @@ function Toasts({
         className={cn(
           // The page gutter: 16 px, 24 px from md up, so a toast lines up with the content column.
           // Phones (below sm) keep the modal gap (5vw, index.css), so a toast is at most 90vw.
-          "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] max-sm:[--toast-inset:max(--spacing(4),var(--modal-gap-x))] md:[--toast-inset:--spacing(6)]",
+          "fixed mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] max-sm:[--toast-inset:max(--spacing(4),var(--modal-gap-x))] md:[--toast-inset:--spacing(6)]",
           UNDER_MODALS,
           // Vertical positioning. Top toasts hang under the app's sticky header (index.css
           // --toast-top-offset); bottom toasts clear the batch bar (--toast-stack-offset).

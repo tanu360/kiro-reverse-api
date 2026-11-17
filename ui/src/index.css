@@ -155,6 +155,23 @@
   }
 }
 
+/*
+ * Toasts drop under the modal layer while a dialog, alert dialog, sheet, drawer, the command
+ * palette or the phone sidebar is open (components/ui/toast.tsx). Set here on the root, like the
+ * offsets above: a `body:has(…) .toast` selector made the browser restyle the whole page (every
+ * element) whenever any element was added or removed, about 200 ms a time on Requests.
+ */
+:root:has(
+  [data-slot="dialog-popup"],
+  [data-slot="alert-dialog-popup"],
+  [data-slot="sheet-popup"],
+  [data-slot="drawer-popup"],
+  [data-slot="command-dialog-popup"],
+  [data-slot="sidebar"][data-mobile="true"]
+) {
+  --toast-layer: 40;
+}
+
 .dark {
   color-scheme: dark;
   /*
