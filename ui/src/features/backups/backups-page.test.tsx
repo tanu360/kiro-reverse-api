@@ -248,7 +248,7 @@ describe("BackupsPage", () => {
     expect(filename).toBe(`kiro-backup-${first.id}.json`);
   });
 
-  it("restores a backup only after confirmation, then announces it and signs out", async () => {
+  it("restores a backup only after confirmation, then signs out", async () => {
     const restored: string[] = [];
     mockServer.use(
       http.post(apiUrl("/backups/:id/restore"), ({ params }) => {
@@ -283,10 +283,8 @@ describe("BackupsPage", () => {
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
     await waitFor(() => expect(order).toContain("session:restored"));
     expect(restored).toEqual([first.id]);
-    expect(order).toEqual([
-      "announce:Backup restored. Sign in with the password stored in the backup.",
-      "session:restored",
-    ]);
+    // The sign-in page says the backup was restored (routes/-guards.test.tsx), nothing here.
+    expect(order).toEqual(["session:restored"]);
     expect(getSession()).toBeNull();
   });
 
@@ -371,7 +369,7 @@ describe("BackupsPage", () => {
     expect(screen.getByRole("button", { name: "Restore from file" })).toHaveFocus();
   });
 
-  it("restores from a valid file, then announces it and signs out", async () => {
+  it("restores from a valid file, then signs out", async () => {
     const { user } = await renderPage();
     const input = screen.getByTestId("backup-upload-input") as HTMLInputElement;
     const backup = {
@@ -383,8 +381,7 @@ describe("BackupsPage", () => {
     };
     await user.upload(input, new File([JSON.stringify(backup)], "good.json"));
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    await expectAnnounced("Backup restored. Sign in with the password stored in the backup.");
-    expect(sessionEvents).toEqual(["restored"]);
+    await waitFor(() => expect(sessionEvents).toEqual(["restored"]));
     const rollback = mockDb.backups.find(
       (row) => row.kind === "pre-restore" && row.restoredAccountCnt === 2,
     );

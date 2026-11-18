@@ -202,11 +202,10 @@ export function BackupsPage(): JSX.Element {
   };
 
   // The server revoked every admin session, this one included. The root route sends the
-  // browser to sign-in once the session is cleared.
+  // browser to sign-in, which says the backup was restored, once the session is cleared.
   const finishRestore = useCallback(() => {
-    announce(t("restored"));
     clearSession("restored");
-  }, [t]);
+  }, []);
 
   const restoreConfirm = useCallback(
     (title: string, target?: string) =>

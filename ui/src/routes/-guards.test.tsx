@@ -162,6 +162,25 @@ describe("route guards", () => {
     expect(notice.closest("[role=alert]")).not.toBeNull();
   });
 
+  it("goes to sign-in, which says the backup was restored, after a restore", async () => {
+    authed.mockReturnValue(true);
+    const { router, user } = await renderApp("/backups");
+    authed.mockReturnValue(false);
+    act(() => {
+      for (const listener of sessionListeners) listener(null, "restored");
+    });
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+    expect(router.state.location.search).toEqual({});
+    const notice = await screen.findByText(
+      "Backup restored. Sign in with the password stored in the backup.",
+    );
+    expect(notice.closest("[role=alert]")).not.toBeNull();
+    expect(screen.queryByText("Your session expired. Sign in again.")).toBeNull();
+    // The next attempt takes its place.
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(screen.queryByText(notice.textContent ?? "")).toBeNull();
+  });
+
   it("says nothing about an expired session after a sign-out", async () => {
     authed.mockReturnValue(true);
     const { router } = await renderApp("/accounts");
