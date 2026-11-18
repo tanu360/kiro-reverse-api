@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
+import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { resetProxyPoolMock, seedProxyPoolMock } from "./mocks";
@@ -52,6 +54,19 @@ afterEach(() => {
   mockServer.events.removeListener("request:start", onRequestStart);
 });
 
+/** Read out by the app's live region, in place of a success toast. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
+/** The card's one-line failure notice. */
+async function actionError(): Promise<HTMLElement> {
+  const notice = await screen.findByRole("alert");
+  expect(notice).toHaveAttribute("data-slot", "action-error");
+  return notice;
+}
+
 async function renderCard() {
   const result = renderWithProviders(<ProxyPoolCard />);
   await screen.findByRole("switch", { name: "Use the proxy pool" });
@@ -91,7 +106,11 @@ describe("ProxyPoolCard", () => {
     await user.type(within(dialog).getByLabelText("Password"), "pw");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
+    // Save reads Saved for a moment over the new row, then the dialog closes.
+    expect(await within(dialog).findByRole("button", { name: "Saved" })).toBeInTheDocument();
     expect(await screen.findByText("Home")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await expectAnnounced("The proxy was added and is being checked.");
     expect(await writes()).toEqual([
       {
         method: "POST",
@@ -123,6 +142,7 @@ describe("ProxyPoolCard", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("Berlin")).toBeInTheDocument();
+    await expectAnnounced("The proxy was saved.");
     const [put] = await writes();
     expect(put.method).toBe("PUT");
     expect(put.path).toBe("/proxy-pool/proxies/px_1");
@@ -142,7 +162,7 @@ describe("ProxyPoolCard", () => {
     const { user } = await renderCard();
     await user.click(await screen.findByRole("button", { name: "Check all" }));
 
-    expect(await screen.findByText("Every proxy was checked.")).toBeInTheDocument();
+    await expectAnnounced("Every proxy was checked.");
     // One failed check is a strike, not a verdict: the proxy stays in rotation, marked unhealthy.
     expect(await screen.findByText("Unhealthy")).toBeInTheDocument();
     expect(
@@ -160,11 +180,9 @@ describe("ProxyPoolCard", () => {
     const { user } = await renderCard();
     await user.click(await screen.findByRole("button", { name: "Test" }));
 
-    // The toast and its live-region copy.
-    expect(
-      await screen.findAllByText("Dead is not reachable. The proxy refused the connection."),
-    ).not.toHaveLength(0);
+    // The row shows the result; a screen reader hears it.
     expect(await screen.findByText(/Last error: The proxy refused the connection\./)).toBeVisible();
+    await expectAnnounced("Dead is not reachable. The proxy refused the connection.");
     // Details opens on a click or tap as well as on hover, and keyboard focus reaches it.
     const details = screen.getByRole("button", { name: "Details" });
     await user.click(details);
@@ -201,7 +219,7 @@ describe("ProxyPoolCard", () => {
     const toggle = screen.getByRole("switch", { name: "Use the proxy pool" });
     await user.click(toggle);
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     await waitFor(() => expect(toggle).toBeChecked());
     expect(await writes()).toEqual([
       { method: "PUT", path: "/proxy-pool/settings", body: { mode: "on" } },
@@ -215,17 +233,133 @@ describe("ProxyPoolCard", () => {
     const confirm = await screen.findByRole("alertdialog");
     await user.click(within(confirm).getByRole("button", { name: "Remove" }));
 
-    expect(await screen.findByText("The proxy was removed.")).toBeInTheDocument();
     expect(await screen.findByText(/No proxies yet/)).toBeInTheDocument();
+    await expectAnnounced("The proxy was removed.");
+    // The row and its Remove are gone: focus is on Add proxy, not the page.
+    await waitFor(() => expect(document.activeElement).toHaveAccessibleName("Add proxy"));
+  });
+
+  it("moves focus to the next row's Remove after a remove", async () => {
+    const tokyo = { ...frankfurt, id: "px_2", label: "Tokyo", url: "http://10.0.0.2:3128" };
+    seedProxyPoolMock({ proxies: [frankfurt, tokyo] });
+    const { user } = await renderCard();
+    const [first] = await screen.findAllByRole("button", { name: "Remove" });
+    await user.click(first);
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(screen.queryByText("Frankfurt")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("aria-description", "Tokyo"),
+    );
+    expect(document.activeElement).toHaveAccessibleName("Remove");
+  });
+
+  it("shows a failed remove in the card, and Try again removes without asking again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.delete(apiUrl("/proxy-pool/proxies/:id"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    await user.click(await screen.findByRole("button", { name: "Remove" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }),
+    );
+
+    const notice = await actionError();
+    expect(notice).toHaveTextContent("boom");
+    expect(screen.getByText("Frankfurt")).toBeInTheDocument();
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText(/No proxies yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await expectAnnounced("The proxy was removed.");
+  });
+
+  it("shows a failed switch in the card until it is closed, then focuses the switch", async () => {
+    mockServer.use(
+      http.put(apiUrl("/proxy-pool/proxies/:id"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    const toggle = await screen.findByRole("switch", { name: "Use Frankfurt" });
+    await user.click(toggle);
+
+    const notice = await actionError();
+    // The switch goes back to the saved state.
+    await waitFor(() => expect(toggle).toBeChecked());
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("keeps a proxy's switch at its new state, disabled, while it saves", async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockServer.use(
+      http.put(apiUrl("/proxy-pool/proxies/:id"), async () => {
+        await held;
+        return undefined;
+      }),
+    );
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    const toggle = await screen.findByRole("switch", { name: "Use Frankfurt" });
+    await user.click(toggle);
+
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    expect(toggle).toHaveAttribute("aria-disabled", "true");
+    release();
+    expect(await screen.findByText("Off")).toBeInTheDocument();
+    await waitFor(() => expect(toggle).not.toHaveAttribute("aria-disabled"));
+    expect(toggle).not.toBeChecked();
+  });
+
+  it("shows a switched-off proxy's failed test in its row", async () => {
+    const dead = { ...frankfurt, id: "px_2", label: "Dead", url: "http://127.0.0.1:9" };
+    seedProxyPoolMock({ proxies: [{ ...dead, enabled: false }] });
+    const { user } = await renderCard();
+    await user.click(await screen.findByRole("button", { name: "Test" }));
+
+    expect(
+      await screen.findByText(/Switched off\. .* Last error: The proxy refused the connection\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Off")).toBeInTheDocument();
+    await expectAnnounced("Dead is not reachable. The proxy refused the connection.");
+  });
+
+  it("shows a failed save in the editor and keeps it open", async () => {
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    await user.click(screen.getByRole("button", { name: "Add proxy" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Host"), "10.0.0.1");
+    await user.type(within(dialog).getByLabelText("Port"), "1080");
+    await user.type(within(dialog).getByLabelText("Username"), "bob");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    const notice = await within(dialog).findByRole("alert");
+    expect(notice).toHaveTextContent("This proxy is already in the pool.");
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBe(dialog);
   });
 
   it("takes a proxy out after three failed checks in a row", async () => {
     const dead = { ...frankfurt, id: "px_2", label: "Dead", url: "http://127.0.0.1:9" };
     seedProxyPoolMock({ proxies: [frankfurt, dead] });
     const { user } = await renderCard();
-    for (let i = 0; i < 3; i++) {
+    const strikes = [/Failed 1 time in a row\./, /Failed 2 times in a row\./, /Failed 3 times/];
+    for (const strike of strikes) {
       await user.click(await screen.findByRole("button", { name: "Check all" }));
-      expect(await screen.findAllByText("Every proxy was checked.")).not.toHaveLength(0);
+      expect(await screen.findByText(strike)).toBeInTheDocument();
     }
     expect(await screen.findByText("Auto-disabled")).toBeInTheDocument();
     expect(
@@ -242,10 +376,8 @@ describe("ProxyPoolCard", () => {
     expect(toggle).toBeChecked();
     await user.click(toggle);
 
-    expect(
-      await screen.findAllByText("Frankfurt is off. Its accounts moved to other proxies."),
-    ).not.toHaveLength(0);
     expect(await screen.findByText("Off")).toBeInTheDocument();
+    await expectAnnounced("Frankfurt is off. Its accounts moved to other proxies.");
     expect(
       screen.getByText("Switched off. It is not used or checked until you switch it on."),
     ).toBeInTheDocument();
@@ -274,12 +406,16 @@ describe("ProxyPoolCard", () => {
     const confirm = await screen.findByRole("alertdialog");
     await user.click(within(confirm).getByRole("button", { name: "Add to pool" }));
 
-    expect(
-      await screen.findAllByText(
-        "http://open.example:8080 was added to the pool and is being checked.",
-      ),
-    ).not.toHaveLength(0);
     expect(await screen.findByText("Also in the pool")).toBeInTheDocument();
+    await expectAnnounced("http://open.example:8080 was added to the pool and is being checked.");
+    // Add to pool went with the result: focus is on the row's Test, not the page.
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute(
+        "aria-description",
+        "http://open.example:8080",
+      ),
+    );
+    expect(document.activeElement).toHaveAccessibleName("Test");
     const adoptWrites = (await writes()).filter((w) => w.path.endsWith("/adopt"));
     expect(adoptWrites).toHaveLength(1);
     expect(adoptWrites[0].path).toMatch(/^\/proxy-pool\/detected\/dx_[0-9a-f]+\/adopt$/);
