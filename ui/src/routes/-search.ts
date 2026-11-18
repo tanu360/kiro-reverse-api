@@ -28,7 +28,7 @@ export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
  * (banned, suspended, no token, out of credits, token expired). The status tabs set active,
  * attention or disabled; a single problem status (an old link, or the Issue select) still works.
  */
-export const ACCOUNT_STATUS_FILTERS = [...ACCOUNT_STATUSES, "attention"] as const;
+const ACCOUNT_STATUS_FILTERS = [...ACCOUNT_STATUSES, "attention"] as const;
 export type AccountStatusFilter = (typeof ACCOUNT_STATUS_FILTERS)[number];
 
 /** Sortable Accounts columns; the ids match the table's column ids. */

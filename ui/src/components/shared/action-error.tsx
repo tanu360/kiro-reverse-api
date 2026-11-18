@@ -1,17 +1,13 @@
 import { AlertCircleIcon, Refresh01Icon, XIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useEffect, useRef } from "react";
-import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
-import { NOTICE_ACTIONS_CLASS, NOTICE_LINE_CLASS, NoticeIconButton } from "./notice-line";
+import { NoticeIconButton, NoticeLine } from "./notice-line";
 
 /**
- * A failed action, said where it was done (a card, a form), in place of an error toast: one
- * plain line with the server's reason (the place says what failed), then Try again and close as
- * bare icons, kept beside the text on a phone too. Its alert role reads it out at once; each new
- * failure scrolls it into view.
+ * A failed action, said where it was done (a card, a form): one plain line with the server's
+ * reason (the place says what failed), then Try again and close as bare icons, kept beside the
+ * text on a phone too. Its alert role reads it out at once; each new failure scrolls it into view.
  */
 export function ActionError({
   error,
@@ -44,26 +40,26 @@ export function ActionError({
   }, [error, message]);
 
   return (
-    <Alert
-      className={cn(NOTICE_LINE_CLASS, className)}
+    <NoticeLine
+      actions={
+        onRetry || onDismiss ? (
+          <>
+            {onRetry ? (
+              <NoticeIconButton icon={Refresh01Icon} label={t("actions.retry")} onClick={onRetry} />
+            ) : null}
+            {onDismiss ? (
+              <NoticeIconButton icon={XIcon} label={t("actions.close")} onClick={onDismiss} />
+            ) : null}
+          </>
+        ) : null
+      }
+      className={className}
       data-slot="action-error"
+      icon={AlertCircleIcon}
       ref={ref}
       variant="error"
     >
-      <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-      <AlertDescription className="wrap-break-word">
-        {message ?? (typeof error === "string" ? error : errorMessage(error, t))}
-      </AlertDescription>
-      {onRetry || onDismiss ? (
-        <AlertAction className={NOTICE_ACTIONS_CLASS}>
-          {onRetry ? (
-            <NoticeIconButton icon={Refresh01Icon} label={t("actions.retry")} onClick={onRetry} />
-          ) : null}
-          {onDismiss ? (
-            <NoticeIconButton icon={XIcon} label={t("actions.close")} onClick={onDismiss} />
-          ) : null}
-        </AlertAction>
-      ) : null}
-    </Alert>
+      {message ?? (typeof error === "string" ? error : errorMessage(error, t))}
+    </NoticeLine>
   );
 }

@@ -24,7 +24,7 @@
   "copyPassword": "Sao chép mật khẩu",
   "clickToCopy": "Nhấn để sao chép",
   "passwordCopied": "Đã sao chép mật khẩu vào bộ nhớ tạm",
-  "changePasswordToast": "Đổi mật khẩu được tạo tự động trong Cài đặt.",
+  "changePasswordHint": "Đổi mật khẩu được tạo tự động trong Cài đặt.",
   "openSettings": "Mở cài đặt",
   "codePrompt": "Nhập mã 6 chữ số trong ứng dụng xác thực.",
   "recoveryPrompt": "Nhập một mã khôi phục bạn đã lưu. Mỗi mã chỉ dùng được một lần.",

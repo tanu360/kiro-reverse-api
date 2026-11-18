@@ -1,13 +1,7 @@
 import { ArrowRight02Icon, InformationCircleIcon, XIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { type JSX, useEffect, useSyncExternalStore } from "react";
-import {
-  NOTICE_ACTIONS_CLASS,
-  NOTICE_LINE_CLASS,
-  NoticeIconButton,
-} from "@/components/shared/notice-line";
-import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { NoticeIconButton, NoticeLine } from "@/components/shared/notice-line";
 import { SECTION_ID, sectionPagePath } from "@/features/settings/sections/sections";
 import { subscribeSession } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
@@ -67,35 +61,36 @@ export function ChangePasswordNotice(): JSX.Element | null {
 
   if (!visible || onSettings) return null;
   return (
-    <Alert
-      className={NOTICE_LINE_CLASS}
+    <NoticeLine
+      actions={
+        <>
+          <NoticeIconButton
+            icon={ArrowRight02Icon}
+            label={t("openSettings")}
+            onClick={() =>
+              void navigate({
+                to: sectionPagePath(SECTION_ID.adminPassword),
+                hash: SECTION_ID.adminPassword,
+              })
+            }
+          />
+          <NoticeIconButton
+            icon={XIcon}
+            label={tc("actions.close")}
+            onClick={() => {
+              setShown(false);
+              // The close button goes with the notice: focus stays on the page, not the body.
+              document.getElementById("main")?.focus();
+            }}
+          />
+        </>
+      }
       data-slot="change-password-notice"
+      icon={InformationCircleIcon}
       role="status"
       variant="info"
     >
-      <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
-      <AlertDescription>{t("changePasswordToast")}</AlertDescription>
-      <AlertAction className={NOTICE_ACTIONS_CLASS}>
-        <NoticeIconButton
-          icon={ArrowRight02Icon}
-          label={t("openSettings")}
-          onClick={() =>
-            void navigate({
-              to: sectionPagePath(SECTION_ID.adminPassword),
-              hash: SECTION_ID.adminPassword,
-            })
-          }
-        />
-        <NoticeIconButton
-          icon={XIcon}
-          label={tc("actions.close")}
-          onClick={() => {
-            setShown(false);
-            // The close button goes with the notice: focus stays on the page, not the body.
-            document.getElementById("main")?.focus();
-          }}
-        />
-      </AlertAction>
-    </Alert>
+      {t("changePasswordHint")}
+    </NoticeLine>
   );
 }

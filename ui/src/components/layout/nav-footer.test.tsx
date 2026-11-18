@@ -148,7 +148,7 @@ describe("NavFooter update card", () => {
     expect(
       (await screen.findAllByText("Ready to install", {}, { timeout: 4000 })).length,
     ).toBeGreaterThan(0);
-    // The card's own button offers the restart (no toast).
+    // The card's own button offers the restart.
     const restart = screen
       .getAllByRole("button", { name: "Restart to update" })
       .find((element) => element.dataset.slot === "update-status-button");

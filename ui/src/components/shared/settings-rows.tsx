@@ -377,7 +377,7 @@ export function SubmitButton({
 
 /**
  * Save: outline and inert while there is nothing to save, primary once there is. `saved` (a
- * useSavedFlash) reads "Saved" with a tick for a moment after a save, in place of a toast.
+ * useSavedFlash) reads "Saved" with a tick for a moment after a save.
  */
 export function SaveButton({
   dirty,

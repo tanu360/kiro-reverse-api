@@ -59,9 +59,9 @@ export interface SelfUpdate {
  * The self-update for the update notice and dialog. The server is asked only when it runs
  * outside a container and a newer release is known; an older server without the endpoint answers
  * 404, which reads as "cannot update itself", so the dialog shows the manual steps. Every step
- * and failure shows in the sidebar's update card and in the dialog, never in a toast. The card
- * is out of sight in the icon rail and on a phone, so screen readers also hear this page's
- * download landing and a download or restart that failed.
+ * and failure shows in the sidebar's update card and in the dialog. The card is out of sight in
+ * the icon rail and on a phone, so screen readers also hear this page's download landing and a
+ * download or restart that failed.
  */
 export function useSelfUpdateController({
   target,
@@ -149,7 +149,7 @@ export function useSelfUpdateController({
     const was = previous.current;
     previous.current = phase;
     if (phase !== "ready" || (was !== "downloading" && was !== "starting")) return;
-    announce(tRef.current("shell.update.readyToast", { latest: target }));
+    announce(tRef.current("shell.update.readyNotice", { latest: target }));
   }, [phase, target]);
 
   return useMemo(

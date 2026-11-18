@@ -24,7 +24,7 @@
   "copyPassword": "Copy password",
   "clickToCopy": "Click to copy",
   "passwordCopied": "Password copied to clipboard",
-  "changePasswordToast": "Change the generated password in Settings.",
+  "changePasswordHint": "Change the generated password in Settings.",
   "openSettings": "Open settings",
   "codePrompt": "Enter the 6-digit code from your authenticator app.",
   "recoveryPrompt": "Enter one of the recovery codes you saved. Each one works once.",

@@ -119,7 +119,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
           if (readStorage(ANNOUNCED_VERSION_KEY) === version) return;
           writeStorage(ANNOUNCED_VERSION_KEY, version);
           // The card appears in the sidebar by itself; a screen reader hears it once.
-          announce(tRef.current("shell.update.availableToast", { latest: version }));
+          announce(tRef.current("shell.update.availableNotice", { latest: version }));
         })
         // The silent check never reports errors.
         .catch(() => {});
