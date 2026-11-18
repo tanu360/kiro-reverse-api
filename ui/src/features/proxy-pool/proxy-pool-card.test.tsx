@@ -352,6 +352,127 @@ describe("ProxyPoolCard", () => {
     expect(screen.getByRole("dialog")).toBe(dialog);
   });
 
+  it("tries a failed settings save again from the card", async () => {
+    let fail = true;
+    mockServer.use(
+      http.put(apiUrl("/proxy-pool/settings"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    const toggle = screen.getByRole("switch", { name: "Use the proxy pool" });
+    await user.click(toggle);
+
+    const notice = await actionError();
+    expect(toggle).not.toBeChecked();
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await expectAnnounced("Your settings were saved.");
+    await waitFor(() => expect(toggle).toBeChecked());
+    const saves = (await writes()).filter((w) => w.path === "/proxy-pool/settings");
+    expect(saves).toHaveLength(2);
+  });
+
+  it("shows a failed switch only once the switch is back, so Try again can't overlap it", async () => {
+    let hold = false;
+    let held = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockServer.use(
+      http.put(apiUrl("/proxy-pool/proxies/:id"), () => {
+        hold = true;
+        return HttpResponse.json({ error: "boom" }, { status: 500 });
+      }),
+      http.get(apiUrl("/proxy-pool"), async () => {
+        if (!hold) return undefined;
+        held++;
+        await gate;
+        return undefined;
+      }),
+    );
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    const toggle = screen.getByRole("switch", { name: "Use Frankfurt" });
+    await user.click(toggle);
+
+    await waitFor(() => expect(held).toBe(1));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-disabled", "true");
+    release();
+    await actionError();
+    expect(toggle).not.toHaveAttribute("aria-disabled");
+    expect(toggle).toBeChecked();
+  });
+
+  it("closes a failed remove's notice on Try again once the proxy is gone anyway", async () => {
+    mockServer.use(
+      http.delete(apiUrl("/proxy-pool/proxies/:id"), () => {
+        // It went meanwhile: another tab, or a remove that went through but timed out.
+        seedProxyPoolMock({ proxies: [] });
+        return HttpResponse.json({ error: "boom" }, { status: 500 });
+      }),
+    );
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    await user.click(await screen.findByRole("button", { name: "Remove" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }),
+    );
+    const notice = await actionError();
+    expect(screen.getByText(/No proxies yet/)).toBeInTheDocument();
+
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await expect(screen.findByRole("alert", {}, { timeout: 300 })).rejects.toThrow();
+    expect(document.activeElement).toHaveAccessibleName("Add proxy");
+    expect((await writes()).filter((w) => w.method === "DELETE")).toHaveLength(1);
+  });
+
+  it("still moves focus after a remove when another remove fails meanwhile", async () => {
+    const tokyo = { ...frankfurt, id: "px_2", label: "Tokyo", url: "http://10.0.0.2:3128" };
+    const paris = { ...frankfurt, id: "px_3", label: "Paris", url: "http://10.0.0.3:3128" };
+    seedProxyPoolMock({ proxies: [frankfurt, tokyo, paris] });
+    let started = 0;
+    let failFrankfurt: () => void = () => {};
+    const frankfurtGate = new Promise<void>((resolve) => {
+      failFrankfurt = resolve;
+    });
+    let passTokyo: () => void = () => {};
+    const tokyoGate = new Promise<void>((resolve) => {
+      passTokyo = resolve;
+    });
+    mockServer.use(
+      http.delete(apiUrl("/proxy-pool/proxies/:id"), async ({ params }) => {
+        started++;
+        if (params.id === "px_1") {
+          await frankfurtGate;
+          return HttpResponse.json({ error: "boom" }, { status: 500 });
+        }
+        await tokyoGate;
+        return undefined;
+      }),
+    );
+    const { user } = await renderCard();
+    const [removeFrankfurt, removeTokyo] = screen.getAllByRole("button", { name: "Remove" });
+    for (const button of [removeFrankfurt, removeTokyo]) {
+      await user.click(button);
+      const confirm = await screen.findByRole("alertdialog");
+      await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    }
+    await waitFor(() => expect(started).toBe(2));
+
+    failFrankfurt();
+    await actionError();
+    passTokyo();
+    await waitFor(() => expect(screen.queryByText("Tokyo")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("aria-description", "Paris"),
+    );
+  });
+
   it("takes a proxy out after three failed checks in a row", async () => {
     const dead = { ...frankfurt, id: "px_2", label: "Dead", url: "http://127.0.0.1:9" };
     seedProxyPoolMock({ proxies: [frankfurt, dead] });

@@ -139,6 +139,26 @@ interface PoolFailure {
   retry: () => void;
   /** Where focus goes as the notice goes: the control that ran the action. */
   focus: () => void;
+  /** Nothing is left to run again: its row is gone (or already in the pool). */
+  moot?: (view: ProxyPoolView) => boolean;
+}
+
+/** A request's result, or its error, so the row can be read again before either shows. */
+type Attempt<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+async function attempt<T>(request: () => Promise<T>): Promise<Attempt<T>> {
+  try {
+    return { ok: true, value: await request() };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+/** Whether the view still has a pool or detected row with this id. */
+function hasRow(view: ProxyPoolView, id: string): boolean {
+  return (
+    view.proxies.some((item) => item.id === id) || view.detected.some((item) => item.id === id)
+  );
 }
 
 /** Where focus goes once the view shows a result that took the focused control. */
@@ -162,7 +182,7 @@ function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet
  * No toasts: a row shows its own result (its state, last check and error, the row going away),
  * its control spins meanwhile, a screen reader hears the result, and a failure shows at the top
  * of the card. Each row stays pending until the pool is read again, so nothing flips back for a
- * moment.
+ * moment; a failure shows only then, so its Try again never runs beside the first try.
  */
 function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const { t } = useT("proxy-pool");
@@ -211,8 +231,6 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const focusRow = (id: string, action: RowAction) => {
     (rowControl(id, action) ?? addRef.current)?.focus();
   };
-  const fail = (error: unknown, retry: () => void, focus: () => void) =>
-    setFailure({ error, retry, focus });
 
   const settings = useMutation({
     mutationFn: updateProxyPoolSettings,
@@ -232,11 +250,12 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
           : patch.directFallback !== undefined
             ? fallbackRef
             : intervalRef;
-      fail(
+      // `mutate`, not saveSettings: this closure is from a render where the save was pending.
+      setFailure({
         error,
-        () => saveSettings(patch),
-        () => control.current?.focus(),
-      );
+        retry: () => settings.mutate(patch),
+        focus: () => control.current?.focus(),
+      });
     },
     onSettled: () => setPending(null),
   });
@@ -253,35 +272,35 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       announce(t("card.checkAllDone"));
     },
     onError: (error) =>
-      fail(
+      setFailure({
         error,
-        () => checkAll.mutate(),
-        () => checkAllRef.current?.focus(),
-      ),
+        retry: () => checkAll.mutate(),
+        focus: () => checkAllRef.current?.focus(),
+      }),
   });
 
   /** Tests one proxy: its row shows the result (state, last check, error) as Test stops. */
   const runTest = async (id: string, name: string, check: () => Promise<PoolProxyHealth>) => {
     setFailure(null);
     setTesting((prev) => toggled(prev, id, true));
-    let result: string | null = null;
-    try {
-      const { status, failures, errorCode, errorStatus } = await check();
-      result =
-        status === "ok" && !failures
-          ? t("card.testOk", { name })
-          : t("card.testFailed", { name, error: proxyFailureSentence(errorCode, errorStatus, t) });
-    } catch (error) {
-      fail(
-        error,
-        () => void runTest(id, name, check),
-        () => focusRow(id, "test"),
-      );
-    } finally {
-      await reload();
-      setTesting((prev) => toggled(prev, id, false));
+    const result = await attempt(check);
+    await reload();
+    setTesting((prev) => toggled(prev, id, false));
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void runTest(id, name, check),
+        focus: () => focusRow(id, "test"),
+        moot: (next) => !hasRow(next, id),
+      });
+      return;
     }
-    if (result) announce(result);
+    const { status, failures, errorCode, errorStatus } = result.value;
+    announce(
+      status === "ok" && !failures
+        ? t("card.testOk", { name })
+        : t("card.testFailed", { name, error: proxyFailureSentence(errorCode, errorStatus, t) }),
+    );
   };
   const test = (proxy: PoolProxy) =>
     runTest(proxy.id, mask(proxyName(proxy)), () =>
@@ -296,54 +315,49 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const toggle = async (proxy: PoolProxy, enabled: boolean) => {
     setFailure(null);
     setSwitching((prev) => new Map(prev).set(proxy.id, enabled));
-    let done = false;
-    try {
-      await setPoolProxyEnabled(proxy.id, enabled);
-      done = true;
-    } catch (error) {
-      fail(
-        error,
-        () => void toggle(proxy, enabled),
-        () => focusRow(proxy.id, "switch"),
-      );
-    } finally {
-      await reload();
-      setSwitching((prev) => {
-        const next = new Map(prev);
-        next.delete(proxy.id);
-        return next;
+    const result = await attempt(() => setPoolProxyEnabled(proxy.id, enabled));
+    await reload();
+    setSwitching((prev) => {
+      const next = new Map(prev);
+      next.delete(proxy.id);
+      return next;
+    });
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void toggle(proxy, enabled),
+        focus: () => focusRow(proxy.id, "switch"),
+        moot: (next) => !hasRow(next, proxy.id),
       });
+      return;
     }
-    if (done) {
-      const name = mask(proxyName(proxy));
-      announce(enabled ? t("card.switchedOn", { name }) : t("card.switchedOff", { name }));
-    }
+    const name = mask(proxyName(proxy));
+    announce(enabled ? t("card.switchedOn", { name }) : t("card.switchedOff", { name }));
   };
 
   /** Add to pool spins; then the row says it is also in the pool, and the pool has a new row. */
   const runAdopt = async (proxy: DetectedProxy) => {
     setFailure(null);
-    refocus.current = {
-      done: (next) => !next.detected.some((item) => item.id === proxy.id && item.canAdopt),
-      focus: () => focusRow(proxy.id, "test"),
-    };
+    const adopted = (next: ProxyPoolView) =>
+      !next.detected.some((item) => item.id === proxy.id && item.canAdopt);
+    const mine: Refocus = { done: adopted, focus: () => focusRow(proxy.id, "test") };
+    refocus.current = mine;
     setBusy((prev) => toggled(prev, proxy.id, true));
-    let done = false;
-    try {
-      await adoptDetectedProxy(proxy.id);
-      done = true;
-    } catch (error) {
-      refocus.current = null;
-      fail(
-        error,
-        () => void runAdopt(proxy),
-        () => focusRow(proxy.id, "adopt"),
-      );
-    } finally {
-      await reload();
-      setBusy((prev) => toggled(prev, proxy.id, false));
+    const result = await attempt(() => adoptDetectedProxy(proxy.id));
+    // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
+    if (!result.ok && refocus.current === mine) refocus.current = null;
+    await reload();
+    setBusy((prev) => toggled(prev, proxy.id, false));
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void runAdopt(proxy),
+        focus: () => focusRow(proxy.id, "adopt"),
+        moot: adopted,
+      });
+      return;
     }
-    if (done) announce(t("detected.adopted", { name: mask(proxy.url) }));
+    announce(t("detected.adopted", { name: mask(proxy.url) }));
   };
 
   const adopt = async (proxy: DetectedProxy) => {
@@ -358,8 +372,9 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   /** Remove spins; then the row goes. */
   const runRemove = async (proxy: PoolProxy, order: readonly string[]) => {
     setFailure(null);
-    refocus.current = {
-      done: (next) => !next.proxies.some((item) => item.id === proxy.id),
+    const gone = (next: ProxyPoolView) => !next.proxies.some((item) => item.id === proxy.id);
+    const mine: Refocus = {
+      done: gone,
       focus: () => {
         const index = order.indexOf(proxy.id);
         for (const id of [...order.slice(index + 1), ...order.slice(0, index).reverse()]) {
@@ -372,23 +387,23 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
         addRef.current?.focus();
       },
     };
+    refocus.current = mine;
     setBusy((prev) => toggled(prev, proxy.id, true));
-    let done = false;
-    try {
-      await removePoolProxy(proxy.id);
-      done = true;
-    } catch (error) {
-      refocus.current = null;
-      fail(
-        error,
-        () => void runRemove(proxy, order),
-        () => focusRow(proxy.id, "remove"),
-      );
-    } finally {
-      await reload();
-      setBusy((prev) => toggled(prev, proxy.id, false));
+    const result = await attempt(() => removePoolProxy(proxy.id));
+    // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
+    if (!result.ok && refocus.current === mine) refocus.current = null;
+    await reload();
+    setBusy((prev) => toggled(prev, proxy.id, false));
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void runRemove(proxy, order),
+        focus: () => focusRow(proxy.id, "remove"),
+        moot: gone,
+      });
+      return;
     }
-    if (done) announce(t("card.removed"));
+    announce(t("card.removed"));
   };
 
   const remove = async (proxy: PoolProxy) => {
@@ -481,7 +496,9 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
             onRetry={() => {
               // The notice goes: focus moves to the control that runs the action first.
               failure.focus();
-              failure.retry();
+              // Its row went meanwhile (another tab, or a try that went through but timed out).
+              if (failure.moot?.(view)) setFailure(null);
+              else failure.retry();
             }}
           />
         </CardPanel>
