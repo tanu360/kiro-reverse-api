@@ -182,6 +182,8 @@ describe("SelfHealCard", () => {
     ]);
     expect(await within(card).findByText(/0 of 5 heals used/)).toBeInTheDocument();
     expect(within(card).queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
+    // Resume went with the warning: focus moved on to the card's Save, not to the page.
+    await waitFor(() => expect(within(card).getByRole("button", { name: "Save" })).toHaveFocus());
   });
 
   it("shows a failed Resume under the warning, and Try again resumes", async () => {

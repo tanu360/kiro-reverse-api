@@ -8,7 +8,15 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type JSX, type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
+import {
+  type JSX,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { CopyField } from "@/components/shared/code-field";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { SETTINGS_ROW_X, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
@@ -69,6 +77,8 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
   const confirm = useConfirm();
   const [pending, setPending] = useState<boolean | null>(null);
   const signOutRef = useRef<HTMLButtonElement>(null);
+  const switchRef = useRef<HTMLElement>(null);
+  const signedOut = useRef(false);
   const setStatus = (next: TunnelStatus) =>
     queryClient.setQueryData(queryKeys.settings.tunnel(), next);
   // The switch, the status and the account row change on screen; a failure shows under the row
@@ -82,9 +92,19 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
     mutationFn: logoutTunnel,
     onSuccess: (next) => {
       setStatus(next);
+      signedOut.current = true;
       announce(t("publicLink.signedOut"));
     },
   });
+  // Sign out goes with the account row: focus, left on the page or still in the closing confirm
+  // (which would drop it next), moves to the switch.
+  useEffect(() => {
+    if (status.signedIn || logout.isPending || !signedOut.current) return;
+    signedOut.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body && !active.closest('[role="alertdialog"]')) return;
+    switchRef.current?.focus();
+  }, [status.signedIn, logout.isPending]);
   const enabled = pending ?? status.enabled;
   // A failed switch or Retry (an enabled change); a failed name shows in its own row.
   const failedEnabled =
@@ -159,6 +179,7 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
         // A failed Retry of a failed link shows by its button instead.
         notice={status.state === "error" ? null : switchFailure}
         onCheckedChange={(next) => void toggle(next)}
+        switchRef={switchRef}
         title={t("publicLink.switch")}
       />
       {status.state === "off" ? null : (

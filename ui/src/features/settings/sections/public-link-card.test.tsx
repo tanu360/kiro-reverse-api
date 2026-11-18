@@ -261,6 +261,16 @@ describe("PublicLinkCard", () => {
     await waitFor(() => expect(mockDb.tunnel.signedIn).toBe(false));
     expect(mockDb.tunnel.enabled).toBe(false);
     await expectAnnounced("Signed out of Tailscale.");
+    // The account row went with Sign out: focus is on the switch, not the page.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Sign out of Tailscale" })).toBeNull(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: "Public HTTPS link" })).toHaveFocus(),
+    );
+    // It stays there once the confirm has closed.
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("switch", { name: "Public HTTPS link" })).toHaveFocus();
   });
 
   it("shows a failed sign-out under its row, and Try again signs out without asking", async () => {

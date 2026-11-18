@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/lib/api/query-keys";
 import type { SettingsPatch } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
 import { mockDb } from "@/lib/mocks/db";
@@ -322,6 +323,22 @@ describe("ApiPage", () => {
     noActionError();
     // The notice is gone; focus is on the key's row menu, not the page.
     expect(document.activeElement).toHaveAccessibleName("Actions for team-a");
+  });
+
+  it("drops a failed action's notice once its key is deleted elsewhere", async () => {
+    mockServer.use(
+      http.put(apiUrl("/api-keys/:id"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { user, queryClient } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Disable" }));
+    await actionError();
+    mockDb.apiKeys = mockDb.apiKeys.filter((apiKey) => apiKey.name !== "team-a");
+    await queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all });
+    await waitFor(() => expect(within(keysTable()).queryByText("team-a")).toBeNull());
+    noActionError();
   });
 
   it("keeps a key whose delete failed and says so until it is closed", async () => {

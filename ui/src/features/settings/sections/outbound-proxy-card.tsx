@@ -218,8 +218,9 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
           direct ? t("proxyNoneHint") : user ? t("proxyAuthAs", { user }) : t("proxyAuthNone")
         }
         notice={
-          // Try again removes at once: the removal was already confirmed.
-          removing && feedback.error != null ? (
+          // Try again removes at once: the removal was already confirmed. A route already gone
+          // (removed in another tab) leaves nothing to remove.
+          removing && feedback.error != null && !direct ? (
             <RowActionError
               error={feedback.error}
               focusTarget={removeRef}
