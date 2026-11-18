@@ -1,5 +1,5 @@
 {
-  "version": "4.0.7",
-  "changelog": "🛠️ A round of fixes. After a batch action, Clear filters, dismissing a new key or a token refresh, keyboard focus stays where you were instead of jumping to the top of the page. The Add account button shows its focus ring in both themes, the update dialog keeps its buttons on screen on short windows, and times read \"1 hour ago\" instead of \"60 minutes ago\". Account tests name the proxy they really used, and 2FA recovery codes download reliably.",
+  "version": "4.0.8",
+  "changelog": "🧹 No more pop-up toasts. Results now show where you acted: buttons flash ✓ Saved or ✓ Copied, errors sit on one plain line beside the action with retry and close icons, and a new API key appears in a one-line green bar. On phones the batch bar fits every action on one row, and Export accounts copies or downloads the JSON without showing it on screen.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
