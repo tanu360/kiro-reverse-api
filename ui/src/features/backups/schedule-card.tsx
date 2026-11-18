@@ -229,12 +229,7 @@ function FieldRow({
 }): JSX.Element {
   return (
     <Field className="items-stretch gap-0" invalid={error !== undefined}>
-      <SettingsRow {...row} className={error ? "pb-2" : undefined} />
-      {error ? (
-        <FieldError className={cn(SETTINGS_ROW_X, "pb-4")} match>
-          {error}
-        </FieldError>
-      ) : null}
+      <SettingsRow {...row} notice={error ? <FieldError match>{error}</FieldError> : null} />
     </Field>
   );
 }
