@@ -157,6 +157,7 @@
   "shell.update.retry": "再試行",
   "shell.update.manual": "手動で更新",
   "shell.update.automatic": "自動で更新",
+  "shell.update.readyToast": "Kiro Proxy {latest} をインストールできます。",
   "shell.update.statusDownloading": "ダウンロード中 {percent}%",
   "shell.update.statusFailed": "アップデートに失敗しました",
   "shell.update.notWritable": "このサーバーは自分で更新できません。{path} に書き込めないためです。手動で更新するか、そのフォルダーへの書き込みを許可してください。",

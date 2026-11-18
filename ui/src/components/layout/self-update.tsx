@@ -6,10 +6,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useCallback, useMemo, useRef, useState } from "react";
+import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { announce } from "@/lib/announce";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { VersionResponse } from "@/lib/api/types";
@@ -58,7 +59,9 @@ export interface SelfUpdate {
  * The self-update for the update notice and dialog. The server is asked only when it runs
  * outside a container and a newer release is known; an older server without the endpoint answers
  * 404, which reads as "cannot update itself", so the dialog shows the manual steps. Every step
- * and failure shows in the sidebar's update card and in the dialog, never in a toast.
+ * and failure shows in the sidebar's update card and in the dialog, never in a toast. The card
+ * is out of sight in the icon rail and on a phone, so screen readers also hear this page's
+ * download landing and a download or restart that failed.
  */
 export function useSelfUpdateController({
   target,
@@ -81,10 +84,19 @@ export function useSelfUpdateController({
   const begin = useMutation({
     mutationFn: () => startUpdate(target),
     onSuccess: (next) => queryClient.setQueryData(queryKeys.update, next),
+    onError: (error) => announce(errorMessage(error, tRef.current), { assertive: true }),
   });
   // useMutation's result is a new object every render; its mutate is stable, so the value below
   // (the update context's) only changes when the update does.
   const download = begin.mutate;
+  const resetBegin = begin.reset;
+
+  // A failure belongs to its release: a newer one found later starts clean.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the release changes.
+  useEffect(() => {
+    resetBegin();
+    setRestartError(undefined);
+  }, [target, resetBegin]);
 
   const restart = useCallback(() => {
     setRestartError(undefined);
@@ -98,11 +110,12 @@ export function useSelfUpdateController({
           setRestarting(false);
           // Said in the card and the dialog; Try again asks the server where it stands (a release
           // still in place comes back as ready to restart).
-          setRestartError(
+          const message =
             error instanceof Error && error.message === "timeout"
               ? tRef.current("shell.update.restartTimeout")
-              : errorMessage(error, tRef.current),
-          );
+              : errorMessage(error, tRef.current);
+          setRestartError(message);
+          announce(message, { assertive: true });
           void queryClient.invalidateQueries({ queryKey: queryKeys.update });
         },
       );
@@ -129,6 +142,15 @@ export function useSelfUpdateController({
         ? "starting"
         : (status?.state ?? "idle");
   const startError = startFailed ? errorMessage(begin.error, t) : undefined;
+
+  // Read out once when this page's download is in place (the card's eyebrow may be out of sight).
+  const previous = useRef(phase);
+  useEffect(() => {
+    const was = previous.current;
+    previous.current = phase;
+    if (phase !== "ready" || (was !== "downloading" && was !== "starting")) return;
+    announce(tRef.current("shell.update.readyToast", { latest: target }));
+  }, [phase, target]);
 
   return useMemo(
     () => ({

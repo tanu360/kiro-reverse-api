@@ -157,6 +157,7 @@
   "shell.update.retry": "Thử lại",
   "shell.update.manual": "Cập nhật thủ công",
   "shell.update.automatic": "Cập nhật tự động",
+  "shell.update.readyToast": "Kiro Proxy {latest} đã sẵn sàng để cài đặt.",
   "shell.update.statusDownloading": "Đang tải {percent}%",
   "shell.update.statusFailed": "Cập nhật thất bại",
   "shell.update.notWritable": "Máy chủ này không tự cập nhật được: nó không thể ghi vào {path}. Hãy cập nhật thủ công hoặc cấp quyền ghi cho thư mục đó.",

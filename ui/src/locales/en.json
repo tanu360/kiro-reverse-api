@@ -157,6 +157,7 @@
   "shell.update.retry": "Try again",
   "shell.update.manual": "Update by hand instead",
   "shell.update.automatic": "Update automatically",
+  "shell.update.readyToast": "Kiro Proxy {latest} is ready to install.",
   "shell.update.statusDownloading": "Downloading {percent}%",
   "shell.update.statusFailed": "Update failed",
   "shell.update.notWritable": "This server cannot update itself: it cannot write to {path}. Update it by hand, or let it write to that folder.",
