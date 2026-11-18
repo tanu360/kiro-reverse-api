@@ -65,10 +65,11 @@ const sidebarMenuButtonVariants = cva(
         outline: "bg-sidebar-control-surface ring-1 ring-sidebar-border",
         // Kiro patch: the sidebar's main action in the sign-in button's look: solid purple, a
         // white centred label and icon, the grain and top highlight, a slight press. The inset
-        // focus ring is drawn in the label colour: the default ring is the purple of the fill.
+        // focus ring is drawn in the text colour (dark in light, white in dark): the default ring
+        // is the purple of the fill.
         primary: cn(
           PRIMARY_FINISH,
-          "relative justify-center bg-primary font-medium [--color-ring:var(--primary-foreground)] text-primary-foreground transition-[width,height,padding,scale] hover:bg-primary-hover hover:text-primary-foreground active:scale-[0.98] active:bg-primary-hover active:text-primary-foreground [&>svg]:text-primary-foreground hover:[&>svg]:text-primary-foreground active:[&>svg]:text-primary-foreground",
+          "relative justify-center bg-primary font-medium [--color-ring:var(--foreground)] text-primary-foreground transition-[width,height,padding,scale] hover:bg-primary-hover hover:text-primary-foreground active:scale-[0.98] active:bg-primary-hover active:text-primary-foreground [&>svg]:text-primary-foreground hover:[&>svg]:text-primary-foreground active:[&>svg]:text-primary-foreground",
         ),
       },
     },

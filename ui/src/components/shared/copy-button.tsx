@@ -39,8 +39,6 @@ export function CopyButton({
 }): JSX.Element {
   const { t } = useT();
   const [copied, setCopied] = useState(false);
-  // No toast (a phone, Android): the tick is aria-hidden, so screen readers hear the copy here.
-  const [announce, setAnnounce] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -57,11 +55,9 @@ export function CopyButton({
       toast.error(t("toast.copyFailed"));
       return;
     }
-    const toasted = copiedToastWanted({ marksItself: true });
-    if (toasted) {
+    if (copiedToastWanted({ marksItself: true })) {
       toast.success(copiedMessage ?? t("toast.copiedToClipboard"));
     }
-    setAnnounce(!toasted);
     setCopied(true);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -92,28 +88,11 @@ export function CopyButton({
     </Button>
   );
 
-  // Always mounted (empty until a silent copy) so the live region exists before it speaks.
-  const status = (
-    <span className="sr-only" role="status">
-      {copied && announce ? t("toast.copied") : null}
-    </span>
-  );
-
-  if (!iconOnly) {
-    return (
-      <>
-        {button}
-        {status}
-      </>
-    );
-  }
+  if (!iconOnly) return button;
   return (
-    <>
-      <Tooltip>
-        <TooltipTrigger render={button} />
-        <TooltipPopup>{copied ? t("toast.copied") : label}</TooltipPopup>
-      </Tooltip>
-      {status}
-    </>
+    <Tooltip>
+      <TooltipTrigger render={button} />
+      <TooltipPopup>{copied ? t("toast.copied") : label}</TooltipPopup>
+    </Tooltip>
   );
 }
