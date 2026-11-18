@@ -1,11 +1,13 @@
 import {
+  CheckIcon,
   ClipboardPasteIcon,
   FloppyDiskIcon,
   InformationCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import { type JSX, useId, useState } from "react";
+import { type JSX, useEffect, useId, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { Code } from "@/components/shared/code";
 import { PasswordInput } from "@/components/shared/password-input";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +39,11 @@ import {
   parseProxyUrl,
   schemeForType,
 } from "@/features/settings/lib/proxy-url";
+import { announce } from "@/lib/announce";
 import { addPoolProxy, type PoolProxy, updatePoolProxy } from "@/lib/api/proxy-pool";
 import { fillNodes, useT } from "@/lib/i18n";
 import { digitsOnly } from "@/lib/input-filters";
-import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import {
   type EditorModel,
   editorErrors,
@@ -75,17 +78,26 @@ function withKind(model: ProxyModel, kind: ProxyKind): ProxyModel {
 
 const PASTE_EXAMPLE = "socks5://user:pass@host:1080";
 
+/** How long Save reads "Saved" before the dialog closes, as in the API key edit sheet. */
+const SAVED_CLOSE_MS = 700;
+
 /**
  * Adds a pool proxy, or edits one. The saved password is never shown: on an edit the password
  * field starts empty, an empty field keeps it, and Remove the saved password drops it. A full
  * proxy URL pasted into Host fills every field.
+ *
+ * No toasts: Save spins, reads "Saved" for a moment (`onSaved` meanwhile updates the list behind
+ * it), then the dialog closes (`onClose`) and a screen reader hears it. A server error shows in
+ * the dialog, over its buttons; Save is the retry.
  */
 export function ProxyEditor({
   proxy,
   onSaved,
+  onClose,
 }: {
   proxy?: PoolProxy;
   onSaved: () => void;
+  onClose: () => void;
 }): JSX.Element {
   const { t } = useT("proxy-pool");
   const id = useId();
@@ -94,6 +106,15 @@ export function ProxyEditor({
   const [showErrors, setShowErrors] = useState(false);
   const errors = editorErrors(model);
   const update = (proxyModel: ProxyModel) => setModel((prev) => ({ ...prev, proxy: proxyModel }));
+  const [saved, setSaved] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   const save = useMutation({
     mutationFn: () => {
@@ -101,10 +122,14 @@ export function ProxyEditor({
       return proxy ? updatePoolProxy(proxy.id, body) : addPoolProxy(body);
     },
     onSuccess: () => {
-      toast.success(editing ? t("editor.saved") : t("editor.added"));
       onSaved();
+      setSaved(true);
+      closeTimer.current = setTimeout(() => {
+        closeTimer.current = null;
+        onClose();
+        announce(editing ? t("editor.saved") : t("editor.added"));
+      }, SAVED_CLOSE_MS);
     },
-    onError: (error) => toast.error(poolErrorMessage(error, t)),
   });
 
   /** A pasted full proxy URL fills every field; anything else is the host as typed. */
@@ -134,6 +159,7 @@ export function ProxyEditor({
         onSubmit={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (save.isPending || saved) return;
           if (hasErrors(errors)) {
             setShowErrors(true);
             return;
@@ -289,14 +315,24 @@ export function ProxyEditor({
               </span>
             </li>
           </ul>
+          {save.isError ? (
+            <ActionError error={save.error} message={poolErrorMessage(save.error, t)} />
+          ) : null}
         </DialogPanel>
         <DialogFooter>
           <DialogClose render={<Button variant="ghost" />}>
             {t("common:actions.cancel")}
           </DialogClose>
-          <Button loading={save.isPending} loadingText={t("common:actions.saving")} type="submit">
-            <HugeiconsIcon icon={FloppyDiskIcon} aria-hidden="true" />
-            {t("common:actions.save")}
+          <Button
+            // Saved: the dialog closes in a moment; Save keeps focus and full strength meanwhile.
+            aria-disabled={saved || undefined}
+            className={cn(saved && "aria-disabled:not-aria-busy:opacity-100")}
+            loading={save.isPending}
+            loadingText={t("common:actions.saving")}
+            type="submit"
+          >
+            <HugeiconsIcon icon={saved ? CheckIcon : FloppyDiskIcon} aria-hidden="true" />
+            {saved ? t("common:actions.saved") : t("common:actions.save")}
           </Button>
         </DialogFooter>
       </form>

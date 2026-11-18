@@ -8,7 +8,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, memo, useMemo, useRef, useState } from "react";
+import { type JSX, memo, type Ref, useEffect, useMemo, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { InfoHint } from "@/components/shared/info-hint";
 import { RelativeTime } from "@/components/shared/relative-time";
@@ -21,6 +22,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import {
   Select,
@@ -32,6 +34,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { SECTION_ID } from "@/features/settings/sections/sections";
 import { SectionQuery, SettingsGroup } from "@/features/settings/sections/settings-section";
+import { announce } from "@/lib/announce";
 import {
   adoptDetectedProxy,
   checkAllPoolProxies,
@@ -39,6 +42,7 @@ import {
   checkPoolProxy,
   type DetectedProxy,
   type PoolProxy,
+  type PoolProxyHealth,
   type ProxyPoolSettingsPatch,
   type ProxyPoolView,
   proxyPoolQuery,
@@ -50,7 +54,6 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { formatDuration, formatDurationMs } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { toast } from "@/lib/toast";
 import { proxyFailureSentence } from "./lib/pool-failure";
 import {
   countChips,
@@ -79,11 +82,13 @@ function IntervalSelect({
   value,
   onChange,
   disabled,
+  triggerRef,
   ...aria
 }: AriaProps & {
   value: number;
   onChange: (minutes: number) => void;
   disabled?: boolean;
+  triggerRef?: Ref<HTMLButtonElement>;
 }): JSX.Element {
   const { t, lang } = useT("proxy-pool");
   // {interval} reads "5 minutes", "1 hour" or "1 day".
@@ -103,7 +108,7 @@ function IntervalSelect({
       }}
       value={String(value)}
     >
-      <SelectTrigger {...aria}>
+      <SelectTrigger ref={triggerRef} {...aria}>
         <SelectValue />
       </SelectTrigger>
       <SelectPopup>
@@ -117,9 +122,67 @@ function IntervalSelect({
   );
 }
 
+/** A row action whose control can take focus back: `data-proxy` and `data-action` on it. */
+type RowAction = "switch" | "test" | "remove" | "adopt";
+
+/** The row's control for `action`, if it is on screen. */
+function rowControl(id: string, action: RowAction): HTMLElement | null {
+  const card = document.getElementById(SECTION_ID.proxyPool);
+  const controls = card?.querySelectorAll<HTMLElement>(`[data-action="${action}"]`) ?? [];
+  return [...controls].find((control) => control.dataset.proxy === id) ?? null;
+}
+
+/** The last action that failed, shown at the top of the card until retried or closed. */
+interface PoolFailure {
+  error: unknown;
+  /** Runs the same action again; a confirmed one does not ask again. */
+  retry: () => void;
+  /** Where focus goes as the notice goes: the control that ran the action. */
+  focus: () => void;
+  /** Nothing is left to run again: its row is gone (or already in the pool). */
+  moot?: (view: ProxyPoolView) => boolean;
+}
+
+/** A request's result, or its error, so the row can be read again before either shows. */
+type Attempt<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+async function attempt<T>(request: () => Promise<T>): Promise<Attempt<T>> {
+  try {
+    return { ok: true, value: await request() };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+/** Whether the view still has a pool or detected row with this id. */
+function hasRow(view: ProxyPoolView, id: string): boolean {
+  return (
+    view.proxies.some((item) => item.id === id) || view.detected.some((item) => item.id === id)
+  );
+}
+
+/** Where focus goes once the view shows a result that took the focused control. */
+interface Refocus {
+  done: (view: ProxyPoolView) => boolean;
+  focus: () => void;
+}
+
+/** A copy of `set` with `id` in it or out of it. */
+function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+  const next = new Set(set);
+  if (on) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
 /**
  * The pool's settings save as they change (a switch or the interval), like the other system
  * switches; each proxy is added, edited, tested or removed on its own, at once.
+ *
+ * No toasts: a row shows its own result (its state, last check and error, the row going away),
+ * its control spins meanwhile, a screen reader hears the result, and a failure shows at the top
+ * of the card. Each row stays pending until the pool is read again, so nothing flips back for a
+ * moment; a failure shows only then, so its Try again never runs beside the first try.
  */
 function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const { t } = useT("proxy-pool");
@@ -129,28 +192,70 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const confirm = useConfirm();
   const [pending, setPending] = useState<ProxyPoolSettingsPatch | null>(null);
   const [testing, setTesting] = useState<ReadonlySet<string>>(new Set());
+  // Proxy id -> the state its switch is moving to.
+  const [switching, setSwitching] = useState<ReadonlyMap<string, boolean>>(new Map());
+  // Proxies being removed, or added to the pool from the detected ones.
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const [failure, setFailure] = useState<PoolFailure | null>(null);
   // `session` remounts the form on each open, so it starts from the saved proxy.
   const [editor, setEditor] = useState<{ open: boolean; session: number; proxy?: PoolProxy }>({
     open: false,
     session: 0,
   });
+  const addRef = useRef<HTMLButtonElement>(null);
+  const checkAllRef = useRef<HTMLButtonElement>(null);
+  const modeRef = useRef<HTMLElement>(null);
+  const fallbackRef = useRef<HTMLElement>(null);
+  const intervalRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef<Refocus | null>(null);
+
+  // Remove takes the row and its focused button, Add to pool its own button: focus goes on to
+  // the next row's Remove (else the previous one's, else Add proxy), or the row's Test.
+  useEffect(() => {
+    const target = refocus.current;
+    if (!target?.done(view)) return;
+    refocus.current = null;
+    // Focus is lost (on <body>), or still in the closing confirm, which would drop it next.
+    const active = document.activeElement;
+    if (active && active !== document.body && !active.closest('[role="alertdialog"]')) return;
+    target.focus();
+  }, [view]);
 
   const store = (next: ProxyPoolView) => {
     queryClient.setQueryData(queryKeys.settings.proxyPool(), next);
   };
-  const refetch = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.settings.proxyPool() });
+  /** Reads the pool again; resolves once the new view is stored. */
+  const reload = () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.proxyPool() });
+
+  /** Focus a row's control, else Add proxy (the row is gone). */
+  const focusRow = (id: string, action: RowAction) => {
+    (rowControl(id, action) ?? addRef.current)?.focus();
   };
 
   const settings = useMutation({
     mutationFn: updateProxyPoolSettings,
-    onMutate: (patch) => setPending(patch),
+    onMutate: (patch) => {
+      setPending(patch);
+      setFailure(null);
+    },
+    // The switch or select already shows the new value.
     onSuccess: (next) => {
       store(next);
-      toast.success(t("settings:saved"));
+      announce(t("settings:saved"));
     },
-    onError: (error) => {
-      toast.error(t("settings:saveFailed", { reason: poolErrorMessage(error, t) }));
+    onError: (error, patch) => {
+      const control =
+        patch.mode !== undefined
+          ? modeRef
+          : patch.directFallback !== undefined
+            ? fallbackRef
+            : intervalRef;
+      // `mutate`, not saveSettings: this closure is from a render where the save was pending.
+      setFailure({
+        error,
+        retry: () => settings.mutate(patch),
+        focus: () => control.current?.focus(),
+      });
     },
     onSettled: () => setPending(null),
   });
@@ -158,82 +263,101 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     if (!settings.isPending) settings.mutate(patch);
   };
 
+  // Every row shows its new check; Check all spins meanwhile.
   const checkAll = useMutation({
     mutationFn: checkAllPoolProxies,
+    onMutate: () => setFailure(null),
     onSuccess: (next) => {
       store(next);
-      toast.success(t("card.checkAllDone"));
+      announce(t("card.checkAllDone"));
     },
-    onError: (error) => toast.error(poolErrorMessage(error, t)),
+    onError: (error) =>
+      setFailure({
+        error,
+        retry: () => checkAll.mutate(),
+        focus: () => checkAllRef.current?.focus(),
+      }),
   });
 
-  const test = async (proxy: PoolProxy) => {
-    setTesting((prev) => new Set(prev).add(proxy.id));
-    try {
-      const { proxy: checked } = await checkPoolProxy(proxy.id);
-      const name = mask(proxyName(checked));
-      if (checked.health.status === "ok" && !checked.health.failures) {
-        toast.success(t("card.testOk", { name }));
-      } else {
-        const { errorCode, errorStatus } = checked.health;
-        toast.error(
-          t("card.testFailed", { name, error: proxyFailureSentence(errorCode, errorStatus, t) }),
-        );
-      }
-    } catch (error) {
-      toast.error(poolErrorMessage(error, t));
-    } finally {
-      setTesting((prev) => {
-        const next = new Set(prev);
-        next.delete(proxy.id);
-        return next;
+  /** Tests one proxy: its row shows the result (state, last check, error) as Test stops. */
+  const runTest = async (id: string, name: string, check: () => Promise<PoolProxyHealth>) => {
+    setFailure(null);
+    setTesting((prev) => toggled(prev, id, true));
+    const result = await attempt(check);
+    await reload();
+    setTesting((prev) => toggled(prev, id, false));
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void runTest(id, name, check),
+        focus: () => focusRow(id, "test"),
+        moot: (next) => !hasRow(next, id),
       });
-      refetch();
+      return;
     }
+    const { status, failures, errorCode, errorStatus } = result.value;
+    announce(
+      status === "ok" && !failures
+        ? t("card.testOk", { name })
+        : t("card.testFailed", { name, error: proxyFailureSentence(errorCode, errorStatus, t) }),
+    );
   };
+  const test = (proxy: PoolProxy) =>
+    runTest(proxy.id, mask(proxyName(proxy)), () =>
+      checkPoolProxy(proxy.id).then(({ proxy: checked }) => checked.health),
+    );
+  const testDetected = (proxy: DetectedProxy) =>
+    runTest(proxy.id, mask(proxy.url), () =>
+      checkDetectedProxy(proxy.id).then(({ detected }) => detected.health),
+    );
 
-  const [switching, setSwitching] = useState<ReadonlySet<string>>(new Set());
+  /** The switch moves at once and waits, disabled, until the pool is read again. */
   const toggle = async (proxy: PoolProxy, enabled: boolean) => {
-    setSwitching((prev) => new Set(prev).add(proxy.id));
-    try {
-      await setPoolProxyEnabled(proxy.id, enabled);
-      const name = mask(proxyName(proxy));
-      toast.success(enabled ? t("card.switchedOn", { name }) : t("card.switchedOff", { name }));
-    } catch (error) {
-      toast.error(poolErrorMessage(error, t));
-    } finally {
-      setSwitching((prev) => {
-        const next = new Set(prev);
-        next.delete(proxy.id);
-        return next;
+    setFailure(null);
+    setSwitching((prev) => new Map(prev).set(proxy.id, enabled));
+    const result = await attempt(() => setPoolProxyEnabled(proxy.id, enabled));
+    await reload();
+    setSwitching((prev) => {
+      const next = new Map(prev);
+      next.delete(proxy.id);
+      return next;
+    });
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void toggle(proxy, enabled),
+        focus: () => focusRow(proxy.id, "switch"),
+        moot: (next) => !hasRow(next, proxy.id),
       });
-      refetch();
+      return;
     }
+    const name = mask(proxyName(proxy));
+    announce(enabled ? t("card.switchedOn", { name }) : t("card.switchedOff", { name }));
   };
 
-  const testDetected = async (proxy: DetectedProxy) => {
-    setTesting((prev) => new Set(prev).add(proxy.id));
-    try {
-      const { detected } = await checkDetectedProxy(proxy.id);
-      const name = mask(proxy.url);
-      if (detected.health.status === "ok" && !detected.health.failures) {
-        toast.success(t("card.testOk", { name }));
-      } else {
-        const { errorCode, errorStatus } = detected.health;
-        toast.error(
-          t("card.testFailed", { name, error: proxyFailureSentence(errorCode, errorStatus, t) }),
-        );
-      }
-    } catch (error) {
-      toast.error(poolErrorMessage(error, t));
-    } finally {
-      setTesting((prev) => {
-        const next = new Set(prev);
-        next.delete(proxy.id);
-        return next;
+  /** Add to pool spins; then the row says it is also in the pool, and the pool has a new row. */
+  const runAdopt = async (proxy: DetectedProxy) => {
+    setFailure(null);
+    const adopted = (next: ProxyPoolView) =>
+      !next.detected.some((item) => item.id === proxy.id && item.canAdopt);
+    const mine: Refocus = { done: adopted, focus: () => focusRow(proxy.id, "test") };
+    refocus.current = mine;
+    setBusy((prev) => toggled(prev, proxy.id, true));
+    const result = await attempt(() => adoptDetectedProxy(proxy.id));
+    // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
+    if (!result.ok && refocus.current === mine) refocus.current = null;
+    await reload();
+    setBusy((prev) => toggled(prev, proxy.id, false));
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void runAdopt(proxy),
+        focus: () => focusRow(proxy.id, "adopt"),
+        moot: adopted,
       });
-      refetch();
+      return;
     }
+    announce(t("detected.adopted", { name: mask(proxy.url) }));
   };
 
   const adopt = async (proxy: DetectedProxy) => {
@@ -242,14 +366,44 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       description: t("detected.adoptBody", { name: mask(proxy.url) }),
       confirmLabel: t("detected.adopt"),
     });
-    if (!confirmed) return;
-    try {
-      await adoptDetectedProxy(proxy.id);
-      toast.success(t("detected.adopted", { name: mask(proxy.url) }));
-    } catch (error) {
-      toast.error(poolErrorMessage(error, t));
+    if (confirmed) await runAdopt(proxy);
+  };
+
+  /** Remove spins; then the row goes. */
+  const runRemove = async (proxy: PoolProxy, order: readonly string[]) => {
+    setFailure(null);
+    const gone = (next: ProxyPoolView) => !next.proxies.some((item) => item.id === proxy.id);
+    const mine: Refocus = {
+      done: gone,
+      focus: () => {
+        const index = order.indexOf(proxy.id);
+        for (const id of [...order.slice(index + 1), ...order.slice(0, index).reverse()]) {
+          const control = rowControl(id, "remove");
+          if (control) {
+            control.focus();
+            return;
+          }
+        }
+        addRef.current?.focus();
+      },
+    };
+    refocus.current = mine;
+    setBusy((prev) => toggled(prev, proxy.id, true));
+    const result = await attempt(() => removePoolProxy(proxy.id));
+    // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
+    if (!result.ok && refocus.current === mine) refocus.current = null;
+    await reload();
+    setBusy((prev) => toggled(prev, proxy.id, false));
+    if (!result.ok) {
+      setFailure({
+        error: result.error,
+        retry: () => void runRemove(proxy, order),
+        focus: () => focusRow(proxy.id, "remove"),
+        moot: gone,
+      });
+      return;
     }
-    refetch();
+    announce(t("card.removed"));
   };
 
   const remove = async (proxy: PoolProxy) => {
@@ -261,14 +415,12 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       confirmLabel: t("actions.remove"),
       variant: "danger",
     });
-    if (!confirmed) return;
-    try {
-      await removePoolProxy(proxy.id);
-      toast.success(t("card.removed"));
-    } catch (error) {
-      toast.error(poolErrorMessage(error, t));
+    if (confirmed) {
+      await runRemove(
+        proxy,
+        view.proxies.map((item) => item.id),
+      );
     }
-    refetch();
   };
 
   const on = (pending?.mode ?? view.mode) === "on";
@@ -305,7 +457,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     <SettingsGroup
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => openEditor()} size="sm" variant="secondary">
+          <Button onClick={() => openEditor()} ref={addRef} size="sm" variant="secondary">
             <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
             {t("card.add")}
           </Button>
@@ -313,6 +465,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
             <Button
               loading={checkAll.isPending}
               onClick={() => checkAll.mutate()}
+              ref={checkAllRef}
               size="sm"
               variant="secondary"
             >
@@ -331,12 +484,32 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       id={SECTION_ID.proxyPool}
       title={t("card.title")}
     >
+      {failure ? (
+        <CardPanel>
+          <ActionError
+            error={failure.error}
+            message={poolErrorMessage(failure.error, t)}
+            onDismiss={() => {
+              setFailure(null);
+              failure.focus();
+            }}
+            onRetry={() => {
+              // The notice goes: focus moves to the control that runs the action first.
+              failure.focus();
+              // Its row went meanwhile (another tab, or a try that went through but timed out).
+              if (failure.moot?.(view)) setFailure(null);
+              else failure.retry();
+            }}
+          />
+        </CardPanel>
+      ) : null}
       <SwitchField
         checked={on}
         description={empty && !on ? t("card.modeNeedsProxy") : t("card.modeHint")}
         // One settings save at a time: a change made while one is saving would be dropped.
         disabled={(empty && !on) || settings.isPending}
         onCheckedChange={(checked) => saveSettings({ mode: checked ? "on" : "off" })}
+        switchRef={modeRef}
         title={t("card.modeTitle")}
       >
         {on && empty ? (
@@ -351,6 +524,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
         description={t("card.fallbackHint")}
         disabled={settings.isPending}
         onCheckedChange={(directFallback) => saveSettings({ directFallback })}
+        switchRef={fallbackRef}
         title={t("card.fallbackTitle")}
       />
       <SettingsRow
@@ -358,6 +532,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
           <IntervalSelect
             disabled={settings.isPending}
             onChange={(checkIntervalMin) => saveSettings({ checkIntervalMin })}
+            triggerRef={intervalRef}
             value={interval}
           />
         }
@@ -376,7 +551,8 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
             key={proxy.id}
             maxFailures={view.maxFailures}
             proxy={proxy}
-            switching={switching.has(proxy.id)}
+            removing={busy.has(proxy.id)}
+            switchingTo={switching.get(proxy.id)}
             testing={testing.has(proxy.id)}
           />
         ))
@@ -396,6 +572,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
           {view.detected.map((proxy) => (
             <DetectedRow
               actions={detectedActions}
+              adopting={busy.has(proxy.id)}
               key={proxy.id}
               proxy={proxy}
               testing={testing.has(proxy.id)}
@@ -412,10 +589,8 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       >
         <ProxyEditor
           key={editor.session}
-          onSaved={() => {
-            setEditor((prev) => ({ ...prev, open: false }));
-            refetch();
-          }}
+          onClose={() => setEditor((prev) => ({ ...prev, open: false }))}
+          onSaved={() => void reload()}
           proxy={editor.proxy}
         />
       </Dialog>
@@ -464,7 +639,8 @@ function CheckFacts({ proxy }: { proxy: PoolProxy | DetectedProxy }): JSX.Elemen
 /**
  * Why a proxy is not plainly healthy: how many failures in a row it has (and that the next ones
  * take it out), that it was taken out, or that it is switched off; with the last error behind
- * Details, which opens below so the sentence stays readable on a phone.
+ * Details, which opens below so the sentence stays readable on a phone. A switched-off proxy
+ * shows its last error only while its last check failed (a Test of it): its state stays Off.
  */
 function StateNote({
   proxy,
@@ -476,22 +652,29 @@ function StateNote({
   const { t } = useT("proxy-pool");
   const mask = useMaskText();
   const { lastError, errorCode, errorStatus, failures = 0 } = proxy.health;
-  if (proxy.state === "off") {
-    return <p className="text-muted-foreground text-xs">{t("card.offNote")}</p>;
-  }
-  if (proxy.state !== "unhealthy" && proxy.state !== "auto_disabled") return null;
   let lead: string;
-  if (proxy.state === "auto_disabled") lead = t("card.autoDisabledNote", { max: maxFailures ?? 3 });
-  else if (maxFailures !== undefined)
-    lead = t("card.strikesNote", { count: failures, max: maxFailures });
-  else lead = t("detected.failingNote", { count: failures });
-  const tone =
-    proxy.state === "auto_disabled" ? "text-destructive-foreground" : "text-warning-foreground";
+  let tone: string;
+  if (proxy.state === "off") {
+    lead = t("card.offNote");
+    tone = "text-muted-foreground";
+  } else if (proxy.state === "auto_disabled") {
+    lead = t("card.autoDisabledNote", { max: maxFailures ?? 3 });
+    tone = "text-destructive-foreground";
+  } else if (proxy.state === "unhealthy") {
+    lead =
+      maxFailures !== undefined
+        ? t("card.strikesNote", { count: failures, max: maxFailures })
+        : t("detected.failingNote", { count: failures });
+    tone = "text-warning-foreground";
+  } else {
+    return null;
+  }
+  const error = proxy.state === "off" ? failures > 0 && lastError : lastError;
   // Sentences joined the language's way: a space in English, none after "。" in Chinese.
   const join = t("common:text.joinSentences");
   return (
     <p className={`wrap-anywhere text-xs ${tone}`}>
-      {lastError
+      {error
         ? fillNodes(join, {
             first: lead,
             second: fillNodes(join, {
@@ -500,7 +683,7 @@ function StateNote({
               }),
               // The link look of Settings' "Learn more": the raw error is a longer note.
               second: (
-                <InfoHint hint={mask(lastError)} variant="link">
+                <InfoHint hint={mask(error)} variant="link">
                   {t("card.lastErrorDetails")}
                 </InfoHint>
               ),
@@ -533,13 +716,16 @@ const ProxyRow = memo(function ProxyRow({
   proxy,
   maxFailures,
   testing,
-  switching,
+  switchingTo,
+  removing,
   actions,
 }: {
   proxy: PoolProxy;
   maxFailures: number;
   testing: boolean;
-  switching: boolean;
+  /** Switched on or off, and saving: the switch shows the new state, disabled, meanwhile. */
+  switchingTo?: boolean;
+  removing: boolean;
   actions: ProxyRowActions;
 }): JSX.Element {
   const { t } = useT("proxy-pool");
@@ -553,13 +739,17 @@ const ProxyRow = memo(function ProxyRow({
         <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
           <Switch
             aria-label={t("card.switchLabel", { name })}
-            checked={proxy.enabled}
-            disabled={switching}
+            checked={switchingTo ?? proxy.enabled}
+            data-action="switch"
+            data-proxy={proxy.id}
+            disabled={switchingTo !== undefined}
             onCheckedChange={(next) => actions.onToggle(proxy, next)}
           />
           {/* Each action also reads the proxy after its name, so nine Tests are told apart. */}
           <Button
             aria-description={name}
+            data-action="test"
+            data-proxy={proxy.id}
             loading={testing}
             onClick={() => actions.onTest(proxy)}
             size="sm"
@@ -579,6 +769,9 @@ const ProxyRow = memo(function ProxyRow({
           </Button>
           <Button
             aria-description={name}
+            data-action="remove"
+            data-proxy={proxy.id}
+            loading={removing}
             onClick={() => actions.onRemove(proxy)}
             size="sm"
             variant="danger"
@@ -631,10 +824,12 @@ const ProxyRow = memo(function ProxyRow({
 const DetectedRow = memo(function DetectedRow({
   proxy,
   testing,
+  adopting,
   actions,
 }: {
   proxy: DetectedProxy;
   testing: boolean;
+  adopting: boolean;
   actions: DetectedRowActions;
 }): JSX.Element {
   const { t } = useT("proxy-pool");
@@ -648,6 +843,8 @@ const DetectedRow = memo(function DetectedRow({
           {/* Each action also reads the proxy after its name, as in the pool's rows. */}
           <Button
             aria-description={proxy.url}
+            data-action="test"
+            data-proxy={proxy.id}
             loading={testing}
             onClick={() => actions.onTest(proxy)}
             size="sm"
@@ -659,6 +856,9 @@ const DetectedRow = memo(function DetectedRow({
           {proxy.canAdopt ? (
             <Button
               aria-description={proxy.url}
+              data-action="adopt"
+              data-proxy={proxy.id}
+              loading={adopting}
               onClick={() => actions.onAdopt(proxy)}
               size="sm"
               variant="secondary"

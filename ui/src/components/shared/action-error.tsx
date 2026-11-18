@@ -20,8 +20,12 @@ export function ActionError({
   onDismiss,
   className,
 }: {
+  /** What failed: a thrown value (its server reason is shown), or a line the page wrote itself. */
   error: unknown;
-  /** The line in place of the error's own reason, when the place words it (a batch's failures). */
+  /**
+   * The line in place of the error's own reason, when the place words the failure itself (a
+   * batch's result, a feature's own error codes).
+   */
   message?: string;
   /** Runs the same action again. */
   onRetry?: () => void;
@@ -48,7 +52,7 @@ export function ActionError({
     >
       <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
       <AlertDescription className="wrap-break-word">
-        {message ?? errorMessage(error, t)}
+        {message ?? (typeof error === "string" ? error : errorMessage(error, t))}
       </AlertDescription>
       {onRetry || onDismiss ? (
         <AlertAction className={NOTICE_ACTIONS_CLASS}>
