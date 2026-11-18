@@ -142,6 +142,10 @@ export const buttonVariants = cva(
         // tone, its text colour (--badge-fg) for the label and the border at 45%, with no fill,
         // so it sits in the notice instead of outweighing its text. Hover and press tint it.
         tone: "border-[color-mix(in_oklab,var(--badge-fg,var(--foreground))_45%,transparent)] bg-transparent text-(--badge-fg,var(--foreground)) hover:bg-[color-mix(in_oklab,var(--badge-fg,var(--foreground))_10%,transparent)] data-pressed:bg-[color-mix(in_oklab,var(--badge-fg,var(--foreground))_10%,transparent)]",
+        // A bare icon action inside a notice (an inline error's Try again and close): no border
+        // and no fill in any state, the notice's text colour a shade lighter, full on hover.
+        "tone-quiet":
+          "border-transparent bg-transparent text-[color-mix(in_oklab,var(--badge-fg,var(--foreground))_70%,transparent)] hover:text-(--badge-fg,var(--foreground)) data-pressed:text-(--badge-fg,var(--foreground))",
         // Supporting actions beside the purple primary (Refresh models, Edit, Restore from file,
         // Clear, a clean Save): a soft neutral fill with no border (coss ui / shadcn secondary),
         // a step deeper on hover and while pressed. The fill is the foreground mixed into the

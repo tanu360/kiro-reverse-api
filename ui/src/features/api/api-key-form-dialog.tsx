@@ -1,5 +1,4 @@
 import {
-  AlertCircleIcon,
   CheckIcon,
   DashboardSpeed01Icon,
   Key01Icon,
@@ -18,6 +17,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import {
   ResponsiveSheet,
@@ -29,7 +29,6 @@ import {
 } from "@/components/shared/responsive-sheet";
 import { SectionCard } from "@/components/shared/section-card";
 import { SETTINGS_ROW_X, SettingsRow } from "@/components/shared/settings-rows";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DialogPanel } from "@/components/ui/dialog";
 import { Field, FieldError, FieldHint } from "@/components/ui/field";
@@ -56,7 +55,6 @@ import { announce } from "@/lib/announce";
 import { accountsQuery } from "@/lib/api/accounts";
 import { createApiKey, keyModelsQuery, updateApiKey } from "@/lib/api/api-keys";
 import { queryKeys } from "@/lib/api/query-keys";
-import { errorMessage } from "@/lib/api/server-errors";
 import type { ApiKey, ApiKeyRoutingMode } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { noSpaces } from "@/lib/input-filters";
@@ -565,22 +563,19 @@ function usePickLists(): void {
   useQuery(accountsQuery());
 }
 
-/** A server error (duplicate key, collision, limits), inside the form. */
+/**
+ * A server error (duplicate key, collision, limits), inside the form, as the page's other
+ * failures show: one line, brought into view (it sits at the end of a long scrolling form, and
+ * on a phone Save would just stop spinning with it out of sight). Save is the retry.
+ */
 function ServerError({ form }: { form: KeyForm }): ReactNode {
   const { t } = useT("api");
-  const ref = useRef<HTMLDivElement>(null);
-  // It sits at the end of a long scrolling form: bring each new error into view, or on a phone
-  // Save just stops spinning with the alert out of sight.
-  useEffect(() => {
-    if (form.error) ref.current?.scrollIntoView?.({ block: "nearest" });
-  }, [form.error]);
   if (!form.error) return null;
   return (
-    <Alert ref={ref} variant="error">
-      <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-      <AlertTitle>{form.editing ? t("form.saveFailed") : t("form.createFailed")}</AlertTitle>
-      <AlertDescription className="wrap-break-word">{errorMessage(form.error, t)}</AlertDescription>
-    </Alert>
+    <ActionError
+      error={form.error}
+      title={form.editing ? t("form.saveFailed") : t("form.createFailed")}
+    />
   );
 }
 
