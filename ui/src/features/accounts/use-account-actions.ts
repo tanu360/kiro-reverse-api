@@ -5,7 +5,6 @@ import { useSavedFlash } from "@/hooks/use-saved-flash";
 import { announce } from "@/lib/announce";
 import { deleteAccount, getAccountFull, refreshAccount, updateAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
-import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
 import { useT } from "@/lib/i18n";
@@ -33,18 +32,15 @@ export function useInvalidateAccounts(): (options?: { withStatus?: boolean }) =>
 }
 
 /**
- * No toasts: an action's failure goes to the place that shows them (the accounts card, the
- * detail sheet, Needs attention), cleared as the next action starts. Outside such a place only a
- * screen reader hears it (`spoken`).
+ * An action's failure goes to the place that shows them (the accounts card, the detail sheet,
+ * the Overview's Needs attention and Accounts cards), cleared as the next action starts. Every
+ * page with these actions puts them under such a place (AccountFailureProvider).
  */
 function useFailures() {
   const place = useAccountFailurePlace();
   return {
     clear: () => place?.report(null),
-    fail: (failure: AccountFailure, spoken: string) => {
-      if (place) place.report(failure);
-      else announce(spoken, { assertive: true });
-    },
+    fail: (failure: AccountFailure) => place?.report(failure),
     fallbackFocus: place?.fallbackFocus,
   };
 }
@@ -54,7 +50,6 @@ function useFailures() {
  * card, where Try again sends the same state again.
  */
 export function useToggleEnabled(account: Account, target?: Target) {
-  const { t } = useT();
   const queryClient = useQueryClient();
   const invalidate = useInvalidateAccounts();
   const failures = useFailures();
@@ -72,10 +67,12 @@ export function useToggleEnabled(account: Account, target?: Target) {
     },
     onError: (error, enabled) => {
       setEnabled(!enabled);
-      failures.fail(
-        { error, retry: () => mutation.mutate(enabled), target, accountId: account.id },
-        errorMessage(error, t),
-      );
+      failures.fail({
+        error,
+        retry: () => mutation.mutate(enabled),
+        target,
+        accountId: account.id,
+      });
     },
     onSettled: () => invalidate({ withStatus: true }),
   });
@@ -98,10 +95,7 @@ export function useRefreshAccount(accountId: string, target?: Target) {
       return invalidate();
     },
     onError: (error) => {
-      failures.fail(
-        { error, retry: () => mutation.mutate(), target, accountId },
-        t("refreshFailed", { reason: errorMessage(error, t) }),
-      );
+      failures.fail({ error, retry: () => mutation.mutate(), target, accountId });
     },
   });
   return mutation;
@@ -141,16 +135,13 @@ export function useCopyAccountJson(target?: Target): {
       announce(t("copyJsonSuccess"));
     } else {
       // The server's reason when /full failed, else the browser refused the clipboard.
-      failures.fail(
-        {
-          error: failure,
-          message: failure ? undefined : t("copyJsonFailed"),
-          retry: () => void copy(accountId),
-          target,
-          accountId,
-        },
-        failure ? errorMessage(failure, t) : t("copyJsonFailed"),
-      );
+      failures.fail({
+        error: failure,
+        message: failure ? undefined : t("copyJsonFailed"),
+        retry: () => void copy(accountId),
+        target,
+        accountId,
+      });
     }
     return ok;
   };
@@ -186,10 +177,12 @@ export function useDeleteAccount(target?: Target): {
     onMutate: () => failures.clear(),
     onSuccess: () => announce(t("deleteSuccess")),
     onError: (error, account) => {
-      failures.fail(
-        { error, retry: () => mutation.mutate(account), target, accountId: account.id },
-        errorMessage(error, t),
-      );
+      failures.fail({
+        error,
+        retry: () => mutation.mutate(account),
+        target,
+        accountId: account.id,
+      });
     },
     onSettled: async (_result, error) => {
       await invalidate({ withStatus: true });

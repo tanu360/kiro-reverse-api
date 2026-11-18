@@ -83,7 +83,6 @@
   "empty.title": "暂无账号",
   "empty.body": "添加一个账号即可开始处理请求。",
   "loadError": "无法加载账号",
-  "refreshFailed": "Token 刷新失败：{reason}",
   "copyJsonSuccess": "凭证已复制。",
   "refreshSuccess": "Token 已刷新。",
   "copyJsonFailed": "无法复制凭证。",

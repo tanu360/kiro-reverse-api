@@ -85,7 +85,6 @@
   "empty.title": "Nenhuma conta por enquanto",
   "empty.body": "Adicione uma conta para começar a atender requisições.",
   "loadError": "Não foi possível carregar as contas",
-  "refreshFailed": "Falha ao atualizar o token: {reason}",
   "copyJsonSuccess": "As credenciais foram copiadas.",
   "refreshSuccess": "O token foi atualizado.",
   "copyJsonFailed": "Não foi possível copiar as credenciais.",

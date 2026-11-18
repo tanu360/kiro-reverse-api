@@ -120,7 +120,7 @@ const ExportRow = memo(function ExportRow({
  * Exports the chosen accounts (the list filter does not apply). The JSON holds live secrets:
  * it is never logged or cached, and lives only in this dialog's state while it is shown.
  * Memoised: the page renders it on every change of its own, while it is mostly closed.
- * No toasts: with nothing selected the count line asks for a selection and the actions wait;
+ * With nothing selected the count line asks for a selection and the actions wait;
  * Copy JSON shows a tick for two seconds; a failed request is said in the dialog, with Try again.
  */
 export const ExportDialog = memo(function ExportDialog({

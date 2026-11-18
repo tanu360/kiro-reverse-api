@@ -133,7 +133,7 @@ export function AccountsPage(): JSX.Element {
   const listRef = useRef<HTMLDivElement | null>(null);
   const refreshAllRef = useRef<HTMLButtonElement | null>(null);
   // The last failed action on the list (a row's, a batch's, Refresh models), said at the top of
-  // the accounts card in place of a toast; the next action clears it.
+  // the accounts card; the next action clears it.
   const [failure, setFailure] = useState<AccountFailure | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
   // Focus for a notice whose own control is gone: the list's select-all, else Refresh models.

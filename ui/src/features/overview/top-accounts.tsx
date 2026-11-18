@@ -2,7 +2,7 @@ import { ArrowUpRight01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type JSX, useCallback, useMemo } from "react";
+import { type JSX, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -11,6 +11,7 @@ import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import {
   AccountIdentity,
   AuthIcon,
@@ -19,6 +20,11 @@ import {
   useAccountName,
 } from "@/features/accounts/account-cells";
 import { AccountDetailSheet } from "@/features/accounts/account-detail-sheet";
+import {
+  type AccountFailure,
+  AccountFailureNotice,
+  AccountFailureProvider,
+} from "@/features/accounts/account-failure";
 import { AccountRowActions } from "@/features/accounts/account-row-actions";
 import { ReloginHost } from "@/features/accounts/relogin-host";
 import { TestAccountDialog } from "@/features/accounts/test-account-dialog";
@@ -192,12 +198,15 @@ function TopAccountCard({
   );
 }
 
-function FooterLink(): JSX.Element {
+function FooterLink({ focusRef }: { focusRef: RefObject<HTMLElement | null> }): JSX.Element {
   const { t } = useT("overview");
   return (
     <Button
       // The arrow, not the invisible box, lines up with the card's content edge (its 8 px inset).
       className="-me-2"
+      ref={(element) => {
+        focusRef.current = element;
+      }}
       render={<Link search={{ sort: "requests", order: "desc" }} to="/accounts" />}
       size="sm"
       variant="ghost"
@@ -212,6 +221,7 @@ function FooterLink(): JSX.Element {
  * The most active accounts since the last statistics reset: their success rate as a ring, the
  * account, when it last served a request, its plan credits, status and the row actions of the
  * Accounts table (test, refresh token, more). Cards on narrow cards; the footer opens them all.
+ * A row action's failure (Refresh token, Copy JSON, Delete) is one line above the rows.
  */
 export function TopAccounts(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -227,6 +237,17 @@ export function TopAccounts(): JSX.Element {
   const accounts = query.data;
   const rows = useMemo(() => (accounts ? topAccounts(accounts) : []), [accounts]);
   const testAccount = test ? accounts?.find((account) => account.id === test.id) : undefined;
+
+  // The last failed row action, with Try again and close; the next action clears it.
+  const [failure, setFailure] = useState<AccountFailure | null>(null);
+  // Focus for a notice whose own control is gone (a deleted row's menu).
+  const footerLinkRef = useRef<HTMLElement>(null);
+  const focusFooterLink = useCallback(() => footerLinkRef.current, []);
+  // It goes with its account once that leaves the card (deleted, or no longer among the busiest).
+  useEffect(() => {
+    const id = failure?.accountId;
+    if (id && accounts && !rows.some((account) => account.id === id)) setFailure(null);
+  }, [failure, accounts, rows]);
 
   const columns = useMemo<DataTableColumn<Account>[]>(
     () => [
@@ -317,74 +338,87 @@ export function TopAccounts(): JSX.Element {
     );
   } else {
     body = (
-      <DataTable
-        caption={t("topAccounts.title")}
-        cardLayout="divided"
-        cardsBelow="3xl"
-        columns={columns}
-        data={rows}
-        density="comfortable"
-        emptyState={emptyState}
-        getRowId={topAccountId}
-        inset
-        loading={query.isPending}
-        onRowClick={onDetails}
-        pageSize={LIMIT}
-        // Each fetch renders the rows again, so their status reads the clock afresh.
-        refreshKey={query.dataUpdatedAt}
-        renderCard={renderCard}
-        renderCardSkeleton={renderTopAccountSkeleton}
-        rowLabel={rowLabel}
-      />
+      <>
+        {failure ? (
+          <CardPanel>
+            <AccountFailureNotice
+              failure={failure}
+              fallbackFocus={focusFooterLink}
+              report={setFailure}
+            />
+          </CardPanel>
+        ) : null}
+        <DataTable
+          caption={t("topAccounts.title")}
+          cardLayout="divided"
+          cardsBelow="3xl"
+          columns={columns}
+          data={rows}
+          density="comfortable"
+          emptyState={emptyState}
+          getRowId={topAccountId}
+          inset
+          loading={query.isPending}
+          onRowClick={onDetails}
+          pageSize={LIMIT}
+          // Each fetch renders the rows again, so their status reads the clock afresh.
+          refreshKey={query.dataUpdatedAt}
+          renderCard={renderCard}
+          renderCardSkeleton={renderTopAccountSkeleton}
+          rowLabel={rowLabel}
+        />
+      </>
     );
   }
 
   return (
     <ReloginHost>
-      <SectionCard
-        description={t("topAccounts.description")}
-        descriptionVariant="inline"
-        footer={
-          total > 0 ? (
-            <>
-              <p>
-                {t("topAccounts.showing", {
-                  count: total,
-                  shown: formatNumber(rows.length, lang),
-                  total: formatNumber(total, lang),
-                })}
-              </p>
-              <FooterLink />
-            </>
-          ) : undefined
-        }
-        icon={UserGroupIcon}
-        id="overview-top-accounts"
-        slim
-        title={t("topAccounts.title")}
-      >
-        {body}
-      </SectionCard>
-      {detail ? (
-        <AccountDetailSheet
-          accountId={detail.id}
-          key={`detail-${detail.session}`}
-          onOpenChange={(open) => {
-            if (!open) closeDetail();
-          }}
-          open={detail.open}
-        />
-      ) : null}
-      {test && testAccount ? (
-        <TestAccountDialog
-          account={testAccount}
-          key={`test-${test.session}`}
-          onOpenChange={(open) => {
-            if (!open) closeTest();
-          }}
-          open={test.open}
-        />
-      ) : null}
+      <AccountFailureProvider fallbackFocus={focusFooterLink} report={setFailure}>
+        <SectionCard
+          description={t("topAccounts.description")}
+          descriptionVariant="inline"
+          footer={
+            total > 0 ? (
+              <>
+                <p>
+                  {t("topAccounts.showing", {
+                    count: total,
+                    shown: formatNumber(rows.length, lang),
+                    total: formatNumber(total, lang),
+                  })}
+                </p>
+                <FooterLink focusRef={footerLinkRef} />
+              </>
+            ) : undefined
+          }
+          icon={UserGroupIcon}
+          id="overview-top-accounts"
+          slim
+          title={t("topAccounts.title")}
+        >
+          {body}
+        </SectionCard>
+        {detail ? (
+          <AccountDetailSheet
+            accountId={detail.id}
+            key={`detail-${detail.session}`}
+            onOpenChange={(open) => {
+              if (!open) closeDetail();
+            }}
+            open={detail.open}
+          />
+        ) : null}
+        {test && testAccount ? (
+          <TestAccountDialog
+            account={testAccount}
+            key={`test-${test.session}`}
+            onOpenChange={(open) => {
+              if (!open) closeTest();
+            }}
+            open={test.open}
+          />
+        ) : null}
+      </AccountFailureProvider>
     </ReloginHost>
   );
 }

@@ -82,7 +82,7 @@ export function failedIdsIn(
  * The batch actions over the selection, run for the page (the bar unmounts with the selection).
  * Each confirms first; while it runs the bar's button spins and its count line says what runs.
  * Batch endpoints answer 200 even when items fail, so `failed` and the per-id `results` are read.
- * No toasts: a clean run clears the selection and a screen reader hears the result; a partial
+ * A clean run clears the selection and a screen reader hears the result; a partial
  * one keeps only the failed accounts selected and names them at the top of the accounts card,
  * where Try again runs the action on them; a failed request keeps the selection and says why.
  */
@@ -193,7 +193,7 @@ export function BatchBar({
   };
 
   const busy = running !== null;
-  // The live count line says what runs while a batch runs, in place of a loading toast.
+  // The live count line says what runs while a batch runs.
   const countLabel = (
     <p aria-live="polite" className="whitespace-nowrap px-1.5 font-medium text-sm tabular-nums">
       {running === "delete"

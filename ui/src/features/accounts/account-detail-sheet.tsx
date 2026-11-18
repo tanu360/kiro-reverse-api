@@ -74,7 +74,7 @@ export function AccountDetailSheet({
     [],
   );
   // A failed action of the sheet's own (Refresh token, the switch, Copy JSON, Delete), said under
-  // those actions in place of a toast.
+  // those actions.
   const [failure, setFailure] = useState<AccountFailure | null>(null);
   // The sheet's actions are the page's next actions too: as one starts, the page's notice under
   // the sheet goes as well (it may be this account's failure, out of date once this succeeds).

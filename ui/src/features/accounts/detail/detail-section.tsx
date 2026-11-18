@@ -10,7 +10,7 @@ import { useInvalidateAccounts } from "../use-account-actions";
 
 /**
  * PUT one field of an account and refetch the list. Each editor owns its own draft, so the
- * refetch never wipes unsaved input elsewhere in the sheet. No toast: the edit closes on the
+ * refetch never wipes unsaved input elsewhere in the sheet. The edit closes on the
  * saved value (a screen reader hears "saved"), and a failure stays under the field
  * (EditableFieldRow), where Save is the retry.
  */
