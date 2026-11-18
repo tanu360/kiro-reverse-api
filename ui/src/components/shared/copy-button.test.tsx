@@ -1,5 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { announce } from "@/lib/announce";
 import { copyText } from "@/lib/clipboard";
 import { renderWithProviders } from "@/test/render";
@@ -18,6 +18,18 @@ beforeEach(() => {
   vi.mocked(announce).mockReset();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+/** A phone-sized touch screen (`matches`) or not. */
+function phone(matches: boolean): void {
+  vi.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({ matches, media: query, addEventListener() {}, removeEventListener() {} }) as never,
+  );
+}
+
 describe("CopyButton", () => {
   it("copies a plain value and shows the copied state", async () => {
     copyTextMock.mockResolvedValue(true);
@@ -27,8 +39,43 @@ describe("CopyButton", () => {
     expect(copyTextMock).toHaveBeenCalledTimes(1);
     expect(await copyTextMock.mock.calls[0]?.[0]).toBe("sk-123");
     await waitFor(() => expect(button).toHaveAttribute("data-copied"));
-    // No toast: the tick and its tooltip show it, and a screen reader hears it.
+    // The tick and its tooltip show it, and a screen reader hears it.
     expect(announce).toHaveBeenCalledWith("Copied to the clipboard.");
+  });
+
+  it("does not read a copy out on Android, which shows its own copied overlay", async () => {
+    copyTextMock.mockResolvedValue(true);
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36",
+    );
+    phone(false);
+    const { user } = renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);
+    const button = screen.getByRole("button", { name: "Copy key" });
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveAttribute("data-copied"));
+    expect(announce).not.toHaveBeenCalled();
+  });
+
+  it("does not read a copy out on another phone, where the tick says it", async () => {
+    copyTextMock.mockResolvedValue(true);
+    phone(true);
+    const { user } = renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);
+    const button = screen.getByRole("button", { name: "Copy key" });
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveAttribute("data-copied"));
+    expect(announce).not.toHaveBeenCalled();
+  });
+
+  it("still reads a failed copy out on a phone", async () => {
+    copyTextMock.mockResolvedValue(false);
+    phone(true);
+    const { user } = renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);
+    await user.click(screen.getByRole("button", { name: "Copy key" }));
+    await waitFor(() =>
+      expect(announce).toHaveBeenCalledWith("Could not copy to the clipboard.", {
+        assertive: true,
+      }),
+    );
   });
 
   it("resolves a lazy value before it is copied", async () => {

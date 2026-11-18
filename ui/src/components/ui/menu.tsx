@@ -68,7 +68,7 @@ export function MenuPopup({
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
-        // z-70: above the toast layer (toast.tsx, z-60), so a toast never covers an open menu.
+        // z-70: above the modal layer (z-50), so a menu opened in a dialog or sheet shows over it.
         className="z-70"
         collisionPadding={collisionPadding}
         data-slot="menu-positioner"

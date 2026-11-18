@@ -13,7 +13,6 @@
   "sparkline.summaryDown_other": "{count} points, from {first} to {last}, down {change}%",
   "pie.total": "Total",
   "spinner.loading": "Loading…",
-  "toast.region": "Notifications",
   "sidebar.toggle": "Toggle sidebar",
   "sidebar.title": "Sidebar",
   "sidebar.description": "Displays the mobile sidebar.",

@@ -37,11 +37,8 @@ describe("SetupPage", () => {
     await screen.findByText(PASSWORD);
     await user.click(screen.getByRole("button", { name: `${PASSWORD} Copy password` }));
     expect(await navigator.clipboard.readText()).toBe(PASSWORD);
-    // Confirmed in place (the label and a status for screen readers), not with a toast.
+    // Confirmed in place: the label and a status for screen readers.
     expect(await screen.findByRole("status")).toHaveTextContent("Password copied to clipboard");
-    expect(
-      screen.queryByText("Password copied to clipboard", { selector: "[data-slot*=toast] *" }),
-    ).toBeNull();
   });
 
   it("says a failed copy on the label above the password", async () => {

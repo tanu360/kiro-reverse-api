@@ -5,7 +5,6 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { AppSidebar } from "./app-sidebar";
-import { useToastPathSync } from "./app-toasts";
 import { activeNavItem } from "./nav-items";
 import { SiteHeader } from "./site-header";
 import { UpdateCheckProvider } from "./update-check";
@@ -21,7 +20,6 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const active = activeNavItem(pathname);
   useDocumentTitle(active ? t(active.labelKey) : null);
-  useToastPathSync();
   return (
     <UpdateCheckProvider>
       <SidebarProvider style={SIDEBAR_STYLE}>
