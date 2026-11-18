@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /** An icon-only action in the notice, named by its tooltip and accessible name. */
 function NoticeIconButton({
@@ -59,13 +60,18 @@ export function ActionError({
   }, [error]);
 
   return (
-    <Alert className={className} data-slot="action-error" ref={ref} variant="error">
+    // The icon, the text's first line and the icon buttons share one 20 px line: the buttons'
+    // extra height goes into negative margins, so they never push the text off the icon.
+    <Alert
+      className={cn("sm:has-data-[slot=alert-action]:py-2", className)}
+      data-slot="action-error"
+      ref={ref}
+      variant="error"
+    >
       <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-      <AlertDescription className="wrap-break-word self-center">
-        {errorMessage(error, t)}
-      </AlertDescription>
+      <AlertDescription className="wrap-break-word">{errorMessage(error, t)}</AlertDescription>
       {onRetry || onDismiss ? (
-        <AlertAction className="-my-1 gap-0 self-center max-sm:col-start-3 max-sm:row-start-1 max-sm:mt-0">
+        <AlertAction className="-my-1 gap-0 self-start max-sm:col-start-3 max-sm:row-start-1 max-sm:-mt-1 sm:-my-1.5 sm:pointer-coarse:-my-2">
           {onRetry ? (
             <NoticeIconButton icon={Refresh01Icon} label={t("actions.retry")} onClick={onRetry} />
           ) : null}
