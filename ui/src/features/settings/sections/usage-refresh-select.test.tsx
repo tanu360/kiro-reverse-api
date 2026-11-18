@@ -31,6 +31,12 @@ afterEach(() => {
   mockServer.events.removeListener("request:start", onRequestStart);
 });
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 async function renderCard(lang?: "zh") {
   const result = renderWithProviders(<UsageCard />, { lang });
   const card = await waitFor(() => {
@@ -55,7 +61,7 @@ describe("UsageRefreshRow", () => {
     await user.click(select);
     await user.click(await screen.findByRole("option", { name: "Off" }));
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await Promise.all(posted)).toEqual([{ usageRefreshIntervalMinutes: 0 }]);
     expect(mockDb.settings.usageRefreshIntervalMinutes).toBe(0);
     expect(select).toHaveTextContent("Off");
@@ -106,7 +112,8 @@ describe("UsageRefreshRow", () => {
     await user.click(select);
     await user.click(await screen.findByRole("option", { name: "Every 2 hours" }));
 
-    expect(await screen.findAllByText(/Could not save settings/)).not.toHaveLength(0);
+    // The reason only, under the row.
+    expect(await within(card).findByRole("alert")).toHaveTextContent("settings store unavailable");
     await waitFor(() => expect(select).toHaveTextContent("Every 30 minutes"));
     expect(mockDb.settings.usageRefreshIntervalMinutes).toBe(30);
   });

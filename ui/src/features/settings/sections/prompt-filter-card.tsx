@@ -111,13 +111,16 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
     },
     samePromptFilter,
   );
-  const { save, saving } = useSectionSave((body: PromptFilterConfig) => updatePromptFilter(body), {
-    onSaved: (sent) => {
-      draft.commit(sent);
-      queryClient.setQueryData(queryKeys.settings.promptFilter(), sent);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.settings.promptFilter() });
+  const { save, feedback } = useSectionSave(
+    (body: PromptFilterConfig) => updatePromptFilter(body),
+    {
+      onSaved: (sent) => {
+        draft.commit(sent);
+        queryClient.setQueryData(queryKeys.settings.promptFilter(), sent);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.settings.promptFilter() });
+      },
     },
-  });
+  );
 
   const setBuiltin = (key: BuiltinKey, value: boolean) =>
     draft.set((prev) => ({ ...prev, [key]: value }));
@@ -218,7 +221,7 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
         <SaveFooter
           dirty={draft.dirty}
           onReload={draft.reload}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

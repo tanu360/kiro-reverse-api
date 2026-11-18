@@ -30,6 +30,7 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { announce } from "@/lib/announce";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
 import {
@@ -46,7 +47,6 @@ import { saveBlob } from "@/lib/download";
 import { formatDateTime } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { digitsOnly } from "@/lib/input-filters";
-import { toast } from "@/lib/toast";
 import { SECTION_ID } from "./sections";
 import { Hint, SectionQuery, SettingsGroup } from "./settings-section";
 import { parseQrSvg, StyledQr } from "./styled-qr";
@@ -295,9 +295,10 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
   const enable = useMutation({
     mutationFn: (value: string) => enableTwoFactor(value),
     onSuccess: (result) => {
+      // No toast: the dialog turns into the recovery codes, and the card's pill reads On.
       setCodes(result.recoveryCodes);
       onDone(result.status);
-      toast.success(t("twoFactor.enabled"));
+      announce(t("twoFactor.enabled"));
     },
     onError: (caught) => setError(codeError(caught, t)),
   });
@@ -459,7 +460,8 @@ function DisableDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }
   const disable = useMutation({
     mutationFn: (proof: TwoFactorProof) => disableTwoFactor(proof),
     onSuccess: (status) => {
-      toast.success(t("twoFactor.disabled"));
+      // No toast: the dialog closes on the card's pill reading Off.
+      announce(t("twoFactor.disabled"));
       onDone(status);
     },
     onError: (caught) =>

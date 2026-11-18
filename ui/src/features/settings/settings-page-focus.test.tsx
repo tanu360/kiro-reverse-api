@@ -48,6 +48,12 @@ function nav(): HTMLElement {
   return screen.getByRole("navigation", { name: "Settings sections" });
 }
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 describe("settings focus", () => {
   it("keeps focus on Save after a save, with Save blocked while clean", async () => {
     const { user } = await renderPage();
@@ -60,7 +66,7 @@ describe("settings focus", () => {
     expect(save).not.toHaveAttribute("aria-disabled");
     await user.click(save);
 
-    await screen.findByText("Your settings were saved.");
+    await expectAnnounced("Your settings were saved.");
     expect(save).toHaveAttribute("aria-disabled", "true");
     expect(save).not.toBeDisabled();
     expect(save).toHaveFocus();
@@ -162,7 +168,7 @@ describe("settings focus", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       await user.click(within(card).getByRole("button", { name: "Save" }));
 
-      await screen.findByText("Your settings were saved.");
+      await expectAnnounced("Your settings were saved.");
       // The server lowercases keys; the refetched copy replaces the clean draft in place.
       await waitFor(() =>
         expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("gpt-x"),

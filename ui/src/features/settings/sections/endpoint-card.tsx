@@ -151,7 +151,7 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
     endpointFallback: config.endpointFallback !== false,
     chatApi: config.chatApi ?? "auto",
   });
-  const { save, saving } = useSectionSave((body: EndpointConfig) => updateEndpointConfig(body), {
+  const { save, feedback } = useSectionSave((body: EndpointConfig) => updateEndpointConfig(body), {
     onSaved: (sent) => {
       draft.commit(sent);
       queryClient.setQueryData(queryKeys.settings.endpoint(), sent);
@@ -165,7 +165,7 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
         <SaveFooter
           dirty={draft.dirty}
           onReload={draft.reload}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

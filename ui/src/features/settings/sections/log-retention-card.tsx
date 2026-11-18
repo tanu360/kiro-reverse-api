@@ -89,16 +89,19 @@ function LogRetentionForm({ retention }: { retention: LogRetention }): JSX.Eleme
   const daysId = useId();
   const draft = useDraft(serverDraft(retention));
   const [daysInvalid, setDaysInvalid] = useState(false);
-  const { save, saving } = useSectionSave((body: LogRetentionUpdate) => updateLogRetention(body), {
-    onSaved: ({ days }) => {
-      draft.commit({ days });
-      queryClient.setQueryData<LogRetention>(queryKeys.settings.logRetention(), (old) =>
-        old ? { ...old, days } : old,
-      );
-      // The save starts a prune; the status lines follow on its settings_changed.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.settings.logRetention() });
+  const { save, feedback } = useSectionSave(
+    (body: LogRetentionUpdate) => updateLogRetention(body),
+    {
+      onSaved: ({ days }) => {
+        draft.commit({ days });
+        queryClient.setQueryData<LogRetention>(queryKeys.settings.logRetention(), (old) =>
+          old ? { ...old, days } : old,
+        );
+        // The save starts a prune; the status lines follow on its settings_changed.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.settings.logRetention() });
+      },
     },
-  });
+  );
 
   const onSubmit = () => {
     const { days } = draft.value;
@@ -118,7 +121,7 @@ function LogRetentionForm({ retention }: { retention: LogRetention }): JSX.Eleme
             setDaysInvalid(false);
             draft.reload();
           }}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

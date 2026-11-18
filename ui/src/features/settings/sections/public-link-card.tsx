@@ -8,7 +8,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type JSX, type KeyboardEvent, type ReactNode, useId, useState } from "react";
+import { type JSX, type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 import { CopyField } from "@/components/shared/code-field";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { SETTINGS_ROW_X, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { Spinner } from "@/components/ui/spinner";
+import { announce } from "@/lib/announce";
 import { queryKeys } from "@/lib/api/query-keys";
 import { serverErrorCode } from "@/lib/api/server-errors";
 import {
@@ -32,16 +33,15 @@ import {
 import { dateTimeFormat, formatBytes } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { deviceNameChars } from "@/lib/input-filters";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { SECTION_ID, sectionPagePath } from "./sections";
 import {
   FieldControl,
   Hint,
   RowAction,
+  RowActionError,
   SectionQuery,
   SettingsGroup,
-  toastSaveFailed,
 } from "./settings-section";
 
 const FUNNEL_GUIDE = "https://tailscale.com/docs/features/tailscale-funnel";
@@ -68,23 +68,32 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [pending, setPending] = useState<boolean | null>(null);
+  const signOutRef = useRef<HTMLButtonElement>(null);
   const setStatus = (next: TunnelStatus) =>
     queryClient.setQueryData(queryKeys.settings.tunnel(), next);
+  // No toasts: the switch, the status and the account row change on screen; a failure shows
+  // under the row it came from (the device name's own failures stay with its field).
   const save = useMutation({
     mutationFn: updateTunnel,
     onSuccess: (next) => setStatus(next),
-    onError: (error) => toastSaveFailed(error, t),
     onSettled: () => setPending(null),
   });
   const logout = useMutation({
     mutationFn: logoutTunnel,
     onSuccess: (next) => {
       setStatus(next);
-      toast.success(t("publicLink.signedOut"));
+      announce(t("publicLink.signedOut"));
     },
-    onError: (error) => toastSaveFailed(error, t),
   });
   const enabled = pending ?? status.enabled;
+  // A failed switch or Retry (an enabled change); a failed name shows in its own row.
+  const failedEnabled =
+    save.isError && save.variables?.enabled !== undefined ? save.variables.enabled : undefined;
+
+  const setEnabled = (next: boolean) => {
+    setPending(next);
+    save.mutate({ enabled: next });
+  };
 
   const toggle = async (next: boolean) => {
     if (!next && status.viaLink) {
@@ -96,9 +105,18 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
       });
       if (!confirmed) return;
     }
-    setPending(next);
-    save.mutate({ enabled: next });
+    setEnabled(next);
   };
+
+  // Try again sends the same change at once: a turn-off was already confirmed.
+  const switchFailure =
+    failedEnabled === undefined ? null : (
+      <RowActionError
+        error={save.error}
+        onDismiss={save.reset}
+        onRetry={() => setEnabled(failedEnabled)}
+      />
+    );
 
   const signOut = async () => {
     const confirmed = await confirm({
@@ -140,13 +158,18 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
         disabled={save.isPending || logout.isPending}
         onCheckedChange={(next) => void toggle(next)}
         title={t("publicLink.switch")}
-      />
+      >
+        {/* A failed Retry of a failed link shows by its button instead. */}
+        {status.state === "error" ? null : switchFailure}
+      </SwitchField>
       {status.state === "off" ? null : (
         <StatusRow
           onRetry={() => save.mutate({ enabled: true })}
           retrying={save.isPending}
           status={status}
-        />
+        >
+          {status.state === "error" ? switchFailure : null}
+        </StatusRow>
       )}
       {status.enabled ? <Warnings status={status} /> : null}
       <DeviceNameRow
@@ -156,10 +179,11 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
             { hostname },
             {
               onSuccess: (next) => {
-                toast.success(t("saved"));
-                onDone(false, next.hostname);
+                announce(t("common:toast.saved"));
+                onDone({ saved: next.hostname });
               },
-              onError: (error) => onDone(serverErrorCode(error) === "tunnel_hostname"),
+              onError: (error) =>
+                onDone({ refused: serverErrorCode(error) === "tunnel_hostname", error }),
             },
           )
         }
@@ -171,6 +195,7 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
               <Button
                 loading={logout.isPending}
                 onClick={() => void signOut()}
+                ref={signOutRef}
                 size="sm"
                 variant="danger"
               >
@@ -182,7 +207,17 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
           controlWidth="actions"
           description={t("publicLink.accountHint")}
           title={t("publicLink.account")}
-        />
+        >
+          {/* Try again signs out at once: the sign-out was already confirmed. */}
+          {logout.isError ? (
+            <RowActionError
+              error={logout.error}
+              focusTarget={signOutRef}
+              onDismiss={logout.reset}
+              onRetry={() => logout.mutate()}
+            />
+          ) : null}
+        </SettingsRow>
       ) : null}
     </SettingsGroup>
   );
@@ -203,10 +238,13 @@ function StatusRow({
   status,
   onRetry,
   retrying,
+  children,
 }: {
   status: TunnelStatus;
   onRetry: () => void;
   retrying: boolean;
+  /** Under a failed link's reason: a failed Retry. */
+  children?: ReactNode;
 }): JSX.Element {
   const { t } = useT("settings");
   const linkLabel = useId();
@@ -264,7 +302,9 @@ function StatusRow({
           </span>
         }
         title={t("publicLink.status")}
-      />
+      >
+        {children}
+      </SettingsRow>
     );
   }
   return <SetupRow status={status} />;
@@ -553,7 +593,10 @@ function DeviceNameRow({
   onSave,
 }: {
   status: TunnelStatus;
-  onSave: (hostname: string, onDone: (refused: boolean, saved?: string) => void) => void;
+  onSave: (
+    hostname: string,
+    onDone: (result: { saved?: string; refused?: boolean; error?: unknown }) => void,
+  ) => void;
 }): JSX.Element {
   const { t } = useT("settings");
   const inputId = useId();
@@ -564,6 +607,8 @@ function DeviceNameRow({
   // (so nothing below runs), clears it through onSave.
   const [sent, setSent] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
+  // A save that failed for another reason than the name: shown under the row, with Try again.
+  const [failure, setFailure] = useState<unknown>(null);
   const name = draft || status.defaultHostname;
   const link = `https://${name}.${tailnetDomain(status.url) ?? "<tailnet>.ts.net"}`;
 
@@ -587,10 +632,12 @@ function DeviceNameRow({
       return;
     }
     setSent(name);
+    setFailure(null);
     const current = status.hostname;
-    onSave(name, (refused, saved) => {
+    onSave(name, ({ saved, refused, error }) => {
       if (saved === undefined || saved === current) setSent(null);
       if (refused) setInvalid(true);
+      else if (error !== undefined) setFailure(error);
     });
   };
 
@@ -608,6 +655,7 @@ function DeviceNameRow({
             onChange={(event) => {
               setDraft(deviceNameChars(event.target.value));
               setInvalid(false);
+              setFailure(null);
             }}
             onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
               if (event.key !== "Enter") return;
@@ -625,6 +673,10 @@ function DeviceNameRow({
       }
       htmlFor={inputId}
       title={t("publicLink.deviceName")}
-    />
+    >
+      {failure === null ? null : (
+        <RowActionError error={failure} onDismiss={() => setFailure(null)} onRetry={commit} />
+      )}
+    </SettingsRow>
   );
 }

@@ -167,7 +167,7 @@ function UpstreamForm({ config }: { config: UpstreamConfig }): JSX.Element {
   const draft = useDraft<UpstreamDraft>(toDraft(config));
   const [authError, setAuthError] = useState<string | null>(null);
   const regions = config.apiRegions ?? [];
-  const { save, saving } = useSectionSave(updateUpstreamConfig, {
+  const { save, feedback } = useSectionSave(updateUpstreamConfig, {
     onSaved: (sent) => {
       const saved = { ...config, ...sent } as UpstreamConfig;
       draft.commit(toDraft(saved));
@@ -200,7 +200,7 @@ function UpstreamForm({ config }: { config: UpstreamConfig }): JSX.Element {
             setAuthError(null);
             draft.reload();
           }}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

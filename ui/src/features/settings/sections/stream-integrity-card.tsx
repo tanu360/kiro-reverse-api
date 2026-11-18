@@ -9,7 +9,7 @@ import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useInstantSetting } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { SectionQuery, SettingsSection } from "./settings-section";
+import { RowActionError, SectionQuery, SettingsSection } from "./settings-section";
 
 export function StreamIntegrityCard(): JSX.Element {
   const { t } = useT("settings");
@@ -42,6 +42,13 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
           <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
           <AlertDescription>{t("lenientStreamIntegrityRisk")}</AlertDescription>
         </Alert>
+        {lenientStreamIntegrity.failure ? (
+          <RowActionError
+            error={lenientStreamIntegrity.failure.error}
+            onDismiss={lenientStreamIntegrity.failure.dismiss}
+            onRetry={lenientStreamIntegrity.failure.retry}
+          />
+        ) : null}
       </SwitchField>
     </SettingsSection>
   );

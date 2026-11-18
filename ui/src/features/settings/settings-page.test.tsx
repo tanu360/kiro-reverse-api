@@ -50,6 +50,12 @@ function section(id: string): HTMLElement {
   return element;
 }
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 async function renderPage(page: SettingsPageId = "requests") {
   const result = renderWithProviders(<SettingsPage page={page} />);
   // The last card to load is enough: every query resolves in the same tick in tests.
@@ -129,7 +135,7 @@ describe("SettingsPage", () => {
     const toggle = within(usage).getByRole("switch", { name: "Allow overage" });
     await user.click(toggle);
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       { method: "POST", path: "/settings", body: { allowOverUsage: true } },
     ]);
@@ -152,7 +158,10 @@ describe("SettingsPage", () => {
 
     await user.click(toggle);
 
-    expect(await screen.findAllByText(/Could not save settings/)).not.toHaveLength(0);
+    // The reason only, under the switch's row.
+    expect(await within(section(SECTION_ID.routing)).findByRole("alert")).toHaveTextContent(
+      "settings store unavailable",
+    );
     await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
   });
 
@@ -167,7 +176,7 @@ describe("SettingsPage", () => {
     );
     await user.click(save);
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       { method: "POST", path: "/settings", body: { autoContinue: true, autoContinueMax: 3 } },
     ]);
@@ -237,7 +246,7 @@ describe("SettingsPage", () => {
     await user.click(toggle);
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       {
         method: "POST",
@@ -256,7 +265,7 @@ describe("SettingsPage", () => {
     await user.clear(within(card).getByLabelText("Trigger suffix"));
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Your settings were saved.");
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       {
         method: "POST",
@@ -322,10 +331,13 @@ describe("SettingsPage", () => {
       // The server's code (model_mapping_duplicate) and model, not its English `error`.
       const reason = "gpt-5 is mapped more than once.";
       expect(await within(card).findByText(reason)).toBeInTheDocument();
-      // Error toasts are high priority: the text also lands in an announcement region.
-      expect(
-        (await screen.findAllByText(`Could not save settings: ${reason}`)).length,
-      ).toBeGreaterThan(0);
+      // The row says it, so the footer does not; a screen reader hears it at once.
+      expect(card.querySelector('[data-slot="action-error"]')).toBeNull();
+      await waitFor(() =>
+        expect(
+          document.querySelector('[data-slot="live-announcer"] [aria-live="assertive"]'),
+        ).toHaveTextContent(reason),
+      );
 
       const [write] = await writes("/model-mappings");
       const sent = (write.body as { mappings: unknown[] }).mappings;
@@ -415,7 +427,7 @@ describe("SettingsPage", () => {
       await user.click(screen.getByRole("menuitem", { name: "Move down" }));
       await user.click(within(card).getByRole("button", { name: "Save" }));
 
-      await screen.findByText("Your settings were saved.");
+      await expectAnnounced("Your settings were saved.");
       const [write] = await writes("/model-mappings");
       const defaults = defaultModelMappings();
       expect((write.body as { mappings: unknown[] }).mappings).toEqual([
@@ -450,6 +462,48 @@ describe("SettingsPage", () => {
     });
   });
 
+  describe("danger zone", () => {
+    it("resets the statistics after confirmation, and the button says it is done", async () => {
+      const { user } = await renderPage("security");
+      const card = section(SECTION_ID.dangerZone);
+      const reset = within(card).getByRole("button", { name: "Reset statistics" });
+
+      await user.click(reset);
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Reset" }));
+
+      await expectAnnounced("The statistics were reset.");
+      expect(reset).toHaveTextContent("Done");
+      expect(await writes()).toEqual([{ method: "POST", path: "/stats/reset", body: null }]);
+    });
+
+    it("shows a failed reset under its row, and Try again resets without asking", async () => {
+      let fail = true;
+      mockServer.use(
+        http.post(apiUrl("/stats/reset"), () =>
+          fail ? HttpResponse.json({ error: "store busy" }, { status: 500 }) : undefined,
+        ),
+      );
+      const { user } = await renderPage("security");
+      const card = section(SECTION_ID.dangerZone);
+      const reset = within(card).getByRole("button", { name: "Reset statistics" });
+      await user.click(reset);
+      await user.click(
+        within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Reset" }),
+      );
+
+      const notice = await within(card).findByRole("alert");
+      expect(notice).toHaveTextContent(/^store busy$/);
+      fail = false;
+      await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+      await expectAnnounced("The statistics were reset.");
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+      expect(reset).toHaveFocus();
+    });
+  });
+
   describe("admin password", () => {
     it("rejects 7 characters without a request", async () => {
       const { user } = await renderPage("security");
@@ -480,7 +534,8 @@ describe("SettingsPage", () => {
       expect(within(dialog).getByText("All other signed-in sessions end.")).toBeInTheDocument();
       await user.click(within(dialog).getByRole("button", { name: "Change password" }));
 
-      expect(await screen.findByText("Your password was changed.")).toBeInTheDocument();
+      await expectAnnounced("Your password was changed.");
+      expect(within(card).getByRole("button", { name: "Saved" })).toBeInTheDocument();
       expect(await writes()).toEqual([
         { method: "POST", path: "/settings", body: { password: "correct horse" } },
         { method: "POST", path: "/session", body: { password: "correct horse" } },
@@ -539,7 +594,7 @@ describe("SettingsPage", () => {
       expect(await writes()).toEqual([]);
     });
 
-    it("shows the server's refusal in the dialog, not only in a toast under it", async () => {
+    it("shows the server's refusal in the dialog", async () => {
       mockServer.use(
         http.post(apiUrl("/proxy"), () =>
           HttpResponse.json(
@@ -553,9 +608,7 @@ describe("SettingsPage", () => {
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
       const notice = await within(dialog).findByRole("alert");
-      expect(notice).toHaveTextContent(
-        "Could not save settings: The proxy URL needs a host and a port from 1 to 65535",
-      );
+      expect(notice).toHaveTextContent(/^The proxy URL needs a host and a port from 1 to 65535/);
       // Over the dialog's buttons, and gone once the form changes.
       expect(
         notice.compareDocumentPosition(within(dialog).getByRole("button", { name: "Save" })) &
@@ -579,7 +632,7 @@ describe("SettingsPage", () => {
       await user.type(within(dialog).getByLabelText("Password"), "p:ss");
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-      await screen.findByText("Your settings were saved.");
+      await expectAnnounced("Your settings were saved.");
       expect(await writes()).toEqual([
         {
           method: "POST",
@@ -602,10 +655,60 @@ describe("SettingsPage", () => {
       const confirm = await screen.findByRole("alertdialog");
       await user.click(within(confirm).getByRole("button", { name: "Remove proxy" }));
 
-      await screen.findByText("Your settings were saved.");
+      await expectAnnounced("Your settings were saved.");
       expect(await writes()).toEqual([{ method: "POST", path: "/proxy", body: { proxyURL: "" } }]);
       expect(await within(card).findByText("Direct connection")).toBeInTheDocument();
-      expect(within(card).getByRole("button", { name: "Set up proxy" })).toBeInTheDocument();
+      await waitFor(() =>
+        expect(within(card).getByRole("button", { name: "Set up proxy" })).toHaveFocus(),
+      );
+    });
+
+    it("moves focus to Set up once a removal goes through, from Try again too", async () => {
+      let fail = true;
+      mockServer.use(
+        http.post(apiUrl("/proxy"), () =>
+          fail ? HttpResponse.json({ error: "store busy" }, { status: 500 }) : undefined,
+        ),
+      );
+      const { user } = await renderPage("server");
+      const card = section(SECTION_ID.outboundProxy);
+      await user.click(within(card).getByRole("button", { name: "Remove proxy" }));
+      const confirm = await screen.findByRole("alertdialog");
+      await user.click(within(confirm).getByRole("button", { name: "Remove proxy" }));
+
+      const notice = await within(card).findByRole("alert");
+      fail = false;
+      await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+      const setUp = await within(card).findByRole("button", { name: "Set up proxy" });
+      await waitFor(() => expect(setUp).toHaveFocus());
+    });
+
+    it("keeps a save on its way busy when the dialog is closed and opened again", async () => {
+      let land: () => void = () => {};
+      mockServer.use(
+        http.post(apiUrl("/proxy"), async () => {
+          await new Promise<void>((resolve) => {
+            land = resolve;
+          });
+          return undefined;
+        }),
+      );
+      const { user } = await renderPage("server");
+      let dialog = await openEditor(user);
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(await within(dialog).findByRole("button", { name: /Saving/ })).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Edit proxy" })).not.toBeInTheDocument(),
+      );
+
+      // Not a fresh, idle form that the first save then flips to Saved and closes.
+      dialog = await openEditor(user);
+      expect(within(dialog).getByRole("button", { name: /Saving/ })).toBeInTheDocument();
+      land();
+      await expectAnnounced("Your settings were saved.");
+      expect(await writes()).toHaveLength(1);
     });
   });
 
@@ -639,7 +742,7 @@ describe("SettingsPage", () => {
     ).toBeInTheDocument();
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Your settings were saved.");
+    await expectAnnounced("Your settings were saved.");
     const [write] = await writes("/prompt-filter");
     const body = write.body as { rules: Array<Record<string, unknown>> };
     expect(Object.keys(body).sort()).toEqual([
@@ -691,7 +794,7 @@ describe("SettingsPage", () => {
     for (const control of within(card).getAllByRole("switch")) expect(control).toBeChecked();
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Your settings were saved.");
+    await expectAnnounced("Your settings were saved.");
     const [write] = await writes("/prompt-filter");
     expect(write.body).toMatchObject({
       filterClaudeCode: true,

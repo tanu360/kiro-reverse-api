@@ -25,6 +25,12 @@ afterEach(() => {
   mockServer.events.removeListener("request:start", onRequestStart);
 });
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 async function renderCard() {
   const result = renderWithProviders(<UpstreamCard />);
   await screen.findByRole("combobox", { name: "API domain" });
@@ -57,7 +63,7 @@ describe("UpstreamCard", () => {
 
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await Promise.all(posts)).toEqual([
       { apiDomain: "kiro", apiRegion: "eu-central-1", authRegion: "" },
     ]);
@@ -74,7 +80,7 @@ describe("UpstreamCard", () => {
     await user.type(within(card).getByLabelText("Sign-in region"), " EU-West-1 ");
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await Promise.all(posts)).toEqual([
       { apiDomain: "amazonaws", apiRegion: "", authRegion: "eu-west-1" },
     ]);
@@ -117,13 +123,77 @@ describe("UpstreamCard", () => {
     await user.click(await screen.findByRole("option", { name: "Kiro (kiro.dev)" }));
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    expect(
-      (
-        await screen.findAllByText(
-          "Could not save settings: Choose an API domain: amazonaws or kiro.",
-        )
-      ).length,
-    ).toBeGreaterThan(0);
+    // The reason only, in the card over Save; the draft stays.
+    expect(await within(card).findByRole("alert")).toHaveTextContent(
+      /^Choose an API domain: amazonaws or kiro\.$/,
+    );
+    expect(within(card).getByText("Unsaved changes")).toBeInTheDocument();
     expect(mockDb.upstream.apiDomain).toBe("amazonaws");
+  });
+
+  it("sends the draft again from Try again, then Save reads Saved", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/upstream"), () =>
+        fail ? HttpResponse.json({ error: "store busy" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user, card } = await renderCard();
+
+    await user.type(within(card).getByLabelText("Sign-in region"), "eu-west-1");
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+    const notice = await within(card).findByRole("alert");
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+    await expectAnnounced("Your settings were saved.");
+    expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+    const save = within(card).getByRole("button", { name: "Saved" });
+    expect(save).toHaveFocus();
+    expect(mockDb.upstream.authRegion).toBe("eu-west-1");
+    // Back to Save after a moment.
+    expect(
+      await within(card).findByRole("button", { name: "Save" }, { timeout: 3000 }),
+    ).toBeInTheDocument();
+  });
+
+  it("forgets a failed save once the draft is undone", async () => {
+    mockServer.use(
+      http.post(apiUrl("/upstream"), () =>
+        HttpResponse.json({ error: "store busy" }, { status: 500 }),
+      ),
+    );
+    const { user, card } = await renderCard();
+    const region = within(card).getByLabelText("Sign-in region");
+
+    await user.type(region, "eu-west-1");
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+    await within(card).findByRole("alert");
+    await user.clear(region);
+    expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+
+    // A new edit is a new draft: the old reason does not come back with it.
+    await user.type(region, "eu-west-2");
+    expect(within(card).getByText("Unsaved changes")).toBeInTheDocument();
+    expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("closes a failed save with focus on Save and the draft kept", async () => {
+    mockServer.use(
+      http.post(apiUrl("/upstream"), () =>
+        HttpResponse.json({ error: "store busy" }, { status: 500 }),
+      ),
+    );
+    const { user, card } = await renderCard();
+
+    await user.type(within(card).getByLabelText("Sign-in region"), "eu-west-1");
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+    const notice = await within(card).findByRole("alert");
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+
+    expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Save" })).toHaveFocus();
+    expect(within(card).getByLabelText("Sign-in region")).toHaveValue("eu-west-1");
   });
 });

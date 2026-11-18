@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { SECTION_ID } from "./sections";
@@ -43,6 +45,12 @@ async function renderCard() {
   const card = document.getElementById(SECTION_ID.selfHeal);
   if (!card) throw new Error("self-heal card not rendered");
   return { ...result, card };
+}
+
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
 }
 
 describe("SelfHealCard", () => {
@@ -135,7 +143,7 @@ describe("SelfHealCard", () => {
     await user.type(rounds, "0");
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       {
         method: "POST",
@@ -168,11 +176,43 @@ describe("SelfHealCard", () => {
 
     await user.click(within(card).getByRole("button", { name: "Resume" }));
 
-    expect(await screen.findByText("Self-heal resumed.")).toBeInTheDocument();
+    await expectAnnounced("Self-heal resumed.");
     expect(await writes()).toEqual([
       { method: "POST", path: "/account-health/resume", body: null },
     ]);
     expect(await within(card).findByText(/0 of 5 heals used/)).toBeInTheDocument();
     expect(within(card).queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
+  });
+
+  it("shows a failed Resume under the warning, and Try again resumes", async () => {
+    mockDb.accountHealth.state = {
+      lastHealAt: mockNowUnix() - 120,
+      rounds: 5,
+      halted: true,
+      haltedAt: mockNowUnix() - 10,
+      lastHealed: 2,
+    };
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/account-health/resume"), () =>
+        fail ? HttpResponse.json({ error: "store busy" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { card, user } = await renderCard();
+    const resume = within(card).getByRole("button", { name: "Resume" });
+
+    await user.click(resume);
+    const notice = await waitFor(() => {
+      const found = card.querySelector<HTMLElement>('[data-slot="action-error"]');
+      if (!found) throw new Error("no inline error yet");
+      return found;
+    });
+    expect(notice).toHaveTextContent(/^store busy$/);
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await expectAnnounced("Self-heal resumed.");
+    expect(await within(card).findByText(/0 of 5 heals used/)).toBeInTheDocument();
+    expect(card.querySelector('[data-slot="action-error"]')).toBeNull();
   });
 });

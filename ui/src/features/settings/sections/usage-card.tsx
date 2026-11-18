@@ -6,7 +6,7 @@ import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useInstantSetting } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { SectionQuery, SettingsSection } from "./settings-section";
+import { RowActionError, SectionQuery, SettingsSection } from "./settings-section";
 import { UsageRefreshRow } from "./usage-refresh-select";
 
 export function UsageCard(): JSX.Element {
@@ -31,7 +31,15 @@ function UsageForm({ settings }: { settings: Settings }): JSX.Element {
         description={t("allowOverUsageHint")}
         onCheckedChange={allowOverUsage.onCheckedChange}
         title={t("allowOverUsage")}
-      />
+      >
+        {allowOverUsage.failure ? (
+          <RowActionError
+            error={allowOverUsage.failure.error}
+            onDismiss={allowOverUsage.failure.dismiss}
+            onRetry={allowOverUsage.failure.retry}
+          />
+        ) : null}
+      </SwitchField>
       {/* Missing (an older server) means the default, 30 minutes. */}
       <UsageRefreshRow saved={settings.usageRefreshIntervalMinutes ?? 30} />
     </SettingsSection>

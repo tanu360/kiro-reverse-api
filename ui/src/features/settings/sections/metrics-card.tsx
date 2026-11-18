@@ -1,19 +1,19 @@
 import { RefreshIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useState } from "react";
+import { type JSX, useId, useRef, useState } from "react";
 import { CodeBlock } from "@/components/shared/code-block";
 import { CopyField } from "@/components/shared/code-field";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { SettingsRow, SwitchField } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { announce } from "@/lib/announce";
 import { type MetricsSettings, metricsQuery, updateMetricsSettings } from "@/lib/api/metrics";
 import { queryKeys } from "@/lib/api/query-keys";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { SECTION_ID } from "./sections";
-import { Hint, SectionQuery, SettingsGroup, toastSaveFailed } from "./settings-section";
+import { Hint, RowActionError, SectionQuery, SettingsGroup } from "./settings-section";
 
 /** Settings card for the Prometheus /metrics endpoint: its switch, address and bearer token. */
 export function MetricsCard(): JSX.Element {
@@ -57,15 +57,31 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
   const urlLabel = useId();
   const tokenLabel = useId();
   const [pending, setPending] = useState<boolean | null>(null);
+  const regenerateRef = useRef<HTMLButtonElement>(null);
+  // No toast: the switch or the token changes on screen and a screen reader hears it; a failure
+  // shows under the row it came from.
   const save = useMutation({
     mutationFn: updateMetricsSettings,
     onSuccess: (next, body) => {
       queryClient.setQueryData(queryKeys.settings.metrics(), next);
-      toast.success(body.regenerate ? t("metrics.regenerated") : t("saved"));
+      announce(body.regenerate ? t("metrics.regenerated") : t("common:toast.saved"));
     },
-    onError: (error) => toastSaveFailed(error, t),
     onSettled: () => setPending(null),
   });
+  const failed = save.isError ? save.variables : undefined;
+  const failure = (retry: () => void, focusTarget?: typeof regenerateRef) =>
+    save.isError ? (
+      <RowActionError
+        error={save.error}
+        focusTarget={focusTarget}
+        onDismiss={save.reset}
+        onRetry={retry}
+      />
+    ) : null;
+  const setEnabled = (next: boolean) => {
+    setPending(next);
+    save.mutate({ enabled: next });
+  };
   const enabled = pending ?? settings.enabled;
   const origin = window.location.origin;
   const endpoint = `${origin}${settings.path}`;
@@ -89,12 +105,11 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
         checked={enabled}
         description={<Hint more={t("metrics.more")}>{t("metrics.switchHint")}</Hint>}
         disabled={save.isPending}
-        onCheckedChange={(next) => {
-          setPending(next);
-          save.mutate({ enabled: next });
-        }}
+        onCheckedChange={setEnabled}
         title={t("metrics.switch")}
-      />
+      >
+        {failed?.enabled !== undefined ? failure(() => setEnabled(failed.enabled === true)) : null}
+      </SwitchField>
       {settings.enabled && settings.token ? (
         <>
           <SettingsRow
@@ -115,6 +130,7 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
                           aria-label={t("metrics.regenerate")}
                           loading={save.isPending && pending === null}
                           onClick={() => void regenerate()}
+                          ref={regenerateRef}
                           size="icon-sm"
                           variant="quiet"
                         />
@@ -134,7 +150,12 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
             }
             description={t("metrics.tokenHint")}
             title={<span id={tokenLabel}>{t("metrics.token")}</span>}
-          />
+          >
+            {/* Try again makes the token at once: the new token was already confirmed. */}
+            {failed?.regenerate
+              ? failure(() => save.mutate({ regenerate: true }), regenerateRef)
+              : null}
+          </SettingsRow>
           <div className="p-4">
             {/* The token masked on screen, as above; Copy copies the job with the whole token. */}
             <CodeBlock

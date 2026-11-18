@@ -31,6 +31,12 @@ async function renderCard() {
   return { ...view, toggle, input };
 }
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 describe("Routing card RPM limit", () => {
   it("is off by default with the number field disabled and no Save pending", async () => {
     const { toggle, input } = await renderCard();
@@ -47,7 +53,7 @@ describe("Routing card RPM limit", () => {
     expect(input).toHaveValue("20");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     await waitFor(() => expect(writes).toEqual([{ accountRpmLimit: 20 }]));
     expect(mockDb.settings.accountRpmLimit).toBe(20);
   });

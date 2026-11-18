@@ -61,7 +61,6 @@
   "dailySummaryTest": "发送测试",
   "dailySummaryTestHint": "立即将最近 24 小时的摘要发送到所有已开启的渠道。不计为当天的摘要。",
   "dailySummaryTestNoChannel": "请先添加或开启一个渠道。",
-  "dailySummaryTestError": "无法发送摘要：{reason}",
   "dailySummaryTestFailed_other": "{count} 个渠道中有 {failed} 个未收到摘要。请查看各渠道的最近结果。",
   "dailySummaryTestOk_other": "摘要已发送到 {count} 个渠道。",
   "dialogHint": "密钥只保存在服务器上，保存后不会再显示。",

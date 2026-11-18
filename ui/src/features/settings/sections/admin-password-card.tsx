@@ -1,15 +1,17 @@
-import { LockPasswordIcon } from "@hugeicons/core-free-icons";
-import { type JSX, useId, useState } from "react";
+import { CheckIcon, LockPasswordIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { type JSX, useId, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { PasswordInput } from "@/components/shared/password-input";
 import { SaveFooter, SettingsRow, SubmitButton } from "@/components/shared/settings-rows";
+import { useSavedFlash } from "@/hooks/use-saved-flash";
+import { announce } from "@/lib/announce";
 import { updateSettings } from "@/lib/api/settings";
 import { reauthenticate } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { useReportDirty } from "../lib/unsaved";
 import { SECTION_ID } from "./sections";
-import { FieldControl, SettingsSection, toastSaveFailed } from "./settings-section";
+import { FieldControl, FooterSaveError, SettingsSection } from "./settings-section";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -20,6 +22,10 @@ export function AdminPasswordCard(): JSX.Element {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // No toast: the button reads "Saved" for a moment after a change; a failure shows over it.
+  const [failure, setFailure] = useState<unknown>(null);
+  const changed = useSavedFlash();
+  const submitRef = useRef<HTMLButtonElement>(null);
   // A typed, unsent password counts as an unsaved change.
   useReportDirty(SECTION_ID.adminPassword, password !== "");
 
@@ -35,18 +41,23 @@ export function AdminPasswordCard(): JSX.Element {
       setError(t("passwordTooShort"));
       return;
     }
-    const confirmed = await confirm({
-      title: t("confirmPasswordTitle"),
-      description: t("confirmPasswordBody"),
-      confirmLabel: t("changePassword"),
-    });
-    if (!confirmed) return;
+    // Try again after a failure sends it at once: the change was already confirmed.
+    if (failure === null) {
+      const confirmed = await confirm({
+        title: t("confirmPasswordTitle"),
+        description: t("confirmPasswordBody"),
+        confirmLabel: t("changePassword"),
+      });
+      if (!confirmed) return;
+    }
 
     setBusy(true);
+    setFailure(null);
+    changed.clear();
     try {
       await updateSettings({ password });
     } catch (caught) {
-      toastSaveFailed(caught, t);
+      setFailure(caught);
       setBusy(false);
       return;
     }
@@ -59,28 +70,55 @@ export function AdminPasswordCard(): JSX.Element {
       setBusy(false);
       return;
     }
-    toast.success(t("passwordChanged"));
+    announce(t("passwordChanged"));
+    changed.flash();
     setPassword("");
     setBusy(false);
   };
 
+  const done = changed.saved && password === "" && !busy;
+
   return (
     <SettingsSection
       footer={
-        <SaveFooter
-          action={
-            // Quiet until a password is typed, like Save; it stays clickable to say one is missing.
-            <SubmitButton
-              blocked={busy}
-              busy={busy}
-              icon={LockPasswordIcon}
-              primary={password !== "" || busy}
-            >
-              {busy ? t("changingPassword") : t("changePassword")}
-            </SubmitButton>
-          }
-          dirty={password !== ""}
-        />
+        <>
+          {failure !== null ? (
+            <FooterSaveError
+              error={failure}
+              onDismiss={() => setFailure(null)}
+              saveRef={submitRef}
+            />
+          ) : null}
+          <SaveFooter
+            action={
+              // Quiet until a password is typed, like Save; it stays clickable to say one is
+              // missing. Just changed, it reads "Saved" with a tick for a moment.
+              <SubmitButton
+                blocked={busy}
+                busy={busy}
+                icon={done ? null : LockPasswordIcon}
+                primary={password !== "" || busy}
+                ref={submitRef}
+              >
+                {busy ? (
+                  t("changingPassword")
+                ) : done ? (
+                  <>
+                    <HugeiconsIcon
+                      icon={CheckIcon}
+                      aria-hidden="true"
+                      className="text-success-foreground"
+                    />
+                    {t("common:actions.saved")}
+                  </>
+                ) : (
+                  t("changePassword")
+                )}
+              </SubmitButton>
+            }
+            dirty={password !== ""}
+          />
+        </>
       }
       hint={t("adminPasswordHint")}
       id={SECTION_ID.adminPassword}
@@ -98,6 +136,8 @@ export function AdminPasswordCard(): JSX.Element {
               onChange={(value) => {
                 setPassword(value);
                 setError(null);
+                setFailure(null);
+                changed.clear();
               }}
               value={password}
             />

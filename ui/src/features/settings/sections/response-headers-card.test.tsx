@@ -50,6 +50,12 @@ async function renderCard() {
   return result;
 }
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 describe("ResponseHeadersCard", () => {
   it("adds a header in the editor, inserts variables at the caret and saves the list", async () => {
     const { user } = await renderCard();
@@ -90,7 +96,7 @@ describe("ResponseHeadersCard", () => {
     expect(toggle).not.toBeChecked();
 
     await user.click(within(card()).getByRole("button", { name: "Save" }));
-    await screen.findByText("Your settings were saved.");
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       {
         method: "POST",

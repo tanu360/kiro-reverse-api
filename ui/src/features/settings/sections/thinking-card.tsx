@@ -140,7 +140,7 @@ function ThinkingForm({ config }: { config: ThinkingConfig }): JSX.Element {
     openaiFormat: config.openaiFormat || "reasoning_content",
     claudeFormat: config.claudeFormat || "thinking",
   });
-  const { save, saving } = useSectionSave(updateThinkingConfig, {
+  const { save, feedback } = useSectionSave(updateThinkingConfig, {
     onSaved: (sent) => {
       draft.commit(sent);
       queryClient.setQueryData(queryKeys.settings.thinking(), sent);
@@ -154,7 +154,7 @@ function ThinkingForm({ config }: { config: ThinkingConfig }): JSX.Element {
         <SaveFooter
           dirty={draft.dirty}
           onReload={draft.reload}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

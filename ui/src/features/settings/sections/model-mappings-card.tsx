@@ -153,7 +153,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
     setServerError(null);
   };
 
-  const { save, saving } = useSectionSave(
+  const { save, feedback } = useSectionSave(
     ({ mappings }: SaveRequest) => updateModelMappings({ mappings }),
     {
       onSaved: ({ mappings, rowIndexes, rows: sentFrom }) => {
@@ -175,6 +175,8 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
         setServerError(errorMessage(error, t));
         setFilter("");
         setPendingFocus({ rowId: row.id });
+        // The row shows the reason; the footer shows nothing more.
+        return true;
       },
     },
   );
@@ -342,7 +344,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
           dirty={draft.dirty}
           note={t("modelMappings.resetNote")}
           onReload={reload}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

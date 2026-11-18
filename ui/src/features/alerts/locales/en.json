@@ -63,7 +63,6 @@
   "dailySummaryTest": "Send test",
   "dailySummaryTestHint": "Sends the last 24 hours now to every channel that is on. It does not count as the day's summary.",
   "dailySummaryTestNoChannel": "Add or switch on a channel first.",
-  "dailySummaryTestError": "Could not send the summary: {reason}",
   "dailySummaryTestFailed_one": "The summary did not reach {failed} of {count} channel. See its last result.",
   "dailySummaryTestFailed_other": "The summary did not reach {failed} of {count} channels. See each channel's last result.",
   "dailySummaryTestOk_one": "Summary sent to {count} channel.",

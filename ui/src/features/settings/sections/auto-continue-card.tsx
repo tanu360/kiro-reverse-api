@@ -78,7 +78,7 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
     autoContinueMax: settings.autoContinueMax || DEFAULT_CONTINUATIONS,
   });
   const [maxInvalid, setMaxInvalid] = useState(false);
-  const { save, saving } = useGeneralSettingsSave(draft);
+  const { save, feedback } = useGeneralSettingsSave(draft);
 
   const onSubmit = () => {
     const { autoContinue, autoContinueMax } = draft.value;
@@ -103,7 +103,7 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
             setMaxInvalid(false);
             draft.reload();
           }}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

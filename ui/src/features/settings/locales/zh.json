@@ -380,7 +380,7 @@
   "confirmResetBody": "请求历史和错误日志会被删除。各账号和各 API Key 的用量保留。此操作无法撤销。",
   "confirmResetAction": "重置",
   "statsReset": "统计已重置。",
-  "resetFailed": "无法重置统计：{reason}",
+  "resetDone": "已完成",
   "twoFactor.title": "两步验证登录",
   "twoFactor.hint": "输入管理员密码后，再要求输入身份验证器应用中的验证码。",
   "twoFactor.on": "已开启",
