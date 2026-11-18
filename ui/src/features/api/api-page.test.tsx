@@ -7,6 +7,7 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
+import { ApiAccessCard } from "./api-access-card";
 import { endOfLocalDay, expiryInDays } from "./api-key-form";
 import { ApiPage } from "./api-page";
 import { ClientSnippetsCard } from "./client-snippets";
@@ -181,6 +182,8 @@ describe("ApiPage", () => {
 
     await user.click(within(panel).getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByTestId("created-key-panel")).not.toBeInTheDocument();
+    // Dismiss went with the panel; focus lands on Create, not the page.
+    expect(screen.getByRole("button", { name: "Create API key" })).toHaveFocus();
   });
 
   it("rejects a fractional token limit without sending a request", async () => {
@@ -222,9 +225,13 @@ describe("ApiPage", () => {
       existing,
     );
     await toAccessStep(user, dialog);
+    const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     expect(await within(dialog).findByText("This API key already exists.")).toBeInTheDocument();
     expect(screen.queryByTestId("created-key-panel")).not.toBeInTheDocument();
+    // At the end of a scrolling form: the error is brought into view.
+    expect(scrolled.mock.contexts).toContain(within(dialog).getByRole("alert"));
+    scrolled.mockRestore();
   });
 
   it("copies the full key of a row from GET /api-keys/{id}", async () => {
@@ -595,6 +602,20 @@ describe("ApiPage", () => {
       await screen.findByText("Create and enable at least one API key before you require one."),
     ).toBeInTheDocument();
     expect(settingsPosts).toHaveLength(0);
+  });
+
+  it("leaves the enabled-key check to the server while the key list failed to load", async () => {
+    mockServer.use(
+      http.get(apiUrl("/api-keys"), () => HttpResponse.json({ error: "boom" }, { status: 500 })),
+    );
+    const { user } = renderWithProviders(<ApiAccessCard />);
+    await screen.findByText("Any client can call the proxy");
+    await user.click(screen.getByRole("switch", { name: "Require an API key" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(settingsPosts).toEqual([{ requireApiKey: true }]));
+    expect(
+      screen.queryByText("Create and enable at least one API key before you require one."),
+    ).not.toBeInTheDocument();
   });
 
   it("lets the hint follow the switch and the footer flag the draft", async () => {

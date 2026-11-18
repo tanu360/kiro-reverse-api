@@ -145,7 +145,7 @@ export function KeyNotice({ apiKey }: { apiKey: UserKey }): JSX.Element | null {
         </Alert>
       )}
       {apiKey.keysRequired ? null : (
-        <Alert data-status="not-required" variant="info">
+        <Alert data-status="not-required" role="note" variant="info">
           <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
           <AlertDescription>{t("alert.notRequired")}</AlertDescription>
         </Alert>

@@ -45,6 +45,9 @@ export function SignInForm({
   const locked = retry.seconds > 0;
   // "1m 30s" like every other duration; tabular digits keep the line still as it counts down.
   const retryNotice = t("rateLimited", { time: formatDuration(retry.seconds, lang) });
+  // The lockout's length when it began: the live region reads this once, not every tick.
+  const [lockSeconds, setLockSeconds] = useState(0);
+  const lockNotice = t("rateLimited", { time: formatDuration(lockSeconds, lang) });
   const inputRef = useRef<HTMLInputElement>(null);
   // With two-factor sign-in on, the right password leads to a second step with this challenge.
   const [challenge, setChallenge] = useState<string | null>(null);
@@ -66,7 +69,11 @@ export function SignInForm({
 
   /** A failure both steps share: the rate limit, an unreachable proxy, or the server's text. */
   const showSharedError = (error: unknown) => {
-    if (isApiError(error) && error.status === 429) retry.start(retrySeconds(error));
+    if (isApiError(error) && error.status === 429) {
+      const seconds = retrySeconds(error);
+      setLockSeconds(seconds);
+      retry.start(seconds);
+    }
     // No answer, or a gateway in front of the proxy answering for it (502 / 503 / 504, whose
     // body is only the status text, e.g. "Bad Gateway"): the proxy cannot be reached.
     else if (
@@ -92,6 +99,8 @@ export function SignInForm({
     const value = code.trim();
     if (!value) {
       setFieldError(recovery ? t("recoveryRequired") : t("codeRequired"));
+      // FieldError is no live region: focus brings the field and its error to a screen reader.
+      codeRef.current?.focus();
       return;
     }
     setFieldError(null);
@@ -139,6 +148,8 @@ export function SignInForm({
     setFormError(null);
     if (!password) {
       setFieldError(t("passwordRequired"));
+      // FieldError is no live region: focus brings the field and its error to a screen reader.
+      inputRef.current?.focus();
       return;
     }
     setFieldError(null);
@@ -187,10 +198,13 @@ export function SignInForm({
         />
         <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
           {locked ? (
-            <Alert role="none" variant="warning">
-              <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
-              <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
-            </Alert>
+            <>
+              <span className="sr-only">{lockNotice}</span>
+              <Alert aria-hidden="true" role="none" variant="warning">
+                <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
+                <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
+              </Alert>
+            </>
           ) : null}
         </div>
         {formError ? (
@@ -256,11 +270,15 @@ export function SignInForm({
       {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
       <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
         {locked ? (
-          // No role: the live region round it announces the countdown politely.
-          <Alert role="none" variant="warning">
-            <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
-            <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
-          </Alert>
+          // No role: the live region round it announces the countdown politely. It reads the
+          // fixed sr-only notice once; the ticking copy is hidden, or it would be re-read each second.
+          <>
+            <span className="sr-only">{lockNotice}</span>
+            <Alert aria-hidden="true" role="none" variant="warning">
+              <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
+              <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
+            </Alert>
+          </>
         ) : null}
       </div>
       {formError ? (

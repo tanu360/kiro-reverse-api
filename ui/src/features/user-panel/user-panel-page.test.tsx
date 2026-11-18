@@ -221,7 +221,7 @@ describe("/user", () => {
     mockDb.settings.requireApiKey = false;
     await signIn();
     await renderPanel();
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    expect(screen.getByRole("note")).toHaveTextContent(
       "This server does not ask for API keys on its own address, so calls made there do not count here. Calls through its public link always do.",
     );
   });
@@ -522,6 +522,7 @@ describe("/user", () => {
     await waitFor(() =>
       expect(screen.getByRole("tab", { name: /^All/ })).toHaveAttribute("aria-selected", "true"),
     );
+    expect(screen.getByRole("tab", { name: /^All/ })).toHaveFocus();
   });
 
   it("signs out: revokes the session and goes to the key sign-in page", async () => {

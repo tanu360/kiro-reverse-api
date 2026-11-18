@@ -96,6 +96,7 @@ describe("UserLoginPage", () => {
     expect(await screen.findByText("Enter an API key.")).toBeInTheDocument();
     expect(keyInput()).toHaveAttribute("aria-invalid", "true");
     expect(keyInput()).toHaveAccessibleDescription("Enter an API key.");
+    expect(keyInput()).toHaveFocus();
     expect(calls).toBe(0);
   });
 
@@ -160,8 +161,12 @@ describe("UserLoginPage", () => {
       await user.type(keyInput(), "sk-wrong");
       await user.click(submitButton());
 
-      const notice = await screen.findByText("Too many attempts. Try again in 1m 30s.");
+      const notice = await screen.findByText("Too many attempts. Try again in 1m 30s.", {
+        selector: ".tabular-nums",
+      });
       expect(notice.closest("[aria-live='polite']")).not.toBeNull();
+      // Read once: the region holds a fixed sr-only copy, the ticking one is hidden from it.
+      expect(notice.closest("[aria-hidden='true']")).not.toBeNull();
       expect(notice).toHaveClass("tabular-nums");
       expect(submitButton()).toHaveAttribute("aria-disabled", "true");
 

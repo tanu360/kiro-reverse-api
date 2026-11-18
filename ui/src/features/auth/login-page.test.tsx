@@ -81,6 +81,8 @@ describe("LoginPage", () => {
     expect(await screen.findByText("Enter the password.")).toBeInTheDocument();
     expect(passwordInput()).toHaveAttribute("aria-invalid", "true");
     expect(passwordInput()).toHaveAccessibleDescription("Enter the password.");
+    // Focus brings the field and its error to a screen reader (FieldError is no live region).
+    expect(passwordInput()).toHaveFocus();
     expect(calls).toBe(0);
   });
 
@@ -144,8 +146,13 @@ describe("LoginPage", () => {
       await user.type(passwordInput(), "wrong-password");
       await user.click(submitButton());
 
-      const notice = await screen.findByText("Too many attempts. Try again in 3s.");
-      expect(notice.closest("[aria-live='polite']")).not.toBeNull();
+      const notice = await screen.findByText("Too many attempts. Try again in 3s.", {
+        selector: ".tabular-nums",
+      });
+      const live = notice.closest<HTMLElement>("[aria-live='polite']");
+      expect(live).not.toBeNull();
+      // The ticking copy is hidden from the live region, so it is not re-read every second.
+      expect(notice.closest("[aria-hidden='true']")).not.toBeNull();
       // aria-disabled, not native disabled: the clicked button keeps focus while locked.
       expect(submitButton()).toHaveAttribute("aria-disabled", "true");
       expect(submitButton()).toHaveFocus();
@@ -154,6 +161,10 @@ describe("LoginPage", () => {
         vi.advanceTimersByTime(1_000);
       });
       expect(screen.getByText("Too many attempts. Try again in 2s.")).toBeInTheDocument();
+      // The region's own copy stays at the starting value.
+      expect(
+        within(live as HTMLElement).getByText("Too many attempts. Try again in 3s."),
+      ).toHaveClass("sr-only");
       expect(submitButton()).toHaveAttribute("aria-disabled", "true");
 
       await act(async () => {
@@ -175,7 +186,9 @@ describe("LoginPage", () => {
       await user.type(passwordInput(), "wrong-password");
       await user.click(submitButton());
 
-      const notice = await screen.findByText("Too many attempts. Try again in 1m 30s.");
+      const notice = await screen.findByText("Too many attempts. Try again in 1m 30s.", {
+        selector: ".tabular-nums",
+      });
       // Tabular digits, so the line does not shift as the seconds count down.
       expect(notice).toHaveClass("tabular-nums");
     });

@@ -529,7 +529,11 @@ export function ApiKeysCard(): JSX.Element {
         <CardPanel>
           <CreatedKeyPanel
             apiKey={createdKey.key}
-            onDismiss={() => setCreatedKey(null)}
+            onDismiss={() => {
+              setCreatedKey(null);
+              // Dismiss goes with the panel; keep focus on the card instead of the page.
+              createRef.current?.focus();
+            }}
             regenerated={createdKey.regenerated}
           />
         </CardPanel>

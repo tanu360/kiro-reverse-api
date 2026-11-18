@@ -66,7 +66,8 @@ export function ApiAccessCard(): JSX.Element {
 
   const onSave = () => {
     if (save.isPending || !dirty) return;
-    if (checked && countEnabledKeys(keys.data ?? []) === 0) {
+    // Only once the keys are loaded: while they load or failed, the count is no answer.
+    if (checked && keys.data && countEnabledKeys(keys.data) === 0) {
       setShowKeyWarning(true);
       return;
     }

@@ -542,9 +542,15 @@ function usePickLists(): void {
 /** A server error (duplicate key, collision, limits), inside the form. */
 function ServerError({ form }: { form: KeyForm }): ReactNode {
   const { t } = useT("api");
+  const ref = useRef<HTMLDivElement>(null);
+  // It sits at the end of a long scrolling form: bring each new error into view, or on a phone
+  // Save just stops spinning with the alert out of sight.
+  useEffect(() => {
+    if (form.error) ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [form.error]);
   if (!form.error) return null;
   return (
-    <Alert variant="error">
+    <Alert ref={ref} variant="error">
       <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
       <AlertTitle>{form.editing ? t("form.saveFailed") : t("form.createFailed")}</AlertTitle>
       <AlertDescription className="wrap-break-word">{errorMessage(form.error, t)}</AlertDescription>

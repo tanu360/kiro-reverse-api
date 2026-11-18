@@ -59,6 +59,9 @@ function UserSignInForm({
   const retry = useRetryCountdown();
   const locked = retry.seconds > 0;
   const retryNotice = t("auth:rateLimited", { time: formatDuration(retry.seconds, lang) });
+  // The lockout's length when it began: the live region reads this once, not every tick.
+  const [lockSeconds, setLockSeconds] = useState(0);
+  const lockNotice = t("auth:rateLimited", { time: formatDuration(lockSeconds, lang) });
   const inputRef = useRef<HTMLInputElement>(null);
 
   const signIn = async (typed: string) => {
@@ -68,6 +71,8 @@ function UserSignInForm({
     const value = typed.trim();
     if (!value) {
       setFieldError(t("errors:serverError.userKeyRequired"));
+      // FieldError is no live region: focus brings the field and its error to a screen reader.
+      inputRef.current?.focus();
       return;
     }
     setFieldError(null);
@@ -87,7 +92,9 @@ function UserSignInForm({
         inputRef.current?.focus();
         inputRef.current?.select();
       } else if (isApiError(error) && error.status === 429) {
-        retry.start(retrySeconds(error));
+        const seconds = retrySeconds(error);
+        setLockSeconds(seconds);
+        retry.start(seconds);
       } else if (
         // No answer, or a gateway in front of the proxy answering for it.
         isApiError(error) &&
@@ -154,10 +161,14 @@ function UserSignInForm({
         {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
         <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
           {locked ? (
-            <Alert role="none" variant="warning">
-              <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
-              <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
-            </Alert>
+            // The fixed sr-only notice is read once; the ticking copy is hidden from the region.
+            <>
+              <span className="sr-only">{lockNotice}</span>
+              <Alert aria-hidden="true" role="none" variant="warning">
+                <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
+                <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
+              </Alert>
+            </>
           ) : null}
         </div>
         {formError ? (

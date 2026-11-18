@@ -75,6 +75,8 @@ describe("conversations", () => {
     await waitFor(() =>
       expect(screen.queryByText(/Showing the turns of conversation/)).not.toBeInTheDocument(),
     );
+    // The notice took its button along; focus is on the status tab, not the page.
+    expect(screen.getByRole("tab", { selected: true })).toHaveFocus();
   });
 });
 
@@ -99,6 +101,8 @@ describe("replay", () => {
     await user.click(within(dialog).getByRole("button", { name: "Run replay" }));
 
     expect(await within(dialog).findByText("HTTP 200")).toBeInTheDocument();
+    // Announced when the run finishes, as a failure's alert is.
+    expect(within(dialog).getByText("HTTP 200").closest('[role="status"]')).not.toBeNull();
     expect(mockDb.requests).toHaveLength(before + 1);
     const logged = mockDb.requests[0];
     expect(logged.replayOf).toBe(record.id);

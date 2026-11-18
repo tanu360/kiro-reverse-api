@@ -56,6 +56,7 @@ export function RequestsPage(): JSX.Element {
   const columns = useRequestColumns();
   // The sheet keeps the open row, so stepping through it never renders this page or its table.
   const sheet = useRef<RequestSheetHandle>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const updateSearch = useCallback(
     (patch: RequestsSearch, options: { replace?: boolean } = {}) => {
@@ -112,9 +113,17 @@ export function RequestsPage(): JSX.Element {
   const setSort = (next: RequestSort, desc: boolean) =>
     updateSearch({ sort: next, order: desc ? "desc" : "asc", page: undefined });
 
+  // Clear filters, Show all and the out-of-range action remove themselves when pressed: focus
+  // moves to a status tab, which stays (All, the first, once the status is cleared), not the page.
+  const focusStatusTab = (which: "first" | "selected") => {
+    const tab = which === "first" ? '[role="tab"]' : '[role="tab"][aria-selected="true"]';
+    bodyRef.current?.querySelector<HTMLElement>(`[data-slot="requests-toolbar"] ${tab}`)?.focus();
+  };
+
   const clearFilters = () => {
     setSearchText("");
     updateSearch({ status: undefined, conversation: undefined, page: undefined });
+    focusStatusTab("first");
   };
 
   let emptyState: JSX.Element;
@@ -122,7 +131,14 @@ export function RequestsPage(): JSX.Element {
     emptyState = (
       <EmptyState
         action={
-          <Button onClick={() => updateSearch({ page: undefined })} size="sm" variant="secondary">
+          <Button
+            onClick={() => {
+              updateSearch({ page: undefined });
+              focusStatusTab("selected");
+            }}
+            size="sm"
+            variant="secondary"
+          >
             {t("outOfRange.action")}
           </Button>
         }
@@ -159,7 +175,9 @@ export function RequestsPage(): JSX.Element {
 
   const fatalError = isError && !hasData;
   // Search and the status filter can't narrow an empty log, so they wait for the first request.
-  const showFilters = !hasData || total > 0 || filtered;
+  // Kept while the previous filter's rows stand in, so clearing a filter that matched nothing
+  // does not drop the toolbar (and the focus moved to its tabs) until the new rows arrive.
+  const showFilters = !hasData || total > 0 || filtered || query.isPlaceholderData;
   const memoryNote =
     data?.persistent === false ? (
       <Alert role="note" size="sm" variant="info">
@@ -176,7 +194,10 @@ export function RequestsPage(): JSX.Element {
       </AlertDescription>
       <AlertAction>
         <Button
-          onClick={() => updateSearch({ conversation: undefined, page: undefined })}
+          onClick={() => {
+            updateSearch({ conversation: undefined, page: undefined });
+            focusStatusTab("selected");
+          }}
           size="xs"
           variant="secondary"
         >
@@ -200,7 +221,7 @@ export function RequestsPage(): JSX.Element {
         title={t("title")}
       />
 
-      <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4" ref={bodyRef}>
         {/* The container the toolbar and column widths respond to. */}
         <DataTableCard
           className="@container/requests"

@@ -190,7 +190,8 @@ function ReplayOutcome({ result }: { result: ReplayResult }): JSX.Element {
       : (result.responseText ?? "");
   return (
     <section aria-label={t("replay.result")} className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Announced when a run finishes, as the error's alert is when one fails. */}
+      <div className="flex flex-wrap items-center gap-2" role="status">
         <Badge dot size="sm" tone={ok ? "success" : "destructive"}>
           {t("replay.status", { status: result.status })}
         </Badge>

@@ -116,6 +116,7 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
   const columns = useRequestColumns(HOLDER_VIEW);
   // The sheet keeps the open row, so stepping through it never renders this card or its table.
   const sheet = useRef<RequestSheetHandle>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
   const { data, error, isError } = query;
   const hasData = data !== undefined;
@@ -144,9 +145,18 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
     setDesc(nextDesc);
     setPage(1);
   };
+  // Clear filters and the out-of-range action remove themselves when pressed: focus moves to a
+  // status tab, which stays (All, the first, once the status is cleared), not the page.
+  const focusStatusTab = (which: "first" | "selected") => {
+    const tab = which === "first" ? '[role="tab"]' : '[role="tab"][aria-selected="true"]';
+    sectionRef.current
+      ?.querySelector<HTMLElement>(`[data-slot="requests-toolbar"] ${tab}`)
+      ?.focus();
+  };
   const clearFilters = () => {
     setStatus(undefined);
     setPage(1);
+    focusStatusTab("first");
   };
   const tableSort: DataTableSort = { id: sort, desc };
 
@@ -155,7 +165,14 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
     emptyState = (
       <EmptyState
         action={
-          <Button onClick={() => setPage(1)} size="sm" variant="secondary">
+          <Button
+            onClick={() => {
+              setPage(1);
+              focusStatusTab("selected");
+            }}
+            size="sm"
+            variant="secondary"
+          >
             {tr("outOfRange.action")}
           </Button>
         }
@@ -192,7 +209,9 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
 
   const fatalError = isError && !hasData;
   // The status filter can't narrow an empty log, so it waits for the first request.
-  const showFilters = !hasData || total > 0 || filtered;
+  // Kept while the previous filter's rows stand in, so clearing a filter that matched nothing
+  // does not drop the toolbar (and the focus moved to its tabs) until the new rows arrive.
+  const showFilters = !hasData || total > 0 || filtered || query.isPlaceholderData;
   // Nothing to page through when the list fits the smallest page, is out of range or failed.
   const showPager = hasData && total > PAGE_SIZES[0] && !outOfRange && !fatalError;
 
@@ -201,6 +220,7 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
       aria-labelledby={headingId}
       className="flex min-w-0 scroll-mt-20 flex-col gap-4"
       id="user-requests"
+      ref={sectionRef}
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 className="font-semibold text-heading leading-6" id={headingId}>

@@ -451,6 +451,8 @@ describe("empty and partial data", () => {
     expect(await screen.findByText("No requests on this page")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Go to first page" }));
     await waitFor(() => expect(screen.getByText("1–10 of 23")).toBeInTheDocument());
+    const statusTabs = screen.getByRole("tablist", { name: "Status" });
+    expect(within(statusTabs).getByRole("tab", { selected: true })).toHaveFocus();
   });
 
   it("turns the badge and notice to expired when the expiry passes on an open page", async () => {

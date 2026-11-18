@@ -573,6 +573,8 @@ describe("RequestsPage", () => {
     await waitFor(() => expect(router.state.location.search).toEqual({}));
     await waitForRows();
     expect(screen.getByRole("searchbox", { name: "Search requests" })).toHaveValue("");
+    // The pressed button is gone; focus is on the All tab, not the page.
+    expect(screen.getByRole("tab", { selected: true })).toHaveFocus();
   });
 
   it("shows the empty state when there are no requests", async () => {
@@ -595,6 +597,7 @@ describe("RequestsPage", () => {
     await user.click(screen.getByRole("button", { name: "Go to first page" }));
     await waitFor(() => expect(router.state.location.search).toEqual({}));
     await waitForRows();
+    expect(screen.getByRole("tab", { selected: true })).toHaveFocus();
   });
 
   it("shows an error state with retry when the first load fails", async () => {
