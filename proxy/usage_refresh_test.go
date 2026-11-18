@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -103,6 +104,13 @@ func TestUsageRefreshSettingsRejectsOutOfRange(t *testing.T) {
 // loop learns of it from the restore event.
 func TestUsageRefreshWakesOnConfigEvents(t *testing.T) {
 	h := &Handler{usageRefresh: newRefreshScheduler(func() time.Duration { return 0 })}
+	// Room for every wake, so each event that wakes the loop leaves its own mark (the real
+	// channel keeps one and drops the rest). Nothing else reads it here.
+	wake := make(chan struct{}, 8)
+	h.usageRefresh.wake = wake
+
+	b := getBroadcaster()
+	first := atomic.LoadUint64(&b.nextID) + 1
 	stop := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
@@ -114,38 +122,43 @@ func TestUsageRefreshWakesOnConfigEvents(t *testing.T) {
 		<-done
 	}()
 
-	// The subscriber starts asynchronously: publish until it sees one.
-	deadline := time.After(2 * time.Second)
-	for woken := false; !woken; {
-		publishEvent(eventBackupRestored, "")
-		select {
-		case <-h.usageRefresh.wake:
-			woken = true
-		case <-deadline:
-			t.Fatal("a backup restore did not wake the sweep loop")
-		case <-time.After(10 * time.Millisecond):
+	// The loop subscribes on its own goroutine: wait for it, so no event is published before.
+	deadline := time.Now().Add(2 * time.Second)
+	for subscribed := false; !subscribed; {
+		b.mu.RLock()
+		for id := range b.subscribers {
+			subscribed = subscribed || id >= first
+		}
+		b.mu.RUnlock()
+		if !subscribed {
+			if time.Now().After(deadline) {
+				t.Fatal("the sweep loop never subscribed to events")
+			}
+			time.Sleep(time.Millisecond)
 		}
 	}
-	settle := func() {
-		time.Sleep(50 * time.Millisecond)
-		select {
-		case <-h.usageRefresh.wake:
-		default:
-		}
-	}
-	settle()
 
+	expectWake := func(what string) {
+		t.Helper()
+		select {
+		case <-wake:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s did not wake the sweep loop", what)
+		}
+	}
+	publishEvent(eventBackupRestored, "")
+	expectWake("a backup restore")
 	publishEvent(eventSettingsChanged, "")
-	select {
-	case <-h.usageRefresh.wake:
-	case <-time.After(2 * time.Second):
-		t.Fatal("a settings change did not wake the sweep loop")
-	}
-	settle()
+	expectWake("a settings change")
 
+	// The loop reads events in order, so the settings change after the stats reset wakes it
+	// once; a second wake could only be the stats reset's.
 	publishEvent(eventStatsReset, "")
-	time.Sleep(50 * time.Millisecond)
-	if len(h.usageRefresh.wake) != 0 {
+	publishEvent(eventSettingsChanged, "")
+	expectWake("a settings change")
+	select {
+	case <-wake:
 		t.Fatal("an unrelated event woke the sweep loop")
+	case <-time.After(100 * time.Millisecond):
 	}
 }
