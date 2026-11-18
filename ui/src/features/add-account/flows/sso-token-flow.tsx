@@ -70,8 +70,7 @@ export function SsoTokenFlow(): JSX.Element {
           reloginAccountId: relogin.accountId,
         });
         if (!sessions.isCurrent(generation)) return;
-        relogin.announce(res);
-        finishAdd([res.account]);
+        relogin.finish(res);
       } catch (error) {
         if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error, setFailure))) {
           setFailure({ error });

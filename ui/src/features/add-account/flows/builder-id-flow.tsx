@@ -34,7 +34,7 @@ interface DeviceCode {
 /** AWS Builder ID device-code sign-in: show the code, then poll until the user approves it. */
 export function BuilderIdFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [region, setRegion] = useState(() => reloginRegion(relogin.target));
@@ -49,8 +49,8 @@ export function BuilderIdFlow(): JSX.Element {
   const codeRef = useRef<HTMLDivElement>(null);
 
   // The poll chain reads the latest render's helpers, not the ones from when it started.
-  const latest = useRef({ relogin, finishAdd, focusAfter });
-  latest.current = { relogin, finishAdd, focusAfter };
+  const latest = useRef({ relogin, focusAfter });
+  latest.current = { relogin, focusAfter };
 
   // Stop polling if this view goes away while the dialog stays open.
   useEffect(() => () => sessions.stopBuilderId(), [sessions]);
@@ -60,14 +60,13 @@ export function BuilderIdFlow(): JSX.Element {
       sessions.builderIdTimer = null;
       const sessionId = sessions.builderIdSession;
       if (!sessionId || !sessions.isCurrent(generation)) return;
-      const { relogin: again, finishAdd: finish, focusAfter: refocus } = latest.current;
+      const { relogin: again, focusAfter: refocus } = latest.current;
       try {
         const res = await pollBuilderId({ sessionId });
         if (!sessions.isCurrent(generation) || sessions.builderIdSession !== sessionId) return;
         if (res.completed) {
           sessions.stopBuilderId();
-          again.announce(res);
-          finish([res.account]);
+          again.finish(res);
           return;
         }
         setReconnecting(false);

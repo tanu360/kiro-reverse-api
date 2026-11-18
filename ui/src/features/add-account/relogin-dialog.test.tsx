@@ -184,6 +184,43 @@ describe("AddAccountDialog in re-login mode", () => {
     expect(refreshes.count).toBe(0);
   });
 
+  it("stays open on the result when the server could not confirm the same user", async () => {
+    const account = accountBy("Enterprise");
+    mockServer.use(
+      http.post(apiUrl("/auth/credentials"), () =>
+        HttpResponse.json({
+          success: true,
+          relogin: true,
+          identityVerified: false,
+          identityReplaced: false,
+          account: { id: account.id, email: account.email },
+        }),
+      ),
+    );
+    const { user } = renderWithProviders(
+      <Harness account={account} initialMethod="credentials" />,
+      { privacy: false },
+    );
+    await submitCredentials(
+      user,
+      JSON.stringify({ refreshToken: "fresh", clientId: "c", clientSecret: "s" }),
+    );
+
+    // One amber line in place of the flow, read out by its alert role; Close takes focus.
+    const line = await screen.findByText(
+      `${account.email} is signed in again. Could not confirm that this sign-in is the same user.`,
+      { selector: '[data-slot="alert-description"]' },
+    );
+    expect(line.closest('[data-slot="alert"]')).toHaveAttribute("role", "alert");
+    const footer = document.querySelector<HTMLElement>('[data-slot="dialog-footer"]');
+    if (!footer) throw new Error("no dialog footer");
+    const buttons = within(footer).getAllByRole("button");
+    expect(buttons.map((button) => button.textContent)).toEqual(["Close"]);
+    await waitFor(() => expect(buttons[0]).toHaveFocus());
+    await user.click(buttons[0]);
+    await expectClosed();
+  });
+
   it("asks before replacing the identity, then applies the waiting login", async () => {
     const confirms = logRequests("/accounts/:id/relogin/confirm");
     const account = accountBy("Enterprise");

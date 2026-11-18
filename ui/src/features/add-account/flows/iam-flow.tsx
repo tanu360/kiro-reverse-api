@@ -25,7 +25,7 @@ import { useReloginFlow } from "../relogin";
  */
 export function IamFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [startUrl, setStartUrl] = useState("");
@@ -92,8 +92,7 @@ export function IamFlow(): JSX.Element {
     try {
       const res = await completeIamSso({ sessionId: sessions.iamSession, callbackUrl: callback });
       if (!sessions.isCurrent(generation)) return;
-      relogin.announce(res);
-      finishAdd([res.account]);
+      relogin.finish(res);
     } catch (error) {
       if (!sessions.isCurrent(generation)) return;
       if (await relogin.resolveMismatch(error, setFailure)) {

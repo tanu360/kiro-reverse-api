@@ -68,8 +68,7 @@ export function ApiKeyFlow(): JSX.Element {
           reloginAccountId: relogin.accountId,
         });
         if (!sessions.isCurrent(generation)) return;
-        relogin.announce(res);
-        finishAdd([res.account]);
+        relogin.finish(res);
       } catch (caught) {
         if (
           sessions.isCurrent(generation) &&

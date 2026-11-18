@@ -107,7 +107,7 @@ function JsonFileInput({
 /** Kiro IDE local cache: kiro-auth-token.json plus, for IdC, the {hash}.json client file. */
 export function LocalCacheFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [provider, setProvider] = useState<LocalProvider>("BuilderId");
@@ -146,8 +146,7 @@ export function LocalCacheFlow(): JSX.Element {
         reloginAccountId: relogin.accountId,
       });
       if (!sessions.isCurrent(generation)) return;
-      relogin.announce(res);
-      finishAdd([res.account]);
+      relogin.finish(res);
     } catch (error) {
       if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error, setFailure))) {
         setFailure({ error });

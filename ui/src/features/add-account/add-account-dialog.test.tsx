@@ -103,6 +103,27 @@ async function expectFlowError(text: string | RegExp): Promise<void> {
   expect(line.closest('[data-slot="dialog-popup"]')).not.toBeNull();
 }
 
+/** The buttons in the dialog's footer, in order. */
+function footerButtons(): HTMLElement[] {
+  const footer = document.querySelector<HTMLElement>('[data-slot="dialog-footer"]');
+  if (!footer) throw new Error("no dialog footer");
+  return within(footer).getAllByRole("button");
+}
+
+/**
+ * A login that went in with a warning: one amber line in the open dialog, and Close as the
+ * footer's only button, with focus.
+ */
+async function expectSavedWarning(text: string | RegExp): Promise<HTMLElement> {
+  const line = await screen.findByText(text, { selector: '[data-slot="alert-description"]' });
+  expect(line.closest('[data-slot="alert"]')).toHaveAttribute("role", "alert");
+  expect(line.closest('[data-slot="dialog-popup"]')).not.toBeNull();
+  const buttons = footerButtons();
+  expect(buttons.map((button) => button.textContent)).toEqual(["Close"]);
+  await waitFor(() => expect(buttons[0]).toHaveFocus());
+  return buttons[0];
+}
+
 /** Waits until the checklist step with this title is the current one. */
 async function expectCurrentStep(title: string): Promise<void> {
   await waitFor(() =>
@@ -296,21 +317,29 @@ describe("Microsoft SSO", () => {
     await waitFor(() => expect(refreshed).toEqual([id]));
   });
 
-  it("shows the warning when the profile is not resolved yet", async () => {
-    mockRefresh();
-    const { user } = renderWithProviders(<Harness initialMethod="microsoft" />);
+  it("stays open on the warning when the profile is not resolved yet", async () => {
+    const refreshed = mockRefresh();
+    const onAdded = vi.fn();
+    const { user } = renderWithProviders(<Harness initialMethod="microsoft" onAdded={onAdded} />);
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
     await user.type(await screen.findByRole("textbox", { name: "Callback URL" }), "http://x/leg1");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await expectCurrentStep("Sign in with Microsoft");
     await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/?noprofile");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    await expectClosed();
-    // Read out after the result, translated from warningCode with the upstream reason as the
-    // detail.
-    await expectAnnounced(
+
+    // One amber line after the result, translated from warningCode with the upstream reason as
+    // the detail, in place of the finished flow.
+    const close = await expectSavedWarning(
       /^Added the account \S+ The account was added, but its Kiro profile could not be found yet\. It is looked up again on the next request\. \(Details: no available Kiro profile\)$/,
     );
+    expect(screen.queryByRole("textbox", { name: "Callback URL" })).not.toBeInTheDocument();
+    const id = lastAccountId();
+    expect(onAdded).toHaveBeenCalledWith([id]);
+    await waitFor(() => expect(refreshed).toEqual([id]));
+
+    await user.click(close);
+    await expectClosed();
   });
 
   it("cancels the server session when the dialog closes mid-flow", async () => {
@@ -503,6 +532,8 @@ describe("Kiro API Key", () => {
     expect(keys).toHaveValue("ksk_duplicate|eu-central-1");
     await waitFor(() => expect(keys).toHaveFocus());
     expect(screen.getByRole("dialog", { name: "Add account" })).toBeInTheDocument();
+    // An account went in, so the footer's Cancel, which would undo nothing, reads Close.
+    expect(footerButtons().map((button) => button.textContent)).toEqual(["Close", "Add"]);
     expect(imports.bodies).toEqual([
       { kiroApiKey: "ksk_duplicate", authMethod: "api_key", region: "us-east-1" },
       { kiroApiKey: "ksk_duplicate|eu-central-1", authMethod: "api_key", region: "" },
@@ -524,6 +555,7 @@ describe("Kiro API Key", () => {
     await user.click(screen.getByRole("button", { name: "Add" }));
     await expectFlowError("boom");
     expect(keys).toHaveValue("ksk_one");
+    expect(footerButtons().map((button) => button.textContent)).toEqual(["Cancel", "Add"]);
 
     fail = false;
     await user.click(screen.getByRole("button", { name: "Add" }));

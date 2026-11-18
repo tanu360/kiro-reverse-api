@@ -14,7 +14,12 @@ import { queryKeys } from "@/lib/api/query-keys";
 import type { Account, AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
-import { type FlowContextValue, FlowProvider } from "./flow-context";
+import {
+  type FinishOptions,
+  type FlowContextValue,
+  FlowProvider,
+  SavedWarning,
+} from "./flow-context";
 import { FlowSessions } from "./flow-sessions";
 import { ApiKeyFlow } from "./flows/api-key-flow";
 import { BuilderIdFlow } from "./flows/builder-id-flow";
@@ -84,6 +89,10 @@ export function AddAccountDialog({
   const [flowKey, setFlowKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
+  // A login that went in with something to read: the dialog shows it in place of the flow.
+  const [warning, setWarning] = useState<string | null>(null);
+  // Accounts went in while the dialog stayed open (see FlowContextValue.saved).
+  const [saved, setSaved] = useState(false);
   // Each time the dialog opens, start over at the requested method (Builder ID by default).
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -92,6 +101,8 @@ export function AddAccountDialog({
       setMethod(startMethod);
       setFlowKey((key) => key + 1);
       setBusy(false);
+      setWarning(null);
+      setSaved(false);
     }
   }
 
@@ -113,8 +124,15 @@ export function AddAccountDialog({
   );
 
   const finishAdd = useCallback(
-    async (refs: AddedAccountRef[], { keepOpen = false }: { keepOpen?: boolean } = {}) => {
-      if (!keepOpen) {
+    async (refs: AddedAccountRef[], { keepOpen = false, warning }: FinishOptions = {}) => {
+      if (keepOpen || warning) {
+        setSaved(true);
+        if (warning) {
+          // The flow is done: it gives way to the line, and a late response is dropped.
+          sessions.reset({ cancelMicrosoft: false });
+          setWarning(warning);
+        }
+      } else {
         sessions.reset({ cancelMicrosoft: false });
         latest.current.onOpenChange(false);
       }
@@ -147,6 +165,7 @@ export function AddAccountDialog({
       setMethod(next);
       setFlowKey((key) => key + 1);
       setBusy(false);
+      setWarning(null);
     },
     [sessions],
   );
@@ -158,11 +177,12 @@ export function AddAccountDialog({
       sessions,
       finishAdd: (refs, options) => void finishAdd(refs, options),
       setBusy,
+      saved,
       cancel,
       footer,
       relogin: relogin ?? null,
     }),
-    [sessions, finishAdd, cancel, footer, relogin],
+    [sessions, finishAdd, saved, cancel, footer, relogin],
   );
 
   const Flow = FLOWS[method];
@@ -199,7 +219,7 @@ export function AddAccountDialog({
               <MethodSelect busy={busy} method={method} onSelect={selectMethod} />
               <MethodHead method={method} relogin={Boolean(relogin)} />
               <FlowProvider value={context}>
-                <Flow key={flowKey} />
+                {warning ? <SavedWarning text={warning} /> : <Flow key={flowKey} />}
               </FlowProvider>
             </DialogPanel>
           </div>

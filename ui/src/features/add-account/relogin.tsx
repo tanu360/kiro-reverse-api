@@ -25,10 +25,12 @@ interface ReloginFlow {
   /** Sent as reloginAccountId; undefined (left out of the body) when adding. */
   accountId: string | undefined;
   /**
-   * Reads out one finished login, in either mode, with an optional note after it. The dialog
-   * closes onto the row it added or signed in again, so nothing else shows it.
+   * Ends the flow on one finished login, in either mode: reads out the result and closes the
+   * dialog onto the row it added or signed in again. With something the admin should read (the
+   * flow's `note`, or a re-login whose user the server could not confirm) the dialog stays open
+   * on the result and that, as one amber line.
    */
-  announce: (res: FinishedLogin, note?: string) => void;
+  finish: (res: FinishedLogin, note?: string) => void;
   /**
    * Handles a re-login that signed in as another user (409 relogin_identity_mismatch): asks to
    * replace the identity, then applies the waiting login (and finishes the dialog) or discards
@@ -46,18 +48,27 @@ export function useReloginFlow(): ReloginFlow {
   const confirm = useConfirm();
   const { relogin, finishAdd, setBusy } = useFlow();
 
-  const announceLogin = useCallback(
+  const finish = useCallback(
     (res: FinishedLogin, note?: string) => {
       const name = display(res.account.email, res.account.id);
-      const parts = [
-        // A login of an account already stored updates it instead of adding a copy.
-        relogin ? t("relogin.success", { name }) : savedText(t, res.account, name),
+      // A login of an account already stored updates it instead of adding a copy.
+      const result = relogin ? t("relogin.success", { name }) : savedText(t, res.account, name);
+      const warnings = [
         note,
         relogin && res.identityVerified === false ? t("relogin.unverified") : undefined,
       ].filter((part): part is string => Boolean(part));
-      announce(parts.reduce((first, second) => t("common:text.joinSentences", { first, second })));
+      if (warnings.length === 0) {
+        announce(result);
+        finishAdd([res.account]);
+        return;
+      }
+      const warning = warnings.reduce(
+        (first, second) => t("common:text.joinSentences", { first, second }),
+        result,
+      );
+      finishAdd([res.account], { warning });
     },
-    [display, relogin, t],
+    [display, finishAdd, relogin, t],
   );
 
   const resolveMismatch = useCallback(
@@ -103,8 +114,7 @@ export function useReloginFlow(): ReloginFlow {
         }
         try {
           const res = await confirmRelogin(relogin.id, mismatch.pendingId);
-          announceLogin(res);
-          finishAdd([res.account]);
+          finish(res);
         } catch (caught) {
           fail({ error: caught });
         }
@@ -113,13 +123,13 @@ export function useReloginFlow(): ReloginFlow {
         setBusy(false);
       }
     },
-    [announceLogin, confirm, display, finishAdd, relogin, setBusy, t],
+    [confirm, display, finish, relogin, setBusy, t],
   );
 
   return {
     target: relogin,
     accountId: relogin?.id,
-    announce: announceLogin,
+    finish,
     resolveMismatch,
   };
 }

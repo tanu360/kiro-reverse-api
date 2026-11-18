@@ -28,7 +28,7 @@ import { useReloginFlow } from "../relogin";
 /** Kiro web cookie: the RefreshToken cookie of app.kiro.dev, a social sign-in. */
 export function CookieFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [provider, setProvider] = useState<CookieProvider>(() =>
@@ -66,8 +66,7 @@ export function CookieFlow(): JSX.Element {
         reloginAccountId: relogin.accountId,
       });
       if (!sessions.isCurrent(generation)) return;
-      relogin.announce(res);
-      finishAdd([res.account]);
+      relogin.finish(res);
     } catch (caught) {
       if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught, setFailure))) {
         setFailure({ error: caught });

@@ -36,7 +36,7 @@ type Stage = "idle" | "kiro" | "microsoft" | "profile";
  */
 export function MicrosoftFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [stage, setStage] = useState<Stage>("idle");
@@ -102,14 +102,13 @@ export function MicrosoftFlow(): JSX.Element {
     // The server closed the login when it saved the account; there is nothing to cancel.
     sessions.microsoftSessionId = "";
     sessions.microsoftSelectionId = "";
-    // The dialog closes onto the new row. A warning (the Kiro profile is looked up again on the
-    // next request) needs nothing from the admin, so it is only read out after the result.
+    // A Kiro profile not found yet (with the upstream reason) can mean the account does not
+    // work, so the dialog stays open on it.
     const detail = { detail: res.warningDetail };
     const warning = res.warning
       ? (serverCodeMessage(res.warningCode, detail, t) ?? res.warning)
       : undefined;
-    relogin.announce(res, warning);
-    finishAdd([res.account]);
+    relogin.finish(res, warning);
   };
 
   const start = () =>

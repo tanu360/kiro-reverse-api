@@ -75,8 +75,7 @@ export function CredentialsFlow(): JSX.Element {
           reloginAccountId: relogin.accountId,
         });
         if (!sessions.isCurrent(generation)) return;
-        relogin.announce(res);
-        finishAdd([res.account]);
+        relogin.finish(res);
       } catch (caught) {
         if (
           sessions.isCurrent(generation) &&
@@ -120,7 +119,8 @@ export function CredentialsFlow(): JSX.Element {
         return;
       }
       // The items that went in are listed at once; the dialog stays open on the ones that failed.
-      // Sending the same JSON again updates those accounts instead of adding copies.
+      // Sending the same JSON again updates the logins that went in instead of adding copies (an
+      // API key that went in is turned down as already added).
       if (added.length > 0) finishAdd(added, { keepOpen: true });
       setFailure({ error: failures, message: text });
       focusAfter(jsonRef);
