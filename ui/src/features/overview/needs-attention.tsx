@@ -267,7 +267,7 @@ export function NeedsAttention(): JSX.Element {
     },
     [rows],
   );
-  // A failed refresh, said above the list in place of a toast (one line, Try again and close).
+  // A failed refresh, said above the list (one line, Try again and close).
   const [failure, setFailure] = useState<AccountFailure | null>(null);
   const focusViewAll = useCallback(() => viewAllRef.current, []);
   // It goes with its account once that leaves the list (healthy again, or deleted).

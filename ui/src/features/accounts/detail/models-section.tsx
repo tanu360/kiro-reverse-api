@@ -21,8 +21,8 @@ import { useT } from "@/lib/i18n";
 import { modelRate, sortModels } from "../account-model";
 
 /**
- * Live model list (GET /models updates the server cache) and a route-cache refresh. No toasts:
- * the list says how its load went; the refresh button spins, then shows a tick for two seconds
+ * Live model list (GET /models updates the server cache) and a route-cache refresh. The list
+ * says how its load went; the refresh button spins, then shows a tick for two seconds
  * (a screen reader hears the model count), and a failed refresh is said at the top of the card.
  */
 export function ModelsSection({ accountId }: { accountId: string }): JSX.Element {

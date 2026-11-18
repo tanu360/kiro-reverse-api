@@ -163,7 +163,7 @@ export function DuplicatesDialog({
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [skipped, setSkipped] = useState<Record<string, boolean>>({});
   const [merging, setMerging] = useState(false);
-  // The last merge that failed, said in the dialog in place of a toast.
+  // The last merge that failed, said in the dialog.
   const [failure, setFailure] = useState<unknown>(null);
   const mergeRef = useRef<HTMLButtonElement | null>(null);
   const included = groups.filter((group) => !skipped[groupKey(group)]);

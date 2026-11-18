@@ -50,8 +50,8 @@ function tagsInUse(accounts: readonly Account[]): string[] {
 
 /**
  * Adds one tag to the selected accounts, or removes it from them. The field takes one tag (the
- * tags already in use are quick picks under it); Add is the form's submit, so Enter adds. No
- * toasts: the pressed button spins; a clean run closes the dialog (a screen reader hears how many
+ * tags already in use are quick picks under it); Add is the form's submit, so Enter adds. The
+ * pressed button spins; a clean run closes the dialog (a screen reader hears how many
  * accounts changed). A partial run stays open on the failed accounts, counting the changed ones
  * and naming the failed ones (such as an account that already has the most tags), where Try
  * again runs on those; a failed request says why, also with Try again.

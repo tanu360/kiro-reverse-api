@@ -4,7 +4,7 @@ import { AreaSparkline } from "@/components/charts/sparkline";
 /** The idle day's line: the stat tiles' quiet grey (overview/stat-sparkline). */
 const IDLE_COLOR = "color-mix(in oklab, var(--muted-foreground) 45%, transparent)";
 
-export interface ActivityPoint {
+interface ActivityPoint {
   reqs: number;
   failures: number;
 }

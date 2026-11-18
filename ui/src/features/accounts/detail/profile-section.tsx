@@ -28,7 +28,7 @@ function defaultArn(result: AccountProfilesResponse): string {
  * Kiro profile pinning. The sheet shows it only where profiles exist (IAM Identity Center and
  * Microsoft sign-ins), never for api_key accounts (the server answers 400). An account pinned
  * before keeps it whatever its sign-in, with loading disabled where there are no profiles, so it
- * can still return to automatic. No toasts: the pressed button spins ("Verifying profile…"), the
+ * can still return to automatic. The pressed button spins ("Verifying profile…"), the
  * rows above show the new region and mode (a screen reader hears the result), and a failure stays
  * under the profiles, where Try again sends the same choice.
  */

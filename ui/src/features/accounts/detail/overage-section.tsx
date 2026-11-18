@@ -42,7 +42,7 @@ function useMergeOverage(accountId: string): (snapshot: OverageResponse) => void
 }
 
 /**
- * Both calls reach real AWS. No confirm for the toggle (old UI parity). No toasts: while a call
+ * Both calls reach real AWS. No confirm for the toggle (old UI parity). While a call
  * runs its button spins, or the switch's title says "Calling AWS…"; the facts and the switch show
  * the result (a screen reader hears it), and a failure is said in the card, with Try again.
  */

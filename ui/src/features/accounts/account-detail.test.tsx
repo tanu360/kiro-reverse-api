@@ -131,7 +131,7 @@ describe("AccountDetailSheet", () => {
     await user.type(input, "4{Enter}");
     await waitFor(() => expect(puts).toEqual([{ weight: 4 }]));
     const saved = await screen.findByText("The change was saved.");
-    // Read out, not toasted: the closed edit and its new value show it.
+    // Read out; on screen the closed edit and its new value show it.
     expect(saved.closest('[data-slot="live-announcer"]')).not.toBeNull();
     await waitFor(() => expect(editingRow(sheet)).toBeNull());
     // Focus goes back to the row.

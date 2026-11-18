@@ -33,7 +33,7 @@ async function renderAccounts(path = "/accounts") {
   return { ...view, table };
 }
 
-/** A result read out by the app's hidden live region (no toast). */
+/** A result read out by the app's hidden live region. */
 async function expectAnnounced(text: string | RegExp): Promise<void> {
   const line = await screen.findByText(text);
   expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
