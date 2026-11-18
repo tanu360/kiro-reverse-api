@@ -72,11 +72,11 @@ describe("hardcoded user-visible text", () => {
 describe("scanSource", () => {
   const scan = (code: string) => scanSource(code, "fixture.tsx").map((f) => `${f.kind}: ${f.text}`);
 
-  it("flags JSX text, visible props, string children and alert/confirm arguments", () => {
+  it("flags JSX text, visible props, string children and announce/confirm arguments", () => {
     expect(
       scan(`
         export function A() {
-          alert("Saved the file");
+          announce("Saved the file");
           confirm("Really?");
           document.title = "Accounts";
           const item = { label: "Overview" };
@@ -89,7 +89,7 @@ describe("scanSource", () => {
         }
       `),
     ).toEqual([
-      "alert: Saved the file",
+      "announce: Saved the file",
       "confirm: Really?",
       "document.title: Accounts",
       "property label: Overview",
@@ -161,7 +161,7 @@ describe("scanSource", () => {
     expect(
       scan(`
         export function A() {
-          alert(t("saveFailed"));
+          announce(t("saveFailed"));
           const item = { labelKey: "shell.nav.overview", hint: "microsoftChoiceHint" };
           return (
             <div aria-label={t("close")} className="flex gap-2" data-state="open" title="Kiro Proxy">

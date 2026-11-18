@@ -83,7 +83,7 @@ export function useSectionSave<V>(
     onSuccess: (_data, variables) => {
       handlers.onSaved(variables);
       savedFlash.flash();
-      announce(handlers.successMessage ?? t("common:toast.saved"));
+      announce(handlers.successMessage ?? t("common:form.saved"));
     },
     onError: (error, variables) => {
       if (handlers.onFailed?.(error, variables) !== true) return;

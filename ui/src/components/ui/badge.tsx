@@ -80,7 +80,7 @@ export const badgeVariants = cva(
 );
 
 export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
-export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
 export interface BadgeProps extends useRender.ComponentProps<"span"> {
   tone?: BadgeTone;

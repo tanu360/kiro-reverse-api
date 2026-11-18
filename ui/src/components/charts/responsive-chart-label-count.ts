@@ -1,4 +1,4 @@
-export interface ResponsiveChartLabelCount {
+interface ResponsiveChartLabelCount {
   base?: number;
   sm?: number;
   md?: number;

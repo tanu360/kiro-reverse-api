@@ -54,7 +54,7 @@ export function PopoverPopup({
         alignOffset={alignOffset}
         anchor={anchor}
         // At most 90 % of the viewport wide and, on phones, its viewport (below) 90 % tall. z-70:
-        // above the modal layer (z-50), so a popover opened in a dialog or sheet shows over it.
+        // above dialogs and sheets (z-50), as every anchored popup.
         className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-[min(var(--available-width),90vw)] transition-[top,left,right,bottom,transform] data-instant:transition-none"
         collisionPadding={collisionPadding}
         data-slot="popover-positioner"

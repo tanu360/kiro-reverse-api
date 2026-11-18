@@ -20,7 +20,7 @@ import { intFmt } from "./chart-formatters";
 import { useOptionalChartLegendHover } from "./chart-legend-hover";
 import { ShareBar } from "./share-bar";
 
-export type LegendMarkerVariant = "dot" | "line" | "dashed";
+type LegendMarkerVariant = "dot" | "line" | "dashed";
 
 export interface LegendItemData {
   /** Display label. */

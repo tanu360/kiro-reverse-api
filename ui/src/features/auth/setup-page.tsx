@@ -113,13 +113,13 @@ function GeneratedPassword({
             aria-hidden="true"
             className="text-success-foreground opacity-0 group-has-data-copied/pw:opacity-100"
           >
-            {tShared("toast.copied")}
+            {tShared("copy.copied")}
           </span>
           <span
             aria-hidden="true"
             className="text-destructive-foreground opacity-0 group-has-data-copy-failed/pw:opacity-100"
           >
-            {tShared("toast.copyFailed")}
+            {tShared("copy.failed")}
           </span>
         </p>
       )}
@@ -175,7 +175,7 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
 
   const onClick = async () => {
     const ok = await copyText(value);
-    if (!ok) announce(tShared("toast.copyFailed"), { assertive: true });
+    if (!ok) announce(tShared("copy.failed"), { assertive: true });
     setResult(ok ? "copied" : "failed");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {

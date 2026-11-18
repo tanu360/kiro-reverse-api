@@ -150,7 +150,7 @@ export function testAlertChannel(channelId: string): Promise<AlertDelivery> {
 }
 
 /** One channel's result of a summary test send. */
-export interface DailySummaryTestResult extends AlertDelivery {
+interface DailySummaryTestResult extends AlertDelivery {
   channelId: string;
 }
 

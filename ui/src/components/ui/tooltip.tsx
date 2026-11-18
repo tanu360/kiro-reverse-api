@@ -36,7 +36,7 @@ export function TooltipPopup({
       <TooltipPrimitive.Positioner
         align={align}
         anchor={anchor}
-        // z-70: above the modal layer (z-50), as every anchored popup.
+        // z-70: above dialogs and sheets (z-50), as every anchored popup.
         className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
         collisionPadding={collisionPadding}
         data-slot="tooltip-positioner"

@@ -8,7 +8,7 @@ import { withDetail } from "./server-errors";
  * Where the public link stands (proxy/tunnel_api.go): off, fetching the Tailscale helper,
  * connecting, waiting on the user at Tailscale (sign-in, device approval, Funnel), live, or failed.
  */
-export type TunnelState =
+type TunnelState =
   | "off"
   | "downloading"
   | "starting"

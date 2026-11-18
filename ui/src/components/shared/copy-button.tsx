@@ -70,8 +70,8 @@ export function CopyButton({
   const onClick = async () => {
     // A lazy value is passed on as a promise so Safari keeps the user activation for the write.
     const ok = await copyText(typeof value === "function" ? value() : value);
-    if (!ok) announce(t("toast.copyFailed"), { assertive: true });
-    else if (copyReadOut()) announce(copiedMessage ?? t("toast.copiedToClipboard"));
+    if (!ok) announce(t("copy.failed"), { assertive: true });
+    else if (copyReadOut()) announce(copiedMessage ?? t("copy.copiedToClipboard"));
     setResult(ok ? "copied" : "failed");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -82,7 +82,7 @@ export function CopyButton({
 
   const iconOnly = !showLabel;
   const Icon = copied ? CheckIcon : failed ? AlertCircleIcon : icon;
-  const said = copied ? t("toast.copied") : failed ? t("toast.copyFailed") : label;
+  const said = copied ? t("copy.copied") : failed ? t("copy.failed") : label;
   const button = (
     <Button
       aria-label={iconOnly ? label : undefined}

@@ -284,7 +284,7 @@ export function AccountRowActions({
           >
             <MenuTriggerIcon busy={manage.busy} copied={manage.copied} />
           </TooltipTrigger>
-          <TooltipPopup>{manage.copied ? tc("toast.copied") : t("actions.more")}</TooltipPopup>
+          <TooltipPopup>{manage.copied ? tc("copy.copied") : t("actions.more")}</TooltipPopup>
         </Tooltip>
         <MenuPopup align="end">
           <MenuItem onClick={() => onDetails(account)}>
@@ -359,7 +359,7 @@ export function AccountSheetActions({
             >
               <MenuTriggerIcon busy={manage.busy} copied={manage.copied} />
             </TooltipTrigger>
-            <TooltipPopup>{manage.copied ? tc("toast.copied") : t("actions.more")}</TooltipPopup>
+            <TooltipPopup>{manage.copied ? tc("copy.copied") : t("actions.more")}</TooltipPopup>
           </Tooltip>
           <MenuPopup align="end">
             <ManageMenuItems account={account} manage={manage} />

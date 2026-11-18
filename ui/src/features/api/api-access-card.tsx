@@ -64,7 +64,7 @@ export function ApiAccessCard(): JSX.Element {
       void queryClient.invalidateQueries({ queryKey: queryKeys.settings.general() });
       setDraft(null);
       savedFlash.flash();
-      announce(t("common:toast.saved"));
+      announce(t("common:form.saved"));
     },
   });
 

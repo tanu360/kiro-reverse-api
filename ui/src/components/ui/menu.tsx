@@ -68,7 +68,7 @@ export function MenuPopup({
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
-        // z-70: above the modal layer (z-50), so a menu opened in a dialog or sheet shows over it.
+        // z-70: above dialogs and sheets (z-50), as every anchored popup.
         className="z-70"
         collisionPadding={collisionPadding}
         data-slot="menu-positioner"

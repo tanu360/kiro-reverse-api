@@ -1,7 +1,7 @@
 /**
  * Screen-reader messages for results the page already shows on its own (a pill that changed, a
- * row that went away, a tick on a button). LiveAnnouncer, mounted once by the app, reads them out
- * from a hidden live region; without it they go nowhere.
+ * row that went away, a tick on a button). LiveAnnouncer, mounted once by the app, reads them
+ * out from a hidden live region; without it they go nowhere.
  */
 interface Announcement {
   text: string;

@@ -149,7 +149,7 @@ export function useSelfUpdateController({
     const was = previous.current;
     previous.current = phase;
     if (phase !== "ready" || (was !== "downloading" && was !== "starting")) return;
-    announce(tRef.current("shell.update.readyToast", { latest: target }));
+    announce(tRef.current("shell.update.readyAnnouncement", { latest: target }));
   }, [phase, target]);
 
   return useMemo(

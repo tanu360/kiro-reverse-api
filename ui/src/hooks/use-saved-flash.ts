@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** How long a Save button reads "Saved" after a save, in place of a toast. */
-export const SAVED_FLASH_MS = 2000;
+/** How long a Save button reads "Saved" after a save. */
+const SAVED_FLASH_MS = 2000;
 
 /**
  * A short "Saved" state for a Save button: `flash()` turns it on, and it goes off by itself
