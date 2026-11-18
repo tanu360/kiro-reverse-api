@@ -222,16 +222,29 @@ describe("BackupsPage", () => {
       ),
     );
     const { user } = await renderPage();
+    const announced = recordAnnouncements();
     const keep = await screen.findByRole("textbox", { name: "Keep latest" });
     await user.clear(keep);
     await user.type(keep, "30");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByText("Enter a whole number from 1 to 200.")).toBeInTheDocument();
+    const error = await screen.findByText("Enter a whole number from 1 to 200.", {
+      selector: '[data-slot="field-error"]',
+    });
     expect(keep).toHaveAttribute("aria-invalid", "true");
+    expect(keep).toHaveAccessibleDescription(
+      "Keep 1–200. Older scheduled backups are deleted. Enter a whole number from 1 to 200.",
+    );
+    // Under the whole row (text and field), not in its text column.
+    const row = keep.closest<HTMLElement>('[data-slot="settings-row"]');
+    expect(row).not.toBeNull();
+    expect(row).not.toContainElement(error);
+    expect(row?.nextElementSibling).toBe(error);
+    // Focus stays on Save, so a screen reader hears it this way.
+    expect(announced).toEqual(["Enter a whole number from 1 to 200."]);
     noActionError();
     // Editing the value clears the mark.
     await user.type(keep, "1");
-    expect(screen.queryByText("Enter a whole number from 1 to 200.")).toBeNull();
+    expect(error).not.toBeInTheDocument();
   });
 
   it("downloads a backup through saveBlob with the server file name", async () => {
@@ -447,6 +460,29 @@ describe("BackupsPage", () => {
     await waitFor(() => expect(dataRows()).toHaveLength(6));
     noActionError();
     await expectAnnounced("The backup was created.");
+    expect(screen.getByRole("button", { name: "Create backup" })).toHaveFocus();
+  });
+
+  it("drops a row's failure once that backup is gone, moving focus out of it", async () => {
+    mockServer.use(
+      http.get(apiUrl("/backups/:id/download"), () =>
+        HttpResponse.json({ error: "read backup: busy" }, { status: 500 }),
+      ),
+    );
+    const { user, queryClient } = await renderPage();
+    const [first] = newestFirst();
+    await rowAction(user, dataRows()[0], "Download");
+    const notice = await actionError();
+    expect(notice).toHaveTextContent("read backup: busy");
+    act(() => within(notice).getByRole("button", { name: "Close" }).focus());
+    // Deleted elsewhere: the list refetches without it, and Try again has nothing to fetch.
+    mockDb.backups.splice(
+      mockDb.backups.findIndex((row) => row.id === first.id),
+      1,
+    );
+    await act(() => queryClient.invalidateQueries());
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
+    noActionError();
     expect(screen.getByRole("button", { name: "Create backup" })).toHaveFocus();
   });
 

@@ -4,16 +4,11 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useRef, useState } from "react";
+import { type ComponentProps, type JSX, useId, useRef, useState } from "react";
 import { ActionError } from "@/components/shared/action-error";
 import { ErrorState } from "@/components/shared/error-state";
-import {
-  NOTICE_ACTIONS_CLASS,
-  NOTICE_LINE_CLASS,
-  NoticeIconButton,
-} from "@/components/shared/notice-line";
+import { NoticeIconButton, NoticeLine } from "@/components/shared/notice-line";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SettingsFrame } from "@/components/shared/section-card";
 import {
@@ -24,7 +19,6 @@ import {
   SwitchField,
 } from "@/components/shared/settings-rows";
 import { useDraftGuard } from "@/components/shared/use-draft-guard";
-import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { CardPanel } from "@/components/ui/card";
 import { Field, FieldError } from "@/components/ui/field";
 import {
@@ -202,20 +196,46 @@ function PruneFailedNotice({
 }): JSX.Element {
   const { t } = useT("backups");
   return (
-    <Alert className={NOTICE_LINE_CLASS} data-testid="schedule-prune-failed" variant="warning">
-      <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
-      <AlertDescription className="wrap-break-word">
-        {t("schedulePruneFailedBody", { detail })}
-      </AlertDescription>
-      <AlertAction className={NOTICE_ACTIONS_CLASS}>
-        <NoticeIconButton
-          icon={Refresh01Icon}
-          label={t("common:actions.retry")}
-          onClick={onRetry}
-        />
-        <NoticeIconButton icon={XIcon} label={t("common:actions.close")} onClick={onDismiss} />
-      </AlertAction>
-    </Alert>
+    <NoticeLine
+      actions={
+        <>
+          <NoticeIconButton
+            icon={Refresh01Icon}
+            label={t("common:actions.retry")}
+            onClick={onRetry}
+          />
+          <NoticeIconButton icon={XIcon} label={t("common:actions.close")} onClick={onDismiss} />
+        </>
+      }
+      data-testid="schedule-prune-failed"
+      icon={TriangleAlertIcon}
+      variant="warning"
+    >
+      {t("schedulePruneFailedBody", { detail })}
+    </NoticeLine>
+  );
+}
+
+/**
+ * A row whose value the server can reject: the Field round it marks the control invalid and adds
+ * the error to the control's description. The error goes under the whole row (text and control),
+ * at the row's width and padding, not into the text column.
+ */
+function FieldRow({
+  error,
+  ...row
+}: Omit<ComponentProps<typeof SettingsRow>, "children" | "className"> & {
+  error?: string;
+}): JSX.Element {
+  return (
+    <Field className="items-stretch gap-0" invalid={error !== undefined}>
+      <SettingsRow {...row} className={error ? "pb-2" : undefined} />
+      {error ? (
+        <FieldError className={cn(SETTINGS_ROW_X, "pb-4")} match>
+          {error}
+        </FieldError>
+      ) : null}
+    </Field>
   );
 }
 
@@ -254,6 +274,9 @@ function ScheduleFormCard({
     setInvalid(null);
   }
 
+  const invalidMessage = (field: InvalidField) =>
+    field === "keep" ? t("invalidKeep", { min: KEEP_MIN, max: KEEP_MAX }) : t("invalidCadence");
+
   const dirty = scheduleDirty(initial, { enabled, cadence, keep });
   useDraftGuard(dirty, {
     message: {
@@ -286,8 +309,13 @@ function ScheduleFormCard({
     },
     onError: (error) => {
       const field = INVALID_FIELDS[serverErrorCode(error) ?? ""];
-      if (field) setInvalid(field);
-      else setFailure(error);
+      if (!field) {
+        setFailure(error);
+        return;
+      }
+      // The row's error has no live region of its own, and focus stays on Save.
+      setInvalid(field);
+      announce(invalidMessage(field));
     },
   });
 
@@ -365,48 +393,38 @@ function ScheduleFormCard({
           onCheckedChange={setEnabled}
           title={t("scheduleEnabled")}
         />
-        {/* One Field round each row: it marks the control invalid and adds the error, which
-            sits under the description, to the control's description. */}
-        <Field className="items-stretch" invalid={invalid === "cadence"}>
-          <SettingsRow
-            control={
-              <FrequencySelect
-                onValueChange={(value) => {
-                  if (invalid === "cadence") setInvalid(null);
-                  setCadence(value);
-                }}
-                value={cadence}
-              />
-            }
-            controlWidth="number"
-            title={t("frequency")}
-          >
-            {invalid === "cadence" ? <FieldError match>{t("invalidCadence")}</FieldError> : null}
-          </SettingsRow>
-        </Field>
-        <Field className="items-stretch" invalid={invalid === "keep"}>
-          <SettingsRow
-            control={
-              <KeepField
-                id={keepId}
-                max={keepMax(initial.keep)}
-                onValueChange={(value) => {
-                  if (invalid === "keep") setInvalid(null);
-                  setKeep(value);
-                }}
-                value={keep}
-              />
-            }
-            controlWidth="number"
-            description={t("keepHint")}
-            htmlFor={keepId}
-            title={t("keepTitle")}
-          >
-            {invalid === "keep" ? (
-              <FieldError match>{t("invalidKeep", { min: KEEP_MIN, max: KEEP_MAX })}</FieldError>
-            ) : null}
-          </SettingsRow>
-        </Field>
+        <FieldRow
+          control={
+            <FrequencySelect
+              onValueChange={(value) => {
+                if (invalid === "cadence") setInvalid(null);
+                setCadence(value);
+              }}
+              value={cadence}
+            />
+          }
+          controlWidth="number"
+          error={invalid === "cadence" ? invalidMessage("cadence") : undefined}
+          title={t("frequency")}
+        />
+        <FieldRow
+          control={
+            <KeepField
+              id={keepId}
+              max={keepMax(initial.keep)}
+              onValueChange={(value) => {
+                if (invalid === "keep") setInvalid(null);
+                setKeep(value);
+              }}
+              value={keep}
+            />
+          }
+          controlWidth="number"
+          description={t("keepHint")}
+          error={invalid === "keep" ? invalidMessage("keep") : undefined}
+          htmlFor={keepId}
+          title={t("keepTitle")}
+        />
       </SettingsFrame>
     </form>
   );
