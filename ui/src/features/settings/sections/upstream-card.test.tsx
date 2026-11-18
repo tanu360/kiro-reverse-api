@@ -158,6 +158,27 @@ describe("UpstreamCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("forgets a failed save once the draft is undone", async () => {
+    mockServer.use(
+      http.post(apiUrl("/upstream"), () =>
+        HttpResponse.json({ error: "store busy" }, { status: 500 }),
+      ),
+    );
+    const { user, card } = await renderCard();
+    const region = within(card).getByLabelText("Sign-in region");
+
+    await user.type(region, "eu-west-1");
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+    await within(card).findByRole("alert");
+    await user.clear(region);
+    expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+
+    // A new edit is a new draft: the old reason does not come back with it.
+    await user.type(region, "eu-west-2");
+    expect(within(card).getByText("Unsaved changes")).toBeInTheDocument();
+    expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("closes a failed save with focus on Save and the draft kept", async () => {
     mockServer.use(
       http.post(apiUrl("/upstream"), () =>

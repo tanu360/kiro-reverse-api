@@ -205,7 +205,7 @@ export function FooterSaveError({
 }
 
 /** How long a dialog's Save reads "Saved" before the dialog closes. */
-export const SAVED_CLOSE_MS = 700;
+const SAVED_CLOSE_MS = 700;
 
 /**
  * A dialog that closes on a save: `done()` turns its Save to "Saved", and `close` runs a moment
@@ -331,6 +331,12 @@ export function SaveFooter({
 }): JSX.Element {
   const saveRef = useRef<HTMLButtonElement>(null);
   const failed = dirty && feedback.error != null;
+  // A draft back to the saved values (undone, or Reload) ends the failure: the next edit must not
+  // bring the old reason back.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the draft turns clean.
+  useEffect(() => {
+    if (!dirty && feedback.error != null) feedback.dismiss();
+  }, [dirty]);
   return (
     <>
       {failed ? (
