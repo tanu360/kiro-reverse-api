@@ -1,4 +1,4 @@
-import { FloppyDiskIcon } from "@hugeicons/core-free-icons";
+import { CheckIcon, FloppyDiskIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
   cloneElement,
@@ -375,10 +375,14 @@ export function SubmitButton({
   );
 }
 
-/** Save: outline and inert while there is nothing to save, primary once there is. */
+/**
+ * Save: outline and inert while there is nothing to save, primary once there is. `saved` (a
+ * useSavedFlash) reads "Saved" with a tick for a moment after a save, in place of a toast.
+ */
 export function SaveButton({
   dirty,
   saving,
+  saved = false,
   label,
   type,
   onClick,
@@ -387,6 +391,8 @@ export function SaveButton({
 }: {
   dirty: boolean;
   saving: boolean;
+  /** Just saved: "Saved" with a tick until the next change. */
+  saved?: boolean;
   /** "Save" by default. */
   label?: string;
   type?: "submit" | "button";
@@ -396,16 +402,28 @@ export function SaveButton({
   className?: string;
 }): JSX.Element {
   const { t } = useT();
+  const done = saved && !dirty && !saving;
   return (
     <SubmitButton
       blocked={!dirty || saving}
       busy={saving}
-      className={className}
+      // Full strength while it says so, though there is nothing to save.
+      className={cn(done && "aria-disabled:not-aria-busy:opacity-100", className)}
+      icon={done ? null : undefined}
       onClick={onClick}
       ref={ref}
       type={type}
     >
-      {saving ? t("actions.saving") : (label ?? t("actions.save"))}
+      {done ? (
+        <>
+          <HugeiconsIcon icon={CheckIcon} aria-hidden="true" className="text-success-foreground" />
+          {t("actions.saved")}
+        </>
+      ) : saving ? (
+        t("actions.saving")
+      ) : (
+        (label ?? t("actions.save"))
+      )}
     </SubmitButton>
   );
 }

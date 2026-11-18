@@ -7,6 +7,7 @@ import { MotionConfig } from "motion/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppToaster } from "@/components/layout/app-toasts";
+import { LiveAnnouncer } from "@/components/layout/live-announcer";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
 import { SkeletonThemeProvider } from "@/components/shared/skeleton-theme";
@@ -41,6 +42,7 @@ async function bootstrap(): Promise<void> {
                     </ConfirmProvider>
                   </TooltipProvider>
                   <AppToaster />
+                  <LiveAnnouncer />
                 </QueryClientProvider>
               </PrivacyProvider>
             </I18nProvider>

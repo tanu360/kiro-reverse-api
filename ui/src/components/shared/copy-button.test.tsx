@@ -1,19 +1,21 @@
 import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { announce } from "@/lib/announce";
 import { copyText } from "@/lib/clipboard";
-import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
 import { CopyButton } from "./copy-button";
 
 vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn() }));
-vi.mock("@/lib/toast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+vi.mock("@/lib/announce", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/announce")>()),
+  announce: vi.fn(),
 }));
 
 const copyTextMock = vi.mocked(copyText);
 
 beforeEach(() => {
   copyTextMock.mockReset();
+  vi.mocked(announce).mockReset();
 });
 
 describe("CopyButton", () => {
@@ -25,7 +27,8 @@ describe("CopyButton", () => {
     expect(copyTextMock).toHaveBeenCalledTimes(1);
     expect(await copyTextMock.mock.calls[0]?.[0]).toBe("sk-123");
     await waitFor(() => expect(button).toHaveAttribute("data-copied"));
-    expect(toast.success).toHaveBeenCalled();
+    // No toast: the tick and its tooltip show it, and a screen reader hears it.
+    expect(announce).toHaveBeenCalledWith("Copied to the clipboard.");
   });
 
   it("resolves a lazy value before it is copied", async () => {
@@ -66,12 +69,23 @@ describe("CopyButton", () => {
     await waitFor(() => expect(button).toHaveAttribute("data-copied"));
   });
 
-  it("reports a failed copy", async () => {
+  it("reports a failed copy on the button itself", async () => {
     copyTextMock.mockResolvedValue(false);
     const { user } = renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);
     const button = screen.getByRole("button", { name: "Copy key" });
     await user.click(button);
-    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    await waitFor(() => expect(button).toHaveAttribute("data-copy-failed"));
     expect(button).not.toHaveAttribute("data-copied");
+    expect(announce).toHaveBeenCalledWith("Could not copy to the clipboard.", { assertive: true });
+  });
+
+  it("names a failed copy in its label", async () => {
+    copyTextMock.mockResolvedValue(false);
+    const { user } = renderWithProviders(
+      <CopyButton label="Copy link" showLabel value="https://x" />,
+    );
+    const button = screen.getByRole("button", { name: "Copy link" });
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveTextContent("Could not copy to the clipboard."));
   });
 });

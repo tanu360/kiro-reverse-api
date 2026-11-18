@@ -83,6 +83,30 @@ async function renderPage() {
 
 type User = Awaited<ReturnType<typeof renderPage>>["user"];
 
+/** A request that waits until `release()`, then falls through to the mock's own handler. */
+function gate(): { wait: () => Promise<void>; release: () => void } {
+  let release = () => {};
+  const opened = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { wait: () => opened, release: () => release() };
+}
+
+/** The card's notice for a failed action, found by its title. */
+async function actionError(title: string): Promise<HTMLElement> {
+  const notice = (await screen.findByText(title)).closest<HTMLElement>(
+    '[data-slot="action-error"]',
+  );
+  if (!notice) throw new Error(`no notice for ${title}`);
+  return notice;
+}
+
+/** Said to a screen reader through the app's live region, not shown as a toast. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 /** A create row's All / Only selected switch (a radio group named by the row's title). */
 function scopeRadio(dialog: HTMLElement, group: string, name: string): HTMLElement {
   return within(within(dialog).getByRole("radiogroup", { name: group })).getByRole("radio", {
@@ -251,6 +275,82 @@ describe("ApiPage", () => {
     await waitFor(() => expect(sent("PUT", `/api-keys/${teamA?.id}`)).toHaveLength(1));
     expect(sent("PUT", `/api-keys/${teamA?.id}`)[0]?.body).toEqual({ enabled: false });
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("says Disabling… in the row while it runs, then Disabled, with no toast", async () => {
+    const put = gate();
+    mockServer.use(
+      http.put(apiUrl("/api-keys/:id"), async () => {
+        await put.wait();
+      }),
+    );
+    const { user } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Disable" }));
+    expect(await within(row("team-a")).findByText("Disabling…")).toBeInTheDocument();
+    put.release();
+    expect(await within(row("team-a")).findByText("Disabled")).toBeInTheDocument();
+    expect(within(row("team-a")).queryByText("Disabling…")).not.toBeInTheDocument();
+    await expectAnnounced("The API key was disabled.");
+  });
+
+  it("shows a failed disable in the card, and Try again sends it again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.put(apiUrl("/api-keys/:id"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = await renderPage();
+    const teamA = mockDb.apiKeys[0];
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Disable" }));
+    const notice = await actionError("Could not disable team-a");
+    expect(within(row("team-a")).getByText("Enabled")).toBeInTheDocument();
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(sent("PUT", `/api-keys/${teamA?.id}`)).toHaveLength(2));
+    expect(await within(row("team-a")).findByText("Disabled")).toBeInTheDocument();
+    expect(screen.queryByText("Could not disable team-a")).not.toBeInTheDocument();
+    // The notice is gone; focus is on the key's row menu, not the page.
+    expect(document.activeElement).toHaveAccessibleName("Actions for team-a");
+  });
+
+  it("keeps a key whose delete failed and says so until it is closed", async () => {
+    mockServer.use(
+      http.delete(apiUrl("/api-keys/:id"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { user } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(within(confirm).getByRole("button", { name: "Delete" }));
+    const notice = await actionError("Could not delete team-a");
+    expect(row("team-a")).toBeInTheDocument();
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(screen.queryByText("Could not delete team-a")).not.toBeInTheDocument();
+    expect(document.activeElement).toHaveAccessibleName("Actions for team-a");
+  });
+
+  it("says Resetting… in the usage while a reset runs", async () => {
+    const post = gate();
+    const teamA = mockDb.apiKeys[0];
+    mockServer.use(
+      http.post(apiUrl("/api-keys/:id/reset-usage"), async () => {
+        await post.wait();
+      }),
+    );
+    const { user } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Reset usage" }));
+    expect(await within(row("team-a")).findByText("Resetting…")).toBeInTheDocument();
+    post.release();
+    await waitFor(() => expect(sent("POST", `/api-keys/${teamA?.id}/reset-usage`)).toHaveLength(1));
+    await waitFor(() =>
+      expect(within(row("team-a")).queryByText("Resetting…")).not.toBeInTheDocument(),
+    );
   });
 
   it("resets usage without a confirm", async () => {
@@ -425,6 +525,9 @@ describe("ApiPage", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(sent("PUT", `/api-keys/${local.id}`)).toHaveLength(1));
     expect(sent("PUT", `/api-keys/${local.id}`)[0]?.body).toMatchObject({ expiresAt: 0 });
+    // Save reads "Saved" for a moment, then the sheet closes on the updated row.
+    expect(await within(dialog).findByRole("button", { name: "Saved" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await within(row("local-dev")).findByText("Enabled")).toBeInTheDocument();
   });
 
@@ -638,7 +741,30 @@ describe("ApiPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(settingsPosts).toEqual([{ requireApiKey: true }]));
     expect(await screen.findByText("Clients must send an API key")).toBeInTheDocument();
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    // No toast: Save reads "Saved" for a moment.
+    expect(await screen.findByRole("button", { name: "Saved" })).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
+  });
+
+  it("shows a failed API access save in the card, and Try again sends the draft again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/settings"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    for (const apiKey of mockDb.apiKeys) apiKey.enabled = apiKey.name === "local-dev";
+    const { user } = await renderPage();
+    await screen.findByText("Any client can call the proxy");
+    await user.click(screen.getByRole("switch", { name: "Require an API key" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const notice = await actionError("Could not save API access");
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(settingsPosts).toEqual([{ requireApiKey: true }]));
+    expect(await screen.findByRole("button", { name: "Saved" })).toBeInTheDocument();
+    expect(screen.queryByText("Could not save API access")).not.toBeInTheDocument();
   });
 
   it("names a key card's limits and shows its last use as a live time", async () => {

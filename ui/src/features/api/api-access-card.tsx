@@ -1,7 +1,8 @@
 import { ShieldKeyIcon, TriangleAlertIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useState } from "react";
+import { type JSX, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard, SettingsFrame } from "@/components/shared/section-card";
 import {
@@ -13,12 +14,13 @@ import {
 import { useDraftGuard } from "@/components/shared/use-draft-guard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSavedFlash } from "@/hooks/use-saved-flash";
+import { announce } from "@/lib/announce";
 import { apiKeysQuery } from "@/lib/api/api-keys";
 import { queryKeys } from "@/lib/api/query-keys";
 import { settingsQuery, updateSettings } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { countEnabledKeys } from "./api-key-form";
 
@@ -35,6 +37,8 @@ export function ApiAccessCard(): JSX.Element {
   const keys = useQuery(apiKeysQuery());
   const [draft, setDraft] = useState<boolean | null>(null);
   const [showKeyWarning, setShowKeyWarning] = useState(false);
+  const savedFlash = useSavedFlash();
+  const saveRef = useRef<HTMLButtonElement>(null);
 
   const saved = settings.data?.requireApiKey ?? false;
   const checked = draft ?? saved;
@@ -49,18 +53,18 @@ export function ApiAccessCard(): JSX.Element {
     },
   });
 
+  // No toast: Save reads "Saved" for a moment, and a failure shows in the card.
   const save = useMutation({
     mutationFn: (requireApiKey: boolean) => updateSettings({ requireApiKey }),
+    onMutate: () => savedFlash.clear(),
     onSuccess: (_result, requireApiKey) => {
       queryClient.setQueryData<Settings>(queryKeys.settings.general(), (old) =>
         old ? { ...old, requireApiKey } : old,
       );
       void queryClient.invalidateQueries({ queryKey: queryKeys.settings.general() });
       setDraft(null);
-      toast.success(t("common:toast.saved"));
-    },
-    onError: (error) => {
-      toastError(error, t);
+      savedFlash.flash();
+      announce(t("common:toast.saved"));
     },
   });
 
@@ -74,6 +78,8 @@ export function ApiAccessCard(): JSX.Element {
     setShowKeyWarning(false);
     save.mutate(checked);
   };
+
+  const failed = save.isError && dirty;
 
   if (settings.isError) {
     return (
@@ -97,7 +103,14 @@ export function ApiAccessCard(): JSX.Element {
       footer={
         <SaveFooter
           action={
-            <SaveButton dirty={dirty} onClick={onSave} saving={save.isPending} type="button" />
+            <SaveButton
+              dirty={dirty}
+              onClick={onSave}
+              ref={saveRef}
+              saved={savedFlash.saved}
+              saving={save.isPending}
+              type="button"
+            />
           }
           dirty={dirty}
           saving={save.isPending}
@@ -122,6 +135,8 @@ export function ApiAccessCard(): JSX.Element {
           onCheckedChange={(next) => {
             setDraft(next);
             setShowKeyWarning(false);
+            savedFlash.clear();
+            save.reset();
           }}
           title={t("access.requireApiKey")}
         >
@@ -130,6 +145,22 @@ export function ApiAccessCard(): JSX.Element {
               <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
               <AlertDescription>{t("access.enabledApiKeyRequired")}</AlertDescription>
             </Alert>
+          ) : null}
+          {/* The draft stays, so Try again sends it again; focus goes to Save as the notice goes. */}
+          {failed ? (
+            <ActionError
+              className="mt-2"
+              error={save.error}
+              onDismiss={() => {
+                save.reset();
+                saveRef.current?.focus();
+              }}
+              onRetry={() => {
+                saveRef.current?.focus();
+                onSave();
+              }}
+              title={t("access.saveFailed")}
+            />
           ) : null}
         </SwitchField>
       )}

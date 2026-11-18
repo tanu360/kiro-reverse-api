@@ -1,5 +1,6 @@
 import {
   AlertCircleIcon,
+  CheckIcon,
   DashboardSpeed01Icon,
   Key01Icon,
   KeyRoundIcon,
@@ -51,6 +52,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ROUTING_MODE_LABEL, useRoutingMode } from "@/features/accounts/use-routing-mode";
+import { announce } from "@/lib/announce";
 import { accountsQuery } from "@/lib/api/accounts";
 import { createApiKey, keyModelsQuery, updateApiKey } from "@/lib/api/api-keys";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -58,7 +60,6 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { ApiKey, ApiKeyRoutingMode } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { noSpaces } from "@/lib/input-filters";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { AccountPicks } from "./account-picker";
 import {
@@ -82,6 +83,9 @@ import { ModelPicks } from "./model-picker";
 import { SheetMark } from "./sheet-mark";
 
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
+
+/** How long the edit sheet's Save reads "Saved" before the sheet closes. */
+export const SAVED_CLOSE_MS = 700;
 
 const CREDIT_FORMAT: Intl.NumberFormatOptions = {
   minimumFractionDigits: 2,
@@ -109,6 +113,8 @@ interface KeyForm {
   } & Record<ApiKeyFormField, RefObject<HTMLInputElement | null>>;
   formId: string;
   pending: boolean;
+  /** Edit only: saved, and the sheet closes in a moment (Save reads "Saved"). */
+  saved: boolean;
   error: unknown;
   /** Marks the failed field and focuses it once it is on screen. */
   reject: (failure: ApiKeyFormFailure) => void;
@@ -147,6 +153,15 @@ function useKeyForm(
     allowedModels: useRef<HTMLInputElement>(null),
   };
   const formId = useId();
+  const [saved, setSaved] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per failed submit.
   useEffect(() => {
@@ -162,11 +177,21 @@ function useKeyForm(
       const created = await createApiKey(buildCreateRequest(data));
       return created.key;
     },
+    // No toast. Create closes at once on the new-key panel (an alert, read out as it shows);
+    // edit reads "Saved" on its Save for a moment, then closes on the updated row.
     onSuccess: (createdKey) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all });
-      toast.success(editing ? t("form.updated") : t("form.created"));
-      if (createdKey) onCreated(createdKey);
-      onOpenChange(false);
+      if (createdKey) {
+        onCreated(createdKey);
+        onOpenChange(false);
+        return;
+      }
+      setSaved(true);
+      closeTimer.current = setTimeout(() => {
+        closeTimer.current = null;
+        onOpenChange(false);
+        announce(t("form.updated"));
+      }, SAVED_CLOSE_MS);
     },
   });
 
@@ -186,7 +211,7 @@ function useKeyForm(
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (mutation.isPending) return;
+    if (mutation.isPending || saved) return;
     const parsed = parseApiKeyForm(values);
     if (!parsed.ok) reject(parsed);
     else mutation.mutate(parsed.value);
@@ -201,6 +226,7 @@ function useKeyForm(
     refs,
     formId,
     pending: mutation.isPending,
+    saved,
     error: mutation.isError ? mutation.error : null,
     reject,
     submit: (data) => mutation.mutate(data),
@@ -609,12 +635,24 @@ function FormActions({ form, onCancel }: { form: KeyForm; onCancel: () => void }
         {t("common:actions.cancel")}
       </Button>
       <Button
+        // Saved: the sheet closes in a moment; Save keeps focus and full strength meanwhile.
+        aria-disabled={form.saved || undefined}
+        className={cn(form.saved && "aria-disabled:not-aria-busy:opacity-100")}
         form={form.formId}
         loading={form.pending}
         loadingText={form.editing ? t("common:actions.saving") : t("form.submitCreating")}
         type="submit"
       >
-        {form.editing ? t("common:actions.save") : t("form.submitCreate")}
+        {form.saved ? (
+          <>
+            <HugeiconsIcon icon={CheckIcon} aria-hidden="true" />
+            {t("common:actions.saved")}
+          </>
+        ) : form.editing ? (
+          t("common:actions.save")
+        ) : (
+          t("form.submitCreate")
+        )}
       </Button>
     </>
   );

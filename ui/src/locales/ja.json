@@ -9,6 +9,7 @@
   "nav.group.manage": "管理",
   "actions.save": "保存",
   "actions.saving": "保存中…",
+  "actions.saved": "保存済み",
   "actions.cancel": "キャンセル",
   "actions.close": "閉じる",
   "actions.delete": "削除",

@@ -8,6 +8,7 @@ import {
   Delete02Icon,
   EllipsisVerticalIcon,
   KeyRoundIcon,
+  LoaderCircleIcon,
   PencilEdit01Icon,
   PlusIcon,
   PowerIcon,
@@ -21,6 +22,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -40,6 +42,7 @@ import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/compone
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { ROUTING_MODE_LABEL } from "@/features/accounts/use-routing-mode";
+import { announce } from "@/lib/announce";
 import {
   apiKeysQuery,
   deleteApiKey,
@@ -60,7 +63,6 @@ import {
 } from "@/lib/format";
 import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   flooredShare,
@@ -95,6 +97,16 @@ interface DialogState {
   target: ApiKeyDialogTarget;
   /** Bumped on every opening so the dialog remounts with fresh values. */
   session: number;
+}
+
+/** A row action that can fail; its failure shows above the table until retried or closed. */
+type KeyAction = "toggle" | "reset" | "regenerate" | "remove";
+
+interface KeyFailure {
+  action: KeyAction;
+  /** The key as it was when the action started (toggle's direction comes from it). */
+  apiKey: ApiKey;
+  error: unknown;
 }
 
 /** The key's name, with any e-mail in it masked in privacy mode, as Usage by key shows it. */
@@ -134,6 +146,8 @@ export function ApiKeysCard(): JSX.Element {
     session: number;
   } | null>(null);
   const [page, setPage] = useState(1);
+  // The last row action that failed, shown in the card instead of a toast.
+  const [failure, setFailure] = useState<KeyFailure | null>(null);
   const createRef = useRef<HTMLButtonElement>(null);
   // Row menu triggers by key id (one in the table, one in the cards), so focus can land on a
   // neighbour when a row goes away.
@@ -195,53 +209,103 @@ export function ApiKeysCard(): JSX.Element {
     createRef.current?.focus();
   }, [keys.data]);
 
+  /*
+   * No toasts: the row shows the result itself (the status pill, the usage, the row going away,
+   * the new-key panel), a screen reader hears it, and a failure shows in the card (KeyFailure).
+   * Each stays pending until the list is refetched, so the pill never flips back for a moment.
+   */
   const toggle = useMutation({
     mutationFn: (apiKey: ApiKey) => updateApiKey(apiKey.id, { enabled: !apiKey.enabled }),
+    onMutate: () => setFailure(null),
     onSuccess: (_result, apiKey) => {
-      toast.success(apiKey.enabled ? t("keys.disabled") : t("keys.enabled"));
+      announce(apiKey.enabled ? t("keys.disabled") : t("keys.enabled"));
     },
-    onError: (error) => {
-      toastError(error, t);
-    },
+    onError: (error, apiKey) => setFailure({ action: "toggle", apiKey, error }),
     onSettled: invalidate,
   });
 
   const reset = useMutation({
     mutationFn: (apiKey: ApiKey) => resetApiKeyUsage(apiKey.id),
+    onMutate: () => setFailure(null),
     onSuccess: (_result, apiKey) => {
-      toast.success(t("keys.usageReset"), {
-        description: apiKey.enabled ? undefined : t("keys.usageResetDisabledHint"),
-      });
+      announce(
+        apiKey.enabled
+          ? t("keys.usageReset")
+          : t("common:text.joinSentences", {
+              first: t("keys.usageReset"),
+              second: t("keys.usageResetDisabledHint"),
+            }),
+      );
     },
-    onError: (error) => {
-      toastError(error, t);
-    },
+    onError: (error, apiKey) => setFailure({ action: "reset", apiKey, error }),
     onSettled: invalidate,
   });
 
   const regenerate = useMutation({
     mutationFn: (apiKey: ApiKey) => regenerateApiKey(apiKey.id),
-    onSuccess: (result) => {
-      setCreatedKey({ key: result.key, regenerated: true });
-      toast.success(t("keys.regenerated"));
-    },
-    onError: (error) => {
-      toastError(error, t);
-    },
+    onMutate: () => setFailure(null),
+    // The new-key panel is an alert: it is read out as it appears.
+    onSuccess: (result) => setCreatedKey({ key: result.key, regenerated: true }),
+    onError: (error, apiKey) => setFailure({ action: "regenerate", apiKey, error }),
     onSettled: invalidate,
   });
 
   const remove = useMutation({
     mutationFn: (apiKey: ApiKey) => deleteApiKey(apiKey.id),
-    onSuccess: () => {
-      toast.success(t("keys.deleted"));
-    },
-    onError: (error) => {
+    onMutate: () => setFailure(null),
+    onSuccess: () => announce(t("keys.deleted")),
+    onError: (error, apiKey) => {
       focusAfterDelete.current = null;
-      toastError(error, t);
+      setFailure({ action: "remove", apiKey, error });
     },
     onSettled: invalidate,
   });
+
+  /** Focus the key's row menu (the table's or the card's, whichever shows), else Create. */
+  const focusRow = (id: string) => {
+    const shown = [...(triggers.current.get(id) ?? [])].find(isShown);
+    (shown ?? createRef.current)?.focus();
+  };
+
+  const failureTitle = ({ action, apiKey }: KeyFailure): string => {
+    const name = keyName(apiKey, t, mask);
+    if (action === "toggle") {
+      return apiKey.enabled ? t("keys.disableFailed", { name }) : t("keys.enableFailed", { name });
+    }
+    if (action === "reset") return t("keys.resetFailed", { name });
+    if (action === "regenerate") return t("keys.regenerateFailed", { name });
+    return t("keys.deleteFailed", { name });
+  };
+
+  // Try again runs the same action on the same key, without asking again: it was confirmed. The
+  // notice goes, so focus moves to the key's row first.
+  const retry = ({ action, apiKey }: KeyFailure) => {
+    focusRow(apiKey.id);
+    if (action === "toggle") toggle.mutate(apiKey);
+    else if (action === "reset") reset.mutate(apiKey);
+    else if (action === "regenerate") {
+      setCreatedKey(null);
+      regenerate.mutate(apiKey);
+    } else {
+      focusAfterDelete.current = { id: apiKey.id, order: list.map((k) => k.id) };
+      remove.mutate(apiKey);
+    }
+  };
+
+  const dismissFailure = (current: KeyFailure) => {
+    setFailure(null);
+    focusRow(current.apiKey.id);
+  };
+
+  // While a toggle or reset runs, its row says so where the result will show.
+  const toggling = toggle.isPending ? toggle.variables : undefined;
+  const resettingId = reset.isPending ? reset.variables?.id : undefined;
+  const togglingText = (apiKey: ApiKey): string | null =>
+    toggling?.id === apiKey.id
+      ? toggling.enabled
+        ? t("keys.disabling")
+        : t("keys.enabling")
+      : null;
 
   const openCreate = () => {
     setCreatedKey(null);
@@ -351,25 +415,37 @@ export function ApiKeysCard(): JSX.Element {
       // Fills the cell, so every copy button lines up at the column's end.
       cell: (apiKey) => <MaskedKey apiKey={apiKey} fill />,
     },
-    { id: "status", header: t("keys.status"), cell: (apiKey) => <KeyStatePill apiKey={apiKey} /> },
-    // One column per limit, each one plain line: used / limit and the share.
+    {
+      id: "status",
+      header: t("keys.status"),
+      cell: (apiKey) => {
+        const pending = togglingText(apiKey);
+        return pending ? <PendingBadge text={pending} /> : <KeyStatePill apiKey={apiKey} />;
+      },
+    },
+    // One column per limit, each one plain line: used / limit and the share. While its usage is
+    // reset, Tokens says so and the other two fade.
     {
       id: "tokens",
       header: t("keys.tokens"),
-      cell: (apiKey) => (
-        <KeyMeasure
-          format={(value) => formatNumber(value, lang)}
-          limit={apiKey.tokenLimit ?? 0}
-          measure="tokens"
-          used={apiKey.tokensUsed}
-        />
-      ),
+      cell: (apiKey) =>
+        resettingId === apiKey.id ? (
+          <PendingText text={t("keys.resetting")} />
+        ) : (
+          <KeyMeasure
+            format={(value) => formatNumber(value, lang)}
+            limit={apiKey.tokenLimit ?? 0}
+            measure="tokens"
+            used={apiKey.tokensUsed}
+          />
+        ),
     },
     {
       id: "credits",
       header: t("keys.credits"),
       cell: (apiKey) => (
         <KeyMeasure
+          fading={resettingId === apiKey.id}
           format={(value) => formatCredits(value, 2, lang)}
           limit={apiKey.creditLimit ?? 0}
           measure="credits"
@@ -382,6 +458,7 @@ export function ApiKeysCard(): JSX.Element {
       header: t("keys.calls"),
       cell: (apiKey) => (
         <KeyMeasure
+          fading={resettingId === apiKey.id}
           format={(value) => formatNumber(value, lang)}
           limit={apiKey.callLimit ?? 0}
           measure="calls"
@@ -420,46 +497,53 @@ export function ApiKeysCard(): JSX.Element {
     },
   ];
 
-  const renderCard = (apiKey: ApiKey) => (
-    <ListCard
-      action={actions(apiKey)}
-      badge={<StatusBadge apiKey={apiKey} />}
-      footer={<MaskedKey apiKey={apiKey} />}
-      meta={
-        <span className="flex flex-wrap gap-x-3 gap-y-1">
-          <span className="tabular-nums">
-            {t("keys.requestsCount", {
-              count: apiKey.requestsCount,
-              n: formatNumber(apiKey.requestsCount, lang),
-            })}
+  const renderCard = (apiKey: ApiKey) => {
+    const pending = togglingText(apiKey);
+    return (
+      <ListCard
+        action={actions(apiKey)}
+        badge={pending ? <PendingBadge text={pending} /> : <StatusBadge apiKey={apiKey} />}
+        footer={<MaskedKey apiKey={apiKey} />}
+        meta={
+          <span className="flex flex-wrap gap-x-3 gap-y-1">
+            <span className="tabular-nums">
+              {t("keys.requestsCount", {
+                count: apiKey.requestsCount,
+                n: formatNumber(apiKey.requestsCount, lang),
+              })}
+            </span>
+            <span>
+              {/* A live relative time, with the full date and time as its tooltip. */}
+              {apiKey.lastUsedAt
+                ? fillNodes(t("keys.lastUsedLabel"), {
+                    time: <RelativeTime value={apiKey.lastUsedAt} />,
+                  })
+                : t("keys.neverUsed")}
+            </span>
           </span>
-          <span>
-            {/* A live relative time, with the full date and time as its tooltip. */}
-            {apiKey.lastUsedAt
-              ? fillNodes(t("keys.lastUsedLabel"), {
-                  time: <RelativeTime value={apiKey.lastUsedAt} />,
-                })
-              : t("keys.neverUsed")}
-          </span>
-        </span>
-      }
-      title={
-        // The same cut as the Name column: a clipped name keeps its full text in a tooltip.
-        <TruncatedText className={cn(!apiKey.name && "text-muted-foreground")}>
-          {keyName(apiKey, t, mask)}
-        </TruncatedText>
-      }
-    >
-      {/* The limit badge sits in the body, so the title keeps the header width beside one badge. */}
-      <div className="flex flex-col items-start gap-2">
-        {/* On a phone the badges share lines, wrapping as the card narrows, not one a line. */}
-        <div className="flex flex-col items-start gap-2 empty:hidden max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:gap-1.5">
-          <AccessBadges apiKey={apiKey} />
+        }
+        title={
+          // The same cut as the Name column: a clipped name keeps its full text in a tooltip.
+          <TruncatedText className={cn(!apiKey.name && "text-muted-foreground")}>
+            {keyName(apiKey, t, mask)}
+          </TruncatedText>
+        }
+      >
+        {/* The limit badge sits in the body, so the title keeps the header width beside one badge. */}
+        <div className="flex flex-col items-start gap-2">
+          {/* On a phone the badges share lines, wrapping as the card narrows, not one a line. */}
+          <div className="flex flex-col items-start gap-2 empty:hidden max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:gap-1.5">
+            <AccessBadges apiKey={apiKey} />
+          </div>
+          {resettingId === apiKey.id ? (
+            <PendingText text={t("keys.resetting")} />
+          ) : (
+            <KeyUsage apiKey={apiKey} labelled />
+          )}
         </div>
-        <KeyUsage apiKey={apiKey} labelled />
-      </div>
-    </ListCard>
-  );
+      </ListCard>
+    );
+  };
 
   const headerActions = (
     // The primary action at the page's button size, as Add account.
@@ -525,6 +609,16 @@ export function ApiKeysCard(): JSX.Element {
       slim
       title={t("keys.title")}
     >
+      {failure ? (
+        <CardPanel>
+          <ActionError
+            error={failure.error}
+            onDismiss={() => dismissFailure(failure)}
+            onRetry={() => retry(failure)}
+            title={failureTitle(failure)}
+          />
+        </CardPanel>
+      ) : null}
       {createdKey ? (
         <CardPanel>
           <CreatedKeyPanel
@@ -906,27 +1000,66 @@ function KeyUsage({
   );
 }
 
+/** A status pill while the key is turned on or off: a spinning ring and "Disabling…". */
+function PendingBadge({ text }: { text: string }): JSX.Element {
+  return (
+    <Badge data-status="pending" tone="neutral">
+      <PendingIcon />
+      {text}
+    </Badge>
+  );
+}
+
+/** The usage's place while it is reset: a spinning ring and "Resetting…", muted 12 px. */
+function PendingText({ text }: { text: string }): JSX.Element {
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-meta text-muted-foreground">
+      <PendingIcon className="size-3.5" />
+      {text}
+    </span>
+  );
+}
+
+/** The spinning ring, hidden from a screen reader: the text beside it says what runs. */
+function PendingIcon({ className }: { className?: string }): JSX.Element {
+  return (
+    <HugeiconsIcon
+      aria-hidden="true"
+      className={cn("animate-spin", className)}
+      data-badge-icon="line"
+      icon={LoaderCircleIcon}
+    />
+  );
+}
+
 /**
  * One limit in its own table column, plain text on one line: the used amount in semibold over a
  * muted limit, then the share in purple; from 75 % the amounts and share turn amber, and red once
  * used up (limitTone, as in Usage by key). Without a limit, the used amount over the infinity sign.
+ * `fading` dims it while the key's usage is reset.
  */
 function KeyMeasure({
   measure,
   used,
   limit,
   format,
+  fading = false,
 }: {
   measure: "tokens" | "credits" | "calls";
   used: number;
   limit: number;
   format: (value: number) => string;
+  fading?: boolean;
 }): JSX.Element {
   const tone = limitTone(used, limit);
   const toned = LIMIT_TONE_TEXT[tone];
   return (
     <span
-      className={cn("whitespace-nowrap text-meta tabular-nums", toned)}
+      className={cn(
+        "whitespace-nowrap text-meta tabular-nums transition-opacity",
+        toned,
+        fading && "opacity-50",
+      )}
       data-measure={measure}
       data-tone={tone}
     >
@@ -988,7 +1121,12 @@ function KeyActions({
           />
         }
       >
-        <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
+        {/* While one of its actions runs (a delete, a new value), the row's menu spins. */}
+        <HugeiconsIcon
+          aria-hidden="true"
+          className={cn(busy && "animate-spin")}
+          icon={busy ? LoaderCircleIcon : EllipsisVerticalIcon}
+        />
       </MenuTrigger>
       <MenuPopup align="end">
         <MenuItem onClick={onUsage}>

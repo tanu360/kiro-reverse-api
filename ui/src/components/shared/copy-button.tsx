@@ -1,19 +1,21 @@
-import { CheckIcon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, CheckIcon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { announce } from "@/lib/announce";
 import { copyText } from "@/lib/clipboard";
 import { copiedToastWanted } from "@/lib/copy-toast";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const COPIED_MS = 2000;
 
 /**
- * Copies a value and says so: a tick in place of the copy icon for two seconds, and a toast
- * except on a phone, where the tick is enough (and Android shows its own "Copied").
+ * Copies a value and says so on the button itself, with no toast: a tick in place of the copy
+ * icon and "Copied" as its tooltip for two seconds; a failed copy shows the alert icon and the
+ * reason the same way. A screen reader hears it too, except on a phone, where the OS says it
+ * (Android shows its own "Copied").
  * Icon-only by default, with `label` as its accessible name and tooltip; the touch sizes come
  * from the Button's icon sizes. `showLabel` makes it a small outline button with the label.
  */
@@ -28,7 +30,7 @@ export function CopyButton({
 }: {
   value: string | (() => Promise<string>);
   label: string;
-  /** The success toast, when it can say what was copied; defaults to "Copied to clipboard". */
+  /** What a screen reader hears; defaults to "Copied to the clipboard." */
   copiedMessage?: string;
   /** Ghost by default when icon-only, secondary (soft fill) with a label. */
   variant?: "ghost" | "quiet" | "outline" | "secondary";
@@ -38,7 +40,9 @@ export function CopyButton({
   className?: string;
 }): JSX.Element {
   const { t } = useT();
-  const [copied, setCopied] = useState(false);
+  const [result, setResult] = useState<"copied" | "failed" | null>(null);
+  const copied = result === "copied";
+  const failed = result === "failed";
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -51,28 +55,27 @@ export function CopyButton({
   const onClick = async () => {
     // A lazy value is passed on as a promise so Safari keeps the user activation for the write.
     const ok = await copyText(typeof value === "function" ? value() : value);
-    if (!ok) {
-      toast.error(t("toast.copyFailed"));
-      return;
+    if (!ok) announce(t("toast.copyFailed"), { assertive: true });
+    else if (copiedToastWanted({ marksItself: true })) {
+      announce(copiedMessage ?? t("toast.copiedToClipboard"));
     }
-    if (copiedToastWanted({ marksItself: true })) {
-      toast.success(copiedMessage ?? t("toast.copiedToClipboard"));
-    }
-    setCopied(true);
+    setResult(ok ? "copied" : "failed");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      setCopied(false);
+      setResult(null);
       timerRef.current = null;
     }, COPIED_MS);
   };
 
   const iconOnly = !showLabel;
-  const Icon = copied ? CheckIcon : Copy01Icon;
+  const Icon = copied ? CheckIcon : failed ? AlertCircleIcon : Copy01Icon;
+  const said = copied ? t("toast.copied") : failed ? t("toast.copyFailed") : label;
   const button = (
     <Button
       aria-label={iconOnly ? label : undefined}
       className={className}
       data-copied={copied ? "" : undefined}
+      data-copy-failed={failed ? "" : undefined}
       onClick={onClick}
       size={iconOnly ? (size === "sm" ? "icon" : size) : "sm"}
       variant={variant ?? (iconOnly ? "ghost" : "secondary")}
@@ -80,11 +83,11 @@ export function CopyButton({
       <AnimatedIcon
         icon={Icon}
         aria-hidden="true"
-        className={cn(copied && "text-success-foreground")}
+        className={cn(copied && "text-success-foreground", failed && "text-destructive-foreground")}
         // The tick plays when it lands; the copy icon coming back two seconds later stays still.
-        playOnSwap={copied}
+        playOnSwap={copied || failed}
       />
-      {iconOnly ? null : <span>{copied ? t("toast.copied") : label}</span>}
+      {iconOnly ? null : <span>{said}</span>}
     </Button>
   );
 
@@ -92,7 +95,7 @@ export function CopyButton({
   return (
     <Tooltip>
       <TooltipTrigger render={button} />
-      <TooltipPopup>{copied ? t("toast.copied") : label}</TooltipPopup>
+      <TooltipPopup>{said}</TooltipPopup>
     </Tooltip>
   );
 }

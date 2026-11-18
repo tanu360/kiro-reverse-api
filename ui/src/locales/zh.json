@@ -9,6 +9,7 @@
   "nav.group.manage": "管理",
   "actions.save": "保存",
   "actions.saving": "正在保存…",
+  "actions.saved": "已保存",
   "actions.cancel": "取消",
   "actions.close": "关闭",
   "actions.delete": "删除",

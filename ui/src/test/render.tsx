@@ -10,6 +10,7 @@ import {
 import { act, type RenderResult, render, waitFor } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
+import { LiveAnnouncer } from "@/components/layout/live-announcer";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
 import { ToastProvider } from "@/components/ui/toast";
@@ -65,6 +66,7 @@ function Providers({
               <ConfirmProvider>{children}</ConfirmProvider>
             </TooltipProvider>
             <ToastProvider />
+            <LiveAnnouncer />
           </QueryClientProvider>
         </PrivacyProvider>
       </I18nProvider>
