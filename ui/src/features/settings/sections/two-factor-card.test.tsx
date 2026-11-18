@@ -1,6 +1,9 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
+import { apiUrl } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
 import { MOCK_TOTP_SECRET, totpCodeAt, totpStep } from "@/lib/mocks/totp";
 import { renderWithProviders } from "@/test/render";
 import { TwoFactorCard } from "./two-factor-card";
@@ -43,6 +46,24 @@ describe("TwoFactorCard", () => {
     expect(
       await screen.findByText("10 unused codes left. Each code signs in once without the app."),
     ).toBeInTheDocument();
+  });
+
+  it("retries a setup that failed to start, and leaves the code field unfocused", async () => {
+    mockServer.use(
+      http.post(apiUrl("/two-factor/setup"), () => HttpResponse.json({}, { status: 500 }), {
+        once: true,
+      }),
+    );
+    const { user } = renderWithProviders(<TwoFactorCard />);
+    await user.click(await screen.findByRole("button", { name: "Turn on" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Turn on" })).toBeDisabled();
+    await user.click(await within(dialog).findByRole("button", { name: "Try again" }));
+    expect(
+      await within(dialog).findByRole("img", { name: "QR code for your authenticator app" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Turn on" })).toBeEnabled();
+    expect(within(dialog).getByLabelText("Code from the app")).not.toHaveFocus();
   });
 
   it("turns off with the password", async () => {

@@ -79,6 +79,11 @@ function withKind(model: ProxyModel, kind: ProxyKind): ProxyModel {
 }
 
 const PASTE_EXAMPLE = "socks5://user:pass@host:1080";
+/**
+ * The longest host name DNS allows. Checked, not a maxLength: the Host field also takes a pasted
+ * full URL, which the browser would cut before parseProxyUrl sees it.
+ */
+const HOST_MAX = 253;
 
 /** `host:port`, an IPv6 host in brackets. */
 function address(model: ProxyModel): string {
@@ -246,7 +251,8 @@ function ProxyEditor({
   const kind = kindOf(model);
   const kindHint = KINDS.find((item) => item.value === kind)?.hint ?? "proxySocks5Hint";
   // The server's checks (proxy-url.ts): a host without a port or a space, a port in range.
-  const hostProblem = proxyHostProblem(model.host);
+  const hostProblem =
+    model.host.trim().length > HOST_MAX ? "invalid" : proxyHostProblem(model.host);
   const portValid = isValidProxyPort(model.port.trim());
   const hostInvalid = addressError && hostProblem !== null;
   const portInvalid = addressError && !portValid;
@@ -299,7 +305,6 @@ function ProxyEditor({
             <Field className="min-w-0 items-stretch" invalid={hostInvalid}>
               <FieldLabel>{t("proxyHost")}</FieldLabel>
               <Input
-                maxLength={253}
                 aria-describedby={tipId}
                 autoComplete="off"
                 onChange={(event) => onHostChange(event.target.value)}

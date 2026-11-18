@@ -97,6 +97,48 @@ describe("AlertsCard", () => {
     expect(screen.getByText("1 channel on")).toBeInTheDocument();
   });
 
+  it("shows when the daily summary was last sent as a live time", async () => {
+    const sent = Math.floor(Date.now() / 1000) - 3600;
+    mockServer.use(
+      http.get(apiUrl("/alerts"), () =>
+        HttpResponse.json({ ...SAVED, dailySummary: true, dailySummaryLastSent: sent }),
+      ),
+    );
+    const { container } = await renderCard();
+    const selector = `time[datetime="${new Date(sent * 1000).toISOString()}"]`;
+    await waitFor(() =>
+      expect(container.querySelector(selector)?.parentElement).toHaveTextContent(/Last sent/),
+    );
+  });
+
+  it("keeps each channel's test spinner while tests overlap", async () => {
+    const second = { ...SAVED.channels[0], id: "ch_two", name: "Second hook" };
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockServer.use(
+      http.get(apiUrl("/alerts"), () =>
+        HttpResponse.json({ ...SAVED, channels: [...SAVED.channels, second] }),
+      ),
+      http.post(apiUrl("/alerts/test"), async () => {
+        await held;
+        return HttpResponse.json({ ts: 1, ok: true, status: 200, attempts: 1, event: "test" });
+      }),
+    );
+    const { user } = await renderCard();
+    const first = await screen.findByRole("button", { name: "Send test to Ops hook" });
+    await user.click(first);
+    await user.click(screen.getByRole("button", { name: "Send test to Second hook" }));
+    expect(screen.getByRole("button", { name: "Send test to Second hook" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(first).toHaveAttribute("aria-busy", "true");
+    release();
+    await waitFor(() => expect(first).not.toHaveAttribute("aria-busy", "true"));
+  });
+
   it("masks emails in a channel's name and error under privacy", async () => {
     const named: AlertsConfig = {
       ...SAVED,

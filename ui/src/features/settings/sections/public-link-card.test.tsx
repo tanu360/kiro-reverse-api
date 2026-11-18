@@ -194,6 +194,21 @@ describe("PublicLinkCard", () => {
     await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-home"));
   });
 
+  it("keeps focus after saving on Enter and does not save again on blur", async () => {
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    const field = await screen.findByRole("textbox", { name: "Device name" });
+    await user.clear(field);
+    await user.type(field, "kiro-home{Enter}");
+    await user.tab();
+    await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-home"));
+    expect(await screen.findAllByText("Your settings were saved.")).toHaveLength(1);
+    expect(field).toHaveValue("kiro-home");
+    await user.click(field);
+    await user.type(field, "2{Enter}");
+    await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-home2"));
+    expect(field).toHaveFocus();
+  });
+
   it("signs out of Tailscale after a confirm", async () => {
     mockDb.twoFactor.enabled = true;
     mockDb.tunnel.signedIn = true;
@@ -284,7 +299,7 @@ describe("PublicLinkCard", () => {
     ).toBeVisible();
     await user.tab();
     await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-proxy"));
-    // The saved name remounts the field with it.
+    // The saved name fills the field.
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "Device name" })).toHaveValue("kiro-proxy"),
     );

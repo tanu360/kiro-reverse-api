@@ -133,11 +133,13 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
   // null row id means Add mapping (after the last row is deleted).
   const menuButtons = useRef(new Map<string, HTMLElement>());
   const addButton = useRef<HTMLButtonElement>(null);
+  const filterInput = useRef<HTMLInputElement>(null);
   const [pendingFocus, setPendingFocus] = useState<{ rowId: string | null }>();
   useLayoutEffect(() => {
     if (!pendingFocus) return;
     setPendingFocus(undefined);
-    if (pendingFocus.rowId === null) addButton.current?.focus();
+    // No row left on screen: the filter field while it shows, else Add mapping.
+    if (pendingFocus.rowId === null) (filterInput.current ?? addButton.current)?.focus();
     else menuButtons.current.get(pendingFocus.rowId)?.focus();
   }, [pendingFocus]);
 
@@ -184,11 +186,13 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
   };
 
   // Focus goes to the next row's menu, the previous row's when the last row goes, and Add
-  // mapping when the list is empty, so it never drops to the page.
+  // mapping when the list is empty (the filter field when a filter hides the rest), so it never
+  // drops to the page.
   const removeRow = (rowId: string) => {
     if (rowId === errorRowId) clearError();
-    const index = rows.findIndex((row) => row.id === rowId);
-    const neighbour = rows[index + 1] ?? rows[index - 1];
+    // The neighbour on screen, not one a filter hides.
+    const index = shown.findIndex(({ row }) => row.id === rowId);
+    const neighbour = (shown[index + 1] ?? shown[index - 1])?.row;
     draft.set((prev) => prev.filter((row) => row.id !== rowId));
     setPendingFocus({ rowId: neighbour?.id ?? null });
   };
@@ -357,6 +361,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
               aria-label={t("modelMappings.filter")}
               onChange={(event) => setFilter(event.target.value)}
               placeholder={t("modelMappings.filter")}
+              ref={filterInput}
               spellCheck={false}
               type="search"
               value={filter}

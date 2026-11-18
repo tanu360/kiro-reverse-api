@@ -68,7 +68,7 @@ import {
 } from "@/lib/api/alerts";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
-import { dateTimeFormat, formatRelativeTime } from "@/lib/format";
+import { dateTimeFormat } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
@@ -270,7 +270,7 @@ function SummaryTimeSelect({
  * dialog like the outbound proxy; then the rules, saved together with Save.
  */
 function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
-  const { t, lang } = useT("alerts");
+  const { t } = useT("alerts");
   const mask = useMaskText();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -368,8 +368,17 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
     channels.mutate({ inputs: toChannelInputs(rest), index: -1, removedId: channel.id });
   };
 
+  // Channels with a test in flight: tests of two channels can overlap, and each keeps its spinner.
+  const [testing, setTesting] = useState<ReadonlySet<string>>(() => new Set());
   const test = useMutation({
     mutationFn: (channel: AlertChannel) => testAlertChannel(channel.id),
+    onMutate: (channel) => setTesting((prev) => new Set(prev).add(channel.id)),
+    onSettled: (_result, _error, channel) =>
+      setTesting((prev) => {
+        const next = new Set(prev);
+        next.delete(channel.id);
+        return next;
+      }),
     onSuccess: (result, channel) => {
       queryClient.setQueryData<AlertsConfig>(alertsQueryKey, (old) =>
         old
@@ -428,12 +437,13 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   const summaryTimeHint = zone
     ? t("dailySummaryTimeHint", { zone, utc: summaryUtc })
     : t("dailySummaryTimeHintNoZone", { utc: summaryUtc });
+  // A live "5 minutes ago": nothing refetches the config while the page stays open.
   const lastSent =
     config.dailySummaryLastSent > 0
-      ? t("dailySummaryLastSent", {
-          relative: formatRelativeTime(config.dailySummaryLastSent, lang),
+      ? fillNodes(t("dailySummaryLastSent"), {
+          relative: <RelativeTime value={config.dailySummaryLastSent} />,
         })
-      : "";
+      : null;
   const full = config.channels.length >= MAX_CHANNELS;
   const invalidText = (field: RulesField): string | null => {
     if (!invalid.includes(field)) return null;
@@ -504,7 +514,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
                 onRemove={() => void onRemove(channel)}
                 onTest={() => test.mutate(channel)}
                 removing={channels.isPending && channels.variables?.removedId === channel.id}
-                testing={test.isPending && test.variables?.id === channel.id}
+                testing={testing.has(channel.id)}
               />
             </li>
           ))}
@@ -614,7 +624,10 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
         }
         description={
           lastSent
-            ? t("common:text.joinSentences", { first: summaryTimeHint, second: lastSent })
+            ? fillNodes(t("common:text.joinSentences"), {
+                first: summaryTimeHint,
+                second: lastSent,
+              })
             : summaryTimeHint
         }
         htmlFor={summaryTimeId}

@@ -150,17 +150,16 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
       )}
       {status.enabled ? <Warnings status={status} /> : null}
       <DeviceNameRow
-        // A new name from the server (a save, another tab) resets the field.
-        key={status.hostname}
         status={status}
-        onSave={(hostname, onRefused) =>
+        onSave={(hostname, onDone) =>
           save.mutate(
             { hostname },
             {
-              onSuccess: () => toast.success(t("saved")),
-              onError: (error) => {
-                if (serverErrorCode(error) === "tunnel_hostname") onRefused();
+              onSuccess: (next) => {
+                toast.success(t("saved"));
+                onDone(false, next.hostname);
               },
+              onError: (error) => onDone(serverErrorCode(error) === "tunnel_hostname"),
             },
           )
         }
@@ -554,16 +553,30 @@ function DeviceNameRow({
   onSave,
 }: {
   status: TunnelStatus;
-  onSave: (hostname: string, onRefused: () => void) => void;
+  onSave: (hostname: string, onDone: (refused: boolean, saved?: string) => void) => void;
 }): JSX.Element {
   const { t } = useT("settings");
   const inputId = useId();
   const [draft, setDraft] = useState(status.hostname);
+  const [synced, setSynced] = useState(status.hostname);
+  // The name on its way to the server: Enter then blur must not save it twice. A save that lands
+  // a new name clears it below; a failure, or a save the server answers with the current name
+  // (so nothing below runs), clears it through onSave.
+  const [sent, setSent] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const name = draft || status.defaultHostname;
   const link = `https://${name}.${tailnetDomain(status.url) ?? "<tailnet>.ts.net"}`;
 
+  // A new name from the server (a save, another tab) resets the field, unless the user is typing
+  // another one. Not remounting keeps focus in the field after Enter.
+  if (status.hostname !== synced) {
+    setSynced(status.hostname);
+    setSent(null);
+    if (draft === synced || name === sent) setDraft(status.hostname);
+  }
+
   const commit = () => {
+    if (sent !== null) return;
     if (name === status.hostname) {
       setDraft(name);
       setInvalid(false);
@@ -573,7 +586,12 @@ function DeviceNameRow({
       setInvalid(true);
       return;
     }
-    onSave(name, () => setInvalid(true));
+    setSent(name);
+    const current = status.hostname;
+    onSave(name, (refused, saved) => {
+      if (saved === undefined || saved === current) setSent(null);
+      if (refused) setInvalid(true);
+    });
   };
 
   return (

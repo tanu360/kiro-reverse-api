@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type JSX, useId, useMemo, useState } from "react";
 import { Code } from "@/components/shared/code";
 import { CopyButton } from "@/components/shared/copy-button";
+import { ErrorState } from "@/components/shared/error-state";
 import { PasswordInput } from "@/components/shared/password-input";
 import { SettingsRow } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -41,6 +42,7 @@ import {
   type TwoFactorStatus,
   twoFactorQuery,
 } from "@/lib/api/two-factor";
+import { saveBlob } from "@/lib/download";
 import { formatDateTime } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { digitsOnly } from "@/lib/input-filters";
@@ -208,12 +210,14 @@ function CodeInput({
   onChange,
   error,
   label,
+  autoFocus = true,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   error: string | null;
   label: string;
+  autoFocus?: boolean;
 }): JSX.Element {
   const { t } = useT("settings");
   return (
@@ -221,7 +225,7 @@ function CodeInput({
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input
         autoComplete="one-time-code"
-        autoFocus
+        autoFocus={autoFocus}
         id={id}
         inputMode="numeric"
         maxLength={9}
@@ -239,14 +243,8 @@ function CodeInput({
 function RecoveryCodes({ codes }: { codes: string[] }): JSX.Element {
   const { t } = useT("settings");
   const text = codes.join("\n");
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([`${text}\n`], { type: "text/plain" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "kiro-proxy-recovery-codes.txt";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const download = () =>
+    saveBlob(new Blob([`${text}\n`], { type: "text/plain" }), "kiro-proxy-recovery-codes.txt");
   return (
     <div className="flex flex-col gap-3">
       <Alert role="note" size="sm" variant="warning">
@@ -351,14 +349,18 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
         {/* The title and description say what to do; the panel is only the QR and the code. */}
         <DialogPanel className="flex flex-col gap-5">
           {setup.isError ? (
-            <Alert role="alert" size="sm" variant="error">
-              <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-              <AlertDescription>{errorMessage(setup.error, t)}</AlertDescription>
-            </Alert>
+            <ErrorState
+              compact
+              error={setup.error}
+              onRetry={() => void setup.refetch()}
+              retrying={setup.isFetching}
+            />
           ) : (
             <SetupSecret setup={setup.data} />
           )}
+          {/* No autofocus here: a phone's keyboard would cover the QR code and the setup key. */}
           <CodeInput
+            autoFocus={false}
             error={error}
             id={codeId}
             label={t("twoFactor.confirmCode")}
