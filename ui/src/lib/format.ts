@@ -332,13 +332,14 @@ export function formatClockTime(date: Date, lang?: Lang): string {
   return dateTimeFormat(lang, { timeStyle: "medium" }).format(date);
 }
 
-// [unit, seconds per unit, use this unit while |diff| is below this many seconds]
+// [unit, seconds per unit, use this unit while the rounded count is below this]. The count is
+// rounded before the unit is chosen, so 59.6 s reads "1 minute ago", not "60 seconds ago".
 const RELATIVE_STEPS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number, number]> = [
   ["second", 1, 60],
-  ["minute", 60, 3600],
-  ["hour", 3600, 86_400],
-  ["day", 86_400, 86_400 * 30],
-  ["month", 86_400 * 30, 86_400 * 365],
+  ["minute", 60, 60],
+  ["hour", 3600, 24],
+  ["day", 86_400, 30],
+  ["month", 86_400 * 30, 12],
   ["year", 86_400 * 365, Number.POSITIVE_INFINITY],
 ];
 
@@ -369,6 +370,7 @@ export function formatRelativeTime(
 ): string {
   const diff = finite(unixSec) - nowMs / 1000;
   const [unit, size] =
-    RELATIVE_STEPS.find(([, , limit]) => Math.abs(diff) < limit) ?? RELATIVE_STEPS[0];
+    RELATIVE_STEPS.find(([, size, limit]) => Math.abs(Math.round(diff / size)) < limit) ??
+    RELATIVE_STEPS[0];
   return relativeTimeFormat(lang, style).format(Math.round(diff / size), unit);
 }

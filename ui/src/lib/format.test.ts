@@ -215,6 +215,16 @@ describe("other formatters", () => {
     expect(formatRelativeTime(now / 1000 - 86_400, "en", now)).toBe("yesterday");
   });
 
+  it("rounds before it picks the unit, so a count never reaches the next unit", () => {
+    const now = 1_800_000_000_000;
+    expect(formatRelativeTime(now / 1000 - 59.6, "en", now)).toBe("1 minute ago");
+    expect(formatRelativeTime(now / 1000 - 3580, "en", now)).toBe("1 hour ago");
+    expect(formatRelativeTime(now / 1000 - 86_000, "en", now)).toBe("yesterday");
+    expect(formatRelativeTime(now / 1000 - 364 * 86_400, "en", now)).toBe("last year");
+    expect(formatRelativeTime(now / 1000 - 59, "en", now)).toBe("59 seconds ago");
+    expect(formatRelativeTime(now / 1000 - 29 * 86_400, "en", now)).toBe("29 days ago");
+  });
+
   it("formats relative time in the narrow style", () => {
     const now = 1_800_000_000_000;
     expect(formatRelativeTime(now / 1000 - 16, "en", now, "narrow")).toBe("16s ago");

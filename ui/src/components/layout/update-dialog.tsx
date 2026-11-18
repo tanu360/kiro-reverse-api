@@ -247,9 +247,10 @@ export function UpdateDialog({
  * The body under the header: a hairline, then one scroll box of one fixed height from sm up
  * (544 px, room for the changes and the download without scrolling), so the dialog never grows
  * or shrinks with a method or the download's state; on phones it takes what the 90dvh dialog
- * leaves.
+ * leaves. On a screen too short for 544 px it shrinks (flex-initial) and scrolls, so the footer
+ * stays on screen.
  */
-const BODY = "min-h-0 flex-1 border-border-subtle border-t sm:h-136 sm:flex-none";
+const BODY = "min-h-0 flex-1 border-border-subtle border-t sm:h-136 sm:flex-initial";
 
 /** How many changes the dialog lists, each at most two lines; the rest are on the release page. */
 const PREVIEW_LINES = 3;
@@ -341,7 +342,7 @@ function UnsupportedNotice({ status }: { status?: UpdateStatus }): JSX.Element |
   const { t } = useT();
   if (status?.reason !== "not_writable" && status?.reason !== "platform") return null;
   return (
-    <Alert variant="info">
+    <Alert role="note" variant="info">
       <HugeiconsIcon aria-hidden="true" icon={InformationCircleIcon} />
       <AlertDescription className="wrap-break-word">
         {/* One paragraph, so the path runs inline: the description lays its children out as a column. */}

@@ -66,7 +66,12 @@ export function MeterIndicator({
 }: MeterPrimitive.Indicator.Props & { tone?: MeterTone }): React.ReactElement {
   return (
     <MeterPrimitive.Indicator
-      className={cn("rounded-full transition-all duration-500", METER_TONE[tone], className)}
+      className={cn(
+        // Base UI sets the fill as an inline width; the tone swaps the background colour.
+        "rounded-full transition-[width,background-color] duration-500",
+        METER_TONE[tone],
+        className,
+      )}
       data-slot="meter-indicator"
       {...props}
     />

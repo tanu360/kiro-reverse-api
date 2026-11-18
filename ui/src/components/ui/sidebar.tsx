@@ -64,10 +64,11 @@ const sidebarMenuButtonVariants = cva(
           "font-medium text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground active:bg-error-surface active:text-destructive-foreground data-[active=true]:bg-error-surface data-[active=true]:text-destructive-foreground data-[active=true]:hover:bg-error-surface data-[active=true]:active:bg-error-surface [&>svg]:text-destructive-foreground hover:[&>svg]:text-destructive-foreground active:[&>svg]:text-destructive-foreground data-[active=true]:[&>svg]:text-destructive-foreground",
         outline: "bg-sidebar-control-surface ring-1 ring-sidebar-border",
         // Kiro patch: the sidebar's main action in the sign-in button's look: solid purple, a
-        // white centred label and icon, the grain and top highlight, a slight press.
+        // white centred label and icon, the grain and top highlight, a slight press. The inset
+        // focus ring is drawn in the label colour: the default ring is the purple of the fill.
         primary: cn(
           PRIMARY_FINISH,
-          "relative justify-center bg-primary font-medium text-primary-foreground transition-[width,height,padding,scale] hover:bg-primary-hover hover:text-primary-foreground active:scale-[0.98] active:bg-primary-hover active:text-primary-foreground [&>svg]:text-primary-foreground hover:[&>svg]:text-primary-foreground active:[&>svg]:text-primary-foreground",
+          "relative justify-center bg-primary font-medium [--color-ring:var(--primary-foreground)] text-primary-foreground transition-[width,height,padding,scale] hover:bg-primary-hover hover:text-primary-foreground active:scale-[0.98] active:bg-primary-hover active:text-primary-foreground [&>svg]:text-primary-foreground hover:[&>svg]:text-primary-foreground active:[&>svg]:text-primary-foreground",
         ),
       },
     },
