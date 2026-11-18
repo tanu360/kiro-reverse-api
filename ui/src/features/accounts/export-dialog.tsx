@@ -145,6 +145,9 @@ export const ExportDialog = memo(function ExportDialog({
   const [reveal, setReveal] = useState(false);
   const maskText = useMaskText();
   const [view, setView] = useState<ExportView>("list");
+  // The quick pick pressed last: of two picks with the same accounts (All and Active when every
+  // account is active), the one pressed is the one shown pressed.
+  const [pick, setPick] = useState<QuickGroup | null>(null);
   const [busy, setBusy] = useState<ExportTask | null>(null);
   // The last task that failed: the server's reason, or words of its own (a refused copy).
   const [failure, setFailure] = useState<{
@@ -180,6 +183,7 @@ export const ExportDialog = memo(function ExportDialog({
       setJson(null);
       setReveal(false);
       setView("list");
+      setPick(null);
       setFailure(null);
       copied.clear();
     }
@@ -207,16 +211,13 @@ export const ExportDialog = memo(function ExportDialog({
   );
   const groupIds = (group: QuickGroup) => groupIdLists[group];
   /** The quick pick the selection equals, if any. */
-  const pickedGroup = useMemo(
-    () =>
-      QUICK_GROUPS.find((group) => {
-        const ids = groupIdLists[group];
-        return (
-          ids.length > 0 && ids.length === selected.size && ids.every((id) => selected.has(id))
-        );
-      }),
-    [groupIdLists, selected],
-  );
+  const pickedGroup = useMemo(() => {
+    const matches = (group: QuickGroup) => {
+      const ids = groupIdLists[group];
+      return ids.length > 0 && ids.length === selected.size && ids.every((id) => selected.has(id));
+    };
+    return pick && matches(pick) ? pick : QUICK_GROUPS.find(matches);
+  }, [groupIdLists, selected, pick]);
 
   // The search narrows the list by email or nickname; the selection keeps hidden rows.
   const visible = useMemo(
@@ -390,174 +391,197 @@ export const ExportDialog = memo(function ExportDialog({
       }
       onOpenChange={onOpenChange}
       open={open}
+      panel={false}
       size="xl"
       title={t("export.title")}
     >
-      <Alert className="mb-3" role="note" variant="warning">
-        <HugeiconsIcon icon={SquareLock02Icon} aria-hidden="true" />
-        <AlertDescription>{t("export.description")}</AlertDescription>
-      </Alert>
-      {failure ? (
-        <ActionError
-          className="mb-3"
-          error={failure.error}
-          message={failure.message}
-          onDismiss={() => {
-            taskControl(failure.task)?.focus();
-            setFailure(null);
-          }}
-          onRetry={() => retry(failure.task)}
-        />
-      ) : null}
-      {/* One fixed height for both views, so the dialog and its footer stay put on a switch. */}
-      <div className="flex h-[26rem] flex-col gap-3 max-sm:h-[60dvh]">
-        <div className="flex items-center justify-between gap-3">
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("export.view")}
-                onValueChange={(next) => onViewChange(next as ExportView)}
-                value={view}
-              />
-            }
-            size="sm"
-          >
-            <SegmentedControlItem render={<RadioPrimitive.Root value="list" />}>
-              {t("export.viewList")}
-            </SegmentedControlItem>
-            <SegmentedControlItem
+      {/*
+        The body never scrolls as a whole, only in its parts (the list, the JSON field), so the
+        view switch, the search and the picks above them stay in reach. On phones it asks for the
+        whole screen and shrinks (min-h-0) to what the dialog leaves under its header and footer;
+        it scrolls only on a screen too short for its controls.
+      */}
+      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pt-1 pb-4 max-sm:h-dvh">
+        <Alert role="note" variant="warning">
+          <HugeiconsIcon icon={SquareLock02Icon} aria-hidden="true" />
+          <AlertDescription>{t("export.description")}</AlertDescription>
+        </Alert>
+        {failure ? (
+          <ActionError
+            error={failure.error}
+            message={failure.message}
+            onDismiss={() => {
+              taskControl(failure.task)?.focus();
+              setFailure(null);
+            }}
+            onRetry={() => retry(failure.task)}
+          />
+        ) : null}
+        {/*
+        One height for both views, so the dialog and its footer stay put on a switch: fixed from
+        sm up (shrinking on a short window), the rest of the dialog on phones.
+      */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 sm:h-[26rem] sm:flex-initial">
+          <div className="flex items-center justify-between gap-3">
+            <SegmentedControl
               render={
-                <RadioPrimitive.Root
-                  disabled={nothingSelected && view === "list"}
-                  ref={jsonViewRef}
-                  value="json"
+                <RadioGroupPrimitive
+                  aria-label={t("export.view")}
+                  onValueChange={(next) => onViewChange(next as ExportView)}
+                  value={view}
                 />
               }
+              size="sm"
             >
-              {t("export.viewJson")}
-            </SegmentedControlItem>
-          </SegmentedControl>
-          <p aria-live="polite" className="text-meta text-muted-foreground tabular-nums">
-            {nothingSelected
-              ? t("export.noSelection")
-              : t("export.selected", { count: selectedCount })}
-          </p>
-        </div>
-        {view === "json" ? (
-          jsonShown ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <label className="font-medium text-sm/5" htmlFor={jsonId}>
-                  {t("export.json")}
-                </label>
-                <Label className="cursor-pointer gap-1.5 text-meta">
-                  <Switch checked={reveal} onCheckedChange={setReveal} />
-                  {t("export.revealCredentials")}
-                </Label>
+              <SegmentedControlItem render={<RadioPrimitive.Root value="list" />}>
+                {t("export.viewList")}
+              </SegmentedControlItem>
+              <SegmentedControlItem
+                render={
+                  <RadioPrimitive.Root
+                    disabled={nothingSelected && view === "list"}
+                    ref={jsonViewRef}
+                    value="json"
+                  />
+                }
+              >
+                {t("export.viewJson")}
+              </SegmentedControlItem>
+            </SegmentedControl>
+            <p aria-live="polite" className="text-meta text-muted-foreground tabular-nums">
+              {nothingSelected
+                ? t("export.noSelection")
+                : t("export.selected", { count: selectedCount })}
+            </p>
+          </div>
+          {view === "json" ? (
+            jsonShown ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="font-medium text-sm/5" htmlFor={jsonId}>
+                    {t("export.json")}
+                  </label>
+                  <Label className="cursor-pointer gap-1.5 text-meta">
+                    <Switch checked={reveal} onCheckedChange={setReveal} />
+                    {t("export.revealCredentials")}
+                  </Label>
+                </div>
+                {/* The field fills the rest of the body; its text scrolls inside it. */}
+                <Textarea
+                  className="min-h-0 flex-1 *:h-full *:max-h-none"
+                  id={jsonId}
+                  readOnly
+                  ref={jsonRef}
+                  value={preview}
+                  variant="mono"
+                  wrap="off"
+                />
+                <p className="text-meta text-muted-foreground">
+                  {t(reveal ? "export.previewFull" : "export.previewMasked")}
+                </p>
               </div>
-              {/* The field fills the rest of the body; its text scrolls inside it. */}
-              <Textarea
-                className="min-h-0 flex-1 *:h-full *:max-h-none"
-                id={jsonId}
-                readOnly
-                ref={jsonRef}
-                value={preview}
-                variant="mono"
-                wrap="off"
-              />
-              <p className="text-meta text-muted-foreground">
-                {t(reveal ? "export.previewFull" : "export.previewMasked")}
-              </p>
-            </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                <LoadingState />
+              </div>
+            )
           ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              <LoadingState />
-            </div>
-          )
-        ) : (
-          <>
-            <InputGroup>
-              <InputGroupAddon>
-                <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-              </InputGroupAddon>
-              <InputGroupInput
-                aria-label={t("export.search")}
-                autoComplete="off"
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("export.search")}
-                type="search"
-                value={query}
-              />
-            </InputGroup>
-            {/* Quick picks: each sets the selection to one status group, as the Accounts tabs split it. */}
-            <fieldset
-              aria-label={t("export.quickSelect")}
-              className="m-0 flex min-w-0 flex-wrap items-center gap-1.5 border-0 p-0"
-            >
-              {QUICK_GROUPS.map((group) => {
-                const count = groupIds(group).length;
-                return (
-                  <button
-                    aria-pressed={pickedGroup === group}
-                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 font-medium text-xs transition-colors focus-visible:focus-outline disabled:cursor-default disabled:opacity-50 aria-pressed:bg-foreground aria-pressed:text-background not-aria-pressed:text-muted-foreground not-aria-pressed:shadow-[inset_0_0_0_1px_var(--border)] not-aria-pressed:hover:bg-accent not-aria-pressed:hover:text-foreground pointer-coarse:h-8"
-                    disabled={count === 0}
-                    key={group}
-                    onClick={() => setSelected(new Set(groupIds(group)))}
-                    type="button"
-                  >
-                    {t(
-                      group === "all"
-                        ? "filter.all"
-                        : group === "attention"
-                          ? "filter.attention"
-                          : `health.${group}`,
-                    )}
-                    <span className="tabular-nums opacity-70">{formatNumber(count, lang)}</span>
-                  </button>
-                );
-              })}
-            </fieldset>
-            {/*
+            <>
+              <InputGroup>
+                <InputGroupAddon>
+                  <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  aria-label={t("export.search")}
+                  autoComplete="off"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t("export.search")}
+                  type="search"
+                  value={query}
+                />
+              </InputGroup>
+              {/* Quick picks: each sets the selection to one status group, as the Accounts tabs split it. */}
+              <fieldset
+                aria-label={t("export.quickSelect")}
+                className="m-0 flex min-w-0 flex-wrap items-center gap-1.5 border-0 p-0"
+              >
+                {QUICK_GROUPS.map((group) => {
+                  const count = groupIds(group).length;
+                  return (
+                    <button
+                      aria-pressed={pickedGroup === group}
+                      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 font-medium text-xs transition-colors focus-visible:focus-outline disabled:cursor-default disabled:opacity-50 aria-pressed:bg-foreground aria-pressed:text-background not-aria-pressed:text-muted-foreground not-aria-pressed:shadow-[inset_0_0_0_1px_var(--border)] not-aria-pressed:hover:bg-accent not-aria-pressed:hover:text-foreground pointer-coarse:h-8"
+                      disabled={count === 0}
+                      key={group}
+                      onClick={() => {
+                        setPick(group);
+                        setSelected(new Set(groupIds(group)));
+                      }}
+                      type="button"
+                    >
+                      {t(
+                        group === "all"
+                          ? "filter.all"
+                          : group === "attention"
+                            ? "filter.attention"
+                            : `health.${group}`,
+                      )}
+                      <span className="tabular-nums opacity-70">{formatNumber(count, lang)}</span>
+                    </button>
+                  );
+                })}
+              </fieldset>
+              {/*
               Inset like the rows below (their 16 px padding and the list's border), so its
               checkbox heads the column of row checkboxes.
             */}
-            <label
-              className="flex cursor-pointer items-center gap-3 self-start ps-4.25 font-medium text-sm/5"
-              htmlFor={selectAllId}
-            >
-              <Checkbox
-                checked={allVisible}
-                disabled={visible.length === 0}
-                id={selectAllId}
-                indeterminate={someVisible}
-                onCheckedChange={toggleVisible}
-              />
-              {/* One name in every state: checked, mixed and unchecked already say which. */}
-              {t("export.selectAll")}
-            </label>
-            {visible.length > 0 ? (
-              // Compact rows, so a long pool shows about seven at a time; the list scrolls inside
-              // its border.
-              <ScrollArea
-                className="min-h-0 flex-1 rounded-xl border border-border-subtle"
-                scrollFade
+              <label
+                className="flex cursor-pointer items-center gap-3 self-start ps-4.25 font-medium text-sm/5"
+                htmlFor={selectAllId}
               >
-                <ul aria-label={t("export.list")} className="divide-y divide-border-subtle">
-                  {visible.map((account) => (
-                    <ExportRow
-                      account={account}
-                      checked={selected.has(account.id)}
-                      key={account.id}
-                      onToggle={toggle}
-                    />
-                  ))}
-                </ul>
-              </ScrollArea>
-            ) : (
-              <p className="m-auto text-muted-foreground text-sm">{tc("state.noMatches")}</p>
-            )}
-          </>
-        )}
+                <Checkbox
+                  checked={allVisible}
+                  disabled={visible.length === 0}
+                  id={selectAllId}
+                  indeterminate={someVisible}
+                  onCheckedChange={toggleVisible}
+                />
+                {/* One name in every state: checked, mixed and unchecked already say which. */}
+                {t("export.selectAll")}
+              </label>
+              {visible.length > 0 ? (
+                // Compact rows, so a long pool shows about seven at a time; the list scrolls inside
+                // its border.
+                <ScrollArea
+                  className="min-h-0 flex-1 rounded-xl border border-border-subtle"
+                  overscrollContain
+                  scrollFade
+                >
+                  {/*
+                  Positioned, so the rows' visually hidden text (absolute) stays inside this scroll
+                  box: without it the hidden text of every row stretched the dialog thousands of
+                  pixels under the list.
+                */}
+                  <ul
+                    aria-label={t("export.list")}
+                    className="relative divide-y divide-border-subtle"
+                  >
+                    {visible.map((account) => (
+                      <ExportRow
+                        account={account}
+                        checked={selected.has(account.id)}
+                        key={account.id}
+                        onToggle={toggle}
+                      />
+                    ))}
+                  </ul>
+                </ScrollArea>
+              ) : (
+                <p className="m-auto text-muted-foreground text-sm">{tc("state.noMatches")}</p>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </ResponsiveDialog>
   );
