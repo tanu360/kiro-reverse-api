@@ -78,8 +78,10 @@ function ModelChips({ models }: { models: readonly string[] }): JSX.Element {
   const { t } = useT("user-panel");
   if (models.length === 0) {
     return (
-      <span className="inline-flex min-w-0 items-center gap-2">
-        <span aria-hidden="true" className="flex -space-x-1">
+      // The words sit on the other facts' baseline and the 24 px marks centre on them, overhanging
+      // the 20 px line by 2 px a side; centred as a 24 px row, the words sat 2 px low.
+      <span className="inline-flex min-w-0 items-baseline gap-2">
+        <span aria-hidden="true" className="-my-0.5 flex -space-x-1 self-center">
           {ALL_MAKERS.map((maker) => (
             <span
               className="flex size-6 items-center justify-center rounded-full border border-border-subtle bg-card"
@@ -117,17 +119,17 @@ export function KeyFacts({ apiKey }: { apiKey: UserKey | undefined }): JSX.Eleme
   const bar = <Skeleton className="my-0.5 h-4 w-24" />;
   return (
     <Card className="@container min-w-0" render={<section aria-label={t("details.title")} />}>
-      <dl className="grid grid-cols-2 @3xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.5fr)] [&>*]:border-border-subtle [&>*:nth-child(even)]:border-s [&>*:nth-child(n+3)]:border-t @3xl:[&>*+*]:border-s @3xl:[&>*]:border-t-0">
+      <dl className="grid grid-cols-2 @3xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.5fr)] [&>*]:border-border-subtle [&>*:nth-child(even)]:border-s [&>*:nth-child(n+3)]:border-t @3xl:[&>*+*]:border-s @3xl:[&>*:nth-child(n+3)]:border-t-0">
         <Fact icon={CircleGaugeIcon} label={t("details.rpm")}>
           {!apiKey ? (
             bar
           ) : apiKey.rpmLimit ? (
             t("details.rpmValue", { n: formatNumber(apiKey.rpmLimit, lang) })
           ) : (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-baseline gap-1.5">
               <HugeiconsIcon
                 aria-hidden="true"
-                className="size-3.5"
+                className="size-3.5 self-center"
                 icon={Infinity01Icon}
                 strokeWidth={2}
               />

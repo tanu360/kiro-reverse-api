@@ -437,8 +437,8 @@ function SelfUpdateCard({
       body = (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
-            <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-              <Spinner aria-hidden="true" className="size-3" />
+            <span className="inline-flex items-baseline gap-1.5 font-medium text-foreground">
+              <Spinner aria-hidden="true" className="size-3 self-center" />
               {t("shell.update.downloading")}
             </span>
             {amount ? <span className="text-muted-foreground tabular-nums">{amount}</span> : null}

@@ -207,10 +207,12 @@ function LimitFooter({ apiKey, kind }: { apiKey: UserKey | undefined; kind: Limi
           <span className="min-w-0 tabular-nums">
             {t("kpi.usedSinceCreated", { n: short(used) })}
           </span>
-          <span className="inline-flex shrink-0 items-center gap-1.5">
+          {/* The words carry the baseline, the sign is centred on them: led by an items-center icon,
+              the span's baseline was the icon's bottom edge and the words rose 3 px. */}
+          <span className="inline-flex shrink-0 items-baseline gap-1.5">
             <HugeiconsIcon
               aria-hidden="true"
-              className="size-3.5"
+              className="size-3.5 self-center"
               icon={Infinity01Icon}
               strokeWidth={2}
             />
