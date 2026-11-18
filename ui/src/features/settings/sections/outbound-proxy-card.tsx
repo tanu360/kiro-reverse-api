@@ -217,6 +217,18 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
         description={
           direct ? t("proxyNoneHint") : user ? t("proxyAuthAs", { user }) : t("proxyAuthNone")
         }
+        notice={
+          // Try again removes at once: the removal was already confirmed. A route already gone
+          // (removed in another tab) leaves nothing to remove.
+          removing && feedback.error != null && !direct ? (
+            <RowActionError
+              error={feedback.error}
+              focusTarget={removeRef}
+              onDismiss={feedback.dismiss}
+              onRetry={() => send("")}
+            />
+          ) : null
+        }
         title={
           direct ? (
             t("proxyDirectTitle")
@@ -227,17 +239,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
             </span>
           )
         }
-      >
-        {/* Try again removes at once: the removal was already confirmed. */}
-        {removing && feedback.error != null ? (
-          <RowActionError
-            error={feedback.error}
-            focusTarget={removeRef}
-            onDismiss={feedback.dismiss}
-            onRetry={() => send("")}
-          />
-        ) : null}
-      </SettingsRow>
+      />
 
       <Dialog
         onOpenChange={(open) => {

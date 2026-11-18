@@ -684,6 +684,25 @@ describe("SettingsPage", () => {
       await waitFor(() => expect(setUp).toHaveFocus());
     });
 
+    it("drops a failed removal's notice once the route is removed elsewhere", async () => {
+      mockServer.use(
+        http.post(apiUrl("/proxy"), () =>
+          HttpResponse.json({ error: "store busy" }, { status: 500 }),
+        ),
+      );
+      const { user, queryClient } = await renderPage("server");
+      const card = section(SECTION_ID.outboundProxy);
+      await user.click(within(card).getByRole("button", { name: "Remove proxy" }));
+      const confirm = await screen.findByRole("alertdialog");
+      await user.click(within(confirm).getByRole("button", { name: "Remove proxy" }));
+      await within(card).findByRole("alert");
+
+      mockDb.proxy = { proxyURL: "" };
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.proxy() });
+      expect(await within(card).findByText("Direct connection")).toBeInTheDocument();
+      expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
+    });
+
     it("keeps a save on its way busy when the dialog is closed and opened again", async () => {
       let land: () => void = () => {};
       mockServer.use(

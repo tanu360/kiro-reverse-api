@@ -1,7 +1,7 @@
 import { Alert02Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, type ReactNode, useId, useRef, useState } from "react";
+import { type JSX, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { ROW_DESCRIPTION, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
@@ -243,14 +243,26 @@ function HealStatusRow({
   const { t } = useT("settings");
   const queryClient = useQueryClient();
   const resumeRef = useRef<HTMLButtonElement>(null);
+  const resumed = useRef(false);
   // The warning goes once the refetch says it is running again; a failure shows under it.
   const resume = useMutation({
     mutationFn: resumeAccountHealth,
     onSuccess: () => {
+      resumed.current = true;
       announce(t("selfHeal.resumed"));
       void queryClient.invalidateQueries({ queryKey: accountHealthKey });
     },
   });
+  // Resume goes with the warning: focus, left on the page, moves on to the card's Save.
+  useEffect(() => {
+    if (state.halted || !resumed.current) return;
+    resumed.current = false;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    document
+      .getElementById(SECTION_ID.selfHeal)
+      ?.querySelector<HTMLElement>('[data-slot="card-footer"] button[type="submit"]')
+      ?.focus();
+  }, [state.halted]);
 
   let description: ReactNode = t("selfHeal.never");
   if (state.lastHealAt > 0) {
@@ -266,7 +278,20 @@ function HealStatusRow({
   }
 
   return (
-    <SettingsRow description={description} title={t("selfHeal.status")}>
+    <SettingsRow
+      description={description}
+      notice={
+        state.halted && resume.isError ? (
+          <RowActionError
+            error={resume.error}
+            focusTarget={resumeRef}
+            onDismiss={resume.reset}
+            onRetry={() => resume.mutate()}
+          />
+        ) : null
+      }
+      title={t("selfHeal.status")}
+    >
       {state.halted ? (
         <Alert role="status" variant="warning">
           <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
@@ -284,14 +309,6 @@ function HealStatusRow({
             </Button>
           </AlertAction>
         </Alert>
-      ) : null}
-      {state.halted && resume.isError ? (
-        <RowActionError
-          error={resume.error}
-          focusTarget={resumeRef}
-          onDismiss={resume.reset}
-          onRetry={() => resume.mutate()}
-        />
       ) : null}
     </SettingsRow>
   );

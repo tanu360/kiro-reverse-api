@@ -68,15 +68,16 @@ export function UsageRefreshRow({ saved }: { saved: number }): JSX.Element {
     <SettingsRow
       control={<IntervalSelect onChange={interval.onChange} value={interval.value} />}
       description={t("usageRefresh.hint")}
+      notice={
+        interval.failure ? (
+          <RowActionError
+            error={interval.failure.error}
+            onDismiss={interval.failure.dismiss}
+            onRetry={interval.failure.retry}
+          />
+        ) : null
+      }
       title={t("usageRefresh.title")}
-    >
-      {interval.failure ? (
-        <RowActionError
-          error={interval.failure.error}
-          onDismiss={interval.failure.dismiss}
-          onRetry={interval.failure.retry}
-        />
-      ) : null}
-    </SettingsRow>
+    />
   );
 }

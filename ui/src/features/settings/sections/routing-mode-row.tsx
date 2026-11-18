@@ -55,15 +55,16 @@ export function RoutingModeRow({ settings }: { settings: Settings }): JSX.Elemen
           t("routingMode.weightedHint")
         )
       }
+      notice={
+        mode.failure ? (
+          <RowActionError
+            error={mode.failure.error}
+            onDismiss={mode.failure.dismiss}
+            onRetry={mode.failure.retry}
+          />
+        ) : null
+      }
       title={t("routingMode.title")}
-    >
-      {mode.failure ? (
-        <RowActionError
-          error={mode.failure.error}
-          onDismiss={mode.failure.dismiss}
-          onRetry={mode.failure.retry}
-        />
-      ) : null}
-    </SettingsRow>
+    />
   );
 }

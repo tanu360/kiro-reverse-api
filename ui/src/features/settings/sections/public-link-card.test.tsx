@@ -218,6 +218,37 @@ describe("PublicLinkCard", () => {
     expect(field).toHaveFocus();
   });
 
+  it("shows a failed name save under its row; Tab reaches Try again without saving again", async () => {
+    let posts = 0;
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/tunnel"), () => {
+        posts += 1;
+        return fail ? HttpResponse.json({ error: "helper busy" }, { status: 500 }) : undefined;
+      }),
+    );
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    const field = await screen.findByRole("textbox", { name: "Device name" });
+    await user.clear(field);
+    await user.type(field, "kiro-home{Enter}");
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveTextContent(/^helper busy$/);
+    expect(posts).toBe(1);
+
+    // The notice comes after the field: leaving the field for it is no new save.
+    await user.tab();
+    const retry = within(notice).getByRole("button", { name: "Try again" });
+    expect(retry).toHaveFocus();
+    expect(posts).toBe(1);
+
+    fail = false;
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-home"));
+    expect(posts).toBe(2);
+    expect(field).toHaveFocus();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("signs out of Tailscale after a confirm", async () => {
     mockDb.twoFactor.enabled = true;
     mockDb.tunnel.signedIn = true;
@@ -230,6 +261,16 @@ describe("PublicLinkCard", () => {
     await waitFor(() => expect(mockDb.tunnel.signedIn).toBe(false));
     expect(mockDb.tunnel.enabled).toBe(false);
     await expectAnnounced("Signed out of Tailscale.");
+    // The account row went with Sign out: focus is on the switch, not the page.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Sign out of Tailscale" })).toBeNull(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: "Public HTTPS link" })).toHaveFocus(),
+    );
+    // It stays there once the confirm has closed.
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("switch", { name: "Public HTTPS link" })).toHaveFocus();
   });
 
   it("shows a failed sign-out under its row, and Try again signs out without asking", async () => {

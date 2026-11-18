@@ -1,14 +1,8 @@
 import { Alert02Icon, ArrowRight02Icon, XIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { type JSX, useState } from "react";
-import {
-  NOTICE_ACTIONS_CLASS,
-  NOTICE_LINE_CLASS,
-  NoticeIconButton,
-} from "@/components/shared/notice-line";
-import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { NoticeIconButton, NoticeLine } from "@/components/shared/notice-line";
 import { announce } from "@/lib/announce";
 import { queryKeys } from "@/lib/api/query-keys";
 import { useAdminEvent } from "@/lib/events/admin-events";
@@ -59,25 +53,30 @@ export function AccountHealNotices(): JSX.Element | null {
 
   if (!halted || onSelfHealPage) return null;
   return (
-    <Alert className={NOTICE_LINE_CLASS} data-slot="self-heal-halted" variant="warning">
-      <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-      <AlertDescription>{t("selfHeal.haltedNotice")}</AlertDescription>
-      <AlertAction className={NOTICE_ACTIONS_CLASS}>
-        <NoticeIconButton
-          icon={ArrowRight02Icon}
-          label={t("selfHeal.open")}
-          onClick={() => void navigate({ to: SELF_HEAL_PATH, hash: SECTION_ID.selfHeal })}
-        />
-        <NoticeIconButton
-          icon={XIcon}
-          label={tc("actions.close")}
-          onClick={() => {
-            setHalted(false);
-            // The close button goes with the notice: focus stays on the page, not the body.
-            document.getElementById("main")?.focus();
-          }}
-        />
-      </AlertAction>
-    </Alert>
+    <NoticeLine
+      actions={
+        <>
+          <NoticeIconButton
+            icon={ArrowRight02Icon}
+            label={t("selfHeal.open")}
+            onClick={() => void navigate({ to: SELF_HEAL_PATH, hash: SECTION_ID.selfHeal })}
+          />
+          <NoticeIconButton
+            icon={XIcon}
+            label={tc("actions.close")}
+            onClick={() => {
+              setHalted(false);
+              // The close button goes with the notice: focus stays on the page, not the body.
+              document.getElementById("main")?.focus();
+            }}
+          />
+        </>
+      }
+      data-slot="self-heal-halted"
+      icon={Alert02Icon}
+      variant="warning"
+    >
+      {t("selfHeal.haltedNotice")}
+    </NoticeLine>
   );
 }

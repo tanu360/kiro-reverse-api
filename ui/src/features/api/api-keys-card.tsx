@@ -174,6 +174,9 @@ export function ApiKeysCard(): JSX.Element {
   const currentPage = Math.min(page, pageCount);
   const pageRows = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const disabledCount = list.filter((apiKey) => !apiKey.enabled).length;
+  // A failure about a key deleted since (in another tab) has nothing left to retry: it goes.
+  const shownFailure =
+    failure && list.some((apiKey) => apiKey.id === failure.apiKey.id) ? failure : null;
 
   // The key being edited was deleted elsewhere: nothing is left to save.
   useEffect(() => {
@@ -599,12 +602,12 @@ export function ApiKeysCard(): JSX.Element {
       slim
       title={t("keys.title")}
     >
-      {failure ? (
+      {shownFailure ? (
         <CardPanel>
           <ActionError
-            error={failure.error}
-            onDismiss={() => dismissFailure(failure)}
-            onRetry={() => retry(failure)}
+            error={shownFailure.error}
+            onDismiss={() => dismissFailure(shownFailure)}
+            onRetry={() => retry(shownFailure)}
           />
         </CardPanel>
       ) : null}

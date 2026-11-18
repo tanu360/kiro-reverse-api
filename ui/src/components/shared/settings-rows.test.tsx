@@ -32,4 +32,32 @@ describe("SettingsRow", () => {
     );
     expect(screen.getByRole("button", { name: "Statistics" })).toBeInTheDocument();
   });
+
+  it.each(["field", "auto"] as const)(
+    "puts a %s row's notice after the text and the control, across the row",
+    (controlWidth) => {
+      renderWithProviders(
+        <SettingsRow
+          control={<input />}
+          controlWidth={controlWidth}
+          description="Where requests go"
+          notice={<p>Could not save</p>}
+          title="Upstream"
+        >
+          <p>Current value</p>
+        </SettingsRow>,
+      );
+      const notice = screen.getByText("Could not save");
+      for (const before of [screen.getByText("Current value"), screen.getByRole("textbox")]) {
+        expect(
+          before.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      }
+      // A slot of its own in the row, outside the text column.
+      const slot = notice.parentElement;
+      expect(slot?.parentElement).toHaveAttribute("data-slot", "settings-row");
+      expect(slot).not.toContainElement(screen.getByText("Current value"));
+      expect(slot).toHaveClass(controlWidth === "auto" ? "col-span-full" : "basis-full");
+    },
+  );
 });

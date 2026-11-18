@@ -132,6 +132,33 @@ export function ApiAccessCard(): JSX.Element {
           checked={checked}
           description={<span data-testid="api-access-state">{hint}</span>}
           disabled={save.isPending}
+          notice={
+            showKeyWarning || failed ? (
+              <>
+                {showKeyWarning ? (
+                  <Alert variant="warning">
+                    <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
+                    <AlertDescription>{t("access.enabledApiKeyRequired")}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {/* The draft stays, so Try again sends it again; focus goes to Save as the notice
+                    goes. */}
+                {failed ? (
+                  <ActionError
+                    error={save.error}
+                    onDismiss={() => {
+                      save.reset();
+                      saveRef.current?.focus();
+                    }}
+                    onRetry={() => {
+                      saveRef.current?.focus();
+                      onSave();
+                    }}
+                  />
+                ) : null}
+              </>
+            ) : null
+          }
           onCheckedChange={(next) => {
             setDraft(next);
             setShowKeyWarning(false);
@@ -139,29 +166,7 @@ export function ApiAccessCard(): JSX.Element {
             save.reset();
           }}
           title={t("access.requireApiKey")}
-        >
-          {showKeyWarning ? (
-            <Alert className="mt-2" variant="warning">
-              <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
-              <AlertDescription>{t("access.enabledApiKeyRequired")}</AlertDescription>
-            </Alert>
-          ) : null}
-          {/* The draft stays, so Try again sends it again; focus goes to Save as the notice goes. */}
-          {failed ? (
-            <ActionError
-              className="mt-2"
-              error={save.error}
-              onDismiss={() => {
-                save.reset();
-                saveRef.current?.focus();
-              }}
-              onRetry={() => {
-                saveRef.current?.focus();
-                onSave();
-              }}
-            />
-          ) : null}
-        </SwitchField>
+        />
       )}
     </SettingsFrame>
   );
