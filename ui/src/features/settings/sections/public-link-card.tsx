@@ -179,7 +179,7 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
             { hostname },
             {
               onSuccess: (next) => {
-                announce(t("common:toast.saved"));
+                announce(t("common:form.saved"));
                 onDone({ saved: next.hostname });
               },
               onError: (error) =>

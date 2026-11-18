@@ -64,7 +64,7 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
     mutationFn: updateMetricsSettings,
     onSuccess: (next, body) => {
       queryClient.setQueryData(queryKeys.settings.metrics(), next);
-      announce(body.regenerate ? t("metrics.regenerated") : t("common:toast.saved"));
+      announce(body.regenerate ? t("metrics.regenerated") : t("common:form.saved"));
     },
     onSettled: () => setPending(null),
   });

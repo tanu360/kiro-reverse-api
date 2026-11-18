@@ -317,7 +317,7 @@ export const ExportDialog = memo(function ExportDialog({
         copied.flash();
         announce(t("export.copied"));
       } else if (fetchError) setFailure({ task: "copy", error: fetchError });
-      else setFailure({ task: "copy", error: null, message: tc("toast.copyFailed") });
+      else setFailure({ task: "copy", error: null, message: tc("copy.failed") });
     });
   };
 
@@ -368,7 +368,7 @@ export const ExportDialog = memo(function ExportDialog({
                   aria-hidden="true"
                   className="text-success-foreground"
                 />
-                {tc("toast.copied")}
+                {tc("copy.copied")}
               </>
             ) : (
               <>
