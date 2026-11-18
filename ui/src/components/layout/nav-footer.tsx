@@ -52,7 +52,8 @@ function eyebrow(
  * is in the Admin menu and the ⌘K palette). Expanded, and in the phone sheet, it is a card: the
  * version and the changelog's first line, and a link to the update dialog. A server that can
  * update itself also gets a round status button at the card's end: it downloads the release,
- * fills a ring while it does, then asks to restart on it, and the eyebrow says where it stands.
+ * fills a ring while it does, then asks to restart on it, and the eyebrow says where it stands
+ * (after a failure, the reason replaces the changelog line).
  * The icon rail has no room for the card: it shows that button's glyph (or, for a server that
  * updates by hand, the bell with the orange dot), which does the same. The header and the Admin
  * menu carry no copy.
@@ -67,6 +68,7 @@ function UpdateNotice(): JSX.Element | null {
   const label = action?.label ?? t("shell.update.available", { latest: version });
   const headline = latest.changelog ? parseChangelog(latest.changelog)[0]?.text : undefined;
   const status = eyebrow(self, t);
+  const failure = self?.phase === "error" ? self.error : undefined;
   return (
     <>
       <Card
@@ -87,9 +89,15 @@ function UpdateNotice(): JSX.Element | null {
           <p className="font-medium text-foreground text-sm">
             {t("shell.update.cardTitle", { latest: version })}
           </p>
-          <p className="line-clamp-2 text-meta text-muted-foreground">
-            {headline ?? t("shell.update.newVersionMessage")}
-          </p>
+          {/* After a failure, why it failed in place of the changelog line (Try again is the
+              round button below). */}
+          {failure ? (
+            <p className="wrap-break-word text-destructive-foreground text-meta">{failure}</p>
+          ) : (
+            <p className="line-clamp-2 text-meta text-muted-foreground">
+              {headline ?? t("shell.update.newVersionMessage")}
+            </p>
+          )}
         </div>
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm">

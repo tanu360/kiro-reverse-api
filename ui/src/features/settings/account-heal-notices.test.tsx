@@ -1,10 +1,9 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/lib/api/query-keys";
 import { AdminEventsProvider, type EventSourceLike } from "@/lib/events/admin-events";
-import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
-import { AccountHealNotices, HALTED_TOAST_ID } from "./account-heal-notices";
+import { AccountHealNotices } from "./account-heal-notices";
 
 vi.mock("@/lib/api/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/session")>();
@@ -55,48 +54,59 @@ async function renderNotices() {
 }
 
 describe("AccountHealNotices", () => {
-  it("toasts a heal and refetches the card, the accounts and the status", async () => {
+  it("reads out a heal and refetches the card, the accounts and the status", async () => {
     const { emit, queryClient } = await renderNotices();
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 
     emit("healed:2");
 
-    expect(
-      await screen.findByText("Self-heal brought 2 accounts back into rotation."),
-    ).toBeInTheDocument();
+    const line = await screen.findByText("Self-heal brought 2 accounts back into rotation.");
+    expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
     const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
     expect(keys).toEqual(
       expect.arrayContaining([queryKeys.settings.all, queryKeys.accounts.list(), queryKeys.status]),
     );
   });
 
-  it("warns once on a halt, with a way to Settings, and closes it on recovery", async () => {
-    const warning = vi.spyOn(toast, "warning");
-    const dismiss = vi.spyOn(toast, "dismiss");
+  it("warns on a halt in one line, with a way to Settings, and drops it on recovery", async () => {
     const { emit } = await renderNotices();
 
     emit("halted:5");
 
-    expect(
+    const notice = (
       await screen.findByText(
         "Self-heal stopped because accounts keep failing after each heal. Check the accounts.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open settings" })).toBeInTheDocument();
-    expect(warning).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ id: HALTED_TOAST_ID, duration: 0 }),
-    );
+      )
+    ).closest("[role=alert]") as HTMLElement;
+    expect(notice).not.toBeNull();
+    expect(within(notice).getByRole("button", { name: "Open settings" })).toBeInTheDocument();
+    // Another halt keeps the one line.
+    emit("halted:5");
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
 
     emit("recovered");
-    expect(dismiss).toHaveBeenCalledWith(HALTED_TOAST_ID);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("drops the halt line on a resume, or when it is closed", async () => {
+    const { emit, user } = await renderNotices();
+    emit("halted:5");
+    await screen.findByRole("alert");
+    emit("resumed");
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    emit("halted:5");
+    await user.click(
+      within(await screen.findByRole("alert")).getByRole("button", { name: "Close" }),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("stays quiet for a heal that restored nothing", async () => {
-    const info = vi.spyOn(toast, "info");
     const { emit } = await renderNotices();
     emit("healed:0");
     emit("resumed");
-    expect(info).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-slot="live-announcer"]')?.textContent).toBe("");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

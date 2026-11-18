@@ -6,7 +6,6 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { maskEmail, maskEmailsInText } from "@/lib/privacy";
-import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 import { inMemoryRequestsHandler } from "./mocks";
 // The request sheet loads the account's sheet lazily. Loading it here, before any test, lets that
@@ -612,21 +611,71 @@ describe("RequestsPage", () => {
     await waitForRows();
   });
 
-  it("keeps the rows and shows a toast when a refresh fails", async () => {
+  it("keeps the rows and says above them why a refresh failed, until one succeeds", async () => {
     let fail = false;
     mockServer.use(
       http.get(RECENT_REQUESTS, () =>
         fail ? HttpResponse.json({ error: "database is locked" }, { status: 500 }) : undefined,
       ),
     );
-    const errorToast = vi.spyOn(toast, "error");
     const { user } = await renderApp("/requests");
     await waitForRows();
     fail = true;
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(errorToast).toHaveBeenCalledTimes(1));
-    // The list's own news: never copied into an open detail sheet (modal-notice.tsx).
-    expect(errorToast.mock.calls[0]?.[1]).toEqual({ background: true });
+    const notice = (await screen.findByText("database is locked")).closest(
+      '[data-slot="action-error"]',
+    ) as HTMLElement;
+    expect(notice).not.toBeNull();
     expect(bodyRows()).toHaveLength(25);
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByText("database is locked")).toBeNull());
+    expect(screen.getByRole("tab", { selected: true })).toHaveFocus();
+    expect(bodyRows()).toHaveLength(25);
+  });
+
+  it("closes the failed-refresh line until the next failure", async () => {
+    let fail = false;
+    mockServer.use(
+      http.get(RECENT_REQUESTS, () =>
+        fail ? HttpResponse.json({ error: "database is locked" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    fail = true;
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const notice = (await screen.findByText("database is locked")).closest(
+      '[data-slot="action-error"]',
+    ) as HTMLElement;
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(screen.queryByText("database is locked")).toBeNull();
+    expect(screen.getByRole("tab", { selected: true })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText("database is locked")).toBeInTheDocument();
+  });
+
+  it("hands focus to Refresh when an empty log's failed-refresh line goes", async () => {
+    mockDb.requests = [];
+    let fail = false;
+    mockServer.use(
+      http.get(RECENT_REQUESTS, () =>
+        fail ? HttpResponse.json({ error: "database is locked" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = await renderApp("/requests");
+    await screen.findByText("No requests yet");
+    fail = true;
+    const refresh = screen.getByRole("button", { name: "Refresh" });
+    await user.click(refresh);
+    const notice = (await screen.findByText("database is locked")).closest(
+      '[data-slot="action-error"]',
+    ) as HTMLElement;
+    // No status tabs on an empty log: focus goes to Refresh, not the body.
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(screen.queryByText("database is locked")).toBeNull();
+    expect(refresh).toHaveFocus();
   });
 });

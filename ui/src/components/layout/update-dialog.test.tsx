@@ -429,10 +429,15 @@ describe("UpdateDialog self-update", () => {
     });
     const { user } = renderSelfUpdate(update);
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The update did not finish");
-    expect(alert).toHaveTextContent("The download does not match the release checksum.");
+    // One plain line: the reason only.
+    expect(alert).toHaveTextContent(/^The download does not match the release checksum\.$/);
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(update.start).toHaveBeenCalledOnce();
+  });
+
+  it("says the update did not finish when the server gave no reason", async () => {
+    renderSelfUpdate(selfUpdate({ phase: "error" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The update did not finish");
   });
 
   it("keeps the steps by hand one link away", async () => {

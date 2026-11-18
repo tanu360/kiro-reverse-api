@@ -78,7 +78,7 @@ import { lifetimeGrid } from "@/lib/mocks/lifetime";
 //   sk-demo-open-server     The server's "Require API key" is off (keysRequired false), for this
 //                           key only: the not-counted notice shows.
 //   sk-demo-short-session   The session ends 30 s after sign-in: the panel goes back to the
-//                           sign-in page with the "session expired" toast on its next poll.
+//                           sign-in page, which says the session expired, on its next poll.
 // Wrong keys, the empty key and the five-try lockout answer as for any other key.
 
 type StoredKey = (typeof mockDb.apiKeys)[number];

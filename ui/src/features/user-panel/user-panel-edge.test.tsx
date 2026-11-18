@@ -6,7 +6,6 @@ import { getUserToken, setUserToken, USER_TOKEN_KEY } from "@/lib/auth/user-sess
 import { jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { queryClient } from "@/lib/query-client";
-import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 
 // The panel against answers at the edges: huge and tiny numbers, long and odd text, empty and
@@ -623,20 +622,19 @@ describe("one request failing", () => {
   });
 
   it.each(["key", "usage", "breakdown", "requests"] as const)(
-    "signs out once with one toast when %s alone answers 401",
+    "signs out once, and the sign-in page says why, when %s alone answers 401",
     async (route) => {
-      const warning = vi.spyOn(toast, "warning");
       serve({
         [route]: () => jsonError(401, "Unauthorized", { code: "user_session_expired" }),
       });
       setUserToken(TOKEN, false);
       const { router } = await renderApp("/user", { authed: false });
       await waitFor(() => expect(router.state.location.pathname).toBe("/user/login"));
-      expect(warning).toHaveBeenCalledTimes(1);
       expect(getUserToken()).toBeNull();
       expect(
         await screen.findByRole("heading", { level: 1, name: "Check your API key" }),
       ).toBeVisible();
+      expect(screen.getAllByText("Your session expired. Sign in again.")).toHaveLength(1);
     },
   );
 });
@@ -653,9 +651,8 @@ describe("the session in another tab", () => {
     );
   }
 
-  it("goes to the sign-in page, without the expiry toast, when another tab signs out", async () => {
+  it("goes to the sign-in page, without the expiry notice, when another tab signs out", async () => {
     serve();
-    const warning = vi.spyOn(toast, "warning");
     setUserToken(TOKEN, true);
     const { router } = await renderApp("/user", { authed: false });
     await screen.findByRole("heading", { level: 1, name: "edge" });
@@ -663,7 +660,8 @@ describe("the session in another tab", () => {
     localStorage.removeItem(USER_TOKEN_KEY);
     act(() => storageEvent(TOKEN, null));
     await waitFor(() => expect(router.state.location.pathname).toBe("/user/login"));
-    expect(warning).not.toHaveBeenCalled();
+    await screen.findByRole("heading", { level: 1, name: "Check your API key" });
+    expect(screen.queryByText("Your session expired. Sign in again.")).toBeNull();
   });
 
   it("loads the other key when another tab signs in with it", async () => {

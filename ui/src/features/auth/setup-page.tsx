@@ -7,17 +7,15 @@ import { Skeleton } from "skullet/react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { announce } from "@/lib/announce";
 import { firstRunQuery } from "@/lib/api/session";
-import { isAuthenticated, subscribeSession } from "@/lib/auth/session";
+import { isAuthenticated } from "@/lib/auth/session";
 import { copyText } from "@/lib/clipboard";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { AuthHeader, AuthLayout } from "./auth-layout";
+import { showChangePasswordNotice } from "./change-password-notice";
 import { SignInForm } from "./sign-in-form";
-
-// Long enough to reach the toast's "Open settings" action.
-const CHANGE_PASSWORD_TOAST_MS = 10_000;
 
 /** How long the password stays green after a copy (components/shared/copy-button.tsx). */
 const COPIED_MS = 2000;
@@ -45,21 +43,11 @@ export function SetupPage(): JSX.Element {
     }
   }, [password, navigate, redirect]);
 
+  // The page the sign-in leads to shows the hint to change the generated password, at its top
+  // (ChangePasswordNotice in the app shell).
   const onSignedIn = () => {
-    const id = toast.info(t("changePasswordToast"), {
-      duration: CHANGE_PASSWORD_TOAST_MS,
-      action: { label: t("openSettings"), onClick: () => void navigate({ to: "/settings" }) },
-      // Not shown on Settings, and closed once the app gets there: it has nothing to add there.
-      hideOnPath: "/settings",
-    });
-    // The hint only makes sense while signed in. When this session ends (sign-out, expiry,
-    // restore) it goes too, so it never sits on the sign-in page pointing at Settings. The
-    // listener removes itself then; dismissing a toast that already timed out does nothing.
-    const stop = subscribeSession((session) => {
-      if (session) return;
-      toast.dismiss(id);
-      stop();
-    });
+    showChangePasswordNotice();
+    announce(t("changePasswordToast"));
   };
 
   return (
@@ -106,18 +94,18 @@ function GeneratedPassword({
     >
       {/*
        * The label doubles as the copy hint: "Generated password" at rest, "Click to copy" while
-       * the password is hovered or keyboard-focused, then "Copied to clipboard" in green. The
-       * three sit in one grid cell and cross-fade, so the line never changes height. With no
-       * password to show, the label goes too: the notice below says why.
+       * the password is hovered or keyboard-focused, then "Copied to clipboard" in green (or
+       * "Could not copy" in red). They sit in one grid cell and cross-fade, so the line never
+       * changes height. With no password to show, the label goes too: the notice below says why.
        */}
       {failed ? null : (
         <p className="grid text-meta [&>span]:col-start-1 [&>span]:row-start-1 [&>span]:transition-opacity [&>span]:duration-150">
-          <span className="text-muted-foreground group-has-data-copied/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
+          <span className="text-muted-foreground group-has-data-copied/pw:opacity-0 group-has-data-copy-failed/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
             {t("generatedPasswordLabel")}
           </span>
           <span
             aria-hidden="true"
-            className="text-info-foreground opacity-0 group-has-[[data-copy-password]:not([data-copied]):focus-visible]/pw:opacity-100 group-has-[[data-copy-password]:not([data-copied]):hover]/pw:opacity-100"
+            className="text-info-foreground opacity-0 group-has-[[data-copy-password]:not([data-copied],[data-copy-failed]):focus-visible]/pw:opacity-100 group-has-[[data-copy-password]:not([data-copied],[data-copy-failed]):hover]/pw:opacity-100"
           >
             {t("clickToCopy")}
           </span>
@@ -126,6 +114,12 @@ function GeneratedPassword({
             className="text-success-foreground opacity-0 group-has-data-copied/pw:opacity-100"
           >
             {tShared("toast.copied")}
+          </span>
+          <span
+            aria-hidden="true"
+            className="text-destructive-foreground opacity-0 group-has-data-copy-failed/pw:opacity-100"
+          >
+            {tShared("toast.copyFailed")}
           </span>
         </p>
       )}
@@ -161,14 +155,15 @@ function GeneratedPassword({
  * The password itself is the copy control: no separate copy icon, no box, just the digits in bold
  * mono. Hovering (or keyboard focus) turns them the accent text purple and the label
  * above reads "Click to copy"; a click or tap copies them and turns the digits and the label green
- * for two seconds. No toast (the label already says it) and no tooltip (it would cover the label).
- * Screen readers get the password plus "Copy password" as its name and a polite "Password copied"
- * status.
+ * for two seconds (a failed copy: the label says so in red). No toast (the label already says it)
+ * and no tooltip (it would cover the label). Screen readers get the password plus "Copy password"
+ * as its name and a polite "Password copied" status (a failure is read out at once).
  */
 function CopyablePassword({ value }: { value: string }): JSX.Element {
   const { t } = useT("auth");
   const { t: tShared } = useT();
-  const [copied, setCopied] = useState(false);
+  const [result, setResult] = useState<"copied" | "failed" | null>(null);
+  const copied = result === "copied";
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -179,14 +174,12 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
   );
 
   const onClick = async () => {
-    if (!(await copyText(value))) {
-      toast.error(tShared("toast.copyFailed"));
-      return;
-    }
-    setCopied(true);
+    const ok = await copyText(value);
+    if (!ok) announce(tShared("toast.copyFailed"), { assertive: true });
+    setResult(ok ? "copied" : "failed");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      setCopied(false);
+      setResult(null);
       timerRef.current = null;
     }, COPIED_MS);
   };
@@ -200,6 +193,7 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
           copied && "text-success-foreground hover:text-success-foreground",
         )}
         data-copied={copied ? "" : undefined}
+        data-copy-failed={result === "failed" ? "" : undefined}
         data-copy-password=""
         onClick={onClick}
         type="button"

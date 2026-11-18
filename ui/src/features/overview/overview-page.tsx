@@ -12,7 +12,6 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { statusQuery } from "@/lib/api/system";
 import { useAdminEventsStatus } from "@/lib/events/admin-events";
 import { useT } from "@/lib/i18n";
-import { toastError } from "@/lib/toast";
 import { KpiCards } from "./kpi-cards";
 import { ModelMixCard } from "./model-mix-card";
 import { NeedsAttention } from "./needs-attention";
@@ -87,20 +86,18 @@ function TotalsErrorBanner(): JSX.Element | null {
 
 export function OverviewPage(): JSX.Element {
   const { t } = useT("overview");
-  const { t: tc } = useT();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = async () => {
     setRefreshing(true);
     try {
-      // A manual refresh reports its failure; background refetches only update the cards.
+      // A failure shows where it happened: the totals banner above the cards, or the card whose
+      // part failed (its own line with Try again).
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.status }, { throwOnError: true }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.observe.all }, { throwOnError: true }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.status }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.observe.all }),
       ]);
-    } catch (error) {
-      toastError(error, tc);
     } finally {
       setRefreshing(false);
     }

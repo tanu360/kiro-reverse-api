@@ -10,7 +10,9 @@ import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { announce } from "@/lib/announce";
 import { queryKeys } from "@/lib/api/query-keys";
+import { errorMessage } from "@/lib/api/server-errors";
 import type { VersionResponse } from "@/lib/api/types";
 import {
   restartForUpdate,
@@ -21,7 +23,6 @@ import {
   waitForVersion,
 } from "@/lib/api/update";
 import { type TFunction, useT } from "@/lib/i18n";
-import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 /**
@@ -54,13 +55,13 @@ export interface SelfUpdate {
   confirmRestart: () => void;
 }
 
-const READY_TOAST_ID = "update-ready";
-const RESTART_TOAST_ID = "update-restart";
-
 /**
  * The self-update for the update notice and dialog. The server is asked only when it runs
  * outside a container and a newer release is known; an older server without the endpoint answers
- * 404, which reads as "cannot update itself", so the dialog shows the manual steps.
+ * 404, which reads as "cannot update itself", so the dialog shows the manual steps. Every step
+ * and failure shows in the sidebar's update card and in the dialog, never in a toast. The card
+ * is out of sight in the icon rail and on a phone, so screen readers also hear this page's
+ * download landing and a download or restart that failed.
  */
 export function useSelfUpdateController({
   target,
@@ -83,35 +84,38 @@ export function useSelfUpdateController({
   const begin = useMutation({
     mutationFn: () => startUpdate(target),
     onSuccess: (next) => queryClient.setQueryData(queryKeys.update, next),
-    onError: (error) => toastError(error, tRef.current),
+    onError: (error) => announce(errorMessage(error, tRef.current), { assertive: true }),
   });
   // useMutation's result is a new object every render; its mutate is stable, so the value below
   // (the update context's) only changes when the update does.
   const download = begin.mutate;
+  const resetBegin = begin.reset;
+
+  // A failure belongs to its release: a newer one found later starts clean.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the release changes.
+  useEffect(() => {
+    resetBegin();
+    setRestartError(undefined);
+  }, [target, resetBegin]);
 
   const restart = useCallback(() => {
-    toast.dismiss(READY_TOAST_ID);
     setRestartError(undefined);
+    // The server is down for a moment: the card and the dialog say "Restarting…" until it reloads.
     setRestarting(true);
-    // The server is down for a moment, so the page says what is going on until it reloads.
-    const progress = toast.loading(
-      tRef.current("shell.update.restartingToast", { latest: target }),
-      { id: RESTART_TOAST_ID },
-    );
     restartForUpdate()
       .then(() => waitForVersion(target))
       .then(
         () => window.location.reload(),
         (error: unknown) => {
           setRestarting(false);
-          if (error instanceof Error && error.message === "timeout") {
-            const message = tRef.current("shell.update.restartTimeout");
-            setRestartError(message);
-            toast.update(progress, { type: "error", title: message });
-            return;
-          }
-          toast.dismiss(progress);
-          toastError(error, tRef.current);
+          // Said in the card and the dialog; Try again asks the server where it stands (a release
+          // still in place comes back as ready to restart).
+          const message =
+            error instanceof Error && error.message === "timeout"
+              ? tRef.current("shell.update.restartTimeout")
+              : errorMessage(error, tRef.current);
+          setRestartError(message);
+          announce(message, { assertive: true });
           void queryClient.invalidateQueries({ queryKey: queryKeys.update });
         },
       );
@@ -127,27 +131,26 @@ export function useSelfUpdateController({
     });
   }, [confirm, restart, target]);
 
+  // A download the server refused (or never got) fails here; once the server reports a download
+  // under way or in place (another tab started it), that wins.
+  const startFailed = begin.isError && (status?.state ?? "idle") === "idle";
   const phase: SelfUpdatePhase = restarting
     ? "restarting"
-    : restartError
+    : restartError || startFailed
       ? "error"
       : begin.isPending
         ? "starting"
         : (status?.state ?? "idle");
+  const startError = startFailed ? errorMessage(begin.error, t) : undefined;
 
-  // One toast when this page's download finishes, with the restart one click away.
+  // Read out once when this page's download is in place (the card's eyebrow may be out of sight).
   const previous = useRef(phase);
   useEffect(() => {
     const was = previous.current;
     previous.current = phase;
     if (phase !== "ready" || (was !== "downloading" && was !== "starting")) return;
-    toast.success(tRef.current("shell.update.readyToast", { latest: target }), {
-      id: READY_TOAST_ID,
-      duration: 12_000,
-      background: true,
-      action: { label: tRef.current("shell.update.restart"), onClick: restart },
-    });
-  }, [phase, restart, target]);
+    announce(tRef.current("shell.update.readyToast", { latest: target }));
+  }, [phase, target]);
 
   return useMemo(
     () => ({
@@ -155,7 +158,7 @@ export function useSelfUpdateController({
       available: Boolean(enabled && status?.supported),
       target,
       phase,
-      error: restartError ?? (status ? updateErrorText(status, t) : undefined),
+      error: restartError ?? startError ?? (status ? updateErrorText(status, t) : undefined),
       start: () => {
         setRestartError(undefined);
         download();
@@ -163,7 +166,18 @@ export function useSelfUpdateController({
       restart,
       confirmRestart,
     }),
-    [status, enabled, target, phase, restartError, download, restart, confirmRestart, t],
+    [
+      status,
+      enabled,
+      target,
+      phase,
+      restartError,
+      startError,
+      download,
+      restart,
+      confirmRestart,
+      t,
+    ],
   );
 }
 

@@ -15,6 +15,7 @@ import { redirectTarget } from "@/routes/-search";
 import { CodeField } from "./code-field";
 import { PasswordField } from "./password-field";
 import { retrySeconds, useRetryCountdown } from "./rate-limit";
+import { useSessionExpired } from "./session-expired";
 
 /**
  * The sign-in form shared by /login and /setup. It never reads the URL: /login passes the
@@ -54,6 +55,8 @@ export function SignInForm({
   const [code, setCode] = useState("");
   const [recovery, setRecovery] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
+  // Came here because the session ran out: said above the button until the next attempt.
+  const session = useSessionExpired("admin");
 
   const finish = async () => {
     setPassword("");
@@ -146,6 +149,7 @@ export function SignInForm({
     event.preventDefault();
     if (pending || locked) return;
     setFormError(null);
+    session.hide();
     if (!password) {
       setFieldError(t("passwordRequired"));
       // FieldError is no live region: focus brings the field and its error to a screen reader.
@@ -285,6 +289,11 @@ export function SignInForm({
         <Alert variant="error">
           <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
           <AlertDescription>{formError}</AlertDescription>
+        </Alert>
+      ) : session.expired ? (
+        <Alert data-slot="session-expired" variant="warning">
+          <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
+          <AlertDescription>{t("errors:sessionExpired")}</AlertDescription>
         </Alert>
       ) : null}
       {/*
