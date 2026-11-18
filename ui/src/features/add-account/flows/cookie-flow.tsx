@@ -10,10 +10,16 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
-import { errorMessage } from "@/lib/api/server-errors";
 import { fillNodes, useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowGuide, FormField, GuideLink, ProviderLogo, SubmitButton } from "../fields";
+import {
+  FlowError,
+  type FlowFailure,
+  FlowGuide,
+  FormField,
+  GuideLink,
+  ProviderLogo,
+  SubmitButton,
+} from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { type CookieProvider, reloginCookieProvider } from "../lib/relogin-method";
@@ -30,6 +36,7 @@ export function CookieFlow(): JSX.Element {
   );
   const [refreshToken, setRefreshToken] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
   const focusAfter = useFocusAfter(pending);
@@ -38,6 +45,7 @@ export function CookieFlow(): JSX.Element {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
+    setFailure(null);
     const token = refreshToken.trim();
     if (!token) {
       setError(t("cookie.refreshTokenMissing"));
@@ -61,8 +69,8 @@ export function CookieFlow(): JSX.Element {
       relogin.announce(res);
       finishAdd([res.account]);
     } catch (caught) {
-      if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught))) {
-        toast.error(t(relogin.failedKey, { error: errorMessage(caught, t) }));
+      if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught, setFailure))) {
+        setFailure({ error: caught });
         focusAfter(tokenRef);
       }
     } finally {
@@ -138,6 +146,7 @@ export function CookieFlow(): JSX.Element {
           variant="mono"
         />
       </FormField>
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton
           busy={pending}

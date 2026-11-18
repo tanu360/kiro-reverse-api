@@ -61,8 +61,17 @@ async function expectClosed(): Promise<void> {
   );
 }
 
-async function expectToast(text: string | RegExp): Promise<void> {
-  expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
+/** Read out by the app's live region (the result a toast used to show). */
+async function expectAnnounced(text: string | RegExp): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
+/** The flow's one-line error at the end of the open dialog. */
+async function expectFlowError(text: string | RegExp): Promise<void> {
+  const line = await screen.findByText(text, { selector: '[data-slot="alert-description"]' });
+  expect(line.closest('[data-slot="action-error"]')).toHaveAttribute("role", "alert");
+  expect(line.closest('[data-slot="dialog-popup"]')).not.toBeNull();
 }
 
 /** Pastes `json` into the credentials field and submits it. */
@@ -170,7 +179,7 @@ describe("AddAccountDialog in re-login mode", () => {
     await expectClosed();
     expect(imports.bodies[0]).toMatchObject({ reloginAccountId: account.id });
     expect(mockDb.accounts).toHaveLength(before);
-    await expectToast(/ is signed in again\.$/);
+    await expectAnnounced(/ is signed in again\.$/);
     // The server checks the new login itself; the dialog does not refresh it.
     expect(refreshes.count).toBe(0);
   });
@@ -197,7 +206,7 @@ describe("AddAccountDialog in re-login mode", () => {
     expect(mockDb.accounts.find((item) => item.id === account.id)?.email).toBe(
       "someone.else@northwind-labs.dev",
     );
-    await expectToast("someone.else@northwind-labs.dev is signed in again.");
+    await expectAnnounced("someone.else@northwind-labs.dev is signed in again.");
   });
 
   it("names the stored account a sign-in belongs to, masked, and asks nothing", async () => {
@@ -224,9 +233,12 @@ describe("AddAccountDialog in re-login mode", () => {
     );
     await submitCredentials(user, OTHER_USER);
 
-    await expectToast(/^This sign-in belongs to te\S+@\S+, another account in the pool\./);
+    // One line in the dialog, which stays open for another try.
+    await expectFlowError(
+      /^This sign-in belongs to te\S+@\S+, another account in the pool\. This account was not changed\. te\S+@\S+ now uses the new sign-in\.$/,
+    );
     expect(screen.queryByText(/teammate@northwind-labs\.dev/)).not.toBeInTheDocument();
-    await expectToast(/now uses the new sign-in\.$/);
+    expect(screen.getByRole("dialog", { name: "Sign in again" })).toBeInTheDocument();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(mockDb.accounts.find((item) => item.id === account.id)?.email).toBe(account.email);
   });
@@ -245,7 +257,8 @@ describe("AddAccountDialog in re-login mode", () => {
 
     await waitFor(() => expect(discards.count).toBe(1));
     expect(confirms.count).toBe(0);
-    await expectToast("Nothing changed. The new sign-in was discarded.");
+    await expectAnnounced("Nothing changed. The new sign-in was discarded.");
+    expect(document.querySelector('[data-slot="action-error"]')).not.toBeInTheDocument();
     expect(mockDb.accounts.find((item) => item.id === account.id)?.email).toBe(account.email);
     // The re-login dialog stays open for another try.
     expect(screen.getByRole("dialog", { name: "Sign in again" })).toBeInTheDocument();
@@ -286,7 +299,7 @@ describe("Builder ID re-login", () => {
     await untilPolls(polls, 3);
     await expectClosed();
     expect(mockDb.accounts).toHaveLength(before);
-    await expectToast(`${account.email} is signed in again.`);
+    await expectAnnounced(`${account.email} is signed in again.`);
   });
 
   it("stops at the start when the account is gone", async () => {
@@ -295,7 +308,7 @@ describe("Builder ID re-login", () => {
     renderWithProviders(<Harness account={account} />);
 
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
-    await expectToast("Could not start sign-in: Account not found.");
+    await expectFlowError("Account not found.");
     expect(screen.queryByText("ABCD-EFGH")).not.toBeInTheDocument();
     expect(polls.count).toBe(0);
   });

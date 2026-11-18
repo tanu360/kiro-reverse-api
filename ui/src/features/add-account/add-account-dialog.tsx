@@ -113,9 +113,11 @@ export function AddAccountDialog({
   );
 
   const finishAdd = useCallback(
-    async (refs: AddedAccountRef[]) => {
-      sessions.reset({ cancelMicrosoft: false });
-      latest.current.onOpenChange(false);
+    async (refs: AddedAccountRef[], { keepOpen = false }: { keepOpen?: boolean } = {}) => {
+      if (!keepOpen) {
+        sessions.reset({ cancelMicrosoft: false });
+        latest.current.onOpenChange(false);
+      }
       const ids = refs.map((ref) => ref.id).filter(Boolean);
       latest.current.onAdded?.(ids);
       await Promise.all([
@@ -154,7 +156,7 @@ export function AddAccountDialog({
   const context = useMemo<FlowContextValue>(
     () => ({
       sessions,
-      finishAdd: (refs) => void finishAdd(refs),
+      finishAdd: (refs, options) => void finishAdd(refs, options),
       setBusy,
       cancel,
       footer,

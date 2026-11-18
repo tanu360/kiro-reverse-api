@@ -1,18 +1,18 @@
 import { useCallback } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { announce } from "@/lib/announce";
 import {
   confirmRelogin,
   discardRelogin,
   reloginMismatch,
   reloginOtherAccount,
 } from "@/lib/api/relogin";
-import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
-import { toast } from "@/lib/toast";
+import type { FlowFailure } from "./fields";
 import { useFlow } from "./flow-context";
-import { savedTitle } from "./result-toast";
+import { savedText } from "./result-text";
 
 interface FinishedLogin {
   account: AddedAccountRef;
@@ -24,17 +24,19 @@ interface ReloginFlow {
   target: Account | null;
   /** Sent as reloginAccountId; undefined (left out of the body) when adding. */
   accountId: string | undefined;
-  /** The failure toast's key: "Could not add the account" or "Could not sign in again". */
-  failedKey: "failed" | "relogin.failed";
-  /** The success toast for one finished login, in either mode. */
-  announce: (res: FinishedLogin) => void;
+  /**
+   * Reads out one finished login, in either mode, with an optional note after it. The dialog
+   * closes onto the row it added or signed in again, so nothing else shows it.
+   */
+  announce: (res: FinishedLogin, note?: string) => void;
   /**
    * Handles a re-login that signed in as another user (409 relogin_identity_mismatch): asks to
    * replace the identity, then applies the waiting login (and finishes the dialog) or discards
-   * it. A sign-in that is another stored account (409 relogin_other_account) only says so. True
-   * when it handled the error, so the flow shows nothing else.
+   * it. A sign-in that is another stored account (409 relogin_other_account) only says so, through
+   * `fail`, as does a failed apply. True when it handled the error, so the flow shows nothing
+   * else.
    */
-  resolveMismatch: (error: unknown) => Promise<boolean>;
+  resolveMismatch: (error: unknown, fail: (failure: FlowFailure) => void) => Promise<boolean>;
 }
 
 /** What every flow needs for re-login mode. Outside it, the hook is inert. */
@@ -44,31 +46,37 @@ export function useReloginFlow(): ReloginFlow {
   const confirm = useConfirm();
   const { relogin, finishAdd, setBusy } = useFlow();
 
-  const announce = useCallback(
-    (res: FinishedLogin) => {
+  const announceLogin = useCallback(
+    (res: FinishedLogin, note?: string) => {
       const name = display(res.account.email, res.account.id);
-      if (!relogin) {
+      const parts = [
         // A login of an account already stored updates it instead of adding a copy.
-        toast.success(savedTitle(t, res.account, name));
-        return;
-      }
-      toast.success(t("relogin.success", { name }), {
-        description: res.identityVerified === false ? t("relogin.unverified") : undefined,
-      });
+        relogin ? t("relogin.success", { name }) : savedText(t, res.account, name),
+        note,
+        relogin && res.identityVerified === false ? t("relogin.unverified") : undefined,
+      ].filter((part): part is string => Boolean(part));
+      announce(parts.reduce((first, second) => t("common:text.joinSentences", { first, second })));
     },
     [display, relogin, t],
   );
 
   const resolveMismatch = useCallback(
-    async (error: unknown) => {
+    async (error: unknown, fail: (failure: FlowFailure) => void) => {
       if (!relogin) return false;
       const other = reloginOtherAccount(error);
       if (other) {
         const name = other.otherEmail
           ? display(other.otherEmail, other.otherAccountId)
           : t("relogin.unknownUser");
-        toast.error(t("relogin.otherAccount", { name }), {
-          description: other.saved ? t("relogin.otherAccountSaved", { name }) : undefined,
+        const first = t("relogin.otherAccount", { name });
+        fail({
+          error,
+          message: other.saved
+            ? t("common:text.joinSentences", {
+                first,
+                second: t("relogin.otherAccountSaved", { name }),
+              })
+            : first,
         });
         return true;
       }
@@ -88,30 +96,30 @@ export function useReloginFlow(): ReloginFlow {
           variant: "danger",
         });
         if (!replace) {
+          // The admin chose this in the confirm; the flow stays as it was.
           void discardRelogin(relogin.id, mismatch.pendingId);
-          toast.info(t("relogin.mismatchDeclined"));
+          announce(t("relogin.mismatchDeclined"));
           return true;
         }
         try {
           const res = await confirmRelogin(relogin.id, mismatch.pendingId);
-          announce(res);
+          announceLogin(res);
           finishAdd([res.account]);
         } catch (caught) {
-          toast.error(t("relogin.failed", { error: errorMessage(caught, t) }));
+          fail({ error: caught });
         }
         return true;
       } finally {
         setBusy(false);
       }
     },
-    [announce, confirm, display, finishAdd, relogin, setBusy, t],
+    [announceLogin, confirm, display, finishAdd, relogin, setBusy, t],
   );
 
   return {
     target: relogin,
     accountId: relogin?.id,
-    failedKey: relogin ? "relogin.failed" : "failed",
-    announce,
+    announce: announceLogin,
     resolveMismatch,
   };
 }

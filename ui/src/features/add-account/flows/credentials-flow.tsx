@@ -1,11 +1,11 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { announce } from "@/lib/announce";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { AddedAccountRef } from "@/lib/api/types";
-import { joinList, useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowGuide, FormField, SubmitButton } from "../fields";
+import { useT } from "@/lib/i18n";
+import { FlowError, type FlowFailure, FlowGuide, FormField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import {
@@ -14,7 +14,7 @@ import {
   parseCredentialsJson,
 } from "../lib/credentials-mapping";
 import { useReloginFlow } from "../relogin";
-import { showBatchResult } from "../result-toast";
+import { batchResultText } from "../result-text";
 
 /** Credentials JSON: one request per item, in order. Failures keep their reasons. */
 export function CredentialsFlow(): JSX.Element {
@@ -24,6 +24,7 @@ export function CredentialsFlow(): JSX.Element {
   const formId = useFormId();
   const [json, setJson] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
   const focusAfter = useFocusAfter(pending);
@@ -32,6 +33,7 @@ export function CredentialsFlow(): JSX.Element {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
+    setFailure(null);
     if (!json.trim()) {
       setError(t("credentials.empty"));
       focusAfter(jsonRef);
@@ -76,8 +78,11 @@ export function CredentialsFlow(): JSX.Element {
         relogin.announce(res);
         finishAdd([res.account]);
       } catch (caught) {
-        if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught))) {
-          toast.error(t(relogin.failedKey, { error: errorMessage(caught, t) }));
+        if (
+          sessions.isCurrent(generation) &&
+          !(await relogin.resolveMismatch(caught, setFailure))
+        ) {
+          setFailure({ error: caught });
           focusAfter(jsonRef);
         }
       } finally {
@@ -108,15 +113,17 @@ export function CredentialsFlow(): JSX.Element {
         if (!sessions.isCurrent(generation)) return;
       }
       if (!sessions.isCurrent(generation)) return;
-      if (added.length === 0) {
-        toast.error(t("allFailed", { error: failures[0] ?? "" }), {
-          description: failures.length > 1 ? joinList(t, failures.slice(1, 3)) : undefined,
-        });
-        focusAfter(jsonRef);
+      const text = batchResultText(t, added, failures);
+      if (failures.length === 0) {
+        announce(text);
+        finishAdd(added);
         return;
       }
-      showBatchResult(t, added, failures);
-      finishAdd(added);
+      // The items that went in are listed at once; the dialog stays open on the ones that failed.
+      // Sending the same JSON again updates those accounts instead of adding copies.
+      if (added.length > 0) finishAdd(added, { keepOpen: true });
+      setFailure({ error: failures, message: text });
+      focusAfter(jsonRef);
     } finally {
       setPending(false);
     }
@@ -141,6 +148,7 @@ export function CredentialsFlow(): JSX.Element {
           variant="mono"
         />
       </FormField>
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton
           busy={pending}

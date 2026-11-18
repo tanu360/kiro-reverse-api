@@ -7,8 +7,11 @@ import type { FlowSessions } from "./flow-sessions";
 
 export interface FlowContextValue {
   sessions: FlowSessions;
-  /** Closes the dialog, reports the ids, refreshes the lists and fetches usage for each id. */
-  finishAdd: (refs: AddedAccountRef[]) => void;
+  /**
+   * Closes the dialog, reports the ids, refreshes the lists and fetches usage for each id. With
+   * `keepOpen` (a batch with failures) the dialog stays open on the flow, which shows them.
+   */
+  finishAdd: (refs: AddedAccountRef[], options?: { keepOpen?: boolean }) => void;
   /** While true the dialog cannot be dismissed with Escape, the backdrop or the X. */
   setBusy: (busy: boolean) => void;
   /** Closes the dialog. */

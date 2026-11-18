@@ -1,19 +1,26 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
 import { Code } from "@/components/shared/code";
 import { Textarea } from "@/components/ui/textarea";
+import { announce } from "@/lib/announce";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { AddedAccountRef } from "@/lib/api/types";
 import { fillNodes, useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowNote, FormField, RegionField, SubmitButton } from "../fields";
+import {
+  FlowError,
+  type FlowFailure,
+  FlowNote,
+  FormField,
+  RegionField,
+  SubmitButton,
+} from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseApiKeyLines } from "../lib/api-key-lines";
 import { parseRegion } from "../lib/region";
 import { reloginRegion } from "../lib/relogin-method";
 import { useReloginFlow } from "../relogin";
-import { showBatchResult } from "../result-toast";
+import { batchResultText } from "../result-text";
 
 /** Kiro CLI API keys, one per line, imported one request at a time. */
 export function ApiKeyFlow(): JSX.Element {
@@ -25,6 +32,7 @@ export function ApiKeyFlow(): JSX.Element {
   // An API key account's region is its key's, so a pasted key without |region keeps it.
   const [region, setRegion] = useState(() => reloginRegion(relogin.target));
   const [errors, setErrors] = useState<{ keys?: string; region?: string }>({});
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
   const focusAfter = useFocusAfter(pending);
@@ -46,6 +54,7 @@ export function ApiKeyFlow(): JSX.Element {
       region: parsed.ok ? undefined : t("regionInvalid"),
     };
     setErrors(nextErrors);
+    setFailure(null);
     if (nextErrors.keys || !parsed.ok) {
       focusAfter(nextErrors.keys ? keysRef : regionRef);
       return;
@@ -62,8 +71,11 @@ export function ApiKeyFlow(): JSX.Element {
         relogin.announce(res);
         finishAdd([res.account]);
       } catch (caught) {
-        if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught))) {
-          toast.error(t(relogin.failedKey, { error: errorMessage(caught, t) }));
+        if (
+          sessions.isCurrent(generation) &&
+          !(await relogin.resolveMismatch(caught, setFailure))
+        ) {
+          setFailure({ error: caught });
           focusAfter(keysRef);
         }
       } finally {
@@ -73,6 +85,7 @@ export function ApiKeyFlow(): JSX.Element {
     }
     const added: AddedAccountRef[] = [];
     const failures: string[] = [];
+    const failedKeys: string[] = [];
     try {
       for (const request of requests) {
         try {
@@ -80,16 +93,24 @@ export function ApiKeyFlow(): JSX.Element {
           added.push(res.account);
         } catch (caught) {
           failures.push(errorMessage(caught, t));
+          failedKeys.push(request.kiroApiKey ?? "");
         }
         if (!sessions.isCurrent(generation)) return;
       }
-      if (added.length === 0) {
-        toast.error(t("failed", { error: failures[0] ?? "" }));
-        focusAfter(keysRef);
+      const text = batchResultText(t, added, failures);
+      if (failures.length === 0) {
+        announce(text);
+        finishAdd(added);
         return;
       }
-      showBatchResult(t, added, failures);
-      finishAdd(added);
+      // The keys that went in are listed at once and leave the field (the server turns down a key
+      // it already has); the dialog stays open on the ones that failed.
+      if (added.length > 0) {
+        finishAdd(added, { keepOpen: true });
+        setKeys(failedKeys.join("\n"));
+      }
+      setFailure({ error: failures, message: text });
+      focusAfter(keysRef);
     } finally {
       setPending(false);
     }
@@ -128,6 +149,7 @@ export function ApiKeyFlow(): JSX.Element {
         onChange={setRegion}
         value={region}
       />
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton
           busy={pending}
