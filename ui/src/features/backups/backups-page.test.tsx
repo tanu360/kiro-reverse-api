@@ -234,11 +234,11 @@ describe("BackupsPage", () => {
     expect(keep).toHaveAccessibleDescription(
       "Keep 1–200. Older scheduled backups are deleted. Enter a whole number from 1 to 200.",
     );
-    // Under the whole row (text and field), not in its text column.
+    // In the row's full-width notice slot under the text and the field, not in its text column.
     const row = keep.closest<HTMLElement>('[data-slot="settings-row"]');
     expect(row).not.toBeNull();
-    expect(row).not.toContainElement(error);
-    expect(row?.nextElementSibling).toBe(error);
+    expect(error.parentElement?.parentElement).toBe(row);
+    expect(error.parentElement).not.toContainElement(keep);
     // Focus stays on Save, so a screen reader hears it this way.
     expect(announced).toEqual(["Enter a whole number from 1 to 200."]);
     noActionError();

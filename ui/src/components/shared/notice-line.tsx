@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
  */
 
 /** On the Alert. */
-export const NOTICE_LINE_CLASS = "sm:has-data-[slot=alert-action]:py-2";
+const NOTICE_LINE_CLASS = "sm:has-data-[slot=alert-action]:py-2";
 
 /** On its AlertAction. */
-export const NOTICE_ACTIONS_CLASS =
+const NOTICE_ACTIONS_CLASS =
   "-my-1 gap-0 self-start max-sm:col-start-3 max-sm:row-start-1 max-sm:-mt-1 sm:-my-1.5 sm:pointer-coarse:-my-2";
 
 /**
