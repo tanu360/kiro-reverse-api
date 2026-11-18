@@ -110,9 +110,14 @@ export function RequestsPage(): JSX.Element {
 
   // Clear filters, Show all and the out-of-range action remove themselves when pressed: focus
   // moves to a status tab, which stays (All, the first, once the status is cleared), not the page.
-  const focusStatusTab = (which: "first" | "selected") => {
+  // Says whether there was a tab to focus.
+  const focusStatusTab = (which: "first" | "selected"): boolean => {
     const tab = which === "first" ? '[role="tab"]' : '[role="tab"][aria-selected="true"]';
-    bodyRef.current?.querySelector<HTMLElement>(`[data-slot="requests-toolbar"] ${tab}`)?.focus();
+    const target = bodyRef.current?.querySelector<HTMLElement>(
+      `[data-slot="requests-toolbar"] ${tab}`,
+    );
+    target?.focus();
+    return Boolean(target);
   };
 
   const clearFilters = () => {
@@ -208,16 +213,23 @@ export function RequestsPage(): JSX.Element {
     void countsQuery.refetch();
   };
   // Try again and close go with the line: focus moves to the selected status tab, not the body.
+  // An empty log has no tabs (showFilters): the page's Refresh, which does the same, takes it.
+  const focusAfterError = () => {
+    if (focusStatusTab("selected")) return;
+    document
+      .querySelector<HTMLElement>('[data-slot="page-header-actions"] [data-slot="refresh-button"]')
+      ?.focus();
+  };
   const refetchError = refetchFailed ? (
     <ActionError
       error={error}
       onDismiss={() => {
         setClosedAt(errorUpdatedAt);
-        focusStatusTab("selected");
+        focusAfterError();
       }}
       onRetry={() => {
         refresh();
-        focusStatusTab("selected");
+        focusAfterError();
       }}
     />
   ) : null;

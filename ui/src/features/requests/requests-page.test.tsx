@@ -656,4 +656,26 @@ describe("RequestsPage", () => {
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     expect(await screen.findByText("database is locked")).toBeInTheDocument();
   });
+
+  it("hands focus to Refresh when an empty log's failed-refresh line goes", async () => {
+    mockDb.requests = [];
+    let fail = false;
+    mockServer.use(
+      http.get(RECENT_REQUESTS, () =>
+        fail ? HttpResponse.json({ error: "database is locked" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = await renderApp("/requests");
+    await screen.findByText("No requests yet");
+    fail = true;
+    const refresh = screen.getByRole("button", { name: "Refresh" });
+    await user.click(refresh);
+    const notice = (await screen.findByText("database is locked")).closest(
+      '[data-slot="action-error"]',
+    ) as HTMLElement;
+    // No status tabs on an empty log: focus goes to Refresh, not the body.
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(screen.queryByText("database is locked")).toBeNull();
+    expect(refresh).toHaveFocus();
+  });
 });
