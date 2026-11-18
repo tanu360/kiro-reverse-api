@@ -203,7 +203,7 @@ const ChartCore = memo(function ChartCore({
   status,
   loadingFill,
 }: ChartInnerProps) {
-  const { tooltipData, setTooltipData, scheduleTooltip, clearTooltip } =
+  const { tooltipData, setTooltipData, scheduleTooltip, clearTooltip, resetTooltipDedupe } =
     useScheduledTooltip<TooltipData>();
   // A zero-duration reveal is loaded from the first render, so static charts
   // don't re-render (cursor / interaction wiring) after their first paint.
@@ -374,23 +374,13 @@ const ChartCore = memo(function ChartCore({
     onPhaseChange?.(isLoaded ? "ready" : "revealing");
   }, [isLoaded, onPhaseChange]);
 
-  // Mouse move handler
-  const handleMouseMove = useCallback(
-    (event: React.MouseEvent<SVGElement>) => {
-      const point = localPoint(event);
-      if (!point) {
-        return;
-      }
-
-      const pos = isHorizontal ? point.y - margin.top : point.x - margin.left;
-
-      // Find which band the mouse is over
-      const bandIndex = Math.floor(pos / columnWidth);
-      const clampedIndex = Math.max(0, Math.min(data.length - 1, bandIndex));
+  // Tooltip for the bar at `clampedIndex`, built from the current data and scales.
+  const buildTooltipAt = useCallback(
+    (clampedIndex: number): TooltipData | null => {
       const d = data[clampedIndex];
 
       if (!d) {
-        return;
+        return null;
       }
 
       // Calculate positions for each bar
@@ -487,34 +477,67 @@ const ChartCore = memo(function ChartCore({
         tooltipX = barPos + bandWidth / 2;
       }
 
-      scheduleTooltip({
+      return {
         point: d,
         index: clampedIndex,
         x: tooltipX,
         yPositions,
         xPositions: Object.keys(xPositions).length > 0 ? xPositions : undefined,
-      });
+      };
     },
     [
       categoryScale,
       valueScale,
       data,
       lines,
-      margin.left,
-      margin.top,
       categoryAccessor,
-      columnWidth,
       bandWidth,
       isHorizontal,
       stacked,
       stackGap,
-      scheduleTooltip,
       yScales,
       primaryYScale,
       squareSnap,
       innerHeight,
     ],
   );
+
+  // Mouse move handler
+  const handleMouseMove = useCallback(
+    (event: React.MouseEvent<SVGElement>) => {
+      const point = localPoint(event);
+      if (!point) {
+        return;
+      }
+
+      const pos = isHorizontal ? point.y - margin.top : point.x - margin.left;
+
+      // Find which band the mouse is over
+      const bandIndex = Math.floor(pos / columnWidth);
+      const clampedIndex = Math.max(0, Math.min(data.length - 1, bandIndex));
+      const tooltip = buildTooltipAt(clampedIndex);
+      if (tooltip) {
+        scheduleTooltip(tooltip);
+      }
+    },
+    [
+      buildTooltipAt,
+      columnWidth,
+      data.length,
+      isHorizontal,
+      margin.left,
+      margin.top,
+      scheduleTooltip,
+    ],
+  );
+
+  // Live data (e.g. a sliding 1h window) replaces the rows under a still
+  // pointer: the dedupe key (index + x) doesn't change, so rebuild the shown
+  // tooltip from the new row at the same index instead of keeping the old one.
+  useEffect(() => {
+    setTooltipData((prev) => (prev === null ? prev : buildTooltipAt(prev.index)));
+    resetTooltipDedupe();
+  }, [buildTooltipAt, setTooltipData, resetTooltipDedupe]);
 
   const handleMouseLeave = useCallback(() => {
     clearTooltip();

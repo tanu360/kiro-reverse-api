@@ -9,7 +9,15 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type JSX, useCallback, useMemo, useState } from "react";
+import {
+  type JSX,
+  type RefObject,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
@@ -124,9 +132,12 @@ function AuthChip({ account }: { account: Account }): JSX.Element {
 function FixAction({
   row,
   onDetails,
+  onRefreshFocus,
 }: {
   row: AttentionRow;
   onDetails: (account: Account) => void;
+  /** The account whose focused refresh may drop focus when it leaves the list; null on failure. */
+  onRefreshFocus: (id: string | null) => void;
 }): JSX.Element {
   const { t } = useT("accounts");
   const refresh = useRefreshAccount(row.account.id);
@@ -139,8 +150,16 @@ function FixAction({
         render={
           <Button
             aria-label={label}
+            data-fix=""
             loading={refreshes && refresh.isPending}
-            onClick={() => (refreshes ? refresh.mutate() : onDetails(row.account))}
+            onClick={(event) => {
+              if (!refreshes) {
+                onDetails(row.account);
+                return;
+              }
+              if (document.activeElement === event.currentTarget) onRefreshFocus(row.account.id);
+              refresh.mutate(undefined, { onError: () => onRefreshFocus(null) });
+            }}
             size="icon-sm"
             variant="outline"
           />
@@ -157,10 +176,12 @@ function AttentionItem({
   row,
   reason,
   onDetails,
+  onRefreshFocus,
 }: {
   row: AttentionRow;
   reason: string | null;
   onDetails: (account: Account) => void;
+  onRefreshFocus: (id: string | null) => void;
 }): JSX.Element {
   const name = useAccountName()(row.account);
   return (
@@ -179,19 +200,23 @@ function AttentionItem({
           <TruncatedText className="text-meta text-muted-foreground">{reason}</TruncatedText>
         ) : null}
       </div>
-      <FixAction onDetails={onDetails} row={row} />
+      <FixAction onDetails={onDetails} onRefreshFocus={onRefreshFocus} row={row} />
     </li>
   );
 }
 
-function ViewAllLink(): JSX.Element {
+function ViewAllLink({ focusRef }: { focusRef: RefObject<HTMLElement | null> }): JSX.Element {
   const { t } = useT("overview");
   const { t: tc } = useT();
   return (
     <Button
-      aria-label={t("attention.viewAll")}
+      // The visible "View all" stays the name (label in name); the longer line is read after it.
+      aria-description={t("attention.viewAll")}
       // The arrow, not the invisible box, lines up with the card's content edge (its 8 px inset).
       className="-me-2"
+      ref={(element) => {
+        focusRef.current = element;
+      }}
       render={<Link search={{ status: "attention" }} to="/accounts" />}
       size="sm"
       variant="ghost"
@@ -219,6 +244,29 @@ export function NeedsAttention(): JSX.Element {
     [query.data, nowSec],
   );
   const onDetails = useCallback((account: Account) => openDetail(account.id), [openDetail]);
+
+  // A refreshed account leaves the list, and its focused button with it: focus the next row's
+  // fix (the previous one at the end of the list), else View all once the list is empty.
+  const listRef = useRef<HTMLUListElement>(null);
+  const viewAllRef = useRef<HTMLElement>(null);
+  const focusAfterRefresh = useRef<{ id: string; index: number } | null>(null);
+  const onRefreshFocus = useCallback(
+    (id: string | null) => {
+      const index = id === null ? -1 : rows.findIndex((row) => row.account.id === id);
+      focusAfterRefresh.current = id === null || index < 0 ? null : { id, index };
+    },
+    [rows],
+  );
+  useLayoutEffect(() => {
+    const pending = focusAfterRefresh.current;
+    if (!pending || rows.some((row) => row.account.id === pending.id)) return;
+    focusAfterRefresh.current = null;
+    // Only when focus was lost with the button (on <body>), not after the user moved it on.
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const fixes = Array.from(listRef.current?.querySelectorAll<HTMLElement>("[data-fix]") ?? []);
+    (fixes[Math.min(pending.index, fixes.length - 1)] ?? viewAllRef.current)?.focus();
+  }, [rows]);
 
   let body: JSX.Element;
   if (query.isPending) {
@@ -259,11 +307,12 @@ export function NeedsAttention(): JSX.Element {
     );
   } else {
     body = (
-      <ul className="flex flex-col divide-y divide-border-subtle">
+      <ul className="flex flex-col divide-y divide-border-subtle" ref={listRef}>
         {rows.slice(0, LIMIT).map((row) => (
           <AttentionItem
             key={row.account.id}
             onDetails={onDetails}
+            onRefreshFocus={onRefreshFocus}
             reason={reasonOf(row)}
             row={row}
           />
@@ -275,7 +324,7 @@ export function NeedsAttention(): JSX.Element {
   return (
     <>
       <SectionCard
-        actions={<ViewAllLink />}
+        actions={<ViewAllLink focusRef={viewAllRef} />}
         description={query.data ? t("attention.count", { count: rows.length }) : undefined}
         descriptionVariant="inline"
         icon={Flag02Icon}

@@ -68,9 +68,14 @@ type StatTrendPlacement = "inline" | "aside";
 /** The trend slot's height in px per placement, for a sparkline's `height`. */
 export const STAT_TREND_HEIGHT: Record<StatTrendPlacement, number> = { inline: 28, aside: 48 };
 
+/** The change as shown: to a tenth of a percent, so the tone and the text agree on "0%". */
+function roundDelta(fraction: number): number {
+  return Math.round(fraction * 1000) / 1000;
+}
+
 /** 0.125 -> "+12.5%", -0.2 -> "-20%", 0 -> "0%" (in the UI language's number format). */
 export function formatDelta(fraction: number, lang?: Lang): string {
-  const rounded = Math.round(fraction * 1000) / 1000;
+  const rounded = roundDelta(fraction);
   // Intl writes a hyphen for the sign; a fall reads as a true minus sign, as wide as the plus.
   return numberFormat(lang, {
     style: "percent",
@@ -190,7 +195,8 @@ function TileShell({
 }
 
 function DeltaText({ delta, lang }: { delta: StatDelta; lang: Lang }): JSX.Element {
-  const direction = delta.value > 0 ? "up" : delta.value < 0 ? "down" : "flat";
+  const shown = roundDelta(delta.value);
+  const direction = shown > 0 ? "up" : shown < 0 ? "down" : "flat";
   const goodWhen = delta.goodWhen ?? "up";
   const tone = direction === "flat" ? "neutral" : direction === goodWhen ? "good" : "bad";
   return (

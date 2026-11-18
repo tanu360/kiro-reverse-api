@@ -434,9 +434,10 @@ describe("OverviewPage", () => {
         within(item).getByRole("button", { name: refreshes ? "Refresh token" : "Details" }),
       ).toBeInTheDocument();
     });
-    expect(
-      within(card).getByRole("link", { name: "View all accounts that need attention" }),
-    ).toHaveAttribute("href", "/accounts?status=attention");
+    // The visible text is the name (label in name); the longer line is its description.
+    const viewAll = within(card).getByRole("link", { name: "View all" });
+    expect(viewAll).toHaveAttribute("href", "/accounts?status=attention");
+    expect(viewAll).toHaveAttribute("aria-description", "View all accounts that need attention");
   });
 
   it("refreshes the token from a needs-attention row", async () => {
@@ -455,6 +456,33 @@ describe("OverviewPage", () => {
     const items = await within(card).findAllByRole("listitem");
     await user.click(within(items[index]).getByRole("button", { name: "Refresh token" }));
     await waitFor(() => expect(refreshed).toEqual([rows[index].account.id]));
+  });
+
+  it("keeps focus in the list when a refreshed account leaves it", async () => {
+    const rows = attentionRows(mockDb.accounts, Date.now() / 1000);
+    const index = rows.findIndex((row) => ["expired", "noToken", "suspended"].includes(row.status));
+    if (index < 0 || index >= 5) throw new Error("fixture has no refreshable account in view");
+    const fixed = rows[index].account.id;
+    let refreshed = false;
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/refresh"), () => {
+        refreshed = true;
+        return undefined;
+      }),
+      // Once refreshed, the account is healthy and drops out of the list.
+      http.get(apiUrl("/accounts"), () =>
+        HttpResponse.json(
+          refreshed ? mockDb.accounts.filter((account) => account.id !== fixed) : mockDb.accounts,
+        ),
+      ),
+    );
+    const { user } = await renderApp("/");
+    const card = await screen.findByRole("region", { name: "Needs attention" });
+    const items = await within(card).findAllByRole("listitem");
+    await user.click(within(items[index]).getByRole("button", { name: "Refresh token" }));
+    await waitFor(() => expect(card.querySelector(`[data-fix]:focus`)).not.toBeNull());
+    const after = within(card).getAllByRole("listitem");
+    expect(within(after[Math.min(index, after.length - 1)]).getByRole("button")).toHaveFocus();
   });
 
   it("shows an empty state when every account is healthy", async () => {

@@ -52,9 +52,10 @@ const PHONE_GAP = 12;
 
 /**
  * Whether the actions sit under the description on a phone: when their buttons (8 px apart) and
- * the gap leave the title less than 12rem. Measured before paint and again on every resize.
+ * the gap leave the title less than 12rem. Measured before paint and again on every resize, and
+ * again when the actions mount later (a page whose actions appear once it has data).
  */
-function usePhoneActionsWrap(): {
+function usePhoneActionsWrap(hasActions: boolean): {
   headerRef: RefObject<HTMLDivElement | null>;
   actionsRef: RefObject<HTMLDivElement | null>;
   wrapped: boolean;
@@ -66,7 +67,7 @@ function usePhoneActionsWrap(): {
   useLayoutEffect(() => {
     const header = headerRef.current;
     const actions = actionsRef.current;
-    if (!header || !actions || typeof ResizeObserver === "undefined") return;
+    if (!(hasActions && header && actions) || typeof ResizeObserver === "undefined") return;
     const measure = (): void => {
       const items = Array.from(actions.children) as HTMLElement[];
       const width =
@@ -80,7 +81,7 @@ function usePhoneActionsWrap(): {
     observer.observe(actions);
     for (const item of Array.from(actions.children)) observer.observe(item);
     return () => observer.disconnect();
-  }, []);
+  }, [hasActions]);
 
   return { headerRef, actionsRef, wrapped };
 }
@@ -100,7 +101,7 @@ export function PageHeaderLayout({
   actions?: ReactNode;
   busy?: boolean;
 }): JSX.Element {
-  const { headerRef, actionsRef, wrapped } = usePhoneActionsWrap();
+  const { headerRef, actionsRef, wrapped } = usePhoneActionsWrap(Boolean(actions));
   return (
     <div
       aria-busy={busy || undefined}

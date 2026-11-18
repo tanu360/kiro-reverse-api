@@ -95,6 +95,19 @@ describe("StatCard", () => {
     expect(screen.getByText("\u221220%").className).toMatch(/success/);
   });
 
+  it("keeps a change that rounds to 0% neutral", () => {
+    renderWithProviders(
+      <StatTile
+        delta={{ value: -0.0004, label: "vs previous hour" }}
+        icon={UsersIcon}
+        label="Success"
+        value="900"
+      />,
+    );
+    const delta = screen.getByText("0%").closest('[data-slot="stat-delta"]');
+    expect(delta).toHaveAttribute("data-tone", "neutral");
+  });
+
   it("renders the skeleton while loading", () => {
     const { container } = renderWithProviders(
       <StatTile icon={UsersIcon} label="Accounts" loading value="8" />,

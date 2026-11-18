@@ -277,7 +277,8 @@ export default function TrafficChart({
       ))}
       {hasPrevious ? <Bar animate={false} dataKey="headroom" fill="transparent" /> : null}
       {hasPrevious && !empty ? <TrendLine dataKey="previous" /> : null}
-      <BarXAxis maxLabels={maxLabels} />
+      {/* No date pill (showDatePill={false} below), so nothing should clear room under the pointer. */}
+      <BarXAxis maxLabels={maxLabels} tickerHalfWidth={0} />
       {/* An empty chart has nothing to inspect: no tooltip over its empty state. */}
       {empty ? null : (
         <ChartTooltip

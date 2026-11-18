@@ -22,9 +22,10 @@ import { AccountDetailSheet } from "@/features/accounts/account-detail-sheet";
 import { AccountRowActions } from "@/features/accounts/account-row-actions";
 import { ReloginHost } from "@/features/accounts/relogin-host";
 import { TestAccountDialog } from "@/features/accounts/test-account-dialog";
+import { whenText } from "@/features/requests/request-cells";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { Account } from "@/lib/api/types";
-import { EMPTY, formatNumber, formatTime } from "@/lib/format";
+import { EMPTY, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useDialogTarget } from "./needs-attention";
@@ -120,13 +121,16 @@ function SuccessCell({ account }: { account: Account }): JSX.Element {
   );
 }
 
-/** The clock time of the last request over how long ago it was; a dash when never used. */
+/**
+ * The clock time of the last request (its date when not today) over how long ago it was; a dash
+ * when never used.
+ */
 function LastUsedCell({ account }: { account: Account }): JSX.Element {
   const { lang } = useT();
   if (!account.lastUsed) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
     <div className="flex flex-col gap-1">
-      <span className="tabular-nums">{formatTime(account.lastUsed, lang)}</span>
+      <span className="tabular-nums">{whenText(account.lastUsed, lang)}</span>
       <RelativeTime className="text-meta text-muted-foreground" value={account.lastUsed} />
     </div>
   );

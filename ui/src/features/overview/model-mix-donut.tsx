@@ -45,10 +45,16 @@ export default function ModelMixDonut({
    */
   innerRadius?: number;
 }): JSX.Element {
-  const data = useMemo(
-    () => slices.map((slice) => ({ label: slice.label, value: slice.value, color: slice.color })),
-    [slices],
-  );
+  const data = useMemo(() => {
+    // Labels repeat (every deleted account reads "Deleted account"): a repeat's key counts it.
+    const seen = new Map<string, number>();
+    return slices.map((slice) => {
+      const count = (seen.get(slice.label) ?? 0) + 1;
+      seen.set(slice.label, count);
+      const key = count === 1 ? slice.label : `${slice.label}#${count}`;
+      return { label: slice.label, value: slice.value, color: slice.color, key };
+    });
+  }, [slices]);
   const total = useMemo(() => slices.reduce((sum, slice) => sum + slice.value, 0), [slices]);
   return (
     <PieChart
@@ -65,12 +71,7 @@ export default function ModelMixDonut({
       padAngle={0.03}
     >
       {data.map((slice, index) => (
-        <PieSlice
-          animate={!reducedMotion}
-          hoverEffect="translate"
-          index={index}
-          key={slice.label}
-        />
+        <PieSlice animate={!reducedMotion} hoverEffect="translate" index={index} key={slice.key} />
       ))}
       <PieCenter
         defaultLabel={centerLabel}

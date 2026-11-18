@@ -1,11 +1,13 @@
 import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copyText } from "@/lib/clipboard";
+import { copiedToastWanted } from "@/lib/copy-toast";
 import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
 import { CopyButton } from "./copy-button";
 
 vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn() }));
+vi.mock("@/lib/copy-toast", () => ({ copiedToastWanted: vi.fn(() => true) }));
 vi.mock("@/lib/toast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
@@ -64,6 +66,19 @@ describe("CopyButton", () => {
     expect(button).toHaveClass("h-7", "sm:h-8");
     await user.click(button);
     await waitFor(() => expect(button).toHaveAttribute("data-copied"));
+  });
+
+  it("says the copy to screen readers when no toast does (a phone)", async () => {
+    copyTextMock.mockResolvedValue(true);
+    vi.mocked(copiedToastWanted).mockReturnValueOnce(false);
+    vi.mocked(toast.success).mockClear();
+    const { user } = renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await user.click(screen.getByRole("button", { name: "Copy key" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Copied to clipboard"),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("reports a failed copy", async () => {

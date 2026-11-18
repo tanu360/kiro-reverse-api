@@ -10,7 +10,7 @@ import {
 } from "./responsive-chart-label-count";
 
 interface BarXAxisProps {
-  /** Width of the date ticker box for fade calculation. Default: 50 */
+  /** Width of the date ticker box for fade calculation; 0 (no date pill) keeps every label. Default: 50 */
   tickerHalfWidth?: number;
   /** Whether to show all labels or skip some for dense data. Default: false */
   showAllLabels?: boolean;
@@ -45,7 +45,7 @@ function BarXAxisLabel({
   const fadeRadius = tickerHalfWidth + fadeBuffer;
 
   let opacity = 1;
-  if (isHovering && crosshairX !== null) {
+  if (isHovering && crosshairX !== null && tickerHalfWidth > 0) {
     const distance = Math.abs(x - crosshairX);
     if (distance < tickerHalfWidth) {
       opacity = 0;
