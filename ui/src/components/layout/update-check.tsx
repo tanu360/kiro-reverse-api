@@ -76,6 +76,8 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
   const resultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const busyRef = useRef(false);
+  // A manual check can outlive the shell (a sign-out while it runs): its answer is dropped then.
+  const mountedRef = useRef(false);
   const openDialog = useCallback(() => setDialogOpen(true), []);
   const tRef = useRef(t);
   tRef.current = t;
@@ -139,12 +141,13 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
     }, CHECK_RESULT_MS);
   }, []);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       if (resultTimer.current) clearTimeout(resultTimer.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   const checkNow = useCallback(
     (onNewer?: () => void) => {
@@ -155,6 +158,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
       lookUp()
         .then(
           ({ newer }) => {
+            if (!mountedRef.current) return;
             if (newer) {
               onNewer?.();
               openDialog();
@@ -164,6 +168,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
             announce(tRef.current("shell.update.upToDate"));
           },
           () => {
+            if (!mountedRef.current) return;
             showResult("failed");
             announce(
               `${tRef.current("shell.update.checkFailed")} ${tRef.current("shell.update.checkFailedDetail")}`,

@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { act, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { subscribeAnnouncements } from "@/lib/announce";
 import { fetchReleaseReady, fetchRemoteVersion } from "@/lib/api/system";
 import { renderWithProviders } from "@/test/render";
 import { CHECK_RESULT_MS, SILENT_CHECK_DELAY_MS, UpdateCheckProvider } from "./update-check";
@@ -242,6 +243,30 @@ describe("UserMenu manual check", () => {
     ).not.toHaveAttribute("aria-busy");
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("");
+  });
+
+  it("drops the answer of a check that outlives the shell", async () => {
+    let answer: (value: { version: string }) => void = () => {};
+    fetchRemote.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const heard: string[] = [];
+    const stop = subscribeAnnouncements(({ text }) => heard.push(text));
+    const { user, unmount } = renderMenu();
+    await screen.findByText("2.1.0");
+    await user.click(screen.getByRole("button", { name: /^Admin menu/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Check for updates" }));
+    // Signed out while it runs: the shell goes, then GitHub answers.
+    unmount();
+    await act(async () => {
+      answer({ version: "2.1.0" });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    stop();
+    expect(heard).toEqual([]);
   });
 
   it("closes the menu and opens the update dialog when the check finds a release", async () => {
