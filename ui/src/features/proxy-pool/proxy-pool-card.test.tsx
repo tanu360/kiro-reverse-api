@@ -54,7 +54,7 @@ afterEach(() => {
   mockServer.events.removeListener("request:start", onRequestStart);
 });
 
-/** Read out by the app's live region, in place of a success toast. */
+/** Read out by the app's live region. */
 async function expectAnnounced(text: string): Promise<void> {
   const line = await screen.findByText(text);
   expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();

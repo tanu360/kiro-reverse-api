@@ -86,9 +86,9 @@ const SAVED_CLOSE_MS = 700;
  * field starts empty, an empty field keeps it, and Remove the saved password drops it. A full
  * proxy URL pasted into Host fills every field.
  *
- * No toasts: Save spins, reads "Saved" for a moment (`onSaved` meanwhile updates the list behind
- * it), then the dialog closes (`onClose`) and a screen reader hears it. A server error shows in
- * the dialog, over its buttons; Save is the retry.
+ * Save spins, reads "Saved" for a moment (`onSaved` meanwhile updates the list behind it), then
+ * the dialog closes (`onClose`) and a screen reader hears it. A server error shows in the dialog,
+ * over its buttons; Save is the retry.
  */
 export function ProxyEditor({
   proxy,
