@@ -19,15 +19,24 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
+import { assignedProxy, proxyName, routesThroughPool } from "@/features/proxy-pool/lib/pool-model";
 import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
+import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
+import { proxyQuery } from "@/lib/api/settings";
 import type { Account, TestAccountResponse } from "@/lib/api/types";
-import { EMPTY, formatClockTime, formatCreditsExact, formatDecimal } from "@/lib/format";
+import {
+  EMPTY,
+  formatClockTime,
+  formatCreditsExact,
+  formatDecimal,
+  formatNumber,
+} from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
-import { authLabel, planLabel } from "./account-model";
+import { authLabel, planLabel, proxyDisplayUrl } from "./account-model";
 import { TestModelPicker } from "./test-model-picker";
 
 /** The old UI's fallback when nothing is cached (the server's own default differs). */
@@ -357,6 +366,26 @@ function Inspector({
 }
 
 /**
+ * The proxy a test goes through, as the details' Proxy row reads it: the account's own (without
+ * its password), its pool proxy while the pool is on, else the global proxy, or Direct.
+ */
+function useTestProxy(account: Account): string {
+  const { t } = useT("accounts");
+  const { t: tp } = useT("proxy-pool");
+  const maskText = useMaskText();
+  const own = account.proxyURL;
+  // The pool and the global proxy are read only when the account has none of its own.
+  const global = useQuery({ ...proxyQuery(), enabled: !own }).data;
+  const pool = useQuery({ ...proxyPoolQuery(), enabled: !own }).data;
+  if (own) return proxyDisplayUrl(own);
+  if (routesThroughPool(pool)) {
+    const proxy = assignedProxy(pool, account.id);
+    return proxy ? maskText(proxyName(proxy)) : tp("account.pool");
+  }
+  return global !== undefined && !global.proxyURL ? t("detail.proxyDirect") : t("test.globalProxy");
+}
+
+/**
  * Sends a real "say ok" request through one account for each picked model, a few at a time, and
  * lists every model's outcome. Tapping a row opens its response and steps. Spends credits per
  * model.
@@ -412,7 +441,7 @@ export function TestAccountDialog({
   const openModel = expanded !== null && rows.includes(expanded) ? expanded : null;
 
   const email = displayEmail(account.email, account.id);
-  const proxy = account.proxyURL || t("test.globalProxy");
+  const proxy = useTestProxy(account);
 
   const setChecked = (model: string, checked: boolean) => {
     setPicked((current) => {
@@ -468,10 +497,10 @@ export function TestAccountDialog({
         "info",
         t("testLog.details", {
           stopReason: result.stopReason || t("testLog.noStopReason"),
-          input: result.inputTokens,
-          output: result.outputTokens,
-          credits: result.credits,
-          context: formatDecimal(Number(result.contextUsage), 1),
+          input: formatNumber(result.inputTokens, lang),
+          output: formatNumber(result.outputTokens, lang),
+          credits: formatCreditsExact(result.credits, lang),
+          context: formatDecimal(Number(result.contextUsage), 1, lang),
         }),
       );
       if (!result.stopReason) append(model, "warn", t("testLog.noStopReasonHint"));
@@ -528,7 +557,12 @@ export function TestAccountDialog({
 
   return (
     <ResponsiveDialog
-      description={`${email} · ${planLabel(account, t)} · ${authLabel(account, t)} · ${proxy}`}
+      // A long email or proxy URL breaks anywhere instead of running past a phone-width panel.
+      description={
+        <span className="wrap-anywhere">
+          {`${email} · ${planLabel(account, t)} · ${authLabel(account, t)} · ${proxy}`}
+        </span>
+      }
       footer={
         <Button onClick={() => onOpenChange(false)} variant="ghost">
           {tc("actions.close")}

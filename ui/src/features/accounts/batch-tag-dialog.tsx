@@ -1,4 +1,13 @@
-import { type FormEvent, type JSX, useCallback, useId, useMemo, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  type FormEvent,
+  type JSX,
+  useCallback,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,6 +59,7 @@ export function BatchTagDialog({
   ids,
   accounts,
   onDone,
+  finalFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -59,6 +69,8 @@ export function BatchTagDialog({
   accounts: Account[];
   /** After a request lands: the page closes the dialog and clears the selection. */
   onDone: () => void;
+  /** Where focus goes on close; the opener is gone once `onDone` clears the selection. */
+  finalFocus?: ComponentProps<typeof ResponsiveDialog>["finalFocus"];
 }): JSX.Element {
   const { t } = useT("accounts");
   const formId = useId();
@@ -88,6 +100,16 @@ export function BatchTagDialog({
   const [picked, setPicked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<BatchTagAction | null>(null);
+  // Every opening starts with an empty field: a draft or error left by Escape does not come back.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setDraft("");
+      setPicked(null);
+      setError(null);
+    }
+  }
   const inUse = useMemo(() => tagsInUse(accounts), [accounts]);
   const shown = picked !== null && draft === picked ? mask(picked) : draft;
 
@@ -161,6 +183,7 @@ export function BatchTagDialog({
     <ResponsiveDialog
       description={t("metadata.batchTagsDescription")}
       dismissible={running === null}
+      finalFocus={finalFocus}
       footer={
         <>
           <Button

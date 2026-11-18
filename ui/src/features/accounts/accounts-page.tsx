@@ -8,7 +8,15 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { type JSX, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  type JSX,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -82,6 +90,18 @@ function useClockAt(tick: number): number {
   return next.nowSec;
 }
 
+/** The list's shown, enabled select-all checkbox (the table header's or the cards' row), if any. */
+function shownSelectAll(root: HTMLElement | null): HTMLElement | null {
+  const boxes = root?.querySelectorAll<HTMLElement>(
+    '[data-slot="data-table"] thead [data-slot="checkbox"]:not([data-disabled]), [data-slot="data-table-select-all"] [data-slot="checkbox"]',
+  );
+  return (
+    [...(boxes ?? [])].find(
+      (box) => typeof box.checkVisibility !== "function" || box.checkVisibility(),
+    ) ?? null
+  );
+}
+
 export function AccountsPage(): JSX.Element {
   const { t } = useT("accounts");
   const { t: tc } = useT();
@@ -107,6 +127,17 @@ export function AccountsPage(): JSX.Element {
   const [detail, openDetail, closeDetail] = useDialogTarget();
   const [test, openTest, closeTest] = useDialogTarget();
   const [relogin, openRelogin, closeRelogin] = useDialogTarget();
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  // The batch bar unmounts with the selection, so focus in it (or already dropped to <body>)
+  // moves to the select-all checkbox first instead of falling to <body>.
+  const clearSelection = () => {
+    const active = document.activeElement;
+    if (!active || active === document.body || active.closest('[data-slot="batch-bar"]')) {
+      shownSelectAll(listRef.current)?.focus();
+    }
+    setSelected(new Set());
+  };
 
   // Drop selected ids that are gone after a refetch. The selection survives filter changes.
   useEffect(() => {
@@ -389,7 +420,7 @@ export function AccountsPage(): JSX.Element {
         title={t("title")}
       />
 
-      <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4" ref={listRef}>
         {noAccounts ? null : <DuplicatesNotice />}
         {/* The accounts container lets the toolbar give the search its own row on narrow cards. */}
         <DataTableCard className="@container/accounts" toolbar={toolbar}>
@@ -420,7 +451,7 @@ export function AccountsPage(): JSX.Element {
         {selected.size > 0 ? (
           <BatchBar
             accounts={accounts}
-            onClear={() => setSelected(new Set())}
+            onClear={clearSelection}
             onExport={() => onExport([...selected])}
             onTags={() => setTagState({ open: true, ids: [...selected] })}
             selectedIds={[...selected]}
@@ -457,6 +488,12 @@ export function AccountsPage(): JSX.Element {
       <BatchTagDialog
         accounts={accounts}
         ids={tagState.ids}
+        // Once a run clears the selection the Tags button that opened it is gone with the bar.
+        finalFocus={() =>
+          listRef.current?.querySelector('[data-slot="batch-bar"]')
+            ? true
+            : (shownSelectAll(listRef.current) ?? true)
+        }
         onDone={() => {
           setTagState((current) => ({ ...current, open: false }));
           setSelected(new Set());

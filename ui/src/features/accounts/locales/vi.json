@@ -263,7 +263,7 @@
   "duplicates.reason.email": "cùng email với cùng phương thức đăng nhập",
   "duplicates.suggested": "Nên giữ",
   "duplicates.refreshed": "Đã làm mới token {time}",
-  "duplicates.requests_other": "{count} yêu cầu",
+  "duplicates.requests_other": "{n} yêu cầu",
   "duplicates.merge": "Gộp",
   "duplicates.mergeCount_other": "Gộp {count} bản trùng",
   "duplicates.mergeSuccess_other": "Đã gộp các tài khoản trùng lặp và xóa {count} bản trùng thừa. Bản sao lưu đã được lưu trước.",

@@ -25,6 +25,8 @@ export function IamFlow(): JSX.Element {
   const [region, setRegion] = useState(() => reloginRegion(relogin.target));
   const [callbackUrl, setCallbackUrl] = useState("");
   const [authorizeUrl, setAuthorizeUrl] = useState("");
+  // The region the login started in, as sent: an empty field means us-east-1.
+  const [startedRegion, setStartedRegion] = useState("");
   const [errors, setErrors] = useState<{ startUrl?: string; region?: string; callback?: string }>(
     {},
   );
@@ -56,6 +58,7 @@ export function IamFlow(): JSX.Element {
       });
       if (!sessions.isCurrent(generation)) return;
       sessions.iamSession = res.sessionId;
+      setStartedRegion(parsed.region);
       setAuthorizeUrl(res.authorizeUrl);
       focusAfter(stepFocus(formId, callbackRef));
     } catch (error) {
@@ -121,7 +124,7 @@ export function IamFlow(): JSX.Element {
           {/* The start URL and region are fixed once the login starts; one line recalls them. */}
           <FlowNote>
             <TruncatedText>
-              {t("iam.summary", { url: startUrl.trim(), region: region.trim() })}
+              {t("iam.summary", { url: startUrl.trim(), region: startedRegion })}
             </TruncatedText>
           </FlowNote>
           <FlowSteps

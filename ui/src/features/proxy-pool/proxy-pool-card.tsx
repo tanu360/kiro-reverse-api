@@ -334,7 +334,8 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       <SwitchField
         checked={on}
         description={empty && !on ? t("card.modeNeedsProxy") : t("card.modeHint")}
-        disabled={empty && !on}
+        // One settings save at a time: a change made while one is saving would be dropped.
+        disabled={(empty && !on) || settings.isPending}
         onCheckedChange={(checked) => saveSettings({ mode: checked ? "on" : "off" })}
         title={t("card.modeTitle")}
       >
@@ -348,12 +349,14 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       <SwitchField
         checked={fallback}
         description={t("card.fallbackHint")}
+        disabled={settings.isPending}
         onCheckedChange={(directFallback) => saveSettings({ directFallback })}
         title={t("card.fallbackTitle")}
       />
       <SettingsRow
         control={
           <IntervalSelect
+            disabled={settings.isPending}
             onChange={(checkIntervalMin) => saveSettings({ checkIntervalMin })}
             value={interval}
           />

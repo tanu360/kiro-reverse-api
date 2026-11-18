@@ -263,7 +263,7 @@
   "duplicates.reason.email": "相同的邮箱及登录方式",
   "duplicates.suggested": "建议保留",
   "duplicates.refreshed": "Token 刷新于 {time}",
-  "duplicates.requests_other": "{count} 次请求",
+  "duplicates.requests_other": "{n} 次请求",
   "duplicates.merge": "合并",
   "duplicates.mergeCount_other": "合并 {count} 个副本",
   "duplicates.mergeSuccess_other": "已合并重复账号，删除了 {count} 个多余副本。合并前已保存备份。",

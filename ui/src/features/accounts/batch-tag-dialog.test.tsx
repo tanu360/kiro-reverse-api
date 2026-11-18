@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
@@ -31,6 +32,25 @@ function renderDialog(ids: string[]) {
     { privacy: true },
   );
   return { ...view, onDone };
+}
+
+/** The dialog with an Open button, to close it and open it again. */
+function ReopenHarness() {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} type="button">
+        Open
+      </button>
+      <BatchTagDialog
+        accounts={mockDb.accounts}
+        ids={[mockDb.accounts[0].id]}
+        onDone={() => {}}
+        onOpenChange={setOpen}
+        open={open}
+      />
+    </>
+  );
 }
 
 describe("BatchTagDialog", () => {
@@ -146,6 +166,21 @@ describe("BatchTagDialog", () => {
     expect(await within(dialog).findByText("Enter one tag at a time.")).toBeInTheDocument();
     expect(bodies).toEqual([]);
     expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("opens again with an empty field after an Escape", async () => {
+    const { user } = renderWithProviders(<ReopenHarness />);
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox", { name: "Tag" }), "a, b");
+    await user.click(within(dialog).getByRole("button", { name: "Add tag" }));
+    expect(await within(dialog).findByText("Enter one tag at a time.")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    const reopened = await screen.findByRole("dialog");
+    expect(within(reopened).getByRole("textbox", { name: "Tag" })).toHaveValue("");
+    expect(within(reopened).queryByText("Enter one tag at a time.")).not.toBeInTheDocument();
   });
 
   it("keeps the dialog open when the request fails", async () => {

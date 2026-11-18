@@ -181,7 +181,8 @@ export function AddAccountDialog({
         <DialogHeader>
           <DialogTitle>{relogin ? t("relogin.title") : t("title")}</DialogTitle>
           {relogin ? (
-            <DialogDescription>
+            // A long email breaks anywhere instead of running past a phone-width dialog.
+            <DialogDescription className="wrap-anywhere">
               {t("relogin.target", { name: display(relogin.email, relogin.id) })}
             </DialogDescription>
           ) : (

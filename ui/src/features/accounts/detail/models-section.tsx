@@ -12,13 +12,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { getAccountModels, refreshAccountModels } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
+import { numberFormat } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { modelRate, sortModels } from "../account-model";
 
 /** Live model list (GET /models updates the server cache) and a route-cache refresh. */
 export function ModelsSection({ accountId }: { accountId: string }): JSX.Element {
-  const { t } = useT("accounts");
+  const { t, lang } = useT("accounts");
 
   const load = useMutation({
     mutationFn: () => getAccountModels(accountId),
@@ -100,7 +101,9 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
               <ListCard
                 badge={
                   <Badge size="sm" tone="neutral">
-                    {t("detail.creditMultiplier", { ratio: modelRate(model) })}
+                    {t("detail.creditMultiplier", {
+                      ratio: numberFormat(lang).format(modelRate(model)),
+                    })}
                   </Badge>
                 }
                 key={model.modelId}

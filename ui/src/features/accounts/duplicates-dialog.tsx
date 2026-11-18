@@ -17,7 +17,7 @@ import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { type DuplicateAccount, type DuplicateGroup, mergeDuplicates } from "@/lib/api/duplicates";
 import { queryKeys } from "@/lib/api/query-keys";
-import { formatList, formatRelativeTime } from "@/lib/format";
+import { formatList, formatNumber, formatRelativeTime } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
@@ -100,7 +100,10 @@ function DuplicateChoice({
     account.lastRefresh > 0
       ? t("duplicates.refreshed", { time: formatRelativeTime(account.lastRefresh, lang) })
       : "",
-    t("duplicates.requests", { count: account.requestCount }),
+    t("duplicates.requests", {
+      count: account.requestCount,
+      n: formatNumber(account.requestCount, lang),
+    }),
   ]
     .filter(Boolean)
     .join(" · ");

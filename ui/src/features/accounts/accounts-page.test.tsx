@@ -346,6 +346,15 @@ describe("AccountsPage layout", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
+  it("moves focus to Select all when Clear selection removes the batch bar", async () => {
+    const { table, user } = await renderAccounts();
+    await user.click(within(bodyRows(table)[0]).getByRole("checkbox"));
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    await user.click(within(bar).getByRole("button", { name: "Clear selection" }));
+    await waitFor(() => expect(screen.queryByRole("toolbar")).not.toBeInTheDocument());
+    expect(document.activeElement).toHaveAttribute("aria-label", "Select all");
+  });
+
   it("puts the batch toolbar after the list, sticky, with a menu for the rest on phones", async () => {
     mockViewport(390);
     const bodies = captureBodies("post", "/accounts/batch");

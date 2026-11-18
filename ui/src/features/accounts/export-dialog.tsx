@@ -23,6 +23,7 @@ import type { Account, ExportData } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
 import { copiedToastWanted } from "@/lib/copy-toast";
 import { saveJson } from "@/lib/download";
+import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
@@ -129,7 +130,7 @@ export const ExportDialog = memo(function ExportDialog({
   /** The ids checked when the dialog opens (the list's selection); every account without it. */
   initialSelection?: readonly string[];
 }): JSX.Element {
-  const { t } = useT("accounts");
+  const { t, lang } = useT("accounts");
   const { t: tc } = useT();
   const jsonId = useId();
   const selectAllId = useId();
@@ -451,7 +452,7 @@ export const ExportDialog = memo(function ExportDialog({
                           ? "filter.attention"
                           : `health.${group}`,
                     )}
-                    <span className="tabular-nums opacity-70">{count}</span>
+                    <span className="tabular-nums opacity-70">{formatNumber(count, lang)}</span>
                   </button>
                 );
               })}

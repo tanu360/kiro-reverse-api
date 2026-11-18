@@ -263,7 +263,7 @@
   "duplicates.reason.email": "同じメールアドレスと同じサインイン方法",
   "duplicates.suggested": "推奨",
   "duplicates.refreshed": "トークン更新：{time}",
-  "duplicates.requests_other": "{count} 件のリクエスト",
+  "duplicates.requests_other": "{n} 件のリクエスト",
   "duplicates.merge": "統合",
   "duplicates.mergeCount_other": "{count} 件のコピーを統合",
   "duplicates.mergeSuccess_other": "重複を統合し、余分なコピー {count} 件を削除しました。事前にバックアップを保存しています。",
