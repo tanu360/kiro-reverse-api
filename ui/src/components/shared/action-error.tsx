@@ -41,7 +41,7 @@ export function ActionError({
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per new failure.
   useEffect(() => {
     ref.current?.scrollIntoView?.({ block: "nearest" });
-  }, [error]);
+  }, [error, message]);
 
   return (
     <Alert
