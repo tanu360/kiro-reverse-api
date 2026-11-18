@@ -18,6 +18,7 @@ import {
   type AccountFailure,
   AccountFailureNotice,
   AccountFailureProvider,
+  useAccountFailurePlace,
 } from "./account-failure";
 import { isApiKeyAccount, isHeld, supportsKiroProfiles } from "./account-model";
 import { AccountSheetActions } from "./account-row-actions";
@@ -75,6 +76,16 @@ export function AccountDetailSheet({
   // A failed action of the sheet's own (Refresh token, the switch, Copy JSON, Delete), said under
   // those actions in place of a toast.
   const [failure, setFailure] = useState<AccountFailure | null>(null);
+  // The sheet's actions are the page's next actions too: as one starts, the page's notice under
+  // the sheet goes as well (it may be this account's failure, out of date once this succeeds).
+  const parent = useAccountFailurePlace();
+  const report = useCallback(
+    (next: AccountFailure | null) => {
+      if (!next) parent?.report(null);
+      setFailure(next);
+    },
+    [parent],
+  );
   const showProfile =
     account !== undefined &&
     !isApiKeyAccount(account) &&
@@ -82,7 +93,7 @@ export function AccountDetailSheet({
 
   return (
     <ReloginProvider onRelogin={openRelogin}>
-      <AccountFailureProvider fallbackFocus={NO_FALLBACK} report={setFailure}>
+      <AccountFailureProvider fallbackFocus={NO_FALLBACK} report={report}>
         <ResponsiveSheet onOpenChange={onOpenChange} open={open && account !== undefined}>
           <ResponsiveSheetHeader className={account ? "gap-4" : undefined}>
             {account ? (

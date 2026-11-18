@@ -472,6 +472,49 @@ describe("AccountsPage layout", () => {
     expect(refresh).toHaveFocus();
   });
 
+  it("drops a row's failure in the card once its account is gone", async () => {
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/refresh"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { table, user, queryClient } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    await user.click(within(row).getByRole("button", { name: "Refresh token" }));
+    expect(await cardNotice()).toHaveTextContent("boom");
+    // Deleted elsewhere (another tab, a merge): the next fetch no longer lists it.
+    mockDb.accounts.splice(
+      mockDb.accounts.findIndex((account) => account.email === DANA),
+      1,
+    );
+    await queryClient.invalidateQueries();
+    await waitFor(() => expect(within(table).queryByText(DANA_MASKED)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("drops the card's failure once the account's sheet acts again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/refresh"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { table, user } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    await user.click(within(row).getByRole("button", { name: "Refresh token" }));
+    expect(await cardNotice()).toHaveTextContent("boom");
+
+    fail = false;
+    await user.click(within(row).getAllByRole("cell")[2]);
+    const sheet = await screen.findByRole("dialog", { name: DANA_MASKED });
+    await user.click(within(sheet).getByRole("button", { name: "Refresh token" }));
+    await expectAnnounced("The token was refreshed.");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // The refresh went through: the card no longer says it failed.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("spins the row menu while an account is deleted and says it once gone", async () => {
     let release: () => void = () => {};
     mockServer.use(

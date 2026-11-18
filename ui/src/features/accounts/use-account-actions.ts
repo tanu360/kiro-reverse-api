@@ -34,8 +34,8 @@ export function useInvalidateAccounts(): (options?: { withStatus?: boolean }) =>
 
 /**
  * No toasts: an action's failure goes to the place that shows them (the accounts card, the
- * detail sheet), cleared as the next action starts. Outside such a place (an Overview row) a
- * screen reader hears `spoken`, and the caller shows the mutation's error itself.
+ * detail sheet, Needs attention), cleared as the next action starts. Outside such a place only a
+ * screen reader hears it (`spoken`).
  */
 function useFailures() {
   const place = useAccountFailurePlace();
@@ -73,7 +73,7 @@ export function useToggleEnabled(account: Account, target?: Target) {
     onError: (error, enabled) => {
       setEnabled(!enabled);
       failures.fail(
-        { error, retry: () => mutation.mutate(enabled), target },
+        { error, retry: () => mutation.mutate(enabled), target, accountId: account.id },
         errorMessage(error, t),
       );
     },
@@ -99,7 +99,7 @@ export function useRefreshAccount(accountId: string, target?: Target) {
     },
     onError: (error) => {
       failures.fail(
-        { error, retry: () => mutation.mutate(), target },
+        { error, retry: () => mutation.mutate(), target, accountId },
         t("refreshFailed", { reason: errorMessage(error, t) }),
       );
     },
@@ -147,6 +147,7 @@ export function useCopyAccountJson(target?: Target): {
           message: failure ? undefined : t("copyJsonFailed"),
           retry: () => void copy(accountId),
           target,
+          accountId,
         },
         failure ? errorMessage(failure, t) : t("copyJsonFailed"),
       );
@@ -186,7 +187,7 @@ export function useDeleteAccount(target?: Target): {
     onSuccess: () => announce(t("deleteSuccess")),
     onError: (error, account) => {
       failures.fail(
-        { error, retry: () => mutation.mutate(account), target },
+        { error, retry: () => mutation.mutate(account), target, accountId: account.id },
         errorMessage(error, t),
       );
     },

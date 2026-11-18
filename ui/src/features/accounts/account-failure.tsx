@@ -3,7 +3,8 @@ import { ActionError } from "@/components/shared/action-error";
 
 /**
  * A failed account action (a row's, the detail sheet's, a batch's), said in one place in place of
- * a toast: the top of the accounts card on the list page, the top of the detail sheet.
+ * a toast: the top of the accounts card on the list page, the top of the detail sheet, above the
+ * Overview's Needs attention list.
  */
 export interface AccountFailure {
   /** The failed request's error: its reason is the line. */
@@ -14,6 +15,8 @@ export interface AccountFailure {
   retry?: () => void;
   /** The control the action came from: focus goes there as the notice goes. */
   target?: () => HTMLElement | null | undefined;
+  /** The account a row's action ran on: the notice goes once the account is gone. */
+  accountId?: string;
 }
 
 export type ReportAccountFailure = (failure: AccountFailure | null) => void;
@@ -53,7 +56,7 @@ function isShown(element: HTMLElement): boolean {
 }
 
 /** Focuses the action's own control while it is shown, else the place's fallback. */
-export function focusFailureTarget(
+function focusFailureTarget(
   failure: AccountFailure,
   fallbackFocus: () => HTMLElement | null | undefined,
 ): void {

@@ -180,6 +180,13 @@ export function AccountsPage(): JSX.Element {
     });
   }, [query.data]);
 
+  // A row's failure goes with its account (deleted in its sheet, merged away): its Try again
+  // would only find the account gone.
+  useEffect(() => {
+    const id = failure?.accountId;
+    if (id && query.data && !query.data.some((account) => account.id === id)) setFailure(null);
+  }, [failure, query.data]);
+
   // Filter, sort and page all live in the URL, so a reload or a shared link keeps the view.
   const { q, status, plan, auth, region, enabled, tag } = search;
   const filters = useMemo<AccountFilters>(
