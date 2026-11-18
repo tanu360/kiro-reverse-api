@@ -1,5 +1,4 @@
 import { Alert02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   createContext,
   type JSX,
@@ -10,8 +9,7 @@ import {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
-import { NOTICE_LINE_CLASS } from "@/components/shared/notice-line";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { NoticeLine } from "@/components/shared/notice-line";
 import { Button } from "@/components/ui/button";
 import type { Account, AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -105,10 +103,9 @@ export function SavedWarning({ text }: { text: string }): JSX.Element {
 
   return (
     <>
-      <Alert className={NOTICE_LINE_CLASS} variant="warning">
-        <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-        <AlertDescription className="wrap-break-word">{text}</AlertDescription>
-      </Alert>
+      <NoticeLine icon={Alert02Icon} variant="warning">
+        {text}
+      </NoticeLine>
       {footer
         ? createPortal(
             <Button onClick={cancel} ref={closeRef}>
