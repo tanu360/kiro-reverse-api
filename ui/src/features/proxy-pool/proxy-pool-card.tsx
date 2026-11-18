@@ -179,10 +179,10 @@ function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet
  * The pool's settings save as they change (a switch or the interval), like the other system
  * switches; each proxy is added, edited, tested or removed on its own, at once.
  *
- * No toasts: a row shows its own result (its state, last check and error, the row going away),
- * its control spins meanwhile, a screen reader hears the result, and a failure shows at the top
- * of the card. Each row stays pending until the pool is read again, so nothing flips back for a
- * moment; a failure shows only then, so its Try again never runs beside the first try.
+ * A row shows its own result (its state, last check and error, the row going away), its control
+ * spins meanwhile, a screen reader hears the result, and a failure shows at the top of the card.
+ * Each row stays pending until the pool is read again, so nothing flips back for a moment; a
+ * failure shows only then, so its Try again never runs beside the first try.
  */
 function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const { t } = useT("proxy-pool");

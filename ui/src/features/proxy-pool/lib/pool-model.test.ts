@@ -14,7 +14,6 @@ import {
   proxyName,
   routesThroughPool,
   stateLook,
-  statusLook,
 } from "./pool-model";
 
 const t = (key: string, params?: TParams) => translate("en", "proxy-pool", key, params);
@@ -77,13 +76,7 @@ describe("stateLook and countChips", () => {
   });
 });
 
-describe("statusLook and proxyName", () => {
-  it("maps each status to a tone and a label", () => {
-    expect(statusLook("ok")).toEqual({ tone: "success", key: "proxy-pool:status.ok" });
-    expect(statusLook("failed").tone).toBe("destructive");
-    expect(statusLook("unknown").tone).toBe("neutral");
-  });
-
+describe("proxyName", () => {
   it("names a proxy by its label, else by its address", () => {
     expect(proxyName({ label: "Frankfurt", url: "http://a:1" })).toBe("Frankfurt");
     expect(proxyName({ label: "  ", url: "http://a:1" })).toBe("http://a:1");

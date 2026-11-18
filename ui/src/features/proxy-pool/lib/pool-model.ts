@@ -10,7 +10,6 @@ import type {
   PoolProxy,
   PoolProxyInput,
   PoolProxyState,
-  PoolProxyStatus,
   ProxyPoolCounts,
   ProxyPoolView,
 } from "@/lib/api/proxy-pool";
@@ -30,13 +29,6 @@ export function intervalOptions(current: number): number[] {
 }
 
 type Tone = "success" | "destructive" | "neutral" | "warning";
-
-/** The badge tone and label key of a health status. */
-export function statusLook(status: PoolProxyStatus): { tone: Tone; key: string } {
-  if (status === "ok") return { tone: "success", key: "proxy-pool:status.ok" };
-  if (status === "failed") return { tone: "destructive", key: "proxy-pool:status.failed" };
-  return { tone: "neutral", key: "proxy-pool:status.unknown" };
-}
 
 /** The badge tone and label key of a proxy's state. */
 export function stateLook(state: PoolProxyState): { tone: Tone; key: string } {

@@ -90,7 +90,7 @@ async function expectClosed(): Promise<void> {
   );
 }
 
-/** Read out by the app's live region (the result a toast used to show). */
+/** Read out by the app's live region. */
 async function expectAnnounced(text: string | RegExp): Promise<void> {
   const line = await screen.findByText(text);
   expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
@@ -179,8 +179,8 @@ describe("Builder ID", () => {
   });
 
   afterEach(() => {
-    // Fire the frames still queued on the fake clock first: Motion waits for one, and would
-    // stall every later animation in this file without it.
+    // Fire the frames still queued on the fake clock first: Motion (the animated icons) waits
+    // for one, and would stall every later animation in this file without it.
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
