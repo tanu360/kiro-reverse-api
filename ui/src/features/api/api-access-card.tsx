@@ -159,7 +159,6 @@ export function ApiAccessCard(): JSX.Element {
                 saveRef.current?.focus();
                 onSave();
               }}
-              title={t("access.saveFailed")}
             />
           ) : null}
         </SwitchField>

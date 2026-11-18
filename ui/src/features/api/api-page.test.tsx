@@ -92,13 +92,17 @@ function gate(): { wait: () => Promise<void>; release: () => void } {
   return { wait: () => opened, release: () => release() };
 }
 
-/** The card's notice for a failed action, found by its title. */
-async function actionError(title: string): Promise<HTMLElement> {
-  const notice = (await screen.findByText(title)).closest<HTMLElement>(
-    '[data-slot="action-error"]',
-  );
-  if (!notice) throw new Error(`no notice for ${title}`);
-  return notice;
+/** The notice for a failed action (one plain line with the server's reason). */
+async function actionError(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const notice = document.querySelector<HTMLElement>('[data-slot="action-error"]');
+    if (!notice) throw new Error("no failure notice");
+    return notice;
+  });
+}
+
+function noActionError(): void {
+  expect(document.querySelector('[data-slot="action-error"]')).toBeNull();
 }
 
 /** Said to a screen reader through the app's live region, not shown as a toast. */
@@ -305,13 +309,13 @@ describe("ApiPage", () => {
     const teamA = mockDb.apiKeys[0];
     await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Disable" }));
-    const notice = await actionError("Could not disable team-a");
+    const notice = await actionError();
     expect(within(row("team-a")).getByText("Enabled")).toBeInTheDocument();
     fail = false;
     await user.click(within(notice).getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(sent("PUT", `/api-keys/${teamA?.id}`)).toHaveLength(2));
     expect(await within(row("team-a")).findByText("Disabled")).toBeInTheDocument();
-    expect(screen.queryByText("Could not disable team-a")).not.toBeInTheDocument();
+    noActionError();
     // The notice is gone; focus is on the key's row menu, not the page.
     expect(document.activeElement).toHaveAccessibleName("Actions for team-a");
   });
@@ -327,10 +331,10 @@ describe("ApiPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("alertdialog");
     await user.click(within(confirm).getByRole("button", { name: "Delete" }));
-    const notice = await actionError("Could not delete team-a");
+    const notice = await actionError();
     expect(row("team-a")).toBeInTheDocument();
     await user.click(within(notice).getByRole("button", { name: "Close" }));
-    expect(screen.queryByText("Could not delete team-a")).not.toBeInTheDocument();
+    noActionError();
     expect(document.activeElement).toHaveAccessibleName("Actions for team-a");
   });
 
@@ -758,13 +762,13 @@ describe("ApiPage", () => {
     await screen.findByText("Any client can call the proxy");
     await user.click(screen.getByRole("switch", { name: "Require an API key" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
-    const notice = await actionError("Could not save API access");
+    const notice = await actionError();
     expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
     fail = false;
     await user.click(within(notice).getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(settingsPosts).toEqual([{ requireApiKey: true }]));
     expect(await screen.findByRole("button", { name: "Saved" })).toBeInTheDocument();
-    expect(screen.queryByText("Could not save API access")).not.toBeInTheDocument();
+    noActionError();
   });
 
   it("names a key card's limits and shows its last use as a live time", async () => {

@@ -569,14 +569,7 @@ function usePickLists(): void {
  * on a phone Save would just stop spinning with it out of sight). Save is the retry.
  */
 function ServerError({ form }: { form: KeyForm }): ReactNode {
-  const { t } = useT("api");
-  if (!form.error) return null;
-  return (
-    <ActionError
-      error={form.error}
-      title={form.editing ? t("form.saveFailed") : t("form.createFailed")}
-    />
-  );
+  return form.error ? <ActionError error={form.error} /> : null;
 }
 
 /*

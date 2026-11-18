@@ -1,7 +1,7 @@
 import { AlertCircleIcon, Refresh01Icon, XIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type JSX, useEffect, useRef } from "react";
-import { Alert, AlertAction, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -31,18 +31,16 @@ function NoticeIconButton({
 
 /**
  * A failed action, said where it was done (a card, a form), in place of an error toast: one
- * line with what failed and the server's reason, then Try again and close as bare icons, kept
- * beside the text on a phone too. Its alert role reads it out at once; each new failure scrolls
- * it into view.
+ * plain line with the server's reason (the place says what failed), then Try again and close as
+ * bare icons, kept beside the text on a phone too. Its alert role reads it out at once; each new
+ * failure scrolls it into view.
  */
 export function ActionError({
-  title,
   error,
   onRetry,
   onDismiss,
   className,
 }: {
-  title: string;
   error: unknown;
   /** Runs the same action again. */
   onRetry?: () => void;
@@ -63,14 +61,9 @@ export function ActionError({
   return (
     <Alert className={className} data-slot="action-error" ref={ref} variant="error">
       <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-      {/* One line, wrapping only when the width runs out: what failed · why. */}
-      <AlertTitle className="wrap-break-word self-center font-normal">
-        <span className="font-medium">{title}</span>
-        <span aria-hidden="true" className="px-1.5">
-          ·
-        </span>
-        <span>{errorMessage(error, t)}</span>
-      </AlertTitle>
+      <AlertDescription className="wrap-break-word self-center">
+        {errorMessage(error, t)}
+      </AlertDescription>
       {onRetry || onDismiss ? (
         <AlertAction className="-my-1 gap-0 self-center max-sm:col-start-3 max-sm:row-start-1 max-sm:mt-0">
           {onRetry ? (

@@ -267,16 +267,6 @@ export function ApiKeysCard(): JSX.Element {
     (shown ?? createRef.current)?.focus();
   };
 
-  const failureTitle = ({ action, apiKey }: KeyFailure): string => {
-    const name = keyName(apiKey, t, mask);
-    if (action === "toggle") {
-      return apiKey.enabled ? t("keys.disableFailed", { name }) : t("keys.enableFailed", { name });
-    }
-    if (action === "reset") return t("keys.resetFailed", { name });
-    if (action === "regenerate") return t("keys.regenerateFailed", { name });
-    return t("keys.deleteFailed", { name });
-  };
-
   // Try again runs the same action on the same key, without asking again: it was confirmed. The
   // notice goes, so focus moves to the key's row first.
   const retry = ({ action, apiKey }: KeyFailure) => {
@@ -615,7 +605,6 @@ export function ApiKeysCard(): JSX.Element {
             error={failure.error}
             onDismiss={() => dismissFailure(failure)}
             onRetry={() => retry(failure)}
-            title={failureTitle(failure)}
           />
         </CardPanel>
       ) : null}
