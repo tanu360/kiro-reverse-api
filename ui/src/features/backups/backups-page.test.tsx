@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { subscribeAnnouncements } from "@/lib/announce";
 import type { BackupEntry } from "@/lib/api/types";
 import { getSession, type SessionChangeReason, subscribeSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
@@ -10,7 +11,6 @@ import { mockDb } from "@/lib/mocks/db";
 import { makeBackupEntry } from "@/lib/mocks/fixtures";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
-import { toast } from "@/lib/toast";
 import { renderApp, renderWithProviders } from "@/test/render";
 import { BackupsPage } from "./backups-page";
 
@@ -70,16 +70,74 @@ async function renderPage() {
   return view;
 }
 
-/** The toast title element, so text elsewhere on the page with the same words never matches. */
-async function findToast(text: string): Promise<HTMLElement> {
-  const matches = await screen.findAllByText(text);
-  const title = matches.find((node) => node.getAttribute("data-slot") === "toast-title");
-  if (!title) throw new Error(`no toast titled "${text}"`);
-  return title;
+/** Said to a screen reader through the app's live region. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
+/** Records what is announced from here on; call it after renderPage. */
+function recordAnnouncements(): string[] {
+  const texts: string[] = [];
+  const stopSession = unsubscribe;
+  const stop = subscribeAnnouncements(({ text }) => texts.push(text));
+  unsubscribe = () => {
+    stopSession();
+    stop();
+  };
+  return texts;
+}
+
+/** The notice for a failed action (one plain line with the server's reason). */
+async function actionError(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const notice = document.querySelector<HTMLElement>('[data-slot="action-error"]');
+    if (!notice) throw new Error("no failure notice");
+    return notice;
+  });
+}
+
+function noActionError(): void {
+  expect(document.querySelector('[data-slot="action-error"]')).toBeNull();
+}
+
+function listCard(): HTMLElement {
+  return screen.getByRole("region", { name: "Saved backups" });
+}
+
+function scheduleCard(): HTMLElement {
+  return screen.getByRole("region", { name: "Schedule" });
 }
 
 function dialog(): HTMLElement {
   return screen.getByRole("alertdialog");
+}
+
+/** Adds `count` older manual backups, so the list takes more than one page. */
+function addOlderBackups(count: number): void {
+  const oldest = Math.min(...mockDb.backups.map((row) => row.createdAt));
+  for (let i = 1; i <= count; i += 1) {
+    mockDb.backups.push(makeBackupEntry({ createdAt: oldest - i * 3600 }));
+  }
+}
+
+/** Holds a request until `release()`, then lets the default handler answer it. */
+function gate(): { wait: () => Promise<undefined>; release: () => void } {
+  let release: () => void = () => {};
+  const open = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    wait: async () => {
+      await open;
+      return undefined;
+    },
+    release,
+  };
+}
+
+function currentPage(): string | null {
+  return document.querySelector('[aria-current="page"]')?.getAttribute("aria-label") ?? null;
 }
 
 describe("BackupsPage", () => {
@@ -128,7 +186,7 @@ describe("BackupsPage", () => {
     );
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create backup" }));
-    expect(await findToast("The backup was created.")).toBeInTheDocument();
+    await expectAnnounced("The backup was created.");
     expect(body).toEqual({
       kind: "manual",
       note: expect.stringMatching(/^manual backup \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/),
@@ -150,11 +208,11 @@ describe("BackupsPage", () => {
     await user.clear(keep);
     await user.type(keep, "500");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(await findToast("The schedule was saved.")).toBeInTheDocument();
+    await expectAnnounced("The schedule was saved.");
     expect(body).toEqual({ enabled: true, cadence: "daily", keep: 200 });
   });
 
-  it("marks the Keep field when the server rejects keep, without a toast", async () => {
+  it("marks the Keep field when the server rejects keep, without a card notice", async () => {
     mockServer.use(
       http.post(apiUrl("/backups/schedule"), () =>
         HttpResponse.json(
@@ -170,7 +228,7 @@ describe("BackupsPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Enter a whole number from 1 to 200.")).toBeInTheDocument();
     expect(keep).toHaveAttribute("aria-invalid", "true");
-    expect(document.querySelector('[data-slot="toast-title"]')).toBeNull();
+    noActionError();
     // Editing the value clears the mark.
     await user.type(keep, "1");
     expect(screen.queryByText("Enter a whole number from 1 to 200.")).toBeNull();
@@ -190,7 +248,7 @@ describe("BackupsPage", () => {
     expect(filename).toBe(`kiro-backup-${first.id}.json`);
   });
 
-  it("restores a backup only after confirmation, then toasts and signs out", async () => {
+  it("restores a backup only after confirmation, then announces it and signs out", async () => {
     const restored: string[] = [];
     mockServer.use(
       http.post(apiUrl("/backups/:id/restore"), ({ params }) => {
@@ -199,13 +257,18 @@ describe("BackupsPage", () => {
       }),
     );
     const order: string[] = [];
-    vi.spyOn(toast, "success").mockImplementation((title) => {
-      order.push(`toast:${title}`);
-      return "id";
-    });
     const { user } = await renderPage();
     unsubscribe();
-    unsubscribe = subscribeSession((_session, reason) => order.push(`session:${reason}`));
+    const unsubscribeSession = subscribeSession((_session, reason) =>
+      order.push(`session:${reason}`),
+    );
+    const unsubscribeAnnouncements = subscribeAnnouncements(({ text }) =>
+      order.push(`announce:${text}`),
+    );
+    unsubscribe = () => {
+      unsubscribeSession();
+      unsubscribeAnnouncements();
+    };
     const [first] = newestFirst();
     await rowAction(user, dataRows()[0], "Restore");
     expect(dialog()).toHaveAccessibleName(
@@ -221,24 +284,34 @@ describe("BackupsPage", () => {
     await waitFor(() => expect(order).toContain("session:restored"));
     expect(restored).toEqual([first.id]);
     expect(order).toEqual([
-      "toast:Backup restored. Sign in with the password stored in the backup.",
+      "announce:Backup restored. Sign in with the password stored in the backup.",
       "session:restored",
     ]);
     expect(getSession()).toBeNull();
   });
 
-  it("shows a failed restore's server message verbatim and keeps the session", async () => {
+  it("shows a failed restore's server message verbatim in the list card and keeps the session", async () => {
+    let fail = true;
     mockServer.use(
       http.post(apiUrl("/backups/:id/restore"), ({ params }) =>
-        HttpResponse.json({ error: `backup not found: ${params.id}` }, { status: 500 }),
+        fail
+          ? HttpResponse.json({ error: `backup not found: ${params.id}` }, { status: 500 })
+          : undefined,
       ),
     );
     const { user } = await renderPage();
     const [first] = newestFirst();
     await rowAction(user, dataRows()[0], "Restore");
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    expect(await findToast(`backup not found: ${first.id}`)).toBeInTheDocument();
+    const notice = await actionError();
+    expect(notice).toHaveTextContent(`backup not found: ${first.id}`);
+    expect(listCard()).toContainElement(notice);
     expect(sessionEvents).toEqual([]);
+    // Try again restores without asking again, and the restore signs out.
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(sessionEvents).toEqual(["restored"]));
   });
 
   it("explains a rejected upload in words, keeps the raw reason as a detail and the session", async () => {
@@ -251,12 +324,15 @@ describe("BackupsPage", () => {
       within(dialog()).getByRole("heading", { name: "Restore from broken.json?" }),
     ).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    expect(await findToast("Could not restore from this file.")).toBeInTheDocument();
-    expect(
-      screen.getAllByText(
-        "It is not a Kiro Proxy backup. Choose a file you downloaded from Backups. Details: backup content is not valid JSON",
-      ).length,
-    ).toBeGreaterThan(0);
+    const notice = await actionError();
+    expect(notice).toHaveTextContent(
+      "It is not a Kiro Proxy backup. Choose a file you downloaded from Backups. Details: backup content is not valid JSON",
+    );
+    // The same file fails the same way: only Close.
+    expect(within(notice).queryByRole("button", { name: "Try again" })).toBeNull();
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    noActionError();
+    expect(screen.getByRole("button", { name: "Restore from file" })).toHaveFocus();
     expect(sessionEvents).toEqual([]);
     expect(getSession()).not.toBeNull();
   });
@@ -266,24 +342,36 @@ describe("BackupsPage", () => {
     const input = screen.getByTestId("backup-upload-input") as HTMLInputElement;
     await user.upload(input, new File([JSON.stringify({ hello: "world" })], "other.json"));
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    expect(await findToast("Could not restore from this file.")).toBeInTheDocument();
-    expect(screen.queryByText("unsupported backup format: expected kiro-proxy-backup")).toBeNull();
+    expect(await actionError()).toHaveTextContent(
+      "It is not a Kiro Proxy backup. Choose a file you downloaded from Backups. Details: unsupported backup format: expected kiro-proxy-backup",
+    );
   });
 
-  it("shows an unknown upload error verbatim", async () => {
+  it("shows an unknown upload error verbatim, and Try again sends the same file", async () => {
+    const sent: string[] = [];
     mockServer.use(
-      http.post(apiUrl("/backups/restore"), () =>
-        HttpResponse.json({ error: "pre-restore snapshot failed: disk full" }, { status: 500 }),
-      ),
+      http.post(apiUrl("/backups/restore"), async ({ request }) => {
+        const file = (await request.formData()).get("file");
+        sent.push(typeof file === "string" || !file ? "" : await file.text());
+        return HttpResponse.json(
+          { error: "pre-restore snapshot failed: disk full" },
+          { status: 500 },
+        );
+      }),
     );
     const { user } = await renderPage();
     const input = screen.getByTestId("backup-upload-input") as HTMLInputElement;
-    await user.upload(input, new File(["{}"], "x.json"));
+    await user.upload(input, new File(['{"x":1}'], "x.json"));
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    expect(await findToast("pre-restore snapshot failed: disk full")).toBeInTheDocument();
+    const notice = await actionError();
+    expect(notice).toHaveTextContent("pre-restore snapshot failed: disk full");
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(sent).toEqual(['{"x":1}', '{"x":1}']));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore from file" })).toHaveFocus();
   });
 
-  it("restores from a valid file, then toasts and signs out", async () => {
+  it("restores from a valid file, then announces it and signs out", async () => {
     const { user } = await renderPage();
     const input = screen.getByTestId("backup-upload-input") as HTMLInputElement;
     const backup = {
@@ -295,9 +383,7 @@ describe("BackupsPage", () => {
     };
     await user.upload(input, new File([JSON.stringify(backup)], "good.json"));
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    expect(
-      await findToast("Backup restored. Sign in with the password stored in the backup."),
-    ).toBeInTheDocument();
+    await expectAnnounced("Backup restored. Sign in with the password stored in the backup.");
     expect(sessionEvents).toEqual(["restored"]);
     const rollback = mockDb.backups.find(
       (row) => row.kind === "pre-restore" && row.restoredAccountCnt === 2,
@@ -318,10 +404,12 @@ describe("BackupsPage", () => {
     const file = new File(["{}"], "huge.json", { type: "application/json" });
     Object.defineProperty(file, "size", { value: 40.5 * 1024 * 1024 });
     await user.upload(input, file);
-    expect(
-      // Testing Library reads the size's no-break space as a plain space.
-      await findToast("The file is 40.5 MB, over the 32 MB limit. Choose a smaller backup file."),
-    ).toBeInTheDocument();
+    const notice = await actionError();
+    // Testing Library reads the size's no-break space as a plain space.
+    expect(notice).toHaveTextContent(
+      "The file is 40.5 MB, over the 32 MB limit. Choose a smaller backup file.",
+    );
+    expect(within(notice).queryByRole("button", { name: "Try again" })).toBeNull();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(sent).toBe(false);
   });
@@ -339,9 +427,50 @@ describe("BackupsPage", () => {
       ),
     ).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
-    expect(await findToast("The backup was deleted.")).toBeInTheDocument();
+    await expectAnnounced("The backup was deleted.");
     await waitFor(() => expect(dataRows()).toHaveLength(4));
     expect(mockDb.backups.some((row) => row.id === first.id)).toBe(false);
+  });
+
+  it("shows a failed create in the list card, and Try again creates the backup", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/backups"), () =>
+        fail ? HttpResponse.json({ error: "disk full" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Create backup" }));
+    const notice = await actionError();
+    expect(notice).toHaveTextContent("disk full");
+    expect(listCard()).toContainElement(notice);
+    expect(dataRows()).toHaveLength(5);
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(dataRows()).toHaveLength(6));
+    noActionError();
+    await expectAnnounced("The backup was created.");
+    expect(screen.getByRole("button", { name: "Create backup" })).toHaveFocus();
+  });
+
+  it("keeps a backup whose delete failed, and Close moves focus to its row", async () => {
+    mockServer.use(
+      http.delete(apiUrl("/backups/:id"), () =>
+        HttpResponse.json({ error: "remove backup: busy" }, { status: 500 }),
+      ),
+    );
+    const { user } = await renderPage();
+    const [, second] = newestFirst();
+    await rowAction(user, dataRows()[1], "Delete");
+    await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
+    const notice = await actionError();
+    expect(notice).toHaveTextContent("remove backup: busy");
+    expect(dataRows()).toHaveLength(5);
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    noActionError();
+    const download = within(dataRows()[1]).getByRole("button", { name: "Download" });
+    expect(download).toHaveAttribute("data-row-focus", second.id);
+    expect(download).toHaveFocus();
   });
 });
 
@@ -430,9 +559,49 @@ describe("BackupsPage focus", () => {
     expect(pending).toHaveFocus();
     await user.click(pending);
     release();
-    expect(await findToast("The backup was created.")).toBeInTheDocument();
+    await expectAnnounced("The backup was created.");
     expect(calls).toBe(1);
     expect(screen.getByRole("button", { name: "Create backup" })).toHaveFocus();
+  });
+
+  it("shows a new backup on the first page when Create is pressed on another", async () => {
+    addOlderBackups(10);
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
+    expect(dataRows()).toHaveLength(5);
+    await user.click(screen.getByRole("button", { name: "Create backup" }));
+    await expectAnnounced("The backup was created.");
+    expect(currentPage()).toBe("Page 1");
+  });
+
+  it("stays on the page the user went to while a backup was being created", async () => {
+    addOlderBackups(10);
+    const create = gate();
+    mockServer.use(http.post(apiUrl("/backups"), create.wait));
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Create backup" }));
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
+    create.release();
+    await expectAnnounced("The backup was created.");
+    // The refetch adds it to the top of page 1, so page 2 gains a row.
+    await waitFor(() => expect(dataRows()).toHaveLength(6));
+    expect(currentPage()).toBe("Page 2");
+  });
+
+  it("keeps the page and the focused row when focus went into the list while creating", async () => {
+    addOlderBackups(10);
+    const create = gate();
+    mockServer.use(http.post(apiUrl("/backups"), create.wait));
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
+    await user.click(screen.getByRole("button", { name: "Create backup" }));
+    const download = within(dataRows()[0]).getByRole("button", { name: "Download" });
+    act(() => download.focus());
+    create.release();
+    await expectAnnounced("The backup was created.");
+    await waitFor(() => expect(dataRows()).toHaveLength(6));
+    expect(currentPage()).toBe("Page 2");
+    expect(download).toHaveFocus();
   });
 
   it("keeps focus on Refresh while the list reloads", async () => {
@@ -462,12 +631,17 @@ describe("BackupsPage focus", () => {
     const download = within(dataRows()[0]).getByRole("button", { name: "Download" });
     await user.click(download);
     expect(download).not.toBeDisabled();
-    expect(await findToast("The backup was downloaded.")).toBeInTheDocument();
-    expect(
-      screen.getAllByText("The file contains passwords and tokens in plain text. Store it safely.")
-        .length,
-    ).toBeGreaterThan(0);
+    const notice = await screen.findByTestId("backup-downloaded");
+    expect(notice).toHaveRole("alert");
+    expect(notice).toHaveTextContent(
+      "The backup was downloaded. The file contains passwords and tokens in plain text. Store it safely.",
+    );
+    expect(listCard()).toContainElement(notice);
     expect(saveBlob).toHaveBeenCalledTimes(1);
+    expect(download).toHaveFocus();
+    // Close goes with the line; focus stays on the row.
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(screen.queryByTestId("backup-downloaded")).toBeNull();
     expect(download).toHaveFocus();
   });
 
@@ -532,18 +706,56 @@ describe("ScheduleCard", () => {
     await user.type(keep, "30");
     const save = screen.getByRole("button", { name: "Save" });
     await user.click(save);
-    expect(await findToast("The schedule was saved.")).toBeInTheDocument();
-    await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
+    await expectAnnounced("The schedule was saved.");
+    // Save reads "Saved" with a tick for a moment.
+    await waitFor(() => expect(save).toHaveAccessibleName("Saved"));
+    expect(save).toHaveAttribute("aria-disabled", "true");
     expect(save).toBeInTheDocument();
     expect(save).toHaveFocus();
     expect(keep).toHaveValue("30");
   });
 
   it("warns, and still re-seeds, when the schedule saved but its prune failed", async () => {
+    let posts = 0;
+    mockServer.use(
+      http.post(apiUrl("/backups/schedule"), async ({ request }) => {
+        posts += 1;
+        const body = (await request.json()) as typeof mockDb.schedule;
+        // Saved: the refetch after the save reads it back.
+        mockDb.schedule = { ...mockDb.schedule, ...body };
+        return HttpResponse.json({ schedule: body, pruneError: "remove backup: disk full" });
+      }),
+    );
+    const { user } = await renderPage();
+    const announced = recordAnnouncements();
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
+    await user.clear(keep);
+    await user.type(keep, "5");
+    const save = screen.getByRole("button", { name: "Save" });
+    await user.click(save);
+    const notice = await screen.findByTestId("schedule-prune-failed");
+    expect(notice).toHaveRole("alert");
+    expect(notice).toHaveTextContent(
+      "Scheduled backups over the Keep latest count are still stored. The next save or scheduled run tries again. Details: remove backup: disk full",
+    );
+    expect(scheduleCard()).toContainElement(notice);
+    await waitFor(() => expect(save).toHaveAccessibleName("Saved"));
+    expect(keep).toHaveValue("5");
+    // The warning is read out as it appears, in place of "saved".
+    expect(announced).toEqual([]);
+    // Try again saves once more, which retries the delete; focus goes to Save.
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(posts).toBe(2));
+    expect(save).toHaveFocus();
+    expect(await screen.findByTestId("schedule-prune-failed")).toBeInTheDocument();
+  });
+
+  it("retries a failed prune with the stored schedule, leaving a later edit unsaved", async () => {
+    const bodies: unknown[] = [];
     mockServer.use(
       http.post(apiUrl("/backups/schedule"), async ({ request }) => {
         const body = (await request.json()) as typeof mockDb.schedule;
-        // Saved: the refetch after the save reads it back.
+        bodies.push(body);
         mockDb.schedule = { ...mockDb.schedule, ...body };
         return HttpResponse.json({ schedule: body, pruneError: "remove backup: disk full" });
       }),
@@ -552,15 +764,42 @@ describe("ScheduleCard", () => {
     const keep = await screen.findByRole("textbox", { name: "Keep latest" });
     await user.clear(keep);
     await user.type(keep, "5");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const notice = await screen.findByTestId("schedule-prune-failed");
+    // A lower keep typed since would delete more backups: Try again must not save it.
+    await user.clear(keep);
+    await user.type(keep, "2");
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1]).toEqual({ enabled: true, cadence: "daily", keep: 5 });
+    await screen.findByTestId("schedule-prune-failed");
+    expect(keep).toHaveValue("2");
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("shows a failed save in the card, and Try again sends the form again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/backups/schedule"), () =>
+        fail ? HttpResponse.json({ error: "config locked" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = await renderPage();
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
+    await user.clear(keep);
+    await user.type(keep, "30");
     const save = screen.getByRole("button", { name: "Save" });
     await user.click(save);
-    const title = await findToast("The schedule was saved, but old backups were not removed.");
-    const toastRoot = title.closest('[data-slot="toast"]') ?? title.parentElement;
-    expect(toastRoot).toHaveTextContent(/next save or scheduled run tries again/);
-    expect(toastRoot).toHaveTextContent("remove backup: disk full");
-    expect(screen.queryByText("The schedule was saved.")).toBeNull();
-    await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
-    expect(keep).toHaveValue("5");
+    const notice = await actionError();
+    expect(notice).toHaveTextContent("config locked");
+    expect(scheduleCard()).toContainElement(notice);
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(save).toHaveAccessibleName("Saved"));
+    noActionError();
+    expect(save).toHaveFocus();
+    expect(mockDb.schedule.keep).toBe(30);
   });
 
   it("shows a stored legacy keep above 200 and sends it back unchanged", async () => {
@@ -582,7 +821,7 @@ describe("ScheduleCard", () => {
     await user.click(screen.getByRole("combobox", { name: "Frequency" }));
     await user.click(await screen.findByRole("option", { name: "Weekly" }));
     await user.click(save);
-    expect(await findToast("The schedule was saved.")).toBeInTheDocument();
+    await expectAnnounced("The schedule was saved.");
     expect(body).toEqual({ enabled: true, cadence: "weekly", keep: 300 });
   });
 
