@@ -92,6 +92,7 @@ export function BuilderIdFlow(): JSX.Element {
   const onStart = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (starting) return;
+    setFailure(null);
     const parsed = parseRegion(region);
     if (!parsed.ok) {
       setRegionError(t("regionInvalid"));
@@ -99,7 +100,6 @@ export function BuilderIdFlow(): JSX.Element {
       return;
     }
     setRegionError(null);
-    setFailure(null);
     setStarting(true);
     const generation = sessions.generation;
     try {

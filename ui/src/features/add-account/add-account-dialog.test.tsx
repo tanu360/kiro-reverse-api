@@ -269,6 +269,24 @@ describe("Builder ID", () => {
     expect(await screen.findByText("Enter a region like us-east-1.")).toBeInTheDocument();
     expect(starts.count).toBe(0);
   });
+
+  it("drops the last failure when the next try stops at the region", async () => {
+    mockServer.use(
+      http.post(apiUrl("/auth/builderid/start"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    renderWithProviders(<Harness initialMethod="builderid" />);
+    await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
+    await expectFlowError("boom");
+
+    const region = screen.getByRole("textbox", { name: "Region" });
+    await user.clear(region);
+    await user.type(region, "useast1");
+    await user.click(screen.getByRole("button", { name: "Start sign-in" }));
+    expect(await screen.findByText("Enter a region like us-east-1.")).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="action-error"]')).not.toBeInTheDocument();
+  });
 });
 
 describe("Microsoft SSO", () => {
