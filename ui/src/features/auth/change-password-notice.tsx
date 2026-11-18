@@ -59,10 +59,11 @@ export function ChangePasswordNotice(): JSX.Element | null {
     select: (state) => isSettingsPath(state.location.pathname),
   });
 
-  // It has nothing to add once Settings is open: it does not come back after.
+  // It has nothing to add once Settings is open: it does not come back after. Also when the
+  // sign-in itself led to Settings, where it is asked for after this page mounted.
   useEffect(() => {
-    if (onSettings) setShown(false);
-  }, [onSettings]);
+    if (onSettings && visible) setShown(false);
+  }, [onSettings, visible]);
 
   if (!visible || onSettings) return null;
   return (

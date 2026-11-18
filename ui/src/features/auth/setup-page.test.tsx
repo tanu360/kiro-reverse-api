@@ -5,6 +5,7 @@ import { clearSession } from "@/lib/auth/session";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp } from "@/test/render";
+import { showChangePasswordNotice } from "./change-password-notice";
 
 // Mock first-run is pending on a fresh mock database (password 12345678).
 const PASSWORD = "12345678";
@@ -27,6 +28,8 @@ describe("SetupPage", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/accounts"));
     expect(router.state.location.search).toMatchObject({ plan: "pro" });
+    // The change-password line is module state: end the session so it does not reach the next test.
+    act(() => clearSession("signout"));
   });
 
   it("copies the password when it is clicked, with no separate copy icon", async () => {
@@ -128,6 +131,20 @@ describe("SetupPage", () => {
     await user.click(within(notice).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("button", { name: "Open settings" })).toBeNull();
     expect(document.getElementById("main")).toHaveFocus();
+    act(() => clearSession("signout"));
+  });
+
+  it("keeps the change-password line away when the sign-in led to Settings", async () => {
+    const { router } = await renderApp("/settings/server");
+    await screen.findByRole("heading", { level: 1, name: "Settings" });
+    // Asked for after Settings mounted, as when the first-run sign-in returns to Settings.
+    act(() => showChangePasswordNotice());
+    expect(document.querySelector('[data-slot="change-password-notice"]')).toBeNull();
+    await act(async () => {
+      await router.navigate({ to: "/" });
+    });
+    await screen.findByRole("heading", { level: 1, name: "Overview" });
+    expect(document.querySelector('[data-slot="change-password-notice"]')).toBeNull();
     act(() => clearSession("signout"));
   });
 
