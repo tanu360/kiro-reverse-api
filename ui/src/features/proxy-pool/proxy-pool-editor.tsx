@@ -107,27 +107,32 @@ export function ProxyEditor({
   const errors = editorErrors(model);
   const update = (proxyModel: ProxyModel) => setModel((prev) => ({ ...prev, proxy: proxyModel }));
   const [saved, setSaved] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-    },
-    [],
-  );
+  // False once this form is gone: closed during its save and opened again, a new form.
+  const live = useRef(false);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
 
   const save = useMutation({
     mutationFn: () => {
       const body = editorRequest(model, editing);
       return proxy ? updatePoolProxy(proxy.id, body) : addPoolProxy(body);
     },
+    // It runs even once the form is gone: then it only says so, and never closes the new form.
     onSuccess: () => {
       onSaved();
+      const done = editing ? t("editor.saved") : t("editor.added");
+      if (!live.current) {
+        announce(done);
+        return;
+      }
       setSaved(true);
-      closeTimer.current = setTimeout(() => {
-        closeTimer.current = null;
-        onClose();
-        announce(editing ? t("editor.saved") : t("editor.added"));
+      setTimeout(() => {
+        if (live.current) onClose();
+        announce(done);
       }, SAVED_CLOSE_MS);
     },
   });

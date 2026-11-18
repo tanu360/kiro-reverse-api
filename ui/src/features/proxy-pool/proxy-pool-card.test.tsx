@@ -336,6 +336,38 @@ describe("ProxyPoolCard", () => {
     await expectAnnounced("Dead is not reachable. The proxy refused the connection.");
   });
 
+  it("never closes the next editor when an earlier one's save ends", async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockServer.use(
+      http.post(apiUrl("/proxy-pool/proxies"), async () => {
+        await held;
+        return undefined;
+      }),
+    );
+    const { user } = await renderCard();
+    await user.click(screen.getByRole("button", { name: "Add proxy" }));
+    let dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Host"), "proxy.local");
+    await user.type(within(dialog).getByLabelText("Port"), "1080");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    // Closed while it saves, then opened again: a new, empty form.
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Add proxy" }));
+    dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Host")).toHaveValue("");
+
+    release();
+    await expectAnnounced("The proxy was added and is being checked.");
+    expect(await screen.findByText("proxy.local:1080", { exact: false })).toBeInTheDocument();
+    // Past the old form's "Saved" moment: the new one is still open.
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(screen.getByRole("dialog")).toBe(dialog);
+  });
+
   it("shows a failed save in the editor and keeps it open", async () => {
     seedProxyPoolMock({ proxies: [frankfurt] });
     const { user } = await renderCard();
@@ -407,7 +439,7 @@ describe("ProxyPoolCard", () => {
     expect(toggle).toBeChecked();
   });
 
-  it("closes a failed remove's notice on Try again once the proxy is gone anyway", async () => {
+  it("takes a failed remove as done when the proxy is gone anyway", async () => {
     mockServer.use(
       http.delete(apiUrl("/proxy-pool/proxies/:id"), () => {
         // It went meanwhile: another tab, or a remove that went through but timed out.
@@ -421,13 +453,49 @@ describe("ProxyPoolCard", () => {
     await user.click(
       within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }),
     );
-    const notice = await actionError();
-    expect(screen.getByText(/No proxies yet/)).toBeInTheDocument();
 
-    await user.click(within(notice).getByRole("button", { name: "Try again" }));
-    await expect(screen.findByRole("alert", {}, { timeout: 300 })).rejects.toThrow();
-    expect(document.activeElement).toHaveAccessibleName("Add proxy");
+    expect(await screen.findByText(/No proxies yet/)).toBeInTheDocument();
+    await expectAnnounced("The proxy was removed.");
+    // No notice for a proxy that is gone, and focus is not left on the page.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toHaveAccessibleName("Add proxy"));
     expect((await writes()).filter((w) => w.method === "DELETE")).toHaveLength(1);
+  });
+
+  it("closes a failed test's notice once its proxy is gone, focus with it", async () => {
+    const tokyo = { ...frankfurt, id: "px_2", label: "Tokyo", url: "http://10.0.0.2:3128" };
+    mockServer.use(
+      http.post(apiUrl("/proxy-pool/proxies/:id/check"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    seedProxyPoolMock({ proxies: [frankfurt, tokyo] });
+    const { user, queryClient } = await renderCard();
+    const [testFrankfurt] = screen.getAllByRole("button", { name: "Test" });
+    await user.click(testFrankfurt);
+    const notice = await actionError();
+    within(notice).getByRole("button", { name: "Try again" }).focus();
+
+    // Removed in another tab; this one reads the pool again.
+    seedProxyPoolMock({ proxies: [tokyo] });
+    await queryClient.invalidateQueries();
+    await waitFor(() => expect(screen.queryByText("Frankfurt")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(document.activeElement).toHaveAccessibleName("Add proxy");
+  });
+
+  it("puts a proxy's state note under its whole row, not beside its buttons", async () => {
+    const dead = { ...frankfurt, id: "px_2", label: "Dead", url: "http://127.0.0.1:9" };
+    seedProxyPoolMock({ proxies: [{ ...dead, enabled: false }, frankfurt] });
+    await renderCard();
+    const note = await screen.findByText(/^Switched off\./);
+    const row = note.previousElementSibling;
+    expect(row).toHaveAttribute("data-slot", "settings-row");
+    expect(row).toHaveTextContent("Dead");
+    expect(within(row as HTMLElement).getByRole("button", { name: "Test" })).toBeInTheDocument();
+    // The healthy row has no note.
+    const healthy = screen.getByText("Frankfurt").closest('[data-slot="settings-row"]');
+    expect(healthy?.nextElementSibling).toBeNull();
   });
 
   it("still moves focus after a remove when another remove fails meanwhile", async () => {
