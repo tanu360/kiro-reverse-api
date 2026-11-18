@@ -460,6 +460,48 @@ describe("AlertsCard daily summary", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
+  it("keeps a save on its way busy when the dialog is closed and opened again", async () => {
+    let land: () => void = () => {};
+    mockServer.use(
+      http.get(apiUrl("/alerts"), () => HttpResponse.json(SAVED)),
+      http.post(apiUrl("/alerts"), async () => {
+        await new Promise<void>((resolve) => {
+          land = resolve;
+        });
+        return HttpResponse.json(SAVED);
+      }),
+    );
+    const { user } = await renderCard();
+    await user.click(await screen.findByRole("button", { name: "Edit Ops hook" }));
+    let dialog = await screen.findByRole("dialog", { name: "Edit channel" });
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByRole("button", { name: /Saving/ })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    // Not a fresh, idle form that the first save then flips to Saved and closes.
+    await user.click(screen.getByRole("button", { name: "Edit Ops hook" }));
+    dialog = await screen.findByRole("dialog", { name: "Edit channel" });
+    expect(within(dialog).getByRole("button", { name: /Saving/ })).toBeInTheDocument();
+    land();
+    await expectAnnounced("Channel saved.");
+  });
+
+  it("removes a channel after confirmation, with focus on Add channel", async () => {
+    mockServer.use(
+      http.get(apiUrl("/alerts"), () => HttpResponse.json(SAVED)),
+      http.post(apiUrl("/alerts"), () => HttpResponse.json({ ...SAVED, channels: [] })),
+    );
+    const { user } = await renderCard();
+    await user.click(await screen.findByRole("button", { name: "Remove Ops hook" }));
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+
+    await expectAnnounced("Channel removed.");
+    expect(screen.queryByText("Ops hook")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add channel" })).toHaveFocus());
+  });
+
   it("shows a failed test under its row, and Try again sends it again", async () => {
     let fail = true;
     mockServer.use(

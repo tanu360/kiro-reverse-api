@@ -125,6 +125,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
   const poolOn = useQuery(proxyPoolQuery()).data?.mode === "on";
   // `session` remounts the form on each open, so it starts from the saved proxy.
   const [editor, setEditor] = useState({ open: false, session: 0 });
+  const editRef = useRef<HTMLButtonElement>(null);
   const removeRef = useRef<HTMLButtonElement>(null);
   // No toast: the dialog's Save reads "Saved", then the dialog closes on the new route; Remove
   // changes the row. A failure shows in the dialog, or under the row for Remove.
@@ -136,6 +137,8 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
         queryClient.setQueryData(queryKeys.settings.proxy(), { proxyURL });
         void queryClient.invalidateQueries({ queryKey: queryKeys.settings.proxy() });
         if (proxyURL !== "") savedClose.done();
+        // Remove goes with the route: focus moves on to Set up, not to the page.
+        else editRef.current?.focus();
       },
     },
   );
@@ -145,13 +148,15 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
     setRemoving(proxyURL === "");
     save(proxyURL);
   };
+  // A save still on its way keeps its state (Save or Remove stays busy), even with the dialog
+  // closed: only a failure is cleared.
   const openEditor = () => {
-    feedback.dismiss();
+    if (!saving) feedback.dismiss();
     savedClose.reset();
     setEditor((prev) => ({ open: true, session: prev.session + 1 }));
   };
   const closeEditor = () => {
-    if (!removing) feedback.dismiss();
+    if (!removing && !saving) feedback.dismiss();
     setEditor((prev) => ({ ...prev, open: false }));
   };
 
@@ -189,7 +194,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
           // A group named by the row: the route, then its actions. Under the route on a narrow
           // row, so a long host keeps the row's width; at the row's end on a wide one.
           <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
-            <Button onClick={openEditor} size="sm" variant="secondary">
+            <Button onClick={openEditor} ref={editRef} size="sm" variant="secondary">
               <HugeiconsIcon icon={direct ? PlusSignIcon : PencilEdit01Icon} aria-hidden="true" />
               {direct ? t("proxySetUp") : t("common:actions.edit")}
             </Button>

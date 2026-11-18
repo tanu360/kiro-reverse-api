@@ -658,7 +658,57 @@ describe("SettingsPage", () => {
       await expectAnnounced("Your settings were saved.");
       expect(await writes()).toEqual([{ method: "POST", path: "/proxy", body: { proxyURL: "" } }]);
       expect(await within(card).findByText("Direct connection")).toBeInTheDocument();
-      expect(within(card).getByRole("button", { name: "Set up proxy" })).toBeInTheDocument();
+      await waitFor(() =>
+        expect(within(card).getByRole("button", { name: "Set up proxy" })).toHaveFocus(),
+      );
+    });
+
+    it("moves focus to Set up once a removal goes through, from Try again too", async () => {
+      let fail = true;
+      mockServer.use(
+        http.post(apiUrl("/proxy"), () =>
+          fail ? HttpResponse.json({ error: "store busy" }, { status: 500 }) : undefined,
+        ),
+      );
+      const { user } = await renderPage("server");
+      const card = section(SECTION_ID.outboundProxy);
+      await user.click(within(card).getByRole("button", { name: "Remove proxy" }));
+      const confirm = await screen.findByRole("alertdialog");
+      await user.click(within(confirm).getByRole("button", { name: "Remove proxy" }));
+
+      const notice = await within(card).findByRole("alert");
+      fail = false;
+      await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+      const setUp = await within(card).findByRole("button", { name: "Set up proxy" });
+      await waitFor(() => expect(setUp).toHaveFocus());
+    });
+
+    it("keeps a save on its way busy when the dialog is closed and opened again", async () => {
+      let land: () => void = () => {};
+      mockServer.use(
+        http.post(apiUrl("/proxy"), async () => {
+          await new Promise<void>((resolve) => {
+            land = resolve;
+          });
+          return undefined;
+        }),
+      );
+      const { user } = await renderPage("server");
+      let dialog = await openEditor(user);
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(await within(dialog).findByRole("button", { name: /Saving/ })).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Edit proxy" })).not.toBeInTheDocument(),
+      );
+
+      // Not a fresh, idle form that the first save then flips to Saved and closes.
+      dialog = await openEditor(user);
+      expect(within(dialog).getByRole("button", { name: /Saving/ })).toBeInTheDocument();
+      land();
+      await expectAnnounced("Your settings were saved.");
+      expect(await writes()).toHaveLength(1);
     });
   });
 

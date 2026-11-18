@@ -394,12 +394,13 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
 
   const openEditor = (id: string | null) => {
     setServerErrors({});
-    if (channels.variables?.draft) channels.reset();
+    // A save still on its way keeps its state (Save stays busy); only a failure is cleared.
+    if (channels.isError && channels.variables?.draft) channels.reset();
     savedClose.reset();
     setEditor((prev) => ({ open: true, session: prev.session + 1, id }));
   };
   const closeEditor = () => {
-    if (channels.variables?.draft) channels.reset();
+    if (channels.isError && channels.variables?.draft) channels.reset();
     setEditor((prev) => ({ ...prev, open: false }));
   };
 
