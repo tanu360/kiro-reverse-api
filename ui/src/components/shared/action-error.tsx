@@ -19,6 +19,7 @@ export function ActionError({
   onDismiss,
   className,
 }: {
+  /** What failed: a thrown value (its server reason is shown), or a line the page wrote itself. */
   error: unknown;
   /** Runs the same action again. */
   onRetry?: () => void;
@@ -44,7 +45,9 @@ export function ActionError({
       variant="error"
     >
       <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-      <AlertDescription className="wrap-break-word">{errorMessage(error, t)}</AlertDescription>
+      <AlertDescription className="wrap-break-word">
+        {typeof error === "string" ? error : errorMessage(error, t)}
+      </AlertDescription>
       {onRetry || onDismiss ? (
         <AlertAction className={NOTICE_ACTIONS_CLASS}>
           {onRetry ? (

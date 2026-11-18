@@ -1,16 +1,31 @@
-import { TimeScheduleIcon } from "@hugeicons/core-free-icons";
+import {
+  Refresh01Icon,
+  TimeScheduleIcon,
+  TriangleAlertIcon,
+  XIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useState } from "react";
+import { type JSX, useId, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { ErrorState } from "@/components/shared/error-state";
+import {
+  NOTICE_ACTIONS_CLASS,
+  NOTICE_LINE_CLASS,
+  NoticeIconButton,
+} from "@/components/shared/notice-line";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SettingsFrame } from "@/components/shared/section-card";
 import {
+  SaveButton,
   SaveFooter,
   SETTINGS_ROW_X,
   SettingsRow,
   SwitchField,
 } from "@/components/shared/settings-rows";
 import { useDraftGuard } from "@/components/shared/use-draft-guard";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { CardPanel } from "@/components/ui/card";
 import { Field, FieldError } from "@/components/ui/field";
 import {
   NumberField,
@@ -27,12 +42,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSavedFlash } from "@/hooks/use-saved-flash";
+import { announce } from "@/lib/announce";
 import { backupScheduleQuery, updateBackupSchedule } from "@/lib/api/backups";
 import { queryKeys } from "@/lib/api/query-keys";
 import { serverErrorCode } from "@/lib/api/server-errors";
 import type { BackupCadence, BackupSchedule } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   CADENCES,
@@ -170,6 +186,39 @@ function RunTimes({ schedule }: { schedule: BackupSchedule }): JSX.Element {
   );
 }
 
+/**
+ * The schedule saved, but the server could not delete the scheduled backups over Keep latest:
+ * one amber line with its reason, then Try again (another save retries the delete) and close.
+ * Its alert role reads it out.
+ */
+function PruneFailedNotice({
+  detail,
+  onRetry,
+  onDismiss,
+}: {
+  detail: string;
+  onRetry: () => void;
+  onDismiss: () => void;
+}): JSX.Element {
+  const { t } = useT("backups");
+  return (
+    <Alert className={NOTICE_LINE_CLASS} data-testid="schedule-prune-failed" variant="warning">
+      <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
+      <AlertDescription className="wrap-break-word">
+        {t("schedulePruneFailedBody", { detail })}
+      </AlertDescription>
+      <AlertAction className={NOTICE_ACTIONS_CLASS}>
+        <NoticeIconButton
+          icon={Refresh01Icon}
+          label={t("common:actions.retry")}
+          onClick={onRetry}
+        />
+        <NoticeIconButton icon={XIcon} label={t("common:actions.close")} onClick={onDismiss} />
+      </AlertAction>
+    </Alert>
+  );
+}
+
 function ScheduleFormCard({
   initial,
   schedule,
@@ -185,6 +234,14 @@ function ScheduleFormCard({
   const [keep, setKeep] = useState<number | null>(initial.keep);
   // A rejected value is marked on its row (the server's 400 names it by code), not toasted.
   const [invalid, setInvalid] = useState<InvalidField | null>(null);
+  /*
+   * No toasts: Save reads "Saved" for a moment and a screen reader hears it; any other failure,
+   * or a save whose delete of old backups failed, shows at the top of the card.
+   */
+  const [failure, setFailure] = useState<unknown>(null);
+  const [pruneError, setPruneError] = useState<string | null>(null);
+  const savedFlash = useSavedFlash();
+  const saveRef = useRef<HTMLButtonElement>(null);
 
   // New server values (after a save or a restore) re-seed the fields in place. The form is not
   // remounted, so focus stays on Save after a save.
@@ -214,16 +271,17 @@ function ScheduleFormCard({
       setKeep(body.keep);
       return updateBackupSchedule(body);
     },
-    onSuccess: ({ schedule: saved, pruneError }) => {
+    onMutate: () => {
+      setFailure(null);
+      setPruneError(null);
+      savedFlash.clear();
+    },
+    onSuccess: ({ schedule: saved, pruneError: pruneFailed }) => {
       // Saved either way; a failed prune leaves extra scheduled backups until the next save of
-      // an enabled schedule, or its next run, retries it.
-      if (pruneError) {
-        toast.warning(t("schedulePruneFailed"), {
-          description: t("schedulePruneFailedBody", { detail: pruneError }),
-        });
-      } else {
-        toast.success(t("scheduleSaved"));
-      }
+      // an enabled schedule, or its next run, retries it. Its notice is read out as it appears.
+      savedFlash.flash();
+      if (pruneFailed) setPruneError(pruneFailed);
+      else announce(t("scheduleSaved"));
       // The server answers with the saved schedule (nextRun included): the form re-seeds from
       // it right away. An older server answers without one; the refetch below covers that.
       if (Object.keys(saved).length > 0) {
@@ -234,9 +292,19 @@ function ScheduleFormCard({
     onError: (error) => {
       const field = INVALID_FIELDS[serverErrorCode(error) ?? ""];
       if (field) setInvalid(field);
-      else toastError(error, t);
+      else setFailure(error);
     },
   });
+
+  // Try again sends the form as it stands; focus moves to Save first, as the notice goes.
+  const retry = () => {
+    saveRef.current?.focus();
+    if (!save.isPending) save.mutate();
+  };
+  const dismiss = (clear: () => void) => {
+    clear();
+    saveRef.current?.focus();
+  };
 
   return (
     <form
@@ -248,11 +316,43 @@ function ScheduleFormCard({
     >
       <SettingsFrame
         description={t("schedule.description")}
-        footer={<SaveFooter dirty={dirty} saving={save.isPending} />}
+        footer={
+          <SaveFooter
+            action={
+              <SaveButton
+                dirty={dirty}
+                ref={saveRef}
+                saved={savedFlash.saved}
+                saving={save.isPending}
+                type="submit"
+              />
+            }
+            dirty={dirty}
+            saving={save.isPending}
+          />
+        }
         icon={TimeScheduleIcon}
         id="backup-schedule"
         title={t("schedule.title")}
       >
+        {failure ? (
+          <CardPanel>
+            <ActionError
+              error={failure}
+              onDismiss={() => dismiss(() => setFailure(null))}
+              onRetry={retry}
+            />
+          </CardPanel>
+        ) : null}
+        {pruneError ? (
+          <CardPanel>
+            <PruneFailedNotice
+              detail={pruneError}
+              onDismiss={() => dismiss(() => setPruneError(null))}
+              onRetry={retry}
+            />
+          </CardPanel>
+        ) : null}
         <SwitchField
           checked={enabled}
           description={<RunTimes schedule={schedule} />}

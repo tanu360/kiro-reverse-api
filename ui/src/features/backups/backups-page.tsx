@@ -1,4 +1,10 @@
-import { ArchiveIcon, FileUpIcon, PlusIcon } from "@hugeicons/core-free-icons";
+import {
+  ArchiveIcon,
+  CircleCheckIcon,
+  FileUpIcon,
+  PlusIcon,
+  XIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,14 +16,23 @@ import {
   useRef,
   useState,
 } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import {
+  NOTICE_ACTIONS_CLASS,
+  NOTICE_LINE_CLASS,
+  NoticeIconButton,
+} from "@/components/shared/notice-line";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { announce } from "@/lib/announce";
 import {
   backupsQuery,
   createBackup,
@@ -33,7 +48,6 @@ import { clearSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { toast, toastError } from "@/lib/toast";
 import { isNotABackupMessage, listMeta, MAX_UPLOAD_BYTES, manualNote } from "./backup-model";
 import {
   type BackupAction,
@@ -87,10 +101,44 @@ function focusFirstShown(elements: readonly HTMLElement[]): void {
   }
 }
 
+/** A row's first action, in the table and in the cards (CSS shows one). */
+function rowFocusTargets(container: HTMLElement | null, id: string): HTMLElement[] {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>(`[${ROW_FOCUS_ATTR}]`)).filter(
+    (element) => element.getAttribute(ROW_FOCUS_ATTR) === id,
+  );
+}
+
 /** A deleted row, and where it was, until focus has moved on from it. */
 interface Refocus {
   id: string;
   index: number;
+}
+
+/** The last action that failed, said at the top of the list card in place of a toast. */
+type Failure =
+  | { action: "create"; error: unknown }
+  | { action: BackupAction; entry: BackupEntry; error: unknown }
+  /** `file` is left out when sending it again cannot help (too large, not a backup). */
+  | { action: "upload"; file?: File; error: unknown };
+
+/**
+ * After a download, one green line: it was downloaded, and the plain-text warning, which the
+ * button shows only as a hover tooltip (so touch users see it here). Its alert role reads it out.
+ */
+function DownloadedNotice({ onDismiss }: { onDismiss: () => void }): JSX.Element {
+  const { t } = useT("backups");
+  return (
+    <Alert className={NOTICE_LINE_CLASS} data-testid="backup-downloaded" variant="success">
+      <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
+      <AlertDescription className="wrap-break-word">
+        {t("common:text.joinSentences", { first: t("downloaded"), second: t("downloadHint") })}
+      </AlertDescription>
+      <AlertAction className={NOTICE_ACTIONS_CLASS}>
+        <NoticeIconButton icon={XIcon} label={t("common:actions.close")} onClick={onDismiss} />
+      </AlertAction>
+    </Alert>
+  );
 }
 
 export function BackupsPage(): JSX.Element {
@@ -99,11 +147,26 @@ export function BackupsPage(): JSX.Element {
   const queryClient = useQueryClient();
   const list = useQuery(backupsQuery());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadRef = useRef<HTMLButtonElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const { busy, isBusy, run } = useBusyRows();
   const listRef = useRef<HTMLDivElement | null>(null);
   const createRef = useRef<HTMLButtonElement | null>(null);
   const [refocus, setRefocus] = useState<Refocus | null>(null);
+  const [page, setPage] = useState(1);
+  /*
+   * No toasts: the list shows a result itself (a row comes or goes, the busy button spins) and a
+   * screen reader hears it; a download leaves a green line with its warning, and a failure shows
+   * at the top of the list card. A restore signs out, so the sign-in page comes next.
+   */
+  const [failure, setFailure] = useState<Failure | null>(null);
+  // The backup just downloaded, for its green line.
+  const [downloaded, setDownloaded] = useState<string | null>(null);
+  /** A new action starts: the last one's notice goes. */
+  const clearNotices = useCallback(() => {
+    setFailure(null);
+    setDownloaded(null);
+  }, []);
 
   const invalidate = useCallback(
     () => queryClient.invalidateQueries({ queryKey: queryKeys.backups.all }),
@@ -113,11 +176,14 @@ export function BackupsPage(): JSX.Element {
   const createPendingRef = useRef(false);
   const create = useMutation({
     mutationFn: () => createBackup({ kind: "manual", note: manualNote(new Date()) }),
+    onMutate: clearNotices,
     onSuccess: () => {
-      toast.success(t("created"));
+      // The new backup is the newest, so it lands at the top of the first page.
+      setPage(1);
+      announce(t("created"));
       void invalidate();
     },
-    onError: (error) => toastError(error, t),
+    onError: (error) => setFailure({ action: "create", error }),
     onSettled: () => {
       createPendingRef.current = false;
     },
@@ -131,7 +197,7 @@ export function BackupsPage(): JSX.Element {
   // The server revoked every admin session, this one included. The root route sends the
   // browser to sign-in once the session is cleared.
   const finishRestore = useCallback(() => {
-    toast.success(t("restored"));
+    announce(t("restored"));
     clearSession("restored");
   }, [t]);
 
@@ -147,34 +213,65 @@ export function BackupsPage(): JSX.Element {
     [confirm, t],
   );
 
+  // Each row action runs without asking again from Try again: it was confirmed the first time.
+  const download = useCallback(
+    (entry: BackupEntry) =>
+      run(entry.id, "download", async () => {
+        clearNotices();
+        try {
+          const { blob, filename } = await downloadBackup(entry.id);
+          saveBlob(blob, filename || `kiro-backup-${entry.id}.json`);
+          setDownloaded(entry.id);
+        } catch (error) {
+          setFailure({ action: "download", entry, error });
+        }
+      }),
+    [run, clearNotices],
+  );
+
+  const restoreEntry = useCallback(
+    (entry: BackupEntry) =>
+      run(entry.id, "restore", async () => {
+        clearNotices();
+        try {
+          await restoreBackup(entry.id);
+        } catch (error) {
+          setFailure({ action: "restore", entry, error });
+          return;
+        }
+        finishRestore();
+      }),
+    [run, clearNotices, finishRestore],
+  );
+
+  const deleteEntry = useCallback(
+    (entry: BackupEntry) =>
+      run(entry.id, "delete", async () => {
+        clearNotices();
+        try {
+          await deleteBackup(entry.id);
+        } catch (error) {
+          setFailure({ action: "delete", entry, error });
+          return;
+        }
+        announce(t("deleted"));
+        const index = (list.data ?? []).findIndex((row) => row.id === entry.id);
+        setRefocus({ id: entry.id, index: Math.max(0, index) });
+        await invalidate();
+      }),
+    [run, clearNotices, t, invalidate, list.data],
+  );
+
   const actions = useMemo<BackupRowActions>(
     () => ({
       busy,
-      onDownload: (entry: BackupEntry) =>
-        void run(entry.id, "download", async () => {
-          try {
-            const { blob, filename } = await downloadBackup(entry.id);
-            saveBlob(blob, filename || `kiro-backup-${entry.id}.json`);
-            // The warning was only a hover tooltip; this way touch users see it too.
-            toast.success(t("downloaded"), { description: t("downloadHint") });
-          } catch (error) {
-            toastError(error, t);
-          }
-        }),
+      onDownload: (entry: BackupEntry) => void download(entry),
       onRestore: (entry: BackupEntry) =>
         void (async () => {
           if (isBusy(entry.id)) return;
           const time = formatDateTime(entry.createdAt, lang);
           if (!(await restoreConfirm(t("confirmRestore", { time }), time))) return;
-          await run(entry.id, "restore", async () => {
-            try {
-              await restoreBackup(entry.id);
-            } catch (error) {
-              toastError(error, t);
-              return;
-            }
-            finishRestore();
-          });
+          await restoreEntry(entry);
         })(),
       onDelete: (entry: BackupEntry) =>
         void (async () => {
@@ -188,27 +285,15 @@ export function BackupsPage(): JSX.Element {
             variant: "danger",
           });
           if (!ok) return;
-          await run(entry.id, "delete", async () => {
-            try {
-              await deleteBackup(entry.id);
-            } catch (error) {
-              toastError(error, t);
-              return;
-            }
-            toast.success(t("deleted"));
-            const index = (list.data ?? []).findIndex((row) => row.id === entry.id);
-            setRefocus({ id: entry.id, index: Math.max(0, index) });
-            await invalidate();
-          });
+          await deleteEntry(entry);
         })(),
     }),
-    [busy, isBusy, run, t, lang, confirm, restoreConfirm, finishRestore, invalidate, list.data],
+    [busy, isBusy, t, lang, confirm, restoreConfirm, download, restoreEntry, deleteEntry],
   );
 
   const rows = list.data ?? [];
   // PAGE_SIZE rows a page; the pager shows only past one page. A page that empties
   // (its last backup deleted) falls back to the new last page.
-  const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageRows = useMemo(
@@ -226,9 +311,7 @@ export function BackupsPage(): JSX.Element {
     if (!container) return;
     const next = rows[Math.min(refocus.index, rows.length - 1)];
     const targets = next
-      ? Array.from(container.querySelectorAll<HTMLElement>(`[${ROW_FOCUS_ATTR}]`)).filter(
-          (element) => element.getAttribute(ROW_FOCUS_ATTR) === next.id,
-        )
+      ? rowFocusTargets(container, next.id)
       : createRef.current
         ? [createRef.current]
         : [];
@@ -236,19 +319,48 @@ export function BackupsPage(): JSX.Element {
     setRefocus(null);
   }, [refocus, rows]);
 
+  /** A row's first action; Create backup when the row is on another page or gone. */
+  const focusRow = (id: string) =>
+    focusFirstShown([
+      ...rowFocusTargets(listRef.current, id),
+      ...(createRef.current ? [createRef.current] : []),
+    ]);
+
+  /**
+   * Where focus goes as a failure's notice closes or retries, so it never drops to <body>: the
+   * control that ran the action.
+   */
+  const focusFailure = (current: Failure) => {
+    if (current.action === "create") createRef.current?.focus();
+    else if (current.action === "upload") uploadRef.current?.focus();
+    else focusRow(current.entry.id);
+  };
+
   const emptyState = useMemo(
     () => <EmptyState description={t("emptyBody")} icon={ArchiveIcon} inCard title={t("empty")} />,
     [t],
   );
 
-  const uploadError = (error: unknown) => {
-    if (isApiError(error) && isNotABackupMessage(error.serverMessage)) {
-      toast.error(t("notABackup"), {
-        description: t("notABackupBody", { detail: error.serverMessage.trim() }),
-      });
+  const upload = async (file: File) => {
+    clearNotices();
+    setUploading(true);
+    try {
+      await restoreBackupUpload(file);
+    } catch (error) {
+      // A file that is not a backup fails the same way every time: no Try again.
+      setFailure(
+        isApiError(error) && isNotABackupMessage(error.serverMessage)
+          ? {
+              action: "upload",
+              error: t("notABackupBody", { detail: error.serverMessage.trim() }),
+            }
+          : { action: "upload", file, error },
+      );
       return;
+    } finally {
+      setUploading(false);
     }
-    toastError(error, t);
+    finishRestore();
   };
 
   const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -257,20 +369,37 @@ export function BackupsPage(): JSX.Element {
     event.target.value = "";
     if (!file) return;
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(t("fileTooLarge", { size: formatBytes(file.size, lang) }));
+      clearNotices();
+      setFailure({
+        action: "upload",
+        error: t("fileTooLarge", { size: formatBytes(file.size, lang) }),
+      });
       return;
     }
     if (!(await restoreConfirm(t("confirmUpload", { name: file.name }), file.name))) return;
-    setUploading(true);
-    try {
-      await restoreBackupUpload(file);
-    } catch (error) {
-      uploadError(error);
-      return;
-    } finally {
-      setUploading(false);
+    await upload(file);
+  };
+
+  // Focus moves first, as the notice goes with the retry.
+  const retry = (current: Failure) => {
+    focusFailure(current);
+    switch (current.action) {
+      case "create":
+        startCreate();
+        break;
+      case "upload":
+        if (current.file) void upload(current.file);
+        break;
+      case "download":
+        void download(current.entry);
+        break;
+      case "restore":
+        void restoreEntry(current.entry);
+        break;
+      case "delete":
+        void deleteEntry(current.entry);
+        break;
     }
-    finishRestore();
   };
 
   return (
@@ -292,6 +421,7 @@ export function BackupsPage(): JSX.Element {
                   <Button
                     loading={uploading}
                     onClick={() => fileInputRef.current?.click()}
+                    ref={uploadRef}
                     variant="secondary"
                   />
                 }
@@ -332,6 +462,30 @@ export function BackupsPage(): JSX.Element {
         slim
         title={t("list.title")}
       >
+        {failure ? (
+          <CardPanel>
+            <ActionError
+              error={failure.error}
+              onDismiss={() => {
+                setFailure(null);
+                focusFailure(failure);
+              }}
+              onRetry={
+                failure.action === "upload" && !failure.file ? undefined : () => retry(failure)
+              }
+            />
+          </CardPanel>
+        ) : null}
+        {downloaded ? (
+          <CardPanel>
+            <DownloadedNotice
+              onDismiss={() => {
+                setDownloaded(null);
+                focusRow(downloaded);
+              }}
+            />
+          </CardPanel>
+        ) : null}
         {list.isError && !list.data ? (
           <ErrorState
             compact
