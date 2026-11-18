@@ -4,7 +4,7 @@ import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 
 /** One account's live numbers. Counts are final client requests: a retried request counts once. */
-export interface AccountActivity {
+interface AccountActivity {
   /** Requests since midnight in the server's time zone, success or failure. */
   today: number;
   /** Requests finished in the last 60 seconds. */

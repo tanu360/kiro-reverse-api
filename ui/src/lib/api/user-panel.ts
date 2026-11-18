@@ -91,7 +91,7 @@ export type UserUsageClient = RequestClient | RequestEndpoint | "other";
 export const USER_USAGE_OTHER_CLIENT = "other";
 
 /** One caller's share of the key's usage; `id` is a UserUsageClient. */
-export interface UserUsageClientItem extends ApiKeyUsageBreakdownItem {
+interface UserUsageClientItem extends ApiKeyUsageBreakdownItem {
   id: UserUsageClient;
 }
 
@@ -147,10 +147,10 @@ export const USER_REQUEST_SORTS = [
   "duration",
 ] as const;
 export type UserRequestSort = (typeof USER_REQUEST_SORTS)[number];
-export type UserRequestOrder = "asc" | "desc";
+type UserRequestOrder = "asc" | "desc";
 
 /** The key's requests per status tab, whatever page and tab the answer is for. */
-export interface UserRequestCounts {
+interface UserRequestCounts {
   all: number;
   succeeded: number;
   failed: number;

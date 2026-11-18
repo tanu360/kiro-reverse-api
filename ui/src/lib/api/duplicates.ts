@@ -3,7 +3,7 @@ import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 
 /** The rule that joined two accounts of a group, in the order the server tries them. */
-export type DuplicateReason = "refresh_token" | "api_key" | "user_id" | "email";
+type DuplicateReason = "refresh_token" | "api_key" | "user_id" | "email";
 
 /** One account of a duplicate group. The server never sends a secret here. */
 export interface DuplicateAccount {

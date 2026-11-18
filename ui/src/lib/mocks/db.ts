@@ -97,7 +97,7 @@ export interface MockDb {
   };
 }
 
-export interface MockTwoFactor {
+interface MockTwoFactor {
   enabled: boolean;
   /** ms epoch */
   enabledAt: number;
@@ -118,7 +118,7 @@ export interface MockTwoFactor {
  * The public link as the mock keeps it. The browser mock walks the flow by time from `since`
  * (download, connect, sign-in, live); a test pins the status it needs in `pinned` instead.
  */
-export interface MockTunnel {
+interface MockTunnel {
   enabled: boolean;
   hostname: string;
   signedIn: boolean;

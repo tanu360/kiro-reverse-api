@@ -10,11 +10,11 @@ import { getVersion } from "./system";
  * way down, checked and in place of the running file (ready for a restart), the restart under
  * way, or failed.
  */
-export type UpdateState = "idle" | "downloading" | "ready" | "restarting" | "error";
+type UpdateState = "idle" | "downloading" | "ready" | "restarting" | "error";
 
 /** Why this server cannot update itself: it runs in a container, on a platform with no release
  * archive, or its executable sits in a folder it cannot write to. */
-export type UpdateUnsupportedReason = "container" | "platform" | "not_writable";
+type UpdateUnsupportedReason = "container" | "platform" | "not_writable";
 
 /** GET /admin/api/update */
 export interface UpdateStatus {

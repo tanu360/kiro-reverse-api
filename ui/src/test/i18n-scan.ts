@@ -3,7 +3,7 @@ import { type AstNode, fields, isAstNode, isNode, type NodeOf } from "./babel-as
 
 /**
  * Static scan for user-visible text that bypasses the locale files. It parses a source file and
- * reports JSX text, user-visible string props, string children, toast/confirm arguments,
+ * reports JSX text, user-visible string props, string children, announce/confirm arguments,
  * document.title assignments and user-visible object properties that hold literal text.
  *
  * A literal is allowed when nothing but product tokens (ALLOWED_TOKENS), digits and punctuation
@@ -71,7 +71,15 @@ const VISIBLE_SUFFIX =
 // Elements whose text content is code, keys or data rather than prose.
 const CODE_ELEMENTS = new Set(["code", "pre", "kbd", "samp", "Code", "Kbd", "KbdGroup"]);
 
-const TOAST_METHODS = new Set(["success", "error", "warning", "info", "loading"]);
+// Calls whose first argument reaches the user: read out by announce(), shown by the native dialogs.
+const TEXT_CALLS = new Set([
+  "announce",
+  "alert",
+  "confirm",
+  "prompt",
+  "window.alert",
+  "window.confirm",
+]);
 
 // "ns:key", "group.key" or a camelCase key name such as "microsoftChoiceHint".
 const KEY_LIKE = /^(?:[A-Za-z][\w-]*(?::[\w.-]+|(?:\.[\w-]+)+)|[a-z]+[A-Z][A-Za-z0-9]*)$/;
@@ -394,12 +402,7 @@ export function scanSource(code: string, file: string): Finding[] {
       }
     } else if (isNode(node, "CallExpression")) {
       const callee = calleeName(node.callee);
-      const [object, method] = callee.split(".");
-      const isToast = (object === "toast" && TOAST_METHODS.has(method ?? "")) || callee === "toast";
-      const isDialog = ["alert", "confirm", "prompt", "window.alert", "window.confirm"].includes(
-        callee,
-      );
-      if (isToast || isDialog) reportExpression(callee, node.arguments[0], true);
+      if (TEXT_CALLS.has(callee)) reportExpression(callee, node.arguments[0], true);
       // messages.join("; "): a list of sentences in English punctuation.
       const [separator] = node.arguments;
       if (callee.endsWith(".join") && isNode(separator, "StringLiteral")) {

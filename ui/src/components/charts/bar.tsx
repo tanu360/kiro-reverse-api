@@ -24,8 +24,8 @@ const BAR_FADE_CLASS = "[transition:opacity_0.15s_ease-in-out]";
 
 type ScaleBand<Domain extends { toString(): string }> = D3ScaleBand<Domain>;
 
-export type BarLineCap = "round" | "butt" | number;
-export type BarAnimationType = "grow" | "fade";
+type BarLineCap = "round" | "butt" | number;
+type BarAnimationType = "grow" | "fade";
 
 // ── Bar-depth perspective trim ───────────────────────────────────────────
 // Uses the SHARED geometry (`bar-depth-geometry.ts`) so a

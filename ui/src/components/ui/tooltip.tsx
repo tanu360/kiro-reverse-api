@@ -36,7 +36,7 @@ export function TooltipPopup({
       <TooltipPrimitive.Positioner
         align={align}
         anchor={anchor}
-        // z-70: above the toast layer (toast.tsx, z-60), as every anchored popup.
+        // z-70: above dialogs and sheets (z-50), as every anchored popup.
         className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
         collisionPadding={collisionPadding}
         data-slot="tooltip-positioner"
@@ -45,7 +45,7 @@ export function TooltipPopup({
       >
         <TooltipPrimitive.Popup
           className={cn(
-            // The one floating sheet (index.css popup-surface), as menus, selects, popovers and toasts.
+            // The one floating sheet (index.css popup-surface), as menus, selects and popovers.
             "popup-surface relative flex h-(--popup-height,auto) w-(--popup-width,auto) max-w-[min(--spacing(80),90vw)] origin-(--transform-origin) wrap-anywhere text-pretty whitespace-normal text-xs leading-snug transition-[width,height,scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
             className,
           )}

@@ -462,9 +462,9 @@ export type CredentialsImportResponse = AddAccountResponse;
 // ---------------------------------------------------------------------------
 
 // `(string & {})` keeps the known values in autocomplete while accepting any server string.
-export type BanStatus = "" | "ACTIVE" | "BANNED" | "SUSPENDED" | (string & {});
+type BanStatus = "" | "ACTIVE" | "BANNED" | "SUSPENDED" | (string & {});
 /** Compare case-insensitively. */
-export type OverageStatus = "" | "ENABLED" | "DISABLED" | (string & {});
+type OverageStatus = "" | "ENABLED" | "DISABLED" | (string & {});
 export type AuthMethod =
   | "idc"
   | "social"
@@ -750,7 +750,7 @@ export type SetAccountProfileResponse =
 // Export (POST /admin/api/export)
 // ---------------------------------------------------------------------------
 
-export interface ExportCredentials {
+interface ExportCredentials {
   accessToken: string;
   csrfToken: string;
   refreshToken: string;
@@ -806,7 +806,7 @@ export interface ExportData {
  * Per-minute values for the last 30 minutes, oldest first; the last entry is the current,
  * partial minute. Taken from the global ring.
  */
-export interface ObserveSeries {
+interface ObserveSeries {
   /** client requests per minute */
   rpm: number[];
   /** failed / requests per minute, 0..1 (0 for an empty minute) */
@@ -866,7 +866,7 @@ export interface HeatmapCell {
   /** omitted when 0 */
   credits?: number;
 }
-export interface AccountHeatmap {
+interface AccountHeatmap {
   /** "_global_" for the global row */
   accountId: string;
   /** never set on global; omitted if the account is missing */
@@ -1147,7 +1147,7 @@ export interface ApiKey {
  * past); `empty`: no credits left; `idle`: nothing spent in the window; `lasts`: at the current
  * rate the credits last until they reset; `runs_out`: they run out before.
  */
-export type AccountForecastStatus = "unknown" | "empty" | "idle" | "lasts" | "runs_out";
+type AccountForecastStatus = "unknown" | "empty" | "idle" | "lasts" | "runs_out";
 
 export interface AccountForecast {
   status: AccountForecastStatus;
@@ -1381,7 +1381,7 @@ export interface ProxyConfig {
 }
 export type ProxyConfigUpdate = ProxyConfig;
 
-export type PromptFilterRuleType = "regex" | "lines-containing" | "contains";
+type PromptFilterRuleType = "regex" | "lines-containing" | "contains";
 export interface PromptFilterRule {
   /** the UI generates 'rule-' + Date.now() */
   id: string;
@@ -1405,13 +1405,7 @@ export type PromptFilterUpdate = Partial<PromptFilterConfig>;
 // Backups
 // ---------------------------------------------------------------------------
 
-export type BackupKind =
-  | "manual"
-  | "scheduled"
-  | "auto"
-  | "pre-restore"
-  | "pre-merge"
-  | (string & {});
+type BackupKind = "manual" | "scheduled" | "auto" | "pre-restore" | "pre-merge" | (string & {});
 export interface BackupEntry {
   id: string;
   /** unix seconds */
