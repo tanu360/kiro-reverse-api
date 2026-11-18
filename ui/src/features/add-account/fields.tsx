@@ -191,7 +191,7 @@ export function FlowGuide({
   );
 }
 
-export type FlowStepState = "done" | "current" | "todo";
+type FlowStepState = "done" | "current" | "todo";
 
 export interface FlowStepItem {
   state: FlowStepState;
