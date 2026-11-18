@@ -40,7 +40,7 @@ export function PriorityRow({ account }: { account: Account }): JSX.Element {
       onOpenChange={setOpen}
       onSubmit={onSubmit}
       open={open}
-      saving={save.isPending}
+      save={save}
       title={t("detail.priority")}
       value={String(account.priority)}
     >

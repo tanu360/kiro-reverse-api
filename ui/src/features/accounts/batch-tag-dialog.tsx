@@ -8,13 +8,14 @@ import {
   useRef,
   useState,
 } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { announce } from "@/lib/announce";
 import { batchAccounts } from "@/lib/api/accounts";
-import { errorMessage } from "@/lib/api/server-errors";
 import type {
   Account,
   AccountActionResult,
@@ -23,8 +24,7 @@ import type {
 } from "@/lib/api/types";
 import { compareText } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail, useMaskText } from "@/lib/privacy";
-import { toast } from "@/lib/toast";
+import { useMaskText } from "@/lib/privacy";
 import {
   editMaskedText,
   type FieldSelection,
@@ -34,6 +34,7 @@ import {
   tagKey,
 } from "./account-metadata";
 import { describeFailures } from "./account-model";
+import { failedIdsIn, useAccountNameOf } from "./batch-bar";
 import { useInvalidateAccounts } from "./use-account-actions";
 
 /** Every tag in the list once (ignoring case, first spelling), sorted, as quick picks. */
@@ -49,9 +50,11 @@ function tagsInUse(accounts: readonly Account[]): string[] {
 
 /**
  * Adds one tag to the selected accounts, or removes it from them. The field takes one tag (the
- * tags already in use are quick picks under it); Add is the form's submit, so Enter adds. The
- * result toast counts the accounts changed and names the ones that failed, such as an account
- * that already has the most tags.
+ * tags already in use are quick picks under it); Add is the form's submit, so Enter adds. No
+ * toasts: the pressed button spins; a clean run closes the dialog (a screen reader hears how many
+ * accounts changed). A partial run stays open on the failed accounts, counting the changed ones
+ * and naming the failed ones (such as an account that already has the most tags), where Try
+ * again runs on those; a failed request says why, also with Try again.
  */
 export function BatchTagDialog({
   open,
@@ -65,10 +68,13 @@ export function BatchTagDialog({
   onOpenChange: (open: boolean) => void;
   /** The selected account ids. */
   ids: string[];
-  /** The whole list: the tags in use, and names for the result toast. */
+  /** The whole list: the tags in use, and names for the failed accounts. */
   accounts: Account[];
-  /** After a request lands: the page closes the dialog and clears the selection. */
-  onDone: () => void;
+  /**
+   * After a request lands. Nothing failed: the page closes the dialog and clears the selection.
+   * Else the failed ids still in the list: the page keeps the dialog on them and selects them.
+   */
+  onDone: (failedIds: string[]) => void;
   /** Where focus goes on close; the opener is gone once `onDone` clears the selection. */
   finalFocus?: ComponentProps<typeof ResponsiveDialog>["finalFocus"];
 }): JSX.Element {
@@ -92,14 +98,23 @@ export function BatchTagDialog({
       inputRef.current = null;
     };
   }, []);
+  const { t: tc } = useT();
   const invalidate = useInvalidateAccounts();
-  const displayEmail = useDisplayEmail();
+  const nameOf = useAccountNameOf(accounts);
   const mask = useMaskText();
   const [draft, setDraft] = useState("");
   // The quick pick in the field: shown masked under privacy (as the chips are) while untouched.
   const [picked, setPicked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<BatchTagAction | null>(null);
+  // The last run that failed (wholly or for some accounts), said in the dialog.
+  const [failure, setFailure] = useState<{
+    action: BatchTagAction;
+    error: unknown;
+    message?: string;
+  } | null>(null);
+  const addRef = useRef<HTMLButtonElement | null>(null);
+  const removeRef = useRef<HTMLButtonElement | null>(null);
   // Every opening starts with an empty field: a draft or error left by Escape does not come back.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -108,15 +123,11 @@ export function BatchTagDialog({
       setDraft("");
       setPicked(null);
       setError(null);
+      setFailure(null);
     }
   }
   const inUse = useMemo(() => tagsInUse(accounts), [accounts]);
   const shown = picked !== null && draft === picked ? mask(picked) : draft;
-
-  const nameOf = (id: string) => {
-    const account = accounts.find((item) => item.id === id);
-    return account ? displayEmail(account.email, account.id) : id;
-  };
 
   /** The one tag typed, or null after showing why it cannot be sent. */
   const readTag = (): string | null => {
@@ -142,7 +153,7 @@ export function BatchTagDialog({
     const tag = readTag();
     if (tag === null) return;
     setRunning(action);
-    const toastId = toast.loading(t("batch.processing"));
+    setFailure(null);
     try {
       const result = (await batchAccounts({
         ids: [...ids],
@@ -155,19 +166,26 @@ export function BatchTagDialog({
           ? { ...row, error: t("metadata.tagLimit", { max: MAX_TAGS }) }
           : row,
       );
-      const failed = result.failed ?? 0;
-      toast.update(toastId, {
-        type: failed > 0 ? "warning" : "success",
-        title: t(action === "addTag" ? "metadata.batchAddResult" : "metadata.batchRemoveResult", {
-          count: result.count ?? 0,
-        }),
-        description: describeFailures(results, nameOf, t) || undefined,
-      });
-      setDraft("");
-      setPicked(null);
-      onDone();
-    } catch (failure) {
-      toast.update(toastId, { type: "error", title: errorMessage(failure, t) });
+      const title = t(
+        action === "addTag" ? "metadata.batchAddResult" : "metadata.batchRemoveResult",
+        { count: result.count ?? 0 },
+      );
+      const details = describeFailures(results, nameOf, t);
+      const message = details ? tc("text.joinSentences", { first: title, second: details }) : title;
+      // Failed accounts still in the list stay in the dialog, with the draft, so Try again sends
+      // the same tag to them. Accounts gone from the list leave nothing to try again.
+      const again = (result.failed ?? 0) > 0 ? failedIdsIn(result.results, accounts) : [];
+      if (again.length > 0) {
+        setFailure({ action, error: null, message });
+        onDone(again);
+      } else {
+        announce(message);
+        setDraft("");
+        setPicked(null);
+        onDone([]);
+      }
+    } catch (failed) {
+      setFailure({ action, error: failed });
     } finally {
       setRunning(null);
       await invalidate();
@@ -190,6 +208,7 @@ export function BatchTagDialog({
             disabled={running === "addTag"}
             loading={running === "removeTag"}
             onClick={() => void run("removeTag")}
+            ref={removeRef}
             variant="secondary"
           >
             {t("metadata.batchRemove")}
@@ -198,6 +217,7 @@ export function BatchTagDialog({
             disabled={running === "removeTag"}
             form={formId}
             loading={running === "addTag"}
+            ref={addRef}
             type="submit"
           >
             {t("metadata.batchAdd")}
@@ -261,6 +281,20 @@ export function BatchTagDialog({
               ))}
             </div>
           </fieldset>
+        ) : null}
+        {failure ? (
+          <ActionError
+            error={failure.error}
+            message={failure.message}
+            onDismiss={() => {
+              (failure.action === "addTag" ? addRef : removeRef).current?.focus();
+              setFailure(null);
+            }}
+            onRetry={() => {
+              (failure.action === "addTag" ? addRef : removeRef).current?.focus();
+              void run(failure.action);
+            }}
+          />
         ) : null}
       </form>
     </ResponsiveDialog>

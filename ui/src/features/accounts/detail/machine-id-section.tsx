@@ -10,7 +10,6 @@ import { generateMachineId } from "@/lib/api/system";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { hexChars } from "@/lib/input-filters";
-import { toast } from "@/lib/toast";
 import { isValidMachineId } from "../account-model";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
 
@@ -19,6 +18,7 @@ import { EditableFieldRow, useSaveAccountField } from "./detail-section";
  * from the server; a spinner takes the dice's place while the server answers. The edit takes the
  * whole row (`wide`), so a UUID fits on one line in the desktop sheet; a phone's 16 px mono line
  * (no zoom on focus) is still narrower than one, and there the field scrolls rather than wraps.
+ * A failed dice shows its reason under the field, as a failed save does; the dice is the retry.
  */
 export function MachineIdRow({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
@@ -32,9 +32,6 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
     onSuccess: (result) => {
       setValue(result.machineId);
       setError(null);
-    },
-    onError: () => {
-      toast.error(t("detail.generateFailed"));
     },
   });
 
@@ -56,15 +53,20 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
   return (
     <EditableFieldRow
       mono
+      extraError={generate.error}
       onEdit={() => {
         setValue(account.machineId);
         setError(null);
+        generate.reset();
         setOpen(true);
       }}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => {
+        if (!next) generate.reset();
+        setOpen(next);
+      }}
       onSubmit={onSubmit}
       open={open}
-      saving={save.isPending}
+      save={save}
       title={t("detail.machineId")}
       value={account.machineId}
       wide

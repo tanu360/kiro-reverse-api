@@ -19,6 +19,12 @@ function captureBatch(): unknown[] {
   return bodies;
 }
 
+/** A result read out by the app's hidden live region (no toast). */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 function renderDialog(ids: string[]) {
   const onDone = vi.fn();
   const view = renderWithProviders(
@@ -64,14 +70,15 @@ describe("BatchTagDialog", () => {
     await waitFor(() => expect(input).toHaveFocus());
 
     await user.type(input, "  vip {Enter}");
-    expect(await screen.findByText("Tagged 2 accounts.")).toBeInTheDocument();
+    await expectAnnounced("Tagged 2 accounts.");
     expect(bodies).toEqual([{ ids, action: "addTag", tag: "vip" }]);
     expect(onDone).toHaveBeenCalledTimes(1);
+    expect(onDone).toHaveBeenCalledWith([]);
     expect(first.tags).toEqual(["vip"]);
 
     await user.type(input, "VIP");
     await user.click(within(dialog).getByRole("button", { name: "Remove tag" }));
-    expect(await screen.findByText("Removed the tag from 2 accounts.")).toBeInTheDocument();
+    await expectAnnounced("Removed the tag from 2 accounts.");
     expect(bodies[1]).toEqual({ ids, action: "removeTag", tag: "VIP" });
     expect(first.tags).toEqual([]);
   });
@@ -140,19 +147,44 @@ describe("BatchTagDialog", () => {
     expect(bodies[0]).toMatchObject({ action: "addTag", tag: "ci" });
   });
 
-  it("names an account that already has the most tags in the result toast", async () => {
+  it("names an account that already has the most tags in the dialog and hands back only it", async () => {
     const [full, other] = mockDb.accounts;
     full.tags = Array.from({ length: 10 }, (_, i) => `t${i}`);
-    const { user } = renderDialog([full.id, other.id]);
+    const { user, onDone } = renderDialog([full.id, other.id]);
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByRole("textbox", { name: "Tag" }), "new");
     await user.click(within(dialog).getByRole("button", { name: "Add tag" }));
-    expect(
-      await screen.findByText("Tagged 1 account.", { selector: "[data-slot=toast-title]" }),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByText(/Already has 10 tags/, { selector: "[data-slot=toast-description]" }),
-    ).toBeInTheDocument();
+    const notice = await within(dialog).findByRole("alert");
+    expect(notice).toHaveTextContent(/^Tagged 1 account\. .+: Already has 10 tags/);
+    // The page keeps the dialog on the account that failed; the draft stays for another try.
+    expect(onDone).toHaveBeenCalledWith([full.id]);
+    expect(within(dialog).getByRole("textbox", { name: "Tag" })).toHaveValue("new");
+  });
+
+  it("says a failed request in the dialog, and Try again sends it again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/accounts/batch"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    // Registered last, so it runs first and sees both requests.
+    const bodies = captureBatch();
+    const [first] = mockDb.accounts;
+    const { user, onDone } = renderDialog([first.id]);
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox", { name: "Tag" }), "vip{Enter}");
+    const notice = await within(dialog).findByRole("alert");
+    expect(notice).toHaveTextContent("boom");
+    expect(onDone).not.toHaveBeenCalled();
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await expectAnnounced("Tagged 1 account.");
+    expect(bodies).toHaveLength(2);
+    expect(onDone).toHaveBeenCalledWith([]);
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Add tag" })).toHaveFocus();
   });
 
   it("asks for one tag and sends nothing for an empty or comma-separated value", async () => {

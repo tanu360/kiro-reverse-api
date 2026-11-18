@@ -15,11 +15,14 @@ import { NOTICE_ACTIONS_CLASS, NOTICE_LINE_CLASS, NoticeIconButton } from "./not
  */
 export function ActionError({
   error,
+  message,
   onRetry,
   onDismiss,
   className,
 }: {
   error: unknown;
+  /** The line in place of the error's reason, for a failure with words of its own (a batch's result). */
+  message?: string;
   /** Runs the same action again. */
   onRetry?: () => void;
   /** Closes the notice; without it (a form's error) it stays until the next try. */
@@ -34,7 +37,7 @@ export function ActionError({
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per new failure.
   useEffect(() => {
     ref.current?.scrollIntoView?.({ block: "nearest" });
-  }, [error]);
+  }, [error, message]);
 
   return (
     <Alert
@@ -44,7 +47,9 @@ export function ActionError({
       variant="error"
     >
       <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-      <AlertDescription className="wrap-break-word">{errorMessage(error, t)}</AlertDescription>
+      <AlertDescription className="wrap-break-word">
+        {message ?? errorMessage(error, t)}
+      </AlertDescription>
       {onRetry || onDismiss ? (
         <AlertAction className={NOTICE_ACTIONS_CLASS}>
           {onRetry ? (

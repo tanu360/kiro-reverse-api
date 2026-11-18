@@ -14,6 +14,11 @@ import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { LiveStatusPill } from "./account-activity";
 import { AuthAvatar, accountMeta } from "./account-cells";
+import {
+  type AccountFailure,
+  AccountFailureNotice,
+  AccountFailureProvider,
+} from "./account-failure";
 import { isApiKeyAccount, isHeld, supportsKiroProfiles } from "./account-model";
 import { AccountSheetActions } from "./account-row-actions";
 import { AccountSection } from "./detail/account-section";
@@ -26,6 +31,9 @@ import { TestAccountDialog } from "./test-account-dialog";
 
 // "Sign in again" opens the add-account dialog over the sheet. Its code loads on first use, so the
 // pages that only open this sheet (Overview, Requests) do not carry it.
+// The sheet's actions are always in it while it is open, so their failure needs no other focus.
+const NO_FALLBACK = () => null;
+
 const AddAccountDialog = lazy(() =>
   import("@/features/add-account/add-account-dialog").then((module) => ({
     default: module.AddAccountDialog,
@@ -64,6 +72,9 @@ export function AccountDetailSheet({
     () => setRelogin((current) => ({ open: true, session: (current?.session ?? 0) + 1 })),
     [],
   );
+  // A failed action of the sheet's own (Refresh token, the switch, Copy JSON, Delete), said under
+  // those actions in place of a toast.
+  const [failure, setFailure] = useState<AccountFailure | null>(null);
   const showProfile =
     account !== undefined &&
     !isApiKeyAccount(account) &&
@@ -71,63 +82,75 @@ export function AccountDetailSheet({
 
   return (
     <ReloginProvider onRelogin={openRelogin}>
-      <ResponsiveSheet onOpenChange={onOpenChange} open={open && account !== undefined}>
-        <ResponsiveSheetHeader className={account ? "gap-4" : undefined}>
-          {account ? (
-            <>
-              <div className="flex items-start gap-3">
-                {/* Centred on the title and meta lines (48 px), and stays there over a ban reason. */}
-                <AuthAvatar account={account} className="mt-1" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  {/* A long address is cut to the sheet and shows in full in a tooltip. */}
-                  <ResponsiveSheetTitle className="min-w-0">
-                    <TruncatedText>{displayEmail(account.email, account.id)}</TruncatedText>
-                  </ResponsiveSheetTitle>
-                  {/* The list's status pill leads the meta line, as on the phone cards. */}
-                  <div className="flex min-w-0 items-center gap-2">
-                    <LiveStatusPill account={account} plain size="sm" />
-                    {meta ? (
-                      <ResponsiveSheetDescription className="min-w-0">
-                        <TruncatedText>{meta}</TruncatedText>
-                      </ResponsiveSheetDescription>
+      <AccountFailureProvider fallbackFocus={NO_FALLBACK} report={setFailure}>
+        <ResponsiveSheet onOpenChange={onOpenChange} open={open && account !== undefined}>
+          <ResponsiveSheetHeader className={account ? "gap-4" : undefined}>
+            {account ? (
+              <>
+                <div className="flex items-start gap-3">
+                  {/* Centred on the title and meta lines (48 px), and stays there over a ban reason. */}
+                  <AuthAvatar account={account} className="mt-1" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    {/* A long address is cut to the sheet and shows in full in a tooltip. */}
+                    <ResponsiveSheetTitle className="min-w-0">
+                      <TruncatedText>{displayEmail(account.email, account.id)}</TruncatedText>
+                    </ResponsiveSheetTitle>
+                    {/* The list's status pill leads the meta line, as on the phone cards. */}
+                    <div className="flex min-w-0 items-center gap-2">
+                      <LiveStatusPill account={account} plain size="sm" />
+                      {meta ? (
+                        <ResponsiveSheetDescription className="min-w-0">
+                          <TruncatedText>{meta}</TruncatedText>
+                        </ResponsiveSheetDescription>
+                      ) : null}
+                    </div>
+                    {/* The ban reason in words, where the list puts it in the pill's tooltip. */}
+                    {account.banReason && isHeld(account) ? (
+                      <p className="text-meta text-muted-foreground">
+                        {serverDataText(account.banReason, t)}
+                      </p>
                     ) : null}
                   </div>
-                  {/* The ban reason in words, where the list puts it in the pill's tooltip. */}
-                  {account.banReason && isHeld(account) ? (
-                    <p className="text-meta text-muted-foreground">
-                      {serverDataText(account.banReason, t)}
-                    </p>
-                  ) : null}
                 </div>
-              </div>
-              {/*
+                {/*
                 The header keeps 48 px at its end for the close button; the actions sit under it, so
                 they run out to the cards' 16 px edge instead (a phone's header keeps no room).
               */}
-              <AccountSheetActions
-                account={account}
-                className="-me-8 max-sm:me-0"
-                onTest={() =>
-                  setTest((current) => ({ open: true, session: (current?.session ?? 0) + 1 }))
-                }
-              />
-            </>
-          ) : (
-            <ResponsiveSheetTitle>{t("detail.title")}</ResponsiveSheetTitle>
-          )}
-        </ResponsiveSheetHeader>
-        <ResponsiveSheetPanel className="flex flex-col gap-4">
-          {account ? (
-            <>
-              <StatisticsSection account={account} />
-              <AccountSection account={account} />
-              <OverageSection account={account} />
-              {showProfile ? <ProfileSection account={account} /> : null}
-              <ModelsSection accountId={account.id} />
-            </>
-          ) : null}
-        </ResponsiveSheetPanel>
-      </ResponsiveSheet>
+                <AccountSheetActions
+                  account={account}
+                  className="-me-8 max-sm:me-0"
+                  onTest={() =>
+                    setTest((current) => ({ open: true, session: (current?.session ?? 0) + 1 }))
+                  }
+                />
+                {failure ? (
+                  // Out to the cards' edge, as the actions above it.
+                  <div className="-me-8 max-sm:me-0">
+                    <AccountFailureNotice
+                      failure={failure}
+                      fallbackFocus={NO_FALLBACK}
+                      report={setFailure}
+                    />
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <ResponsiveSheetTitle>{t("detail.title")}</ResponsiveSheetTitle>
+            )}
+          </ResponsiveSheetHeader>
+          <ResponsiveSheetPanel className="flex flex-col gap-4">
+            {account ? (
+              <>
+                <StatisticsSection account={account} />
+                <AccountSection account={account} />
+                <OverageSection account={account} />
+                {showProfile ? <ProfileSection account={account} /> : null}
+                <ModelsSection accountId={account.id} />
+              </>
+            ) : null}
+          </ResponsiveSheetPanel>
+        </ResponsiveSheet>
+      </AccountFailureProvider>
       {test && account ? (
         <TestAccountDialog
           account={account}

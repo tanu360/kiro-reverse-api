@@ -78,7 +78,7 @@ function NicknameRow({ account }: { account: Account }): JSX.Element {
       onOpenChange={setOpen}
       onSubmit={() => save.mutate({ nickname: draft.trim() }, { onSuccess: () => setOpen(false) })}
       open={open}
-      saving={save.isPending}
+      save={save}
       title={t("detail.nickname")}
       value={account.nickname}
     >

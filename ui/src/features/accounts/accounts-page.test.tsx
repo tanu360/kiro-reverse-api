@@ -33,6 +33,18 @@ async function renderAccounts(path = "/accounts") {
   return { ...view, table };
 }
 
+/** A result read out by the app's hidden live region (no toast). */
+async function expectAnnounced(text: string | RegExp): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
+/** The one-line failure at the top of the accounts card. */
+async function cardNotice(): Promise<HTMLElement> {
+  const card = screen.getByRole("main").querySelector('[data-slot="data-table-card-body"]');
+  return within(card as HTMLElement).findByRole("alert");
+}
+
 function bodyRows(table: HTMLElement): HTMLElement[] {
   return within(table).getAllByRole("row").slice(1);
 }
@@ -216,9 +228,7 @@ describe("AccountsPage", () => {
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
-    expect(
-      await screen.findByText(`Deleted ${ids.length} accounts, 0 failed.`),
-    ).toBeInTheDocument();
+    await expectAnnounced(`Deleted ${ids.length} accounts, 0 failed.`);
     expect(bodies).toEqual([{ ids, action: "delete" }]);
     await waitFor(() => expect(screen.queryByText(/ selected$/)).not.toBeInTheDocument());
   });
@@ -379,7 +389,8 @@ describe("AccountsPage layout", () => {
   });
 
   it("refreshes the selection's models in one batch call and reports the result", async () => {
-    // The third account fails upstream: the toast counts it and names it with the reason.
+    // The third account fails upstream: the card counts it and names it with the reason, and it
+    // alone stays selected; Try again runs the action on it.
     mockServer.use(
       http.post(apiUrl("/accounts/batch"), async ({ request }) => {
         const { ids } = (await request.clone().json()) as { ids: string[] };
@@ -402,15 +413,111 @@ describe("AccountsPage layout", () => {
     await user.click(within(bar).getByRole("button", { name: "Refresh models" }));
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Refresh models" }));
-    const title = await screen.findByText("Refreshed models for 2 accounts, 1 failed.");
-    const toastRoot = title.closest<HTMLElement>('[data-slot="toast"]');
-    expect(toastRoot).toHaveAttribute("data-type", "warning");
-    expect(toastRoot?.querySelector('[data-slot="toast-description"]')?.textContent).toMatch(
-      /: upstream 500$/,
+    const notice = await cardNotice();
+    expect(notice).toHaveTextContent(
+      /^Refreshed models for 2 accounts, 1 failed\. .+: upstream 500$/,
     );
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({ action: "refreshModels" });
-    expect((bodies[0] as { ids: string[] }).ids).toHaveLength(3);
+    const sent = (bodies[0] as { ids: string[] }).ids;
+    expect(sent).toHaveLength(3);
+    expect(await screen.findByText("1 selected")).toBeInTheDocument();
+
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1]).toEqual({ action: "refreshModels", ids: [sent[2]] });
+  });
+
+  it("keeps the selection and says why in the card when a batch request fails", async () => {
+    mockServer.use(
+      http.post(apiUrl("/accounts/batch"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { table, user } = await renderAccounts();
+    await user.click(within(bodyRows(table)[0]).getAllByRole("checkbox")[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    await user.click(within(bar).getByRole("button", { name: "Disable selected" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Disable" }),
+    );
+    expect(await cardNotice()).toHaveTextContent("boom");
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    await user.click(within(await cardNotice()).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(within(bar).getByRole("button", { name: "Disable selected" })).toHaveFocus();
+  });
+
+  it("says a failed token refresh in the card, and Try again sends it again", async () => {
+    let fail = true;
+    const calls: string[] = [];
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/refresh"), ({ params }) => {
+        calls.push(String(params.id));
+        return fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined;
+      }),
+    );
+    const { table, user } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    const refresh = within(row).getByRole("button", { name: "Refresh token" });
+    await user.click(refresh);
+    const notice = await cardNotice();
+    expect(notice).toHaveTextContent("boom");
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await expectAnnounced("The token was refreshed.");
+    expect(calls).toHaveLength(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(refresh).toHaveFocus();
+  });
+
+  it("spins the row menu while an account is deleted and says it once gone", async () => {
+    let release: () => void = () => {};
+    mockServer.use(
+      http.delete(apiUrl("/accounts/:id"), async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return undefined;
+      }),
+    );
+    const { table, user } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    const more = within(row).getByRole("button", { name: "More actions" });
+    await user.click(more);
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+    );
+    await waitFor(() => expect(more).toHaveAttribute("aria-busy", "true"));
+    release();
+    await expectAnnounced("The account was deleted.");
+    await waitFor(() => expect(within(table).queryByText(DANA_MASKED)).not.toBeInTheDocument());
+  });
+
+  it("spins Refresh models while the sweep runs and reads out the result", async () => {
+    let release: () => void = () => {};
+    mockServer.use(
+      http.post(apiUrl("/accounts/models/refresh"), async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return undefined;
+      }),
+    );
+    const { user } = await renderAccounts();
+    const button = screen.getByRole("button", { name: "Refresh models" });
+    await user.click(button);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Refresh models",
+      }),
+    );
+    await waitFor(() => expect(button).toHaveAttribute("aria-busy", "true"));
+    release();
+    await expectAnnounced(/^Models refreshed\. \d+ available\.$/);
+    expect(button).not.toHaveAttribute("aria-busy");
   });
 
   it("exports the selection from the batch toolbar with only those accounts checked", async () => {
@@ -561,7 +668,7 @@ describe("AccountsPage tags", () => {
     await user.click(within(bar).getByRole("button", { name: "Tags" }));
     const dialog = await screen.findByRole("dialog", { name: "Edit tags for 2 accounts" });
     await user.type(within(dialog).getByRole("textbox", { name: "Tag" }), "vip{Enter}");
-    expect(await screen.findByText("Tagged 2 accounts.")).toBeInTheDocument();
+    await expectAnnounced("Tagged 2 accounts.");
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({ action: "addTag", tag: "vip" });
     await waitFor(() => expect(screen.queryByText(/ selected$/)).not.toBeInTheDocument());

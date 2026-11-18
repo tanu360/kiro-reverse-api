@@ -130,7 +130,9 @@ describe("AccountDetailSheet", () => {
     await user.clear(input);
     await user.type(input, "4{Enter}");
     await waitFor(() => expect(puts).toEqual([{ weight: 4 }]));
-    expect(await screen.findByText("The change was saved.")).toBeInTheDocument();
+    const saved = await screen.findByText("The change was saved.");
+    // Read out, not toasted: the closed edit and its new value show it.
+    expect(saved.closest('[data-slot="live-announcer"]')).not.toBeNull();
     await waitFor(() => expect(editingRow(sheet)).toBeNull());
     // Focus goes back to the row.
     expect(within(sheet).getByRole("button", { name: "Edit Weight" })).toHaveFocus();
@@ -258,9 +260,8 @@ describe("AccountDetailSheet", () => {
 
     const sandboxArn = "arn:aws:codewhisperer:us-east-1:381492027763:profile/HV4N8TQW2JDE";
     await waitFor(() => expect(pins).toEqual([{ profileArn: sandboxArn }]));
-    expect(
-      await screen.findByText("The account now uses the us-east-1 profile."),
-    ).toBeInTheDocument();
+    const pinned = await screen.findByText("The account now uses the us-east-1 profile.");
+    expect(pinned.closest('[data-slot="live-announcer"]')).not.toBeNull();
     await waitFor(() => expect(lists.length).toBeGreaterThan(0));
     await waitFor(() =>
       expect(
@@ -419,5 +420,74 @@ describe("AccountDetailSheet notes and tags", () => {
     const sheet = await screen.findByRole("dialog");
     const facts = await within(sheet).findByRole("region", { name: "Account" });
     expect(within(facts).getByText("Owner: ops.team@example.com")).toBeInTheDocument();
+  });
+
+  it("keeps a failed save under the field, and drops it on Cancel", async () => {
+    mockServer.use(
+      http.put(apiUrl("/accounts/:id"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { sheet, user } = await openSheet(dana());
+    const row = await openEditor(sheet, user, "Weight");
+    const input = within(row).getByRole("textbox", { name: "Weight" });
+    await user.clear(input);
+    await user.type(input, "4{Enter}");
+    expect(await within(row).findByRole("alert")).toHaveTextContent("boom");
+    // The edit stays open on the draft: Save is the retry.
+    expect(input).toHaveValue("4");
+    await user.click(within(row).getByRole("button", { name: "Cancel" }));
+    const again = await openEditor(sheet, user, "Weight");
+    expect(within(again).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("says a failed token refresh under the sheet's actions", async () => {
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/refresh"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { sheet, user } = await openSheet(dana());
+    const refresh = within(sheet).getByRole("button", { name: "Refresh token" });
+    await user.click(refresh);
+    const notice = await within(sheet).findByRole("alert");
+    expect(notice).toHaveTextContent("boom");
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(within(sheet).queryByRole("alert")).not.toBeInTheDocument();
+    expect(refresh).toHaveFocus();
+  });
+
+  it("says a failed overage switch in its card, and Try again sends it again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/overage"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 502 }) : undefined,
+      ),
+    );
+    const { sheet, user } = await openSheet(dana());
+    const overage = section(sheet, "Overage (AWS)");
+    const toggle = within(overage).getByRole("switch", { name: "Enable overage upstream" });
+    const before = toggle.getAttribute("aria-checked");
+    await user.click(toggle);
+    const notice = await within(overage).findByRole("alert");
+    expect(notice).toHaveTextContent("boom");
+    expect(toggle).toHaveAttribute("aria-checked", before);
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(toggle).not.toHaveAttribute("aria-checked", before));
+    expect(within(overage).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("says a failed model cache refresh in the models card", async () => {
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/models/refresh"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { sheet, user } = await openSheet(dana());
+    const models = section(sheet, "Available models");
+    await user.click(within(models).getByRole("button", { name: "Refresh models" }));
+    expect(await within(models).findByRole("alert")).toHaveTextContent("boom");
   });
 });

@@ -29,6 +29,12 @@ function addDanaCopy(): Account {
   return dana;
 }
 
+/** A result read out by the app's hidden live region (no toast). */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 async function renderAccounts() {
   const view = await renderApp("/accounts");
   const table = await screen.findByRole("table", { name: "Accounts" });
@@ -127,11 +133,9 @@ describe("Duplicate accounts", () => {
     await user.click(within(dialog).getAllByRole("radio")[1] as HTMLElement);
     await user.click(within(dialog).getByRole("button", { name: "Merge 1 copy" }));
 
-    expect(
-      await screen.findByText(
-        "Merged the duplicates and deleted 1 extra copy. A backup was saved first.",
-      ),
-    ).toBeInTheDocument();
+    await expectAnnounced(
+      "Merged the duplicates and deleted 1 extra copy. A backup was saved first.",
+    );
     expect(bodies).toEqual([{ keepId: COPY_ID, ids: [dana.id, COPY_ID] }]);
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Duplicate accounts" })).not.toBeInTheDocument(),
@@ -175,11 +179,9 @@ describe("Duplicate accounts", () => {
     await user.click(switches[0] as HTMLElement);
     await user.click(within(dialog).getByRole("button", { name: "Merge 1 copy" }));
 
-    expect(
-      await screen.findByText(
-        "Merged the duplicates and deleted 1 extra copy. A backup was saved first.",
-      ),
-    ).toBeInTheDocument();
+    await expectAnnounced(
+      "Merged the duplicates and deleted 1 extra copy. A backup was saved first.",
+    );
     expect(bodies).toEqual([{ keepId: dana.id, ids: [dana.id, COPY_ID] }]);
     expect(mockDb.accounts.some((account) => account.id === "other-copy")).toBe(true);
     expect(await screen.findByText("1 duplicate account")).toBeInTheDocument();
@@ -268,15 +270,17 @@ describe("Duplicate accounts", () => {
     const dialog = await openReview(user);
     await user.click(within(dialog).getByRole("button", { name: "Merge 1 copy" }));
 
-    const matches = await screen.findAllByText(
+    // Said in the dialog, once; nothing was merged, so the dialog stays for another look.
+    const notice = await within(dialog).findByRole("alert");
+    expect(notice).toHaveTextContent(
       "These accounts are no longer duplicates. Review the duplicates again.",
     );
-    // One error toast (the toast region also announces it to screen readers).
-    expect(matches.filter((node) => node.getAttribute("data-slot") === "toast-title")).toHaveLength(
-      1,
-    );
-    // Nothing was merged, so the dialog stays for another look.
+    expect(within(dialog).getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("dialog", { name: "Duplicate accounts" })).toBeInTheDocument();
     expect(mockDb.accounts.some((account) => account.id === COPY_ID)).toBe(true);
+
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Merge 1 copy" })).toHaveFocus();
   });
 });

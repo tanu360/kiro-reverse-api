@@ -619,11 +619,11 @@ export function overageCapable(account: Pick<Account, "overageCapability">): boo
 // Batch results
 // ---------------------------------------------------------------------------
 
-/** How many failed accounts a result toast names before it says "and N more". */
+/** How many failed accounts a batch result names before it says "and N more". */
 const FAILURE_NAMES_SHOWN = 3;
 
 /**
- * The failed rows of a batch or sweep answer as one toast description. Rows that share an error
+ * The failed rows of a batch or sweep answer as one line of text. Rows that share an error
  * show it once ("name and 4 more: error"), so a sweep where every account hit the same upstream
  * error reads as one line. The first few reasons are listed, then "and N more" counts the
  * accounts left out. `nameOf` gives the display name (masked under privacy); an id with no
@@ -658,6 +658,6 @@ export function describeFailures(
     .slice(FAILURE_NAMES_SHOWN)
     .reduce((total, group) => total + group.ids.length, 0);
   if (rest > 0) lines.push(t("batch.moreFailures", { count: rest }));
-  // One line: a toast description does not keep line breaks.
+  // One line: it follows the result's counts in the one-line notice that says it.
   return joinList(t, lines);
 }

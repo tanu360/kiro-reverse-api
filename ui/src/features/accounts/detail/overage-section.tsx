@@ -1,19 +1,22 @@
 import { CloudDownloadIcon, ZapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useState } from "react";
+import { type JSX, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { KeyValueGrid, type KeyValueItem } from "@/components/shared/key-value-grid";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { SwitchField } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import { announce } from "@/lib/announce";
 import { getAccountOverage, setAccountOverage } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, OverageResponse } from "@/lib/api/types";
 import { formatUsd } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { overageCapable, overageEnabled } from "../account-model";
 
 /** Merges an overage snapshot (not a full Account) into the cached list row. */
@@ -38,44 +41,52 @@ function useMergeOverage(accountId: string): (snapshot: OverageResponse) => void
   };
 }
 
-/** Both calls reach real AWS. No confirm for the toggle (old UI parity). */
+/**
+ * Both calls reach real AWS. No confirm for the toggle (old UI parity). No toasts: while a call
+ * runs its button spins, or the switch's title says "Calling AWS…"; the facts and the switch show
+ * the result (a screen reader hears it), and a failure is said in the card, with Try again.
+ */
 export function OverageSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   const merge = useMergeOverage(account.id);
+  const syncRef = useRef<HTMLButtonElement | null>(null);
+  const switchRef = useRef<HTMLElement | null>(null);
   // The switch shows the requested state while the call runs, then the cached snapshot again.
   const [pending, setPending] = useState<boolean | null>(null);
-
-  const failureToast = (toastId: string, error: unknown) =>
-    toast.update(toastId, {
-      type: "error",
-      title: errorMessage(error, t, "accounts:detail.overageSwitchFailed"),
-    });
+  // The last call that failed, with its control (focused as the notice goes) and its retry.
+  const [failure, setFailure] = useState<{
+    error: unknown;
+    retry: () => void;
+    target: () => HTMLElement | null;
+  } | null>(null);
 
   const sync = useMutation({
     mutationFn: () => getAccountOverage(account.id),
-    onMutate: () => ({ toastId: toast.loading(t("detail.overageSwitching")) }),
-    onSuccess: (snapshot, _vars, context) => {
+    onMutate: () => setFailure(null),
+    onSuccess: (snapshot) => {
       merge(snapshot);
-      toast.update(context.toastId, { type: "success", title: t("detail.saved") });
+      announce(t("detail.saved"));
     },
-    onError: (error, _vars, context) => {
-      if (context) failureToast(context.toastId, error);
-    },
+    onError: (error) =>
+      setFailure({ error, retry: () => sync.mutate(), target: () => syncRef.current }),
   });
 
   const toggle = useMutation({
     mutationFn: (enabled: boolean) => setAccountOverage(account.id, enabled),
     onMutate: (enabled) => {
+      setFailure(null);
       setPending(enabled);
-      return { toastId: toast.loading(t("detail.overageSwitching")) };
     },
-    onSuccess: (snapshot, _vars, context) => {
+    onSuccess: (snapshot) => {
       merge(snapshot);
-      toast.update(context.toastId, { type: "success", title: t("detail.saved") });
+      announce(t("detail.saved"));
     },
-    onError: (error, _vars, context) => {
-      if (context) failureToast(context.toastId, error);
-    },
+    onError: (error, enabled) =>
+      setFailure({
+        error,
+        retry: () => toggle.mutate(enabled),
+        target: () => switchRef.current,
+      }),
     onSettled: () => setPending(null),
   });
 
@@ -108,6 +119,7 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         <Button
           loading={sync.isPending}
           onClick={() => sync.mutate()}
+          ref={syncRef}
           size="sm"
           variant="secondary"
         >
@@ -119,11 +131,36 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
       slim
       title={t("detail.overage")}
     >
+      {failure ? (
+        <CardPanel>
+          <ActionError
+            error={failure.error}
+            message={errorMessage(failure.error, t, "accounts:detail.overageSwitchFailed")}
+            onDismiss={() => {
+              failure.target()?.focus();
+              setFailure(null);
+            }}
+            onRetry={() => {
+              failure.target()?.focus();
+              failure.retry();
+            }}
+          />
+        </CardPanel>
+      ) : null}
       <SwitchField
         checked={pending ?? overageEnabled(account)}
         description={t("detail.overageHint")}
         disabled={!capable || toggle.isPending}
         onCheckedChange={(checked) => toggle.mutate(checked)}
+        status={
+          toggle.isPending ? (
+            <span className="inline-flex items-center gap-1.5 text-meta text-muted-foreground">
+              <Spinner aria-hidden="true" className="size-3.5" />
+              {t("detail.overageSwitching")}
+            </span>
+          ) : undefined
+        }
+        switchRef={switchRef}
         title={t("detail.overageSwitch")}
       />
       {/* Label over value, two across: the four numbers and the sync time in three short rows. */}
