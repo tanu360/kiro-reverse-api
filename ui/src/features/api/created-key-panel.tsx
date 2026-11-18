@@ -1,14 +1,8 @@
 import { CircleCheckIcon, Link01Icon, XIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
-import {
-  NOTICE_ACTIONS_CLASS,
-  NOTICE_LINE_CLASS,
-  NoticeIconButton,
-} from "@/components/shared/notice-line";
-import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { NoticeIconButton, NoticeLine } from "@/components/shared/notice-line";
 import { tunnelQuery } from "@/lib/api/tunnel";
 import { useT } from "@/lib/i18n";
 
@@ -46,25 +40,33 @@ export function CreatedKeyPanel({
   const { t } = useT("api");
   const userPanel = useUserPanelUrl();
   return (
-    <Alert className={NOTICE_LINE_CLASS} data-testid="created-key-panel" variant="success">
-      <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
-      <AlertDescription className="wrap-break-word">
-        <span>
-          {t("created.title")}{" "}
-          <span className="whitespace-nowrap font-mono text-meta">{maskSecret(apiKey)}</span>
-        </span>
-      </AlertDescription>
-      <AlertAction className={NOTICE_ACTIONS_CLASS}>
-        <CopyButton label={t("created.copy")} size="icon-sm" value={apiKey} variant="tone-quiet" />
-        <CopyButton
-          icon={Link01Icon}
-          label={t("created.copyUserPanel")}
-          size="icon-sm"
-          value={userPanel}
-          variant="tone-quiet"
-        />
-        <NoticeIconButton icon={XIcon} label={t("created.dismiss")} onClick={onDismiss} />
-      </AlertAction>
-    </Alert>
+    <NoticeLine
+      actions={
+        <>
+          <CopyButton
+            label={t("created.copy")}
+            size="icon-sm"
+            value={apiKey}
+            variant="tone-quiet"
+          />
+          <CopyButton
+            icon={Link01Icon}
+            label={t("created.copyUserPanel")}
+            size="icon-sm"
+            value={userPanel}
+            variant="tone-quiet"
+          />
+          <NoticeIconButton icon={XIcon} label={t("created.dismiss")} onClick={onDismiss} />
+        </>
+      }
+      data-testid="created-key-panel"
+      icon={CircleCheckIcon}
+      variant="success"
+    >
+      <span>
+        {t("created.title")}{" "}
+        <span className="whitespace-nowrap font-mono text-meta">{maskSecret(apiKey)}</span>
+      </span>
+    </NoticeLine>
   );
 }
