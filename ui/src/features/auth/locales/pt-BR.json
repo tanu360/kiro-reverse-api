@@ -24,7 +24,7 @@
   "copyPassword": "Copiar senha",
   "clickToCopy": "Clique para copiar",
   "passwordCopied": "Senha copiada para a área de transferência",
-  "changePasswordToast": "Altere a senha gerada em Configurações.",
+  "changePasswordHint": "Altere a senha gerada em Configurações.",
   "openSettings": "Abrir configurações",
   "codePrompt": "Digite o código de 6 dígitos do seu app autenticador.",
   "recoveryPrompt": "Digite um dos códigos de recuperação que você guardou. Cada um funciona uma vez.",

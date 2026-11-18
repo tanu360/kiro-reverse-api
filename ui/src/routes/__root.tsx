@@ -14,7 +14,7 @@ import { StatusPage } from "@/components/layout/status-page";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { markSessionExpired } from "@/features/auth/session-expired";
+import { markSignInReason } from "@/features/auth/sign-in-reason";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { subscribeSession } from "@/lib/auth/session";
@@ -36,9 +36,8 @@ function RootComponent(): JSX.Element {
 }
 
 /**
- * One subscription for the app: an expired session goes to sign-in, which says the session
- * expired; sign-out and backup restore go to sign-in silently; a password change keeps the user
- * where they are.
+ * One subscription for the app: an expired session and a backup restore go to sign-in, which
+ * says why; a sign-out goes there silently; a password change keeps the user where they are.
  */
 function useSessionRedirects(): void {
   const router = useRouter();
@@ -47,7 +46,7 @@ function useSessionRedirects(): void {
     () =>
       subscribeSession((_session, reason) => {
         if (reason === "expired") {
-          markSessionExpired("admin");
+          markSignInReason("admin", "expired");
           const location = router.state.location;
           void router.navigate({
             to: "/login",
@@ -56,6 +55,7 @@ function useSessionRedirects(): void {
           });
           return;
         }
+        if (reason === "restored") markSignInReason("admin", "restored");
         if (reason === "signout" || reason === "restored") {
           void router.navigate({ to: "/login" });
         }

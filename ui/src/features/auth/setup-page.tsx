@@ -47,7 +47,7 @@ export function SetupPage(): JSX.Element {
   // (ChangePasswordNotice in the app shell).
   const onSignedIn = () => {
     showChangePasswordNotice();
-    announce(t("changePasswordToast"));
+    announce(t("changePasswordHint"));
   };
 
   return (
@@ -155,9 +155,9 @@ function GeneratedPassword({
  * The password itself is the copy control: no separate copy icon, no box, just the digits in bold
  * mono. Hovering (or keyboard focus) turns them the accent text purple and the label
  * above reads "Click to copy"; a click or tap copies them and turns the digits and the label green
- * for two seconds (a failed copy: the label says so in red). No toast (the label already says it)
- * and no tooltip (it would cover the label). Screen readers get the password plus "Copy password"
- * as its name and a polite "Password copied" status (a failure is read out at once).
+ * for two seconds (a failed copy: the label says so in red). No tooltip (it would cover the
+ * label). Screen readers get the password plus "Copy password" as its name and a polite
+ * "Password copied" status (a failure is read out at once).
  */
 function CopyablePassword({ value }: { value: string }): JSX.Element {
   const { t } = useT("auth");

@@ -50,8 +50,9 @@ interface ResponsiveDialogProps {
   dismissible?: boolean;
   initialFocus?: RefObject<HTMLElement | null>;
   /**
-   * Where focus goes on close, for a dialog whose opener is gone by then (a dismissed toast's
-   * button): Base UI's Popup finalFocus. Defaults to the element that opened it.
+   * Where focus goes on close, for a dialog whose opener is gone by then (a batch bar's button
+   * after the run cleared the selection): Base UI's Popup finalFocus. Defaults to the element
+   * that opened it.
    */
   finalFocus?: DialogPrimitive.Popup.Props["finalFocus"];
 }

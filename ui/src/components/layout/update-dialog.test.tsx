@@ -71,11 +71,11 @@ describe("parseChangelog", () => {
 describe("plainChangelog", () => {
   it("keeps the changelog's order and drops every kind tag, capitalising what follows", () => {
     const lines = plainChangelog(
-      "🔑 New: keys\n🔧 Fixed: the toast\n🔧 fix: a crash\n⚙️ Changed: defaults\n📦 Binaries",
+      "🔑 New: keys\n🔧 Fixed: the tooltip\n🔧 fix: a crash\n⚙️ Changed: defaults\n📦 Binaries",
     );
     expect(lines.map((line) => [line.marker, line.tag, line.text])).toEqual([
       ["🔑", null, "Keys"],
-      ["🔧", null, "The toast"],
+      ["🔧", null, "The tooltip"],
       ["🔧", null, "A crash"],
       ["⚙️", null, "Defaults"],
       ["📦", null, "Binaries"],

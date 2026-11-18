@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { markSessionExpired } from "@/features/auth/session-expired";
+import { markSignInReason } from "@/features/auth/sign-in-reason";
 import { subscribeUserSession } from "@/lib/auth/user-session";
 
 /**
@@ -15,7 +15,7 @@ export function useUserSessionRedirects(): void {
     () =>
       subscribeUserSession((_token, reason) => {
         if (reason === "expired") {
-          markSessionExpired("user");
+          markSignInReason("user", "expired");
           void router.navigate({ to: "/user/login", replace: true });
           return;
         }

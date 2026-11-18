@@ -24,7 +24,7 @@
   "copyPassword": "パスワードをコピー",
   "clickToCopy": "クリックしてコピー",
   "passwordCopied": "パスワードをクリップボードにコピーしました",
-  "changePasswordToast": "生成されたパスワードを「設定」で変更してください。",
+  "changePasswordHint": "生成されたパスワードを「設定」で変更してください。",
   "openSettings": "設定を開く",
   "codePrompt": "認証アプリに表示される 6 桁のコードを入力してください。",
   "recoveryPrompt": "保存したリカバリーコードのいずれかを入力してください。各コードは 1 回だけ使用できます。",
