@@ -138,7 +138,7 @@ export function ApiKeysCard(): JSX.Element {
     session: 0,
   });
   // The full secret from the last create or regenerate, shown once.
-  const [createdKey, setCreatedKey] = useState<{ key: string; regenerated: boolean } | null>(null);
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
   // The key whose usage chart is open; kept while the sheet closes, a new session per opening.
   const [usageFor, setUsageFor] = useState<{
     apiKey: ApiKey;
@@ -245,7 +245,7 @@ export function ApiKeysCard(): JSX.Element {
     mutationFn: (apiKey: ApiKey) => regenerateApiKey(apiKey.id),
     onMutate: () => setFailure(null),
     // The new-key panel is an alert: it is read out as it appears.
-    onSuccess: (result) => setCreatedKey({ key: result.key, regenerated: true }),
+    onSuccess: (result) => setCreatedKey(result.key),
     onError: (error, apiKey) => setFailure({ action: "regenerate", apiKey, error }),
     onSettled: invalidate,
   });
@@ -611,13 +611,12 @@ export function ApiKeysCard(): JSX.Element {
       {createdKey ? (
         <CardPanel>
           <CreatedKeyPanel
-            apiKey={createdKey.key}
+            apiKey={createdKey}
             onDismiss={() => {
               setCreatedKey(null);
               // Dismiss goes with the panel; keep focus on the card instead of the page.
               createRef.current?.focus();
             }}
-            regenerated={createdKey.regenerated}
           />
         </CardPanel>
       ) : null}
@@ -655,7 +654,7 @@ export function ApiKeysCard(): JSX.Element {
       </div>
       <ApiKeyFormDialog
         key={dialog.session}
-        onCreated={(key) => setCreatedKey({ key, regenerated: false })}
+        onCreated={(key) => setCreatedKey(key)}
         onOpenChange={(open) => setDialog((prev) => ({ ...prev, open }))}
         open={dialog.open}
         target={dialog.target}

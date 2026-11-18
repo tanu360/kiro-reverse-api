@@ -152,9 +152,11 @@ describe("ApiPage", () => {
     await toAccessStep(user, dialog);
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     const panel = await screen.findByTestId("created-key-panel");
-    await waitFor(() =>
-      expect(within(panel).getByText("https://kiro.tail1234.ts.net/user")).toBeInTheDocument(),
-    );
+    // The link copies once the public link's status is in.
+    await waitFor(async () => {
+      await user.click(within(panel).getByRole("button", { name: "Copy usage page link" }));
+      expect(copyTextMock).toHaveBeenLastCalledWith("https://kiro.tail1234.ts.net/user");
+    });
   });
 
   it("creates a key and shows the full key once, ready to copy", async () => {
@@ -186,7 +188,10 @@ describe("ApiPage", () => {
     const created = mockDb.apiKeys.at(-1);
     expect(created?.name).toBe("laptop");
     expect(created?.key).toMatch(/^sk-[0-9a-f]{64}$/);
-    expect(within(panel).getByText(created?.key ?? "")).toBeInTheDocument();
+    // One line: the key masked as the table masks it; the copy button copies all of it.
+    const key = created?.key ?? "";
+    expect(within(panel).getByText(`${key.slice(0, 6)}****${key.slice(-4)}`)).toBeInTheDocument();
+    expect(within(panel).queryByText(key)).not.toBeInTheDocument();
     expect(sent("POST", "/api-keys")[0]?.body).toEqual({
       name: "laptop",
       enabled: true,
@@ -204,7 +209,6 @@ describe("ApiPage", () => {
     await user.click(within(panel).getByRole("button", { name: "Copy new API key" }));
     expect(copyTextMock).toHaveBeenCalledWith(created?.key);
     // The key also signs in to the usage page; its link copies from the panel.
-    expect(within(panel).getByText(/also sign in with it/)).toBeInTheDocument();
     await user.click(within(panel).getByRole("button", { name: "Copy usage page link" }));
     expect(copyTextMock).toHaveBeenCalledWith(`${window.location.origin}/user`);
 
@@ -395,8 +399,9 @@ describe("ApiPage", () => {
     const newKey = mockDb.apiKeys[0]?.key ?? "";
     expect(newKey).toMatch(/^sk-[0-9a-f]{64}$/);
     expect(newKey).not.toBe(oldKey);
-    expect(within(panel).getByText(newKey)).toBeInTheDocument();
-    expect(within(panel).getByText(/The old key no longer works/)).toBeInTheDocument();
+    expect(
+      within(panel).getByText(`${newKey.slice(0, 6)}****${newKey.slice(-4)}`),
+    ).toBeInTheDocument();
     // Same key: id, name and usage stay.
     expect(mockDb.apiKeys[0]).toMatchObject({
       id: teamA?.id,

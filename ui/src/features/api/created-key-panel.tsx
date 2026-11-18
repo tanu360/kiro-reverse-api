@@ -1,10 +1,14 @@
-import { KeyRoundIcon } from "@hugeicons/core-free-icons";
+import { CircleCheckIcon, Link01Icon, XIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { CopyField } from "@/components/shared/code-field";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/shared/copy-button";
+import {
+  NOTICE_ACTIONS_CLASS,
+  NOTICE_LINE_CLASS,
+  NoticeIconButton,
+} from "@/components/shared/notice-line";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { tunnelQuery } from "@/lib/api/tunnel";
 import { useT } from "@/lib/i18n";
 
@@ -21,48 +25,45 @@ function useUserPanelUrl(): string {
   return `${publicUrl ?? window.location.origin}/user`;
 }
 
+/** The secret as the table masks a key: its first six and last four characters. */
+function maskSecret(secret: string): string {
+  return secret.length > 12 ? `${secret.slice(0, 6)}****${secret.slice(-4)}` : secret;
+}
+
 /**
- * The full secret from the last create or regenerate. It lives only in the parent's state: never
- * stored or cached, and gone on the next create, on edit, on Dismiss and when the page unmounts.
+ * The full secret from the last create or regenerate, as one green line: "New API key" and the
+ * masked key, then bare icons to copy the key, copy the usage page link and close. The secret
+ * lives only in the parent's state: never stored or cached, and gone on the next create, on
+ * edit, on close and when the page unmounts. It can be copied again from the table.
  */
 export function CreatedKeyPanel({
   apiKey,
   onDismiss,
-  regenerated = false,
 }: {
   apiKey: string;
   onDismiss: () => void;
-  /** The secret replaced an existing key's value, so the old one no longer works. */
-  regenerated?: boolean;
 }): JSX.Element {
   const { t } = useT("api");
   const userPanel = useUserPanelUrl();
   return (
-    <Alert data-testid="created-key-panel" variant="success">
-      <HugeiconsIcon icon={KeyRoundIcon} aria-hidden="true" />
-      <AlertTitle>{t("created.title")}</AlertTitle>
-      <AlertDescription>
-        <p>{regenerated ? t("created.regeneratedBody") : t("created.body")}</p>
-        <CopyField
-          copyLabel={t("created.copy")}
-          label={t("created.title")}
-          multiline
-          value={apiKey}
-        />
-        <p>{t("created.userPanel")}</p>
-        <CopyField
-          copyLabel={t("created.copyUserPanel")}
-          label={t("created.userPanelLabel")}
-          multiline
-          value={userPanel}
-          variant="outline"
-        />
+    <Alert className={NOTICE_LINE_CLASS} data-testid="created-key-panel" variant="success">
+      <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
+      <AlertDescription className="wrap-break-word">
+        <span>
+          {t("created.title")}{" "}
+          <span className="whitespace-nowrap font-mono text-meta">{maskSecret(apiKey)}</span>
+        </span>
       </AlertDescription>
-      {/* Right of the text from sm, under it on phones: its edge lines up with the copy field. */}
-      <AlertAction>
-        <Button onClick={onDismiss} size="sm" variant="tone">
-          {t("created.dismiss")}
-        </Button>
+      <AlertAction className={NOTICE_ACTIONS_CLASS}>
+        <CopyButton label={t("created.copy")} size="icon-sm" value={apiKey} variant="tone-quiet" />
+        <CopyButton
+          icon={Link01Icon}
+          label={t("created.copyUserPanel")}
+          size="icon-sm"
+          value={userPanel}
+          variant="tone-quiet"
+        />
+        <NoticeIconButton icon={XIcon} label={t("created.dismiss")} onClick={onDismiss} />
       </AlertAction>
     </Alert>
   );

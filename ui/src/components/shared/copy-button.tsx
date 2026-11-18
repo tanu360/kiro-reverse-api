@@ -1,4 +1,5 @@
 import { AlertCircleIcon, CheckIcon, Copy01Icon } from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ export function CopyButton({
   variant,
   size = "icon",
   showLabel = false,
+  icon = Copy01Icon,
   copiedMessage,
   className,
 }: {
@@ -33,10 +35,12 @@ export function CopyButton({
   /** What a screen reader hears; defaults to "Copied to the clipboard." */
   copiedMessage?: string;
   /** Ghost by default when icon-only, secondary (soft fill) with a label. */
-  variant?: "ghost" | "quiet" | "outline" | "secondary";
+  variant?: "ghost" | "quiet" | "outline" | "secondary" | "tone-quiet";
   /** The icon size; a labelled button is always `sm` (the value "sm" is kept for old callers). */
   size?: "icon" | "icon-sm" | "icon-xs" | "sm";
   showLabel?: boolean;
+  /** The resting icon (a link for a URL); the tick and the alert icon replace it as usual. */
+  icon?: IconSvgElement;
   className?: string;
 }): JSX.Element {
   const { t } = useT();
@@ -68,7 +72,7 @@ export function CopyButton({
   };
 
   const iconOnly = !showLabel;
-  const Icon = copied ? CheckIcon : failed ? AlertCircleIcon : Copy01Icon;
+  const Icon = copied ? CheckIcon : failed ? AlertCircleIcon : icon;
   const said = copied ? t("toast.copied") : failed ? t("toast.copyFailed") : label;
   const button = (
     <Button
