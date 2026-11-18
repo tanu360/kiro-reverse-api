@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSavedFlash } from "@/hooks/use-saved-flash";
 import { announce } from "@/lib/announce";
 import { exportAccounts } from "@/lib/api/accounts";
@@ -273,47 +275,65 @@ export const ExportDialog = memo(function ExportDialog({
 
   const nothingSelected = selectedCount === 0;
 
+  // Phones: one footer row, Cancel and then Copy and Download as icons named by their tooltips.
+  const iconOnly = useMediaQuery("max-sm");
+  /** A footer action; on phones its icon alone, its name in a tooltip. */
+  const footerAction = (name: string, button: JSX.Element) =>
+    iconOnly ? (
+      <Tooltip>
+        <TooltipTrigger aria-label={name} render={button} />
+        <TooltipPopup>{name}</TooltipPopup>
+      </Tooltip>
+    ) : (
+      button
+    );
+
   return (
     <ResponsiveDialog
       description={t("export.pickDescription")}
       footer={
-        <>
-          <Button onClick={() => onOpenChange(false)} variant="ghost">
+        // One child: the phone footer gives it the whole row; from sm up its buttons sit at the
+        // footer's end as before.
+        <div className="flex gap-2 sm:contents">
+          <Button className="max-sm:flex-1" onClick={() => onOpenChange(false)} variant="ghost">
             {tc("actions.cancel")}
           </Button>
-          <Button
-            disabled={nothingSelected || (busy !== null && busy !== "copy")}
-            loading={busy === "copy"}
-            onClick={onCopy}
-            ref={copyRef}
-            variant="secondary"
-          >
-            {copied.saved ? (
-              <>
+          {footerAction(
+            t("export.copyJson"),
+            <Button
+              disabled={nothingSelected || (busy !== null && busy !== "copy")}
+              loading={busy === "copy"}
+              onClick={onCopy}
+              ref={copyRef}
+              size={iconOnly ? "icon" : "default"}
+              variant="secondary"
+            >
+              {copied.saved ? (
                 <HugeiconsIcon
                   icon={CheckIcon}
                   aria-hidden="true"
                   className="text-success-foreground"
                 />
-                {tc("copy.copied")}
-              </>
-            ) : (
-              <>
+              ) : (
                 <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
-                {t("export.copyJson")}
-              </>
-            )}
-          </Button>
-          <Button
-            disabled={nothingSelected || (busy !== null && busy !== "download")}
-            loading={busy === "download"}
-            onClick={() => void onDownload()}
-            ref={downloadRef}
-          >
-            <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
-            {t("export.downloadJson")}
-          </Button>
-        </>
+              )}
+              {iconOnly ? null : copied.saved ? tc("copy.copied") : t("export.copyJson")}
+            </Button>,
+          )}
+          {footerAction(
+            t("export.downloadJson"),
+            <Button
+              disabled={nothingSelected || (busy !== null && busy !== "download")}
+              loading={busy === "download"}
+              onClick={() => void onDownload()}
+              ref={downloadRef}
+              size={iconOnly ? "icon" : "default"}
+            >
+              <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+              {iconOnly ? null : t("export.downloadJson")}
+            </Button>,
+          )}
+        </div>
       }
       onOpenChange={onOpenChange}
       open={open}

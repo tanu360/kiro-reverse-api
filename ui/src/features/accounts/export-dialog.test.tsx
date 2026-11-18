@@ -164,6 +164,32 @@ describe("ExportDialog", () => {
     expect(activePick).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("puts Cancel, Copy and Download on one phone row, the last two as named icons", async () => {
+    const media = vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("max-width"),
+          media: query,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    try {
+      const { dialog } = await openExport();
+      for (const name of ["Copy JSON", "Download JSON"]) {
+        const button = within(dialog).getByRole("button", { name });
+        expect(button).not.toHaveTextContent(name);
+      }
+      expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveTextContent("Cancel");
+    } finally {
+      media.mockRestore();
+    }
+  });
+
   it("never shows the export: no view switch, no credentials on screen", async () => {
     const { dialog } = await openExport();
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
