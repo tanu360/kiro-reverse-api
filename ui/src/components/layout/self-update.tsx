@@ -60,8 +60,9 @@ export interface SelfUpdate {
  * outside a container and a newer release is known; an older server without the endpoint answers
  * 404, which reads as "cannot update itself", so the dialog shows the manual steps. Every step
  * and failure shows in the sidebar's update card and in the dialog. The card is out of sight in
- * the icon rail and on a phone, so screen readers also hear this page's download landing and a
- * download or restart that failed.
+ * the icon rail and on a phone, so screen readers hear each step of this page's update from here
+ * (once, wherever it shows): the download and the restart under way, the download in place, and
+ * a download or restart that failed.
  */
 export function useSelfUpdateController({
   target,
@@ -84,7 +85,6 @@ export function useSelfUpdateController({
   const begin = useMutation({
     mutationFn: () => startUpdate(target),
     onSuccess: (next) => queryClient.setQueryData(queryKeys.update, next),
-    onError: (error) => announce(errorMessage(error, tRef.current), { assertive: true }),
   });
   // useMutation's result is a new object every render; its mutate is stable, so the value below
   // (the update context's) only changes when the update does.
@@ -102,6 +102,7 @@ export function useSelfUpdateController({
     setRestartError(undefined);
     // The server is down for a moment: the card and the dialog say "Restarting…" until it reloads.
     setRestarting(true);
+    announce(tRef.current("shell.update.restarting"));
     restartForUpdate()
       .then(() => waitForVersion(target))
       .then(
@@ -110,12 +111,11 @@ export function useSelfUpdateController({
           setRestarting(false);
           // Said in the card and the dialog; Try again asks the server where it stands (a release
           // still in place comes back as ready to restart).
-          const message =
+          setRestartError(
             error instanceof Error && error.message === "timeout"
               ? tRef.current("shell.update.restartTimeout")
-              : errorMessage(error, tRef.current);
-          setRestartError(message);
-          announce(message, { assertive: true });
+              : errorMessage(error, tRef.current),
+          );
           void queryClient.invalidateQueries({ queryKey: queryKeys.update });
         },
       );
@@ -142,15 +142,23 @@ export function useSelfUpdateController({
         ? "starting"
         : (status?.state ?? "idle");
   const startError = startFailed ? errorMessage(begin.error, t) : undefined;
+  const error = restartError ?? startError ?? (status ? updateErrorText(status, t) : undefined);
 
-  // Read out once when this page's download is in place (the card's eyebrow may be out of sight).
+  // How a step under way ended, read out once: the download in place, or why a download or the
+  // restart failed. A state the page loaded with stays quiet.
   const previous = useRef(phase);
   useEffect(() => {
     const was = previous.current;
     previous.current = phase;
-    if (phase !== "ready" || (was !== "downloading" && was !== "starting")) return;
-    announce(tRef.current("shell.update.readyAnnouncement", { latest: target }));
-  }, [phase, target]);
+    if (phase === "ready" && (was === "starting" || was === "downloading")) {
+      announce(tRef.current("shell.update.readyAnnouncement", { latest: target }));
+    } else if (
+      phase === "error" &&
+      (was === "starting" || was === "downloading" || was === "restarting")
+    ) {
+      announce(error ?? tRef.current("shell.update.failedTitle"), { assertive: true });
+    }
+  }, [phase, target, error]);
 
   return useMemo(
     () => ({
@@ -158,26 +166,16 @@ export function useSelfUpdateController({
       available: Boolean(enabled && status?.supported),
       target,
       phase,
-      error: restartError ?? startError ?? (status ? updateErrorText(status, t) : undefined),
+      error,
       start: () => {
         setRestartError(undefined);
+        announce(t("shell.update.downloading"));
         download();
       },
       restart,
       confirmRestart,
     }),
-    [
-      status,
-      enabled,
-      target,
-      phase,
-      restartError,
-      startError,
-      download,
-      restart,
-      confirmRestart,
-      t,
-    ],
+    [status, enabled, target, phase, error, download, restart, confirmRestart, t],
   );
 }
 

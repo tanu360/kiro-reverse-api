@@ -13,21 +13,19 @@ const COPIED_MS = 2000;
 
 /**
  * Whether a successful copy is also read out to a screen reader. Android 13 and later shows its
- * own "Copied" overlay for every copy, so it would be said twice: never there. On another phone
- * the button's own tick and "Copied" label are enough as well. A failed copy is always read out.
+ * own "Copied" overlay for every copy, so it would be said twice: never there. Everywhere else,
+ * an iPhone included, the tick and the "Copied" tooltip are only seen, so it is read out. A
+ * failed copy is always read out.
  */
 function copyReadOut(): boolean {
   // The OS's own clipboard overlay is a platform trait no media query reports.
-  if (typeof navigator !== "undefined" && /\bAndroid\b/i.test(navigator.userAgent)) return false;
-  if (typeof window === "undefined" || !window.matchMedia) return true;
-  return !window.matchMedia("(max-width: 39.99rem) and (pointer: coarse)").matches;
+  return typeof navigator === "undefined" || !/\bAndroid\b/i.test(navigator.userAgent);
 }
 
 /**
  * Copies a value and says so on the button itself: a tick in place of the copy icon and "Copied"
  * as its tooltip for two seconds; a failed copy shows the alert icon and the reason the same way.
- * A screen reader hears it too, except on a phone, where the OS says it (Android shows its own
- * "Copied").
+ * A screen reader hears it too, except on Android, which says "Copied" itself.
  * Icon-only by default, with `label` as its accessible name and tooltip; the touch sizes come
  * from the Button's icon sizes. `showLabel` makes it a small outline button with the label.
  */

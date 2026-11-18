@@ -140,6 +140,9 @@ describe("NavFooter update card", () => {
     await user.click(button as HTMLElement);
     // The eyebrow says how far it got (the rail's button says the same, hidden while expanded).
     expect((await screen.findAllByText(/^Downloading/)).length).toBeGreaterThan(0);
+    // Read out once from the self-update, not from a live region in the card as well.
+    await vi.waitFor(() => expect(announced()).toContain("Downloading…"));
+    expect(updateCard().querySelector("[aria-live]")).toBeNull();
 
     // The mock's download takes six seconds; the next poll finds it in place.
     await act(async () => {
@@ -225,11 +228,15 @@ describe("NavFooter update card", () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     expect(
-      await screen.findByText(
+      await within(updateCard()).findByText(
         "The download does not match the release checksum.",
         {},
         { timeout: 4000 },
       ),
     ).toBeInTheDocument();
+    // The server's own failure is read out too: the card is out of sight in the rail and on a phone.
+    await vi.waitFor(() =>
+      expect(announced()).toContain("The download does not match the release checksum."),
+    );
   });
 });
