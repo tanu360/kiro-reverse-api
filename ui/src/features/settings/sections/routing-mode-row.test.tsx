@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { queryKeys } from "@/lib/api/query-keys";
+import type { Settings } from "@/lib/api/types";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
@@ -124,6 +126,25 @@ describe("RoutingModeRow", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(posts).toEqual([{ routingMode: "priority" }, { routingMode: "priority" }]);
     expect(mockDb.settings.routingMode).toBe("priority");
+  });
+
+  it("drops a failure once the server's saved mode changes", async () => {
+    mockServer.use(
+      http.post(apiUrl("/settings"), () =>
+        HttpResponse.json({ error: "store busy" }, { status: 500 }),
+      ),
+    );
+    const { user, queryClient } = await renderCard();
+
+    await user.click(screen.getByRole("radio", { name: "Priority" }));
+    await screen.findByRole("alert");
+    // Another tab saved the same pick: Try again would do nothing, so the notice goes.
+    queryClient.setQueryData<Settings>(queryKeys.settings.general(), (old) =>
+      old ? { ...old, routingMode: "priority" } : old,
+    );
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByRole("radio", { name: "Priority" })).toBeChecked();
   });
 
   it("closes a failure with focus back on the choice", async () => {

@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { queryKeys } from "@/lib/api/query-keys";
 import { updateSettings } from "@/lib/api/settings";
 import type { Settings, SettingsPatch } from "@/lib/api/types";
@@ -26,7 +26,7 @@ export function useGeneralSettingsSave<D>(draft: Draft<D>): {
 }
 
 /** Writes a saved slice into the cached settings, then refetches them. */
-export function writeSettingsCache(
+function writeSettingsCache(
   queryClient: ReturnType<typeof useQueryClient>,
   patch: SettingsPatch,
 ): void {
@@ -72,6 +72,12 @@ export function useInstantValue<T extends boolean | number | string>(
     },
   );
   const value = pending ?? saved;
+  // A new saved value from the server (another tab, a refetch) makes a failed pick moot: its
+  // notice goes, so Try again never resends a stale pick or does nothing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the saved value changes.
+  useEffect(() => {
+    if (feedback.error != null) feedback.dismiss();
+  }, [saved]);
   const onChange = (next: T) => {
     if (saving || next === value) return;
     setPending(next);
