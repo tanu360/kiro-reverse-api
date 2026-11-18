@@ -85,7 +85,6 @@
   "empty.title": "No accounts yet",
   "empty.body": "Add an account to start serving requests.",
   "loadError": "Could not load accounts",
-  "refreshFailed": "Token refresh failed: {reason}",
   "copyJsonSuccess": "The credentials were copied.",
   "refreshSuccess": "The token was refreshed.",
   "copyJsonFailed": "Could not copy the credentials.",

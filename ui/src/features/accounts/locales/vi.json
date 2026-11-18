@@ -83,7 +83,6 @@
   "empty.title": "Chưa có tài khoản",
   "empty.body": "Thêm tài khoản để bắt đầu phục vụ yêu cầu.",
   "loadError": "Không thể tải tài khoản",
-  "refreshFailed": "Làm mới token thất bại: {reason}",
   "copyJsonSuccess": "Đã sao chép thông tin xác thực.",
   "refreshSuccess": "Đã làm mới token.",
   "copyJsonFailed": "Không thể sao chép thông tin xác thực.",

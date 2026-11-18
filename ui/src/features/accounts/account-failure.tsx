@@ -2,9 +2,9 @@ import { createContext, type JSX, type ReactNode, useContext, useMemo } from "re
 import { ActionError } from "@/components/shared/action-error";
 
 /**
- * A failed account action (a row's, the detail sheet's, a batch's), said in one place in place of
- * a toast: the top of the accounts card on the list page, the top of the detail sheet, above the
- * Overview's Needs attention list.
+ * A failed account action (a row's, the detail sheet's, a batch's), said in one place: the top of
+ * the accounts card on the list page, the top of the detail sheet, above the rows of the
+ * Overview's Needs attention and Accounts cards.
  */
 export interface AccountFailure {
   /** The failed request's error: its reason is the line. */

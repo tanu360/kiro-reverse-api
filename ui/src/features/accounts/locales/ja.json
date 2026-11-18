@@ -83,7 +83,6 @@
   "empty.title": "アカウントがまだありません",
   "empty.body": "アカウントを追加すると、リクエストの処理を開始できます。",
   "loadError": "アカウントを読み込めませんでした",
-  "refreshFailed": "トークンの更新に失敗しました：{reason}",
   "copyJsonSuccess": "認証情報をコピーしました。",
   "refreshSuccess": "トークンを更新しました。",
   "copyJsonFailed": "認証情報をコピーできませんでした。",
