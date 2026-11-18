@@ -1,24 +1,39 @@
+import { Alert02Icon, ArrowRight02Icon, XIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { type JSX, useState } from "react";
+import {
+  NOTICE_ACTIONS_CLASS,
+  NOTICE_LINE_CLASS,
+  NoticeIconButton,
+} from "@/components/shared/notice-line";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { announce } from "@/lib/announce";
 import { queryKeys } from "@/lib/api/query-keys";
 import { useAdminEvent } from "@/lib/events/admin-events";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { SECTION_ID, sectionPagePath } from "./sections/sections";
 
-/** One halt notice at a time; a recovery or a resume closes it. */
-export const HALTED_TOAST_ID = "self-heal-halted";
+const SELF_HEAL_PATH = sectionPagePath(SECTION_ID.selfHeal);
 
 /**
- * Turns the server's account_heal events into toasts on every page: an info toast when a heal
- * brought accounts back, and a warning that stays until it is closed, the pool recovers or an
- * admin resumes, when self-heal stopped. Every event refetches the self-heal card, the account
- * list and the status counts. Renders nothing.
+ * The server's account_heal events, on every page (it sits at the top of the app shell's
+ * content). Every event refetches the self-heal card, the account list and the status counts. A
+ * heal that brought accounts back is read out to screen readers (the lists update themselves).
+ * When self-heal stops, a one-line warning stays at the top of the page, with a way to the
+ * self-heal settings, until it is closed, the pool recovers or an admin resumes. It hides on the
+ * settings page with the self-heal card, which says the same with its Resume.
  */
-export function AccountHealNotices(): null {
+export function AccountHealNotices(): JSX.Element | null {
   const { t } = useT("settings");
+  const { t: tc } = useT();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [halted, setHalted] = useState(false);
+  const onSelfHealPage = useRouterState({
+    select: (state) => state.location.pathname.replace(/\/+$/, "") === SELF_HEAL_PATH,
+  });
 
   useAdminEvent("account_heal", (event) => {
     for (const queryKey of [queryKeys.settings.all, queryKeys.accounts.list(), queryKeys.status]) {
@@ -29,30 +44,40 @@ export function AccountHealNotices(): null {
     switch (kind) {
       case "healed":
         if (Number.isInteger(count) && count > 0) {
-          toast.info(t("selfHeal.toastHealed", { count }));
+          announce(t("selfHeal.toastHealed", { count }));
         }
         break;
       case "halted":
-        toast.warning(t("selfHeal.toastHalted"), {
-          id: HALTED_TOAST_ID,
-          duration: 0,
-          background: true,
-          action: {
-            label: t("selfHeal.open"),
-            onClick: () =>
-              void navigate({
-                to: sectionPagePath(SECTION_ID.selfHeal),
-                hash: SECTION_ID.selfHeal,
-              }),
-          },
-        });
+        setHalted(true);
         break;
       case "recovered":
       case "resumed":
-        toast.dismiss(HALTED_TOAST_ID);
+        setHalted(false);
         break;
     }
   });
 
-  return null;
+  if (!halted || onSelfHealPage) return null;
+  return (
+    <Alert className={NOTICE_LINE_CLASS} data-slot="self-heal-halted" variant="warning">
+      <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
+      <AlertDescription>{t("selfHeal.toastHalted")}</AlertDescription>
+      <AlertAction className={NOTICE_ACTIONS_CLASS}>
+        <NoticeIconButton
+          icon={ArrowRight02Icon}
+          label={t("selfHeal.open")}
+          onClick={() => void navigate({ to: SELF_HEAL_PATH, hash: SECTION_ID.selfHeal })}
+        />
+        <NoticeIconButton
+          icon={XIcon}
+          label={tc("actions.close")}
+          onClick={() => {
+            setHalted(false);
+            // The close button goes with the notice: focus stays on the page, not the body.
+            document.getElementById("main")?.focus();
+          }}
+        />
+      </AlertAction>
+    </Alert>
+  );
 }

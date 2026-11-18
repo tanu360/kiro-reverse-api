@@ -168,10 +168,10 @@ test.describe("app shell", () => {
     await expect(page).toHaveTitle("Settings · Kiro Proxy");
   });
 
-  test("sign-out dismisses the session's toasts", async ({ page }) => {
-    // The first-run sign-in shows "Change the generated password" for 10 s.
-    const hint = page.getByText("Change the generated password in Settings.");
-    await expect(hint).toBeVisible();
+  test("sign-out drops the change-password hint", async ({ page }) => {
+    // The first-run sign-in shows "Change the generated password" at the top of the page.
+    const hint = page.locator('[data-slot="change-password-notice"]');
+    await expect(hint).toHaveText("Change the generated password in Settings.");
     await page.getByRole("button", { name: "Admin menu" }).first().click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/(login|setup)/);

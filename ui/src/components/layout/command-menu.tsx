@@ -3,7 +3,6 @@ import {
   LanguagesIcon,
   LogOutIcon,
   PlusIcon,
-  RefreshCwIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
@@ -42,6 +41,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
 import { LANGS, useLanguage, useT } from "@/lib/i18n";
 import { usePrivacy } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ import { NAV_ITEMS } from "./nav-items";
 import { THEMES, useTheme } from "./theme-provider";
 import { THEME_ICONS } from "./theme-switch";
 import { useUpdateCheck } from "./update-check";
-import { useSignOut } from "./user-menu";
+import { updateCheckRow, useSignOut } from "./user-menu";
 
 interface CommandEntry {
   value: string;
@@ -62,6 +62,12 @@ interface CommandEntry {
   note?: string;
   /** Label, group title and extra words, lower-cased, for the filter. */
   search: string;
+  /** Filtered by this instead of the label, when the label says a result for a while. */
+  searchAs?: string;
+  /** A spinner in the icon's place while it runs. */
+  busy?: boolean;
+  /** The palette stays open while it runs: the row says the outcome itself. */
+  keepOpen?: boolean;
   run: () => void;
 }
 
@@ -124,7 +130,7 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
   const { toggle: togglePrivacy } = usePrivacy();
   const { theme, setTheme } = useTheme();
   const { lang, setLang } = useLanguage();
-  const { checkNow } = useUpdateCheck();
+  const { checking, checkNow, checkResult } = useUpdateCheck();
   const signOut = useSignOut();
 
   useEffect(() => {
@@ -188,10 +194,11 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
       items: items.map((item) => ({
         ...item,
         verb,
-        search: `${item.label} ${label} ${keywords}`.toLowerCase(),
+        search: `${item.searchAs ?? item.label} ${label} ${keywords}`.toLowerCase(),
       })),
     });
     const current = t("shell.command.current");
+    const check = updateCheckRow(checkResult, t);
     return [
       group(
         "pages",
@@ -219,9 +226,13 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
         },
         {
           value: "action-update",
-          label: t("shell.update.check"),
-          icon: RefreshCwIcon,
-          run: checkNow,
+          label: check.label,
+          icon: check.icon,
+          searchAs: t("shell.update.check"),
+          busy: checking,
+          keepOpen: true,
+          // A newer release closes the palette and opens the update dialog.
+          run: () => checkNow(() => setOpen(false)),
         },
         {
           value: "action-sign-out",
@@ -257,10 +268,26 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
         "locale",
       ),
     ];
-  }, [t, navigate, togglePrivacy, checkNow, signOut, theme, setTheme, lang, setLang]);
+  }, [
+    t,
+    navigate,
+    togglePrivacy,
+    checking,
+    checkNow,
+    checkResult,
+    signOut,
+    theme,
+    setTheme,
+    lang,
+    setLang,
+  ]);
 
   // Closing first hands focus back to the page, so a command can then move it.
   const select = (entry: CommandEntry) => {
+    if (entry.keepOpen) {
+      entry.run();
+      return;
+    }
     opener.current = null;
     setOpen(false);
     entry.run();
@@ -300,8 +327,17 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
                   <CommandGroupLabel>{group.label}</CommandGroupLabel>
                   <CommandCollection>
                     {(entry: CommandEntry) => (
-                      <CommandItem key={entry.value} onClick={() => select(entry)} value={entry}>
-                        <HugeiconsIcon icon={entry.icon} aria-hidden="true" />
+                      <CommandItem
+                        aria-busy={entry.busy || undefined}
+                        key={entry.value}
+                        onClick={() => select(entry)}
+                        value={entry}
+                      >
+                        {entry.busy ? (
+                          <Spinner aria-hidden="true" />
+                        ) : (
+                          <HugeiconsIcon icon={entry.icon} aria-hidden="true" />
+                        )}
                         <span className="truncate font-medium">{entry.label}</span>
                         {entry.note ? <CommandItemNote>{entry.note}</CommandItemNote> : null}
                       </CommandItem>

@@ -10,6 +10,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { AuthHeader, AuthLayout, AuthSwitchLink } from "@/features/auth/auth-layout";
 import { retrySeconds, useRetryCountdown } from "@/features/auth/rate-limit";
+import { useSessionExpired } from "@/features/auth/session-expired";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
 import { signInWithKey } from "@/lib/api/user-panel";
@@ -63,10 +64,13 @@ function UserSignInForm({
   const [lockSeconds, setLockSeconds] = useState(0);
   const lockNotice = t("auth:rateLimited", { time: formatDuration(lockSeconds, lang) });
   const inputRef = useRef<HTMLInputElement>(null);
+  // Came here because the session ran out: said above the button until the next attempt.
+  const session = useSessionExpired("user");
 
   const signIn = async (typed: string) => {
     if (pending || locked) return;
     setFormError(null);
+    session.hide();
     // A pasted key often brings a space or line break along.
     const value = typed.trim();
     if (!value) {
@@ -175,6 +179,11 @@ function UserSignInForm({
           <Alert variant="error">
             <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
             <AlertDescription>{formError}</AlertDescription>
+          </Alert>
+        ) : session.expired ? (
+          <Alert data-slot="session-expired" variant="warning">
+            <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
+            <AlertDescription>{t("errors:sessionExpired")}</AlertDescription>
           </Alert>
         ) : null}
         <Button

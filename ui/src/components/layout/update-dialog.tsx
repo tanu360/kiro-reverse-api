@@ -13,7 +13,7 @@ import { ChoiceCard } from "@/components/shared/choice-card";
 import { CopyField } from "@/components/shared/code-field";
 import { IconChip } from "@/components/shared/icon-chip";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -497,12 +497,12 @@ function SelfUpdateCard({
     case "error":
       body = (
         <div className="flex flex-col gap-3">
+          {/* One plain line: the reason (the card says it failed); the title only without one. */}
           <Alert variant="error">
             <HugeiconsIcon aria-hidden="true" icon={AlertCircleIcon} />
-            <AlertTitle>{t("shell.update.failedTitle")}</AlertTitle>
-            {update.error ? (
-              <AlertDescription className="wrap-break-word">{update.error}</AlertDescription>
-            ) : null}
+            <AlertDescription className="wrap-break-word">
+              {update.error ?? t("shell.update.failedTitle")}
+            </AlertDescription>
           </Alert>
           <Button className="w-full" onClick={update.start} variant="outline">
             <HugeiconsIcon aria-hidden="true" icon={Download04Icon} />

@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { act, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getFirstRun } from "@/lib/api/session";
@@ -7,7 +7,6 @@ import { USER_API_BASE } from "@/lib/api/user-panel";
 import { isAuthenticated, type Session, type SessionChangeReason } from "@/lib/auth/session";
 import { USER_TOKEN_KEY } from "@/lib/auth/user-session";
 import { mockServer } from "@/lib/mocks/node";
-import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 
 type SessionListener = (session: Session | null, reason: SessionChangeReason) => void;
@@ -56,11 +55,6 @@ vi.mock("@/lib/api/system", async (importOriginal) => {
     fetchRemoteVersion: () => new Promise(() => {}),
   };
 });
-
-vi.mock("@/lib/toast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
-  syncToastPath: vi.fn(),
-}));
 
 const authed = vi.mocked(isAuthenticated);
 const firstRun = vi.mocked(getFirstRun);
@@ -153,7 +147,7 @@ describe("route guards", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("goes to sign-in with one toast when the session expires", async () => {
+  it("goes to sign-in, which says the session expired, when it expires", async () => {
     authed.mockReturnValue(true);
     const { router } = await renderApp("/accounts");
     expect(router.state.location.pathname).toBe("/accounts");
@@ -164,11 +158,20 @@ describe("route guards", () => {
     });
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
     expect(router.state.location.search).toEqual({ redirect: "/accounts" });
-    expect(toast.warning).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast.warning).mock.calls[0]?.[1]).toEqual({
-      id: "session-expired",
-      background: true,
+    const notice = await screen.findByText("Your session expired. Sign in again.");
+    expect(notice.closest("[role=alert]")).not.toBeNull();
+  });
+
+  it("says nothing about an expired session after a sign-out", async () => {
+    authed.mockReturnValue(true);
+    const { router } = await renderApp("/accounts");
+    authed.mockReturnValue(false);
+    act(() => {
+      for (const listener of sessionListeners) listener(null, "signout");
     });
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+    await screen.findByRole("button", { name: "Sign in" });
+    expect(screen.queryByText("Your session expired. Sign in again.")).toBeNull();
   });
 
   it("does not move on a password change", async () => {

@@ -1,6 +1,8 @@
 import {
+  AlertCircleIcon,
   BookOpen01Icon,
   BubbleChatQuestionIcon,
+  CheckIcon,
   EllipsisVerticalIcon,
   LogOutIcon,
   RefreshCwIcon,
@@ -25,10 +27,9 @@ import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 import { statusQuery, versionQuery } from "@/lib/api/system";
 import { signOut } from "@/lib/auth/session";
-import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
+import { type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useUpdateCheck } from "./update-check";
+import { type UpdateCheckResult, useUpdateCheck } from "./update-check";
 import { stripV } from "./update-dialog";
 
 export const GITHUB_URL = "https://github.com/tanu360/kiro-reverse-api";
@@ -53,17 +54,37 @@ export function useSignOut(): () => Promise<void> {
     } catch {
       // The server session may already be gone; the local session is cleared either way.
     }
-    // Toasts from the session (for example "Change the generated password" with its link to
-    // Settings) must not follow the user onto the sign-in page.
-    toast.dismiss();
     await navigate({ to: "/login" });
   }, [navigate]);
 }
 
-/** `onCheckSettled` closes the menu once a manual check has its answer. */
-function UserMenuItems({ onCheckSettled }: { onCheckSettled: () => void }): JSX.Element {
+/**
+ * The row of a manual update check, in the Admin menu and the ⌘K palette: its icon and label,
+ * then for a few seconds its answer in their place, a tick and "Kiro Proxy is up to date." or an
+ * alert and "Could not check for updates." (a click checks again).
+ */
+export function updateCheckRow(
+  result: UpdateCheckResult | null,
+  t: TFunction,
+): { icon: IconSvgElement; label: string; tone?: string } {
+  if (result === "upToDate") {
+    return { icon: CheckIcon, label: t("shell.update.upToDate"), tone: "text-success-foreground" };
+  }
+  if (result === "failed") {
+    return {
+      icon: AlertCircleIcon,
+      label: t("shell.update.checkFailed"),
+      tone: "text-destructive-foreground",
+    };
+  }
+  return { icon: RefreshCwIcon, label: t("shell.update.check") };
+}
+
+/** `onNewerRelease` closes the menu when a manual check finds a release (its dialog opens). */
+function UserMenuItems({ onNewerRelease }: { onNewerRelease: () => void }): JSX.Element {
   const { t } = useT();
-  const { checking, checkNow, latest } = useUpdateCheck();
+  const { checking, checkNow, checkResult, latest } = useUpdateCheck();
+  const check = updateCheckRow(checkResult, t);
   const handleSignOut = useSignOut();
   return (
     <>
@@ -73,21 +94,27 @@ function UserMenuItems({ onCheckSettled }: { onCheckSettled: () => void }): JSX.
          * Only while no newer release is known: once one is, the bell above the Admin row names
          * it, so the menu carries no copy. Stays open while it checks: the spinner takes the
          * icon's place, the label stays and aria-busy marks the row (a second click does
-         * nothing). The menu closes when the answer is in, just before its toast or the update
-         * dialog shows.
+         * nothing). Then the row says the answer itself; a newer release closes the menu and
+         * opens the update dialog.
          */}
         {latest ? null : (
           <MenuItem
             aria-busy={checking || undefined}
             closeOnClick={false}
-            onClick={() => checkNow(onCheckSettled)}
+            onClick={() => checkNow(onNewerRelease)}
           >
             {checking ? (
               <Spinner aria-hidden="true" />
             ) : (
-              <AnimatedIcon icon={RefreshCwIcon} aria-hidden="true" />
+              <AnimatedIcon
+                icon={check.icon}
+                aria-hidden="true"
+                className={check.tone}
+                playOnSwap={checkResult !== null}
+              />
             )}
-            {t("shell.update.check")}
+            {/* The answer wraps rather than slide: it is read once, often in another language. */}
+            {checkResult ? <span className="min-w-0 py-1.5">{check.label}</span> : check.label}
           </MenuItem>
         )}
         {HELP_LINKS.map((link) => (
@@ -188,7 +215,7 @@ function SidebarUserMenu(): JSX.Element {
           side={isMobile ? "bottom" : "right"}
           sideOffset={isMobile ? 4 : 12}
         >
-          <UserMenuItems onCheckSettled={() => setOpen(false)} />
+          <UserMenuItems onNewerRelease={() => setOpen(false)} />
         </MenuPopup>
       </Menu>
     </>

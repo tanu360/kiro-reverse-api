@@ -7,7 +7,6 @@ import { EndpointsCard } from "@/features/api/endpoints-card";
 import { queryKeys } from "@/lib/api/query-keys";
 import { signOutUser, userKeyQuery } from "@/lib/api/user-panel";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { KeyHeading, KeyNotice } from "./key-overview";
 import { useRerenderAtExpiry } from "./key-status";
 import { RecentRequestsCard } from "./recent-requests-card";
@@ -24,7 +23,6 @@ function useUserSignOut(): { signOut: () => Promise<void>; signingOut: boolean }
     signingOut,
     signOut: async () => {
       setSigningOut(true);
-      toast.dismiss();
       await signOutUser();
     },
   };

@@ -6,7 +6,6 @@ import { getUserToken } from "@/lib/auth/user-session";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
-import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 import { userKeyStatus } from "./key-status";
 import { resetUserPanelMock } from "./mocks";
@@ -547,8 +546,7 @@ describe("/user", () => {
     expect(adminCalls).toEqual([]);
   });
 
-  it("toasts once and goes to the key sign-in page when the session expires", async () => {
-    const warning = vi.spyOn(toast, "warning");
+  it("goes to the key sign-in page, which says the session expired, when it expires", async () => {
     await signIn();
     const { router, queryClient } = await renderPanel();
     // The token stops working: every panel request now gets the 401.
@@ -559,11 +557,8 @@ describe("/user", () => {
     );
     await queryClient.refetchQueries();
     await waitFor(() => expect(router.state.location.pathname).toBe("/user/login"));
-    expect(warning).toHaveBeenCalledTimes(1);
-    expect(warning).toHaveBeenCalledWith(
-      "Your session expired. Sign in again.",
-      expect.objectContaining({ id: "user-session-expired" }),
-    );
+    const notice = await screen.findByText("Your session expired. Sign in again.");
+    expect(notice.closest("[role=alert]")).not.toBeNull();
     expect(getUserToken()).toBeNull();
   });
 });

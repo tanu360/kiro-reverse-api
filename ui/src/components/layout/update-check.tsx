@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { announce } from "@/lib/announce";
 import {
   compareVersions,
   fetchReleaseReady,
@@ -20,32 +21,35 @@ import type { RemoteVersionJson, VersionResponse } from "@/lib/api/types";
 import { updateStatusQuery } from "@/lib/api/update";
 import { useT } from "@/lib/i18n";
 import { readStorage, writeStorage } from "@/lib/storage";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { type SelfUpdate, useSelfUpdateController } from "./self-update";
 import { stripV, UpdateDialog } from "./update-dialog";
 
 /** The silent check waits this long after the shell mounts (old UI: 2 s after sign-in). */
 export const SILENT_CHECK_DELAY_MS = 2000;
-const AVAILABLE_TOAST_MS = 5200;
-const AVAILABLE_TOAST_ID = "update-available";
 /**
- * The release the silent check last announced with a toast. Each release gets one toast; after
- * that the sidebar bell's dot carries the notice, so the toast does not cover the page (the
- * sticky Settings chips on a phone) on every visit.
+ * The release the silent check last read out to screen readers. The sidebar's update card shows
+ * a newer release for as long as it is known; each release is read out once, not on every visit.
  */
 const ANNOUNCED_VERSION_KEY = "kiro_update_announced";
-const UP_TO_DATE_TOAST_MS = 3600;
+/** How long the row that ran a manual check says its answer ("Kiro Proxy is up to date."). */
+export const CHECK_RESULT_MS = 4000;
+
+/** A manual check's answer, said on the row that ran it: the Admin menu's or the palette's. */
+export type UpdateCheckResult = "upToDate" | "failed";
 
 interface UpdateCheckValue {
   /** Set once a check found a newer release. */
   latest: RemoteVersionJson | null;
   checking: boolean;
+  /** The last manual check's answer, for CHECK_RESULT_MS; null otherwise. */
+  checkResult: UpdateCheckResult | null;
   /**
-   * Manual check: spinner while busy, toast when up to date or failed, dialog when newer.
-   * `onSettled` runs once the answer is in, just before that toast or dialog shows.
+   * Manual check: the row that runs it spins while busy, then says up to date or failed itself
+   * (checkResult). A newer release opens the dialog instead, right after `onNewer` (which
+   * closes the menu the check ran from).
    */
-  checkNow: (onSettled?: () => void) => void;
+  checkNow: (onNewer?: () => void) => void;
   openDialog: () => void;
   /** The running version, bare ("3.2.0"); empty until the first check. */
   current: string;
@@ -68,13 +72,11 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
   // The server's platform and container flag, for the dialog's How to update steps.
   const [server, setServer] = useState<VersionResponse | undefined>();
   const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<UpdateCheckResult | null>(null);
+  const resultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const busyRef = useRef(false);
-  // The dialog says what the toast said, so opening it retires the toast.
-  const openDialog = useCallback(() => {
-    toast.dismiss(AVAILABLE_TOAST_ID);
-    setDialogOpen(true);
-  }, []);
+  const openDialog = useCallback(() => setDialogOpen(true), []);
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -114,12 +116,8 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
           const version = stripV(newer.version);
           if (readStorage(ANNOUNCED_VERSION_KEY) === version) return;
           writeStorage(ANNOUNCED_VERSION_KEY, version);
-          toast.warning(tRef.current("shell.update.availableToast", { latest: version }), {
-            id: AVAILABLE_TOAST_ID,
-            duration: AVAILABLE_TOAST_MS,
-            background: true,
-            action: { label: tRef.current("shell.update.view"), onClick: () => openDialog() },
-          });
+          // The card appears in the sidebar by itself; a screen reader hears it once.
+          announce(tRef.current("shell.update.availableToast", { latest: version }));
         })
         // The silent check never reports errors.
         .catch(() => {});
@@ -128,30 +126,49 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [lookUp, openDialog]);
+  }, [lookUp]);
+
+  const showResult = useCallback((result: UpdateCheckResult | null) => {
+    if (resultTimer.current) clearTimeout(resultTimer.current);
+    resultTimer.current = null;
+    setCheckResult(result);
+    if (!result) return;
+    resultTimer.current = setTimeout(() => {
+      resultTimer.current = null;
+      setCheckResult(null);
+    }, CHECK_RESULT_MS);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (resultTimer.current) clearTimeout(resultTimer.current);
+    },
+    [],
+  );
 
   const checkNow = useCallback(
-    (onSettled?: () => void) => {
+    (onNewer?: () => void) => {
       if (busyRef.current) return;
       busyRef.current = true;
+      showResult(null);
       setChecking(true);
       lookUp()
         .then(
           ({ newer }) => {
-            onSettled?.();
             if (newer) {
+              onNewer?.();
               openDialog();
               return;
             }
-            toast.success(tRef.current("shell.update.upToDate"), {
-              duration: UP_TO_DATE_TOAST_MS,
-            });
+            showResult("upToDate");
+            announce(tRef.current("shell.update.upToDate"));
           },
           () => {
-            onSettled?.();
-            toast.error(tRef.current("shell.update.checkFailed"), {
-              description: tRef.current("shell.update.checkFailedDetail"),
-            });
+            showResult("failed");
+            announce(
+              `${tRef.current("shell.update.checkFailed")} ${tRef.current("shell.update.checkFailedDetail")}`,
+              { assertive: true },
+            );
           },
         )
         .finally(() => {
@@ -159,15 +176,15 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
           setChecking(false);
         });
     },
-    [lookUp, openDialog],
+    [lookUp, openDialog, showResult],
   );
   const selfUpdate = useSelfUpdateController({
     target: latest ? stripV(latest.version) : "",
     server,
   });
   const value = useMemo(
-    () => ({ latest, checking, checkNow, openDialog, current, selfUpdate }),
-    [latest, checking, checkNow, openDialog, current, selfUpdate],
+    () => ({ latest, checking, checkResult, checkNow, openDialog, current, selfUpdate }),
+    [latest, checking, checkResult, checkNow, openDialog, current, selfUpdate],
   );
 
   return (

@@ -1,11 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
-import { act, screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { fetchReleaseReady, fetchRemoteVersion } from "@/lib/api/system";
-import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
-import { SILENT_CHECK_DELAY_MS, UpdateCheckProvider } from "./update-check";
+import { CHECK_RESULT_MS, SILENT_CHECK_DELAY_MS, UpdateCheckProvider } from "./update-check";
 import { UserMenu } from "./user-menu";
 
 const { getStatus } = vi.hoisted(() => ({ getStatus: vi.fn() }));
@@ -41,12 +40,19 @@ vi.mock("@/lib/api/system", () => {
     },
   };
 });
-vi.mock("@/lib/toast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), dismiss: vi.fn() },
-}));
-
 const fetchRemote = vi.mocked(fetchRemoteVersion);
 const releaseReady = vi.mocked(fetchReleaseReady);
+
+/** Read out by the app's live region (lib/announce), not shown. */
+function announced(text: string | RegExp): HTMLElement | null {
+  const region = document.querySelector<HTMLElement>('[data-slot="live-announcer"]');
+  return region ? within(region).queryByText(text) : null;
+}
+
+/** Everything the live region holds now. */
+function announcerText(): string {
+  return document.querySelector('[data-slot="live-announcer"]')?.textContent ?? "";
+}
 
 function renderMenu() {
   return renderWithProviders(
@@ -98,14 +104,13 @@ describe("UserMenu", () => {
       await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS - 100);
     });
     expect(fetchRemote).not.toHaveBeenCalled();
-    expect(toast.warning).not.toHaveBeenCalled();
+    expect(announced(/is available/)).toBeNull();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(200);
     });
     expect(fetchRemote).toHaveBeenCalledTimes(1);
-    expect(toast.warning).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast.warning).mock.calls[0]?.[1]).toMatchObject({ duration: 5200 });
+    await vi.waitFor(() => expect(announced("Version 2.2.0 is available.")).not.toBeNull());
   });
 
   it("stays silent when the remote version is the same", async () => {
@@ -115,8 +120,7 @@ describe("UserMenu", () => {
       await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
     });
     expect(fetchRemote).toHaveBeenCalledTimes(1);
-    expect(toast.warning).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcerText()).toBe("");
   });
 
   it("stays silent about a newer version whose release files are not out yet", async () => {
@@ -127,8 +131,7 @@ describe("UserMenu", () => {
       await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
     });
     expect(releaseReady).toHaveBeenCalledWith("v2.2.0");
-    expect(toast.warning).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcerText()).toBe("");
   });
 
   it("stays silent when the silent check fails", async () => {
@@ -137,20 +140,44 @@ describe("UserMenu", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
     });
-    expect(toast.error).not.toHaveBeenCalled();
-    expect(toast.warning).not.toHaveBeenCalled();
+    expect(announcerText()).toBe("");
   });
 
-  it("a manual check reports an up-to-date version", async () => {
+  it("a manual check says an up-to-date version on its row, then goes back", async () => {
     fetchRemote.mockResolvedValue({ version: "2.1.0" });
     const { user } = renderMenu();
     await screen.findByText("2.1.0");
     await user.click(screen.getByRole("button", { name: /^Admin menu/ }));
     await user.click(await screen.findByRole("menuitem", { name: "Check for updates" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Kiro Proxy is up to date." }),
+    ).toBeInTheDocument();
+    await vi.waitFor(() => expect(announced("Kiro Proxy is up to date.")).not.toBeNull());
+
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(CHECK_RESULT_MS);
     });
-    expect(toast.success).toHaveBeenCalledWith(expect.any(String), { duration: 3600 });
+    expect(screen.getByRole("menuitem", { name: "Check for updates" })).toBeInTheDocument();
+  });
+
+  it("a failed manual check says so on its row, and a click checks again", async () => {
+    fetchRemote.mockRejectedValueOnce(new Error("offline"));
+    fetchRemote.mockResolvedValue({ version: "2.1.0" });
+    const { user } = renderMenu();
+    await screen.findByText("2.1.0");
+    await user.click(screen.getByRole("button", { name: /^Admin menu/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Check for updates" }));
+    const failed = await screen.findByRole("menuitem", { name: "Could not check for updates." });
+    await vi.waitFor(() =>
+      expect(
+        announced("Could not check for updates. GitHub did not answer. Try again later."),
+      ).not.toBeNull(),
+    );
+
+    await user.click(failed);
+    expect(
+      await screen.findByRole("menuitem", { name: "Kiro Proxy is up to date." }),
+    ).toBeInTheDocument();
   });
 
   it("a manual check reports up to date while the newer release has no files yet", async () => {
@@ -160,11 +187,10 @@ describe("UserMenu", () => {
     await screen.findByText("2.1.0");
     await user.click(screen.getByRole("button", { name: /^Admin menu/ }));
     await user.click(await screen.findByRole("menuitem", { name: "Check for updates" }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
-    });
-    expect(toast.success).toHaveBeenCalledWith(expect.any(String), { duration: 3600 });
-    expect(toast.warning).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole("menuitem", { name: "Kiro Proxy is up to date." }),
+    ).toBeInTheDocument();
+    expect(announced(/is available/)).toBeNull();
   });
 });
 
@@ -187,7 +213,7 @@ describe("UserMenu with a newer release known", () => {
 });
 
 describe("UserMenu manual check", () => {
-  it("keeps the menu open with a busy row while it checks, then closes it", async () => {
+  it("keeps the menu open with a busy row while it checks, then says the answer there", async () => {
     let answer: (value: { version: string }) => void = () => {};
     fetchRemote.mockImplementation(
       () =>
@@ -211,9 +237,25 @@ describe("UserMenu manual check", () => {
       answer({ version: "2.1.0" });
       await vi.advanceTimersByTimeAsync(10);
     });
-    expect(toast.success).toHaveBeenCalledWith(expect.any(String), { duration: 3600 });
-    await vi.waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(
+      await screen.findByRole("menuitem", { name: "Kiro Proxy is up to date." }),
+    ).not.toHaveAttribute("aria-busy");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("");
+  });
+
+  it("closes the menu and opens the update dialog when the check finds a release", async () => {
+    fetchRemote.mockResolvedValueOnce({ version: "2.1.0" });
+    const { user } = renderMenu();
+    await screen.findByText("2.1.0");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
+    });
+    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "Fixes", download: "https://x" });
+    await user.click(screen.getByRole("button", { name: /^Admin menu/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Check for updates" }));
+    expect(await screen.findByText("Version update")).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 });
 

@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import type { JSX } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { ChangePasswordNotice } from "@/features/auth/change-password-notice";
 import { AccountHealNotices } from "@/features/settings/account-heal-notices";
 import { isAuthenticated, useSession } from "@/lib/auth/session";
 import { isUserSignedIn } from "@/lib/auth/user-session";
@@ -29,8 +30,10 @@ function AppLayout(): JSX.Element | null {
   if (!session) return null;
   return (
     <AdminEventsProvider>
-      <AccountHealNotices />
       <AppShell>
+        {/* App-wide one-line notices, at the top of every page; nothing while there is none. */}
+        <ChangePasswordNotice />
+        <AccountHealNotices />
         <Outlet />
       </AppShell>
     </AdminEventsProvider>

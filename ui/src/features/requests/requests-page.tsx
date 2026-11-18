@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { DataTable, type DataTableSort } from "@/components/shared/data-table";
 import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -12,11 +13,9 @@ import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { recentRequestsQuery, requestCountsQuery } from "@/lib/api/requests";
-import { errorMessage } from "@/lib/api/server-errors";
 import type { RequestRecord } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
 import { shortConversationId } from "./conversation-sheet";
@@ -76,16 +75,12 @@ export function RequestsPage(): JSX.Element {
     updateSearch({ search: undefined }, { replace: true });
   }, [urlSearch.search, updateSearch]);
 
-  // A failed refetch keeps the rows on screen and reports the failure in a toast; it is the
-  // page's own news, never copied into an open detail sheet.
+  // A failed refetch keeps the rows on screen and says why in one line above them, until a
+  // fetch succeeds or it is closed (a later failure shows it again).
   const { data, error, errorUpdatedAt, isError } = query;
   const hasData = data !== undefined;
-  const toastedAt = useRef(0);
-  useEffect(() => {
-    if (!isError || !hasData || errorUpdatedAt === toastedAt.current) return;
-    toastedAt.current = errorUpdatedAt;
-    toast.error(errorMessage(error, t), { background: true });
-  }, [isError, hasData, error, errorUpdatedAt, t]);
+  const [closedAt, setClosedAt] = useState(0);
+  const refetchFailed = isError && hasData && errorUpdatedAt !== closedAt;
 
   const rows = data?.requests ?? [];
   // The server echoes the normalized paging values; they win over the URL (gotcha 8).
@@ -212,6 +207,20 @@ export function RequestsPage(): JSX.Element {
     void query.refetch();
     void countsQuery.refetch();
   };
+  // Try again and close go with the line: focus moves to the selected status tab, not the body.
+  const refetchError = refetchFailed ? (
+    <ActionError
+      error={error}
+      onDismiss={() => {
+        setClosedAt(errorUpdatedAt);
+        focusStatusTab("selected");
+      }}
+      onRetry={() => {
+        refresh();
+        focusStatusTab("selected");
+      }}
+    />
+  ) : null;
 
   return (
     <>
@@ -255,11 +264,13 @@ export function RequestsPage(): JSX.Element {
                 />
                 {conversationNote}
                 {memoryNote}
+                {refetchError}
               </>
             ) : (
               <>
                 {conversationNote}
                 {memoryNote}
+                {refetchError}
               </>
             )
           }

@@ -25,7 +25,9 @@ test("first visit goes to setup, signs in with the first-run password and stays 
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/^https?:\/\/[^/]+\/?$/);
   await expect(page.locator("main#main h1")).toHaveText("Overview");
-  await expect(page.getByText("Change the generated password in Settings.")).toBeVisible();
+  await expect(page.locator('[data-slot="change-password-notice"]')).toHaveText(
+    "Change the generated password in Settings.",
+  );
 
   await page.reload();
   await expect(page).toHaveURL(/^https?:\/\/[^/]+\/?$/);

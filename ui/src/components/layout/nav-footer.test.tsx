@@ -1,11 +1,13 @@
 import { queryOptions } from "@tanstack/react-query";
 import { act, screen } from "@testing-library/react";
+import { http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { fetchRemoteVersion } from "@/lib/api/system";
 import { mockDb } from "@/lib/mocks/db";
+import { apiUrl, jsonError } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
 import { freshMockUpdate } from "@/lib/mocks/update";
-import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
 import { NavFooter } from "./nav-footer";
 import { SILENT_CHECK_DELAY_MS, UpdateCheckProvider } from "./update-check";
@@ -27,19 +29,6 @@ vi.mock("@/lib/api/system", () => ({
   compareVersions: (a: string, b: string) =>
     a.replace(/^v/, "").localeCompare(b.replace(/^v/, ""), undefined, { numeric: true }),
 }));
-vi.mock("@/lib/toast", () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-    info: vi.fn(),
-    loading: vi.fn(),
-    update: vi.fn(),
-    dismiss: vi.fn(),
-  },
-  toastError: vi.fn(),
-}));
-
 const fetchRemote = vi.mocked(fetchRemoteVersion);
 
 function renderFooter() {
@@ -61,7 +50,6 @@ async function passSilentCheck(): Promise<void> {
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   fetchRemote.mockReset();
-  vi.mocked(toast.dismiss).mockClear();
 });
 
 afterEach(() => {
@@ -101,8 +89,20 @@ describe("NavFooter update card", () => {
 
     await user.click(screen.getByRole("button", { name: "See what's new" }));
     expect(await screen.findByText("Version update")).toBeInTheDocument();
-    // The toast would cover the dialog footer (a bottom drawer on phones).
-    expect(toast.dismiss).toHaveBeenCalledWith("update-available");
+  });
+
+  it("reads a newer release out once, then not on the next visit", async () => {
+    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "", download: "https://x" });
+    const first = renderFooter();
+    await passSilentCheck();
+    const line = await screen.findByText("Version 2.2.0 is available.");
+    expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+    first.unmount();
+
+    renderFooter();
+    await passSilentCheck();
+    await screen.findByText("Kiro Proxy 2.2.0");
+    expect(screen.queryByText("Version 2.2.0 is available.")).toBeNull();
   });
 
   it("downloads from the card on a server that updates itself, then offers the restart", async () => {
@@ -127,9 +127,59 @@ describe("NavFooter update card", () => {
     expect(
       (await screen.findAllByText("Ready to install", {}, { timeout: 4000 })).length,
     ).toBeGreaterThan(0);
-    expect(toast.success).toHaveBeenCalledWith(
-      "Kiro Proxy 2.2.0 is ready to install.",
-      expect.objectContaining({ action: expect.objectContaining({ label: "Restart to update" }) }),
+    // The card's own button offers the restart (no toast).
+    const restart = screen
+      .getAllByRole("button", { name: "Restart to update" })
+      .find((element) => element.dataset.slot === "update-status-button");
+    expect(restart).toBeDefined();
+  });
+
+  it("says in the card why a download did not start, and Try again sends it again", async () => {
+    mockDb.server = "binary";
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/update"), () => (fail ? jsonError(500, "disk is full") : undefined)),
     );
+    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "🔑 New keys" });
+    const { user } = renderFooter();
+    await passSilentCheck();
+
+    const card = await screen.findByText("Kiro Proxy 2.2.0");
+    const statusButton = () =>
+      screen
+        .getAllByRole("button")
+        .find((element) => element.dataset.slot === "update-status-button") as HTMLElement;
+    await user.click(statusButton());
+    expect(await screen.findByText("disk is full")).toBeInTheDocument();
+    expect(card.closest('[data-slot="sidebar-update-card"]')).toHaveTextContent("Update failed");
+    expect(screen.queryByText("New keys")).toBeNull();
+
+    fail = false;
+    expect(statusButton()).toHaveAccessibleName("Try again");
+    await user.click(statusButton());
+    expect((await screen.findAllByText(/^Downloading/)).length).toBeGreaterThan(0);
+    expect(screen.queryByText("disk is full")).toBeNull();
+  });
+
+  it("says in the card why a download failed", async () => {
+    mockDb.server = "fail";
+    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "🔑 New keys" });
+    const { user } = renderFooter();
+    await passSilentCheck();
+    await screen.findByText("Kiro Proxy 2.2.0");
+    const button = screen
+      .getAllByRole("button", { name: "Download update" })
+      .find((element) => element.dataset.slot === "update-status-button");
+    await user.click(button as HTMLElement);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(
+      await screen.findByText(
+        "The download does not match the release checksum.",
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
   });
 });

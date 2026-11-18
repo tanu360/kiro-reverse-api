@@ -8,17 +8,17 @@ import {
   useLocation,
   useRouter,
 } from "@tanstack/react-router";
-import { type JSX, useEffect, useRef } from "react";
+import { type JSX, useEffect } from "react";
 import { NotFound } from "@/components/layout/not-found";
 import { StatusPage } from "@/components/layout/status-page";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { markSessionExpired } from "@/features/auth/session-expired";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { subscribeSession } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -36,24 +36,18 @@ function RootComponent(): JSX.Element {
 }
 
 /**
- * One subscription for the app: an expired session toasts once and goes to sign-in;
- * sign-out and backup restore go to sign-in silently (their callers toast); a password
- * change keeps the user where they are.
+ * One subscription for the app: an expired session goes to sign-in, which says the session
+ * expired; sign-out and backup restore go to sign-in silently; a password change keeps the user
+ * where they are.
  */
 function useSessionRedirects(): void {
   const router = useRouter();
-  const { t } = useT();
-  const tRef = useRef(t);
-  tRef.current = t;
 
   useEffect(
     () =>
       subscribeSession((_session, reason) => {
         if (reason === "expired") {
-          toast.warning(tRef.current("errors:sessionExpired"), {
-            id: "session-expired",
-            background: true,
-          });
+          markSessionExpired("admin");
           const location = router.state.location;
           void router.navigate({
             to: "/login",
