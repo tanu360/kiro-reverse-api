@@ -164,52 +164,12 @@ describe("ExportDialog", () => {
     expect(activePick).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("masks credentials in the JSON preview until shown, and copies them whole", async () => {
-    const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
-    const json = (await within(dialog).findByRole("textbox", {
-      name: "Export JSON",
-    })) as HTMLTextAreaElement;
-    const masked = json.value;
-    expect(masked).toMatch(/"refreshToken": "[^"]{4}…[^"]{4}"/);
-    expect(within(dialog).getByText(/Credentials are hidden in this preview/)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("switch", { name: "Show credentials" }));
-    expect(json.value).not.toMatch(/"refreshToken": "[^"]{4}…[^"]{4}"/);
-    expect(json.value.length).toBeGreaterThan(masked.length);
-    expect(within(dialog).getByText("This preview shows live credentials.")).toBeInTheDocument();
-  });
-
-  it("swaps the list for the JSON and back", async () => {
-    const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
-    await within(dialog).findByRole("textbox", { name: "Export JSON" });
-    expect(
-      within(dialog).queryByRole("list", { name: "Accounts to export" }),
-    ).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("radio", { name: "Accounts" }));
-    expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
-  });
-
-  it("stays on the list when JSON is picked with nothing selected", async () => {
-    const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("checkbox", { name: "Select all" }));
-    expect(within(dialog).getByRole("radio", { name: "JSON" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
-    expect(within(dialog).getByText("Select at least one account.")).toBeInTheDocument();
-    expect(within(dialog).getByRole("radio", { name: "Accounts" })).toBeChecked();
-    expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
-  });
-
-  it("focuses the JSON once it renders, so it is in view on phones", async () => {
-    const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
-    const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
-    const json = await within(dialog).findByRole("textbox", { name: "Export JSON" });
-    await waitFor(() => expect(json).toHaveFocus());
-    expect(scrolled.mock.contexts).toContain(json);
-    scrolled.mockRestore();
+  it("never shows the export: no view switch, no credentials on screen", async () => {
+    const { dialog } = await openExport();
+    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    // The count ends the quick picks' row.
+    const picks = within(dialog).getByRole("group", { name: "Select a group" });
+    expect(within(picks).getByText(/\d+ selected/)).toBeInTheDocument();
   });
 });
