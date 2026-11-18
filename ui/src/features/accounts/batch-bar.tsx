@@ -3,7 +3,6 @@ import {
   CircleOffIcon,
   Delete02Icon,
   Download01Icon,
-  EllipsisVerticalIcon,
   Layers01Icon,
   Refresh01Icon,
   Tag01Icon,
@@ -13,7 +12,6 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type JSX, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
-import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Toolbar, ToolbarButton, ToolbarGroup, ToolbarSeparator } from "@/components/ui/toolbar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-media-query";
@@ -29,6 +27,7 @@ import type {
   BatchRefreshModelsResponse,
   BatchRefreshResponse,
 } from "@/lib/api/types";
+import { formatNumber } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -194,7 +193,7 @@ export function BatchBar({
   /** Opens the dialog that adds or removes a tag on the selection. */
   onTags: () => void;
 }): JSX.Element {
-  const { t } = useT("accounts");
+  const { t, lang } = useT("accounts");
   const isMobile = useIsMobile();
   const count = selectedIds.length;
   const run = (action: BatchAction) => {
@@ -210,22 +209,34 @@ export function BatchBar({
         : running
           ? t("batch.processing")
           : null;
-  // The live count line. While a batch runs, a phone's says what runs in the count's place: the
-  // rarer actions sit in the bar's menu, whose button only spins. A wider bar shows every action,
-  // the running one spinning, so its count stays (and the bar its width); the run is named for
-  // screen readers only.
+  // The live count line. While a batch runs its action's button spins and the count stays (the
+  // bar keeps its width); the run is named for screen readers only. A phone shows the bare
+  // number, so every action fits on one row; a screen reader still hears "3 selected".
   const countLabel = (
-    <p aria-live="polite" className="whitespace-nowrap px-1.5 font-medium text-sm tabular-nums">
-      {runningLabel && isMobile ? runningLabel : t("batch.selected", { count })}
-      {runningLabel && !isMobile ? <span className="sr-only">{runningLabel}</span> : null}
+    <p
+      aria-live="polite"
+      className={cn(
+        "whitespace-nowrap px-1.5 text-sm tabular-nums",
+        isMobile ? "min-w-0 flex-1 px-1 font-semibold" : "font-medium",
+      )}
+    >
+      {isMobile ? (
+        <>
+          <span aria-hidden="true">{formatNumber(count, lang)}</span>
+          <span className="sr-only">{t("batch.selected", { count })}</span>
+        </>
+      ) : (
+        t("batch.selected", { count })
+      )}
+      {runningLabel ? <span className="sr-only">{runningLabel}</span> : null}
     </p>
   );
 
   /** One action as a toolbar button; `label` is the visible text, `name` the full name. */
-  const actionButton = (action: BatchAction, label: string, name?: string, className?: string) => (
+  const actionButton = (action: BatchAction, label: string, name?: string) => (
     <ToolbarButton
       aria-label={name}
-      className={cn(WAITING, className)}
+      className={WAITING}
       data-batch-action={action}
       disabled={busy && running !== action}
       key={action}
@@ -242,6 +253,43 @@ export function BatchBar({
       {label}
     </ToolbarButton>
   );
+
+  /**
+   * One action as an icon button, named by its tooltip (phones). A batch action spins while it
+   * runs; Tags and Export open their dialogs.
+   */
+  const iconButton = (
+    name: string,
+    icon: IconSvgElement,
+    onClick: () => void,
+    action?: BatchAction,
+  ) => (
+    <Tooltip key={name}>
+      <TooltipTrigger
+        render={
+          <ToolbarButton
+            aria-label={name}
+            className={WAITING}
+            data-batch-action={action}
+            disabled={busy && (action === undefined || running !== action)}
+            onClick={onClick}
+            render={
+              <Button
+                loading={action !== undefined && running === action}
+                size="icon-sm"
+                variant={action === "delete" ? "on-primary-danger" : "on-primary"}
+              />
+            }
+          />
+        }
+      >
+        <HugeiconsIcon icon={icon} aria-hidden="true" />
+      </TooltipTrigger>
+      <TooltipPopup>{name}</TooltipPopup>
+    </Tooltip>
+  );
+  const iconAction = (action: BatchAction, name: string) =>
+    iconButton(name, ACTION_ICONS[action], () => run(action), action);
 
   const clearButton = (
     <Tooltip>
@@ -264,8 +312,6 @@ export function BatchBar({
     </Tooltip>
   );
 
-  const menuLoading = running === "refresh" || running === "refreshModels" || running === "delete";
-
   return (
     <Toolbar
       aria-label={t("batch.label")}
@@ -277,57 +323,29 @@ export function BatchBar({
       data-slot="batch-bar"
       variant="inverted"
     >
-      {/* Phones: two rows, the count with its clear button over the actions. */}
-      <ToolbarGroup className={cn(isMobile && "w-full justify-between")}>
-        {countLabel}
-        {clearButton}
-      </ToolbarGroup>
       {isMobile ? (
-        // The common actions stay on the bar, the rest sit in its menu.
-        <ToolbarGroup className="w-full">
-          {actionButton("enable", t("batch.enableShort"), t("batch.enable"), "flex-1")}
-          {actionButton("disable", t("batch.disableShort"), t("batch.disable"), "flex-1")}
-          <Menu>
-            <ToolbarButton
-              aria-label={t("batch.more")}
-              className={WAITING}
-              data-batch-more=""
-              disabled={busy && !menuLoading}
-              render={
-                <MenuTrigger
-                  render={<Button loading={menuLoading} size="icon-sm" variant="on-primary" />}
-                />
-              }
-            >
-              <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
-            </ToolbarButton>
-            <MenuPopup align="end">
-              <MenuItem onClick={() => run("refresh")}>
-                <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-                {t("batch.refresh")}
-              </MenuItem>
-              <MenuItem onClick={() => run("refreshModels")}>
-                <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
-                {t("batch.refreshModels")}
-              </MenuItem>
-              <MenuItem onClick={onTags}>
-                <HugeiconsIcon icon={Tag01Icon} aria-hidden="true" />
-                {t("metadata.batchTags")}
-              </MenuItem>
-              <MenuItem onClick={onExport}>
-                <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
-                {t("batch.export")}
-              </MenuItem>
-              <MenuSeparator />
-              <MenuItem onClick={() => run("delete")} variant="destructive">
-                <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-                {t("batch.delete")}
-              </MenuItem>
-            </MenuPopup>
-          </Menu>
-        </ToolbarGroup>
+        // Phones: one row, the clear button and the count, then every action as an icon.
+        <>
+          <ToolbarGroup className="min-w-0 flex-1">
+            {clearButton}
+            {countLabel}
+          </ToolbarGroup>
+          <ToolbarGroup className="min-[375px]:gap-2">
+            {iconAction("enable", t("batch.enable"))}
+            {iconAction("disable", t("batch.disable"))}
+            {iconAction("refresh", t("batch.refresh"))}
+            {iconAction("refreshModels", t("batch.refreshModels"))}
+            {iconButton(t("metadata.batchTags"), Tag01Icon, onTags)}
+            {iconButton(t("batch.export"), Download01Icon, onExport)}
+            {iconAction("delete", t("batch.delete"))}
+          </ToolbarGroup>
+        </>
       ) : (
         <>
+          <ToolbarGroup>
+            {countLabel}
+            {clearButton}
+          </ToolbarGroup>
           <ToolbarSeparator orientation="vertical" />
           <ToolbarGroup>
             {actionButton("enable", t("batch.enableShort"), t("batch.enable"))}

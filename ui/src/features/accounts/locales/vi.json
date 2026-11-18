@@ -100,7 +100,6 @@
   "batch.clear": "Bỏ chọn",
   "batch.enableShort": "Bật",
   "batch.disableShort": "Tắt",
-  "batch.more": "Thao tác hàng loạt khác",
   "batch.export": "Xuất mục đã chọn",
   "batch.notFound": "Không tìm thấy tài khoản",
   "batch.moreFailures": "và {count} tài khoản khác",

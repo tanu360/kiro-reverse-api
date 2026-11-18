@@ -103,7 +103,6 @@
   "batch.clear": "Limpar seleção",
   "batch.enableShort": "Habilitar",
   "batch.disableShort": "Desabilitar",
-  "batch.more": "Mais ações em lote",
   "batch.export": "Exportar selecionadas",
   "batch.notFound": "Conta não encontrada",
   "batch.moreFailures": "e mais {count}",

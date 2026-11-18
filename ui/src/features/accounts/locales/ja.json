@@ -100,7 +100,6 @@
   "batch.clear": "選択を解除",
   "batch.enableShort": "有効化",
   "batch.disableShort": "無効化",
-  "batch.more": "その他の一括操作",
   "batch.export": "選択項目をエクスポート",
   "batch.notFound": "アカウントが見つかりません",
   "batch.moreFailures": "ほか {count} 件",

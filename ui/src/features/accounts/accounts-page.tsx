@@ -159,12 +159,11 @@ export function AccountsPage(): JSX.Element {
     selectedIds,
     select: (ids) => (ids.length > 0 ? setSelected(new Set(ids)) : clearSelection()),
     report: setFailure,
-    // The action's button on the bar; on a phone the bar's menu holds the rarer ones.
+    // The action's button on the bar.
     target: (action: BatchAction) => {
       const bar = listRef.current?.querySelector('[data-slot="batch-bar"]');
       return (
         bar?.querySelector<HTMLElement>(`[data-batch-action="${action}"]`) ??
-        bar?.querySelector<HTMLElement>("[data-batch-more]") ??
         shownSelectAll(listRef.current)
       );
     },

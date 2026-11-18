@@ -100,7 +100,6 @@
   "batch.clear": "清除选择",
   "batch.enableShort": "启用",
   "batch.disableShort": "禁用",
-  "batch.more": "更多批量操作",
   "batch.export": "导出所选",
   "batch.notFound": "未找到账号",
   "batch.moreFailures": "另有 {count} 个",

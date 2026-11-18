@@ -381,8 +381,7 @@ describe("AccountsPage layout", () => {
       expect(within(bar).getByRole("button", { name })).toBeInTheDocument();
     }
 
-    await user.click(within(bar).getByRole("button", { name: "More batch actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Delete selected" }));
+    await user.click(within(bar).getByRole("button", { name: "Delete selected" }));
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(bodies).toHaveLength(1));
@@ -809,15 +808,35 @@ describe("AccountsPage tags", () => {
     await waitFor(() => expect(within(table).getAllByText("vip")).toHaveLength(2));
   });
 
-  it("offers Tags in the phone batch menu", async () => {
+  it("puts every batch action on one phone row, the count as a bare number", async () => {
+    mockViewport(390);
+    const { list, user } = await renderCards();
+    await user.click(within(list).getAllByRole("checkbox")[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    for (const name of [
+      "Enable selected",
+      "Disable selected",
+      "Refresh tokens",
+      "Refresh models",
+      "Tags",
+      "Export selected",
+      "Delete selected",
+    ]) {
+      expect(within(bar).getByRole("button", { name })).toBeInTheDocument();
+    }
+    expect(within(bar).queryAllByRole("button", { expanded: false })).toHaveLength(0);
+    expect(within(bar).getByText("1 selected")).toHaveClass("sr-only");
+    expect(within(bar).getByText("1")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("offers Tags on the phone batch bar", async () => {
     mockViewport(390);
     const { list, user } = await renderCards();
     tagFixtures();
     const checkboxes = within(list).getAllByRole("checkbox");
     await user.click(checkboxes[0]);
     const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
-    await user.click(within(bar).getByRole("button", { name: "More batch actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Tags" }));
+    await user.click(within(bar).getByRole("button", { name: "Tags" }));
     expect(
       await screen.findByRole("dialog", { name: "Edit tags for 1 account" }),
     ).toBeInTheDocument();

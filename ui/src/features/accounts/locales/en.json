@@ -102,7 +102,6 @@
   "batch.clear": "Clear selection",
   "batch.enableShort": "Enable",
   "batch.disableShort": "Disable",
-  "batch.more": "More batch actions",
   "batch.export": "Export selected",
   "batch.notFound": "Account not found",
   "batch.moreFailures": "and {count} more",
