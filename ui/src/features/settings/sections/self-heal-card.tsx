@@ -243,8 +243,7 @@ function HealStatusRow({
   const { t } = useT("settings");
   const queryClient = useQueryClient();
   const resumeRef = useRef<HTMLButtonElement>(null);
-  // No toast: the warning goes once the refetch says it is running again; a failure shows
-  // under the warning.
+  // The warning goes once the refetch says it is running again; a failure shows under it.
   const resume = useMutation({
     mutationFn: resumeAccountHealth,
     onSuccess: () => {

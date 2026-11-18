@@ -71,8 +71,8 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
   const signOutRef = useRef<HTMLButtonElement>(null);
   const setStatus = (next: TunnelStatus) =>
     queryClient.setQueryData(queryKeys.settings.tunnel(), next);
-  // No toasts: the switch, the status and the account row change on screen; a failure shows
-  // under the row it came from (the device name's own failures stay with its field).
+  // The switch, the status and the account row change on screen; a failure shows under the row
+  // it came from (the device name's own failures stay with its field).
   const save = useMutation({
     mutationFn: updateTunnel,
     onSuccess: (next) => setStatus(next),

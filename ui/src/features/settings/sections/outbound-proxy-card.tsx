@@ -127,8 +127,8 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
   const [editor, setEditor] = useState({ open: false, session: 0 });
   const editRef = useRef<HTMLButtonElement>(null);
   const removeRef = useRef<HTMLButtonElement>(null);
-  // No toast: the dialog's Save reads "Saved", then the dialog closes on the new route; Remove
-  // changes the row. A failure shows in the dialog, or under the row for Remove.
+  // The dialog's Save reads "Saved", then the dialog closes on the new route; Remove changes
+  // the row. A failure shows in the dialog, or under the row for Remove.
   const savedClose = useSavedThenClose(() => setEditor((prev) => ({ ...prev, open: false })));
   const { save, saving, feedback } = useSectionSave(
     (proxyURL: string) => updateProxyConfig({ proxyURL }),

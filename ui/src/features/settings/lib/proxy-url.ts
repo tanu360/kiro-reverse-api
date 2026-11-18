@@ -1,5 +1,5 @@
-export type ProxyType = "none" | "socks5" | "http";
-export type ProxyScheme = "socks5" | "socks5h" | "http" | "https";
+type ProxyType = "none" | "socks5" | "http";
+type ProxyScheme = "socks5" | "socks5h" | "http" | "https";
 
 /** The outbound proxy form, split from and joined back into `proxyURL`. */
 export interface ProxyModel {

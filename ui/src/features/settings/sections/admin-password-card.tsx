@@ -22,7 +22,7 @@ export function AdminPasswordCard(): JSX.Element {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // No toast: the button reads "Saved" for a moment after a change; a failure shows over it.
+  // The button reads "Saved" for a moment after a change; a failure shows over it.
   const [failure, setFailure] = useState<unknown>(null);
   const changed = useSavedFlash();
   const submitRef = useRef<HTMLButtonElement>(null);

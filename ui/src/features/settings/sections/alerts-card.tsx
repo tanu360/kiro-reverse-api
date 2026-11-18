@@ -359,8 +359,8 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   const editing = editor.id
     ? config.channels.find((channel) => channel.id === editor.id)
     : undefined;
-  // No toasts. The dialog's Save reads "Saved", then the dialog closes on the saved row; a
-  // removed row goes. A failure shows in the dialog, or under the row for a removal.
+  // The dialog's Save reads "Saved", then the dialog closes on the saved row; a removed row
+  // goes. A failure shows in the dialog, or under the row for a removal.
   const savedClose = useSavedThenClose(() => setEditor((prev) => ({ ...prev, open: false })));
 
   const channels = useMutation({
@@ -437,7 +437,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
       next.delete(id);
       return next;
     });
-  // No toast: the row's last result changes on screen, and a screen reader hears it.
+  // The row's last result changes on screen, and a screen reader hears it.
   const test = useMutation({
     mutationFn: (channel: AlertChannel) => testAlertChannel(channel.id),
     onMutate: (channel) => {
