@@ -1,4 +1,5 @@
 import {
+  CheckIcon,
   Copy01Icon,
   Download01Icon,
   Search01Icon,
@@ -6,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,15 +20,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useSavedFlash } from "@/hooks/use-saved-flash";
+import { announce } from "@/lib/announce";
 import { exportAccounts } from "@/lib/api/accounts";
 import type { Account, ExportData } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
-import { copiedToastWanted } from "@/lib/copy-toast";
 import { saveJson } from "@/lib/download";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { toast, toastError } from "@/lib/toast";
 import { AuthIcon, accountMeta, StatusPill, useAccountName } from "./account-cells";
 import {
   accountStatus,
@@ -39,6 +41,7 @@ import {
 } from "./account-model";
 
 type ExportView = "list" | "json";
+type ExportTask = "show" | "copy" | "download";
 type QuickGroup = "all" | StatusGroup;
 const QUICK_GROUPS: readonly QuickGroup[] = ["all", ...STATUS_GROUPS];
 
@@ -117,6 +120,8 @@ const ExportRow = memo(function ExportRow({
  * Exports the chosen accounts (the list filter does not apply). The JSON holds live secrets:
  * it is never logged or cached, and lives only in this dialog's state while it is shown.
  * Memoised: the page renders it on every change of its own, while it is mostly closed.
+ * No toasts: with nothing selected the count line asks for a selection and the actions wait;
+ * Copy JSON shows a tick for two seconds; a failed request is said in the dialog, with Try again.
  */
 export const ExportDialog = memo(function ExportDialog({
   accounts,
@@ -140,8 +145,18 @@ export const ExportDialog = memo(function ExportDialog({
   const [reveal, setReveal] = useState(false);
   const maskText = useMaskText();
   const [view, setView] = useState<ExportView>("list");
-  const [busy, setBusy] = useState<"show" | "copy" | "download" | null>(null);
+  const [busy, setBusy] = useState<ExportTask | null>(null);
+  // The last task that failed: the server's reason, or words of its own (a refused copy).
+  const [failure, setFailure] = useState<{
+    task: ExportTask;
+    error: unknown;
+    message?: string;
+  } | null>(null);
+  const copied = useSavedFlash();
   const jsonRef = useRef<HTMLTextAreaElement | null>(null);
+  const jsonViewRef = useRef<HTMLButtonElement | null>(null);
+  const copyRef = useRef<HTMLButtonElement | null>(null);
+  const downloadRef = useRef<HTMLButtonElement | null>(null);
   const jsonShown = view === "json" && json !== null;
 
   // The JSON takes the list's place: focus it, so it is ready to select (and in view on phones).
@@ -165,6 +180,8 @@ export const ExportDialog = memo(function ExportDialog({
       setJson(null);
       setReveal(false);
       setView("list");
+      setFailure(null);
+      copied.clear();
     }
   }
 
@@ -240,24 +257,22 @@ export const ExportDialog = memo(function ExportDialog({
     [accounts, selected],
   );
 
-  /** Fetches the export, or warns when nothing is selected. Server errors toast. */
-  const fetchExport = async (): Promise<ExportData | null> => {
+  /** Fetches the export of the selection; a server error is said in the dialog. */
+  const fetchExport = async (task: ExportTask): Promise<ExportData | null> => {
     const ids = selectedIds();
-    if (ids.length === 0) {
-      toast.warning(t("export.noSelection"));
-      return null;
-    }
+    if (ids.length === 0) return null;
     try {
       return await exportAccounts(ids);
     } catch (error) {
-      toastError(error, t);
+      setFailure({ task, error });
       return null;
     }
   };
 
-  const withBusy = async (kind: "show" | "copy" | "download", task: () => Promise<void>) => {
+  const withBusy = async (kind: ExportTask, task: () => Promise<void>) => {
     if (busy) return;
     setBusy(kind);
+    setFailure(null);
     try {
       await task();
     } finally {
@@ -266,21 +281,18 @@ export const ExportDialog = memo(function ExportDialog({
   };
 
   // JSON fetches the selection afresh and swaps the list for it (a spinner holds its place
-  // meanwhile); a failed fetch or an empty selection stays on the list. Ignored mid-request.
+  // meanwhile); a failed fetch stays on the list. Ignored mid-request or with nothing selected.
   const onViewChange = (next: ExportView) => {
     if (busy || next === view) return;
     if (next === "list") {
       setView("list");
       return;
     }
-    if (selectedCount === 0) {
-      toast.warning(t("export.noSelection"));
-      return;
-    }
+    if (selectedCount === 0) return;
     setJson(null);
     setView("json");
     void withBusy("show", async () => {
-      const data = await fetchExport();
+      const data = await fetchExport("show");
       if (data) setJson(data);
       else setView("list");
     });
@@ -288,25 +300,24 @@ export const ExportDialog = memo(function ExportDialog({
 
   const onCopy = () => {
     const ids = selectedIds();
-    if (ids.length === 0) {
-      toast.warning(t("export.noSelection"));
-      return;
-    }
-    let failure: unknown = null;
+    if (ids.length === 0) return;
+    copied.clear();
+    let fetchError: unknown = null;
     // The promise goes to copyText at once, so Safari keeps the click's user activation.
     const text = exportAccounts(ids).then(
       (data) => JSON.stringify(buildExportCopy(data), null, 2),
       (error: unknown) => {
-        failure = error;
+        fetchError = error;
         throw error;
       },
     );
     void withBusy("copy", async () => {
       const ok = await copyText(text);
       if (ok) {
-        if (copiedToastWanted({ marksItself: false })) toast.success(t("export.copied"));
-      } else if (failure) toastError(failure, t);
-      else toast.error(tc("toast.copyFailed"));
+        copied.flash();
+        announce(t("export.copied"));
+      } else if (fetchError) setFailure({ task: "copy", error: fetchError });
+      else setFailure({ task: "copy", error: null, message: tc("toast.copyFailed") });
     });
   };
 
@@ -319,9 +330,21 @@ export const ExportDialog = memo(function ExportDialog({
 
   const onDownload = () =>
     withBusy("download", async () => {
-      const data = await fetchExport();
+      const data = await fetchExport("download");
       if (data) saveJson(data, exportFilename());
     });
+
+  // Try again runs the failed task once more; it and close leave focus on that task's control.
+  const taskControl = (task: ExportTask) =>
+    task === "show" ? jsonViewRef.current : task === "copy" ? copyRef.current : downloadRef.current;
+  const retry = (task: ExportTask) => {
+    taskControl(task)?.focus();
+    if (task === "show") onViewChange("json");
+    else if (task === "copy") onCopy();
+    else void onDownload();
+  };
+
+  const nothingSelected = selectedCount === 0;
 
   return (
     <ResponsiveDialog
@@ -332,18 +355,33 @@ export const ExportDialog = memo(function ExportDialog({
             {tc("actions.cancel")}
           </Button>
           <Button
-            disabled={busy !== null && busy !== "copy"}
+            disabled={nothingSelected || (busy !== null && busy !== "copy")}
             loading={busy === "copy"}
             onClick={onCopy}
+            ref={copyRef}
             variant="secondary"
           >
-            <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
-            {t("export.copyJson")}
+            {copied.saved ? (
+              <>
+                <HugeiconsIcon
+                  icon={CheckIcon}
+                  aria-hidden="true"
+                  className="text-success-foreground"
+                />
+                {tc("toast.copied")}
+              </>
+            ) : (
+              <>
+                <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
+                {t("export.copyJson")}
+              </>
+            )}
           </Button>
           <Button
-            disabled={busy !== null && busy !== "download"}
+            disabled={nothingSelected || (busy !== null && busy !== "download")}
             loading={busy === "download"}
             onClick={() => void onDownload()}
+            ref={downloadRef}
           >
             <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
             {t("export.downloadJson")}
@@ -359,6 +397,18 @@ export const ExportDialog = memo(function ExportDialog({
         <HugeiconsIcon icon={SquareLock02Icon} aria-hidden="true" />
         <AlertDescription>{t("export.description")}</AlertDescription>
       </Alert>
+      {failure ? (
+        <ActionError
+          className="mb-3"
+          error={failure.error}
+          message={failure.message}
+          onDismiss={() => {
+            taskControl(failure.task)?.focus();
+            setFailure(null);
+          }}
+          onRetry={() => retry(failure.task)}
+        />
+      ) : null}
       {/* One fixed height for both views, so the dialog and its footer stay put on a switch. */}
       <div className="flex h-[26rem] flex-col gap-3 max-sm:h-[60dvh]">
         <div className="flex items-center justify-between gap-3">
@@ -375,12 +425,22 @@ export const ExportDialog = memo(function ExportDialog({
             <SegmentedControlItem render={<RadioPrimitive.Root value="list" />}>
               {t("export.viewList")}
             </SegmentedControlItem>
-            <SegmentedControlItem render={<RadioPrimitive.Root value="json" />}>
+            <SegmentedControlItem
+              render={
+                <RadioPrimitive.Root
+                  disabled={nothingSelected && view === "list"}
+                  ref={jsonViewRef}
+                  value="json"
+                />
+              }
+            >
               {t("export.viewJson")}
             </SegmentedControlItem>
           </SegmentedControl>
           <p aria-live="polite" className="text-meta text-muted-foreground tabular-nums">
-            {t("export.selected", { count: selectedCount })}
+            {nothingSelected
+              ? t("export.noSelection")
+              : t("export.selected", { count: selectedCount })}
           </p>
         </div>
         {view === "json" ? (

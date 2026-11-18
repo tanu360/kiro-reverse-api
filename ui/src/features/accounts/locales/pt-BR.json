@@ -177,7 +177,6 @@
   "detail.nickname": "Apelido",
   "detail.nicknamePlaceholder": "Principal da equipe",
   "detail.saved": "A alteração foi salva.",
-  "detail.saveFailed": "Não foi possível salvar: {reason}",
   "detail.loadFailed": "Não foi possível carregar: {reason}",
   "detail.profile": "Perfil do Kiro",
   "detail.profileRegion": "Região",
@@ -200,7 +199,6 @@
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "Informe um UUID ou 32 caracteres hexadecimais, ou deixe o campo vazio.",
   "detail.generateRandom": "Gerar ID aleatório da máquina",
-  "detail.generateFailed": "Não foi possível gerar um ID da máquina.",
   "detail.weight": "Peso",
   "detail.weightHint": "0 ou 1 é o normal. Uma conta com peso N recebe cerca de N vezes mais requisições novas.",
   "detail.priority": "Prioridade",
@@ -367,6 +365,5 @@
   "export.downloadJson": "Baixar JSON",
   "export.json": "JSON de exportação",
   "export.copied": "As credenciais foram copiadas.",
-  "export.noAccounts": "Ainda não há contas para exportar.",
   "export.noSelection": "Selecione pelo menos uma conta."
 }

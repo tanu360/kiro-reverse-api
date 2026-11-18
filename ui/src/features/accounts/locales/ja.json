@@ -159,7 +159,6 @@
   "detail.nickname": "ニックネーム",
   "detail.nicknamePlaceholder": "チームのメイン",
   "detail.saved": "変更を保存しました。",
-  "detail.saveFailed": "保存できませんでした：{reason}",
   "detail.loadFailed": "読み込めませんでした：{reason}",
   "detail.profile": "Kiro プロファイル",
   "detail.profileRegion": "リージョン",
@@ -182,7 +181,6 @@
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "UUID または 32 文字の 16 進数を入力するか、空欄のままにしてください。",
   "detail.generateRandom": "ランダムなマシン ID を生成",
-  "detail.generateFailed": "マシン ID を生成できませんでした。",
   "detail.weight": "重み",
   "detail.weightHint": "通常は 0 または 1 です。重みが N のアカウントは、新しいリクエストを約 N 倍多く受け持ちます。",
   "detail.priority": "優先度",
@@ -339,6 +337,5 @@
   "export.downloadJson": "JSON をダウンロード",
   "export.json": "JSON をエクスポート",
   "export.copied": "認証情報をコピーしました。",
-  "export.noAccounts": "エクスポートできるアカウントはまだありません。",
   "export.noSelection": "アカウントを 1 つ以上選択してください。"
 }

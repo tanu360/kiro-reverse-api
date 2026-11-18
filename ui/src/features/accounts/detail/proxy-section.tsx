@@ -48,7 +48,7 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
       onOpenChange={setOpen}
       onSubmit={onSubmit}
       open={open}
-      saving={save.isPending}
+      save={save}
       title={t("detail.proxyURL")}
       value={<ProxyValue accountId={account.id} proxyURL={account.proxyURL} />}
       // A proxy URL is as long as a machine ID: the edit takes the whole row, label above.

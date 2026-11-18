@@ -36,7 +36,7 @@ export function WeightRow({ account }: { account: Account }): JSX.Element {
       onOpenChange={setOpen}
       onSubmit={onSubmit}
       open={open}
-      saving={save.isPending}
+      save={save}
       title={t("detail.weight")}
       value={String(account.weight)}
     >

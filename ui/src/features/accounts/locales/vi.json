@@ -159,7 +159,6 @@
   "detail.nickname": "Biệt danh",
   "detail.nicknamePlaceholder": "Tài khoản chính của nhóm",
   "detail.saved": "Đã lưu thay đổi.",
-  "detail.saveFailed": "Không thể lưu: {reason}",
   "detail.loadFailed": "Không thể tải: {reason}",
   "detail.profile": "Kiro profile",
   "detail.profileRegion": "Khu vực",
@@ -182,7 +181,6 @@
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "Nhập UUID hoặc 32 ký tự hex, hoặc để trống.",
   "detail.generateRandom": "Tạo machine ID ngẫu nhiên",
-  "detail.generateFailed": "Không thể tạo machine ID.",
   "detail.weight": "Trọng số",
   "detail.weightHint": "0 hoặc 1 là bình thường. Tài khoản có trọng số N nhận số yêu cầu mới gấp khoảng N lần.",
   "detail.priority": "Mức ưu tiên",
@@ -339,6 +337,5 @@
   "export.downloadJson": "Tải xuống JSON",
   "export.json": "Xuất JSON",
   "export.copied": "Đã sao chép thông tin xác thực.",
-  "export.noAccounts": "Chưa có tài khoản nào để xuất.",
   "export.noSelection": "Chọn ít nhất một tài khoản."
 }

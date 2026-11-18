@@ -1,4 +1,5 @@
 import {
+  CheckIcon,
   Copy01Icon,
   Delete02Icon,
   EllipsisVerticalIcon,
@@ -8,7 +9,7 @@ import {
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { JSX, ReactElement } from "react";
+import { type JSX, type ReactElement, type Ref, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Spinner } from "@/components/ui/spinner";
@@ -42,7 +43,9 @@ export interface RowActionHandlers {
 export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   const displayEmail = useDisplayEmail();
-  const toggle = useToggleEnabled(account);
+  const switchRef = useRef<HTMLElement | null>(null);
+  // A failed switch is said in the card; Try again and close come back to the switch.
+  const toggle = useToggleEnabled(account, () => switchRef.current);
   const label = t("actions.enableAccount", { email: displayEmail(account.email, account.id) });
   if (isBanned(account)) {
     const reason =
@@ -64,18 +67,56 @@ export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
       checked={account.enabled}
       disabled={toggle.isPending}
       onCheckedChange={(checked) => toggle.mutate(checked)}
+      ref={switchRef}
     />
   );
+}
+
+/**
+ * Copy JSON and Delete for one account's menu. They live with the menu's trigger, not its popup
+ * (which closes at once): the trigger spins while either runs and shows a tick for two seconds
+ * after a copy; a failure is said in the card (or the sheet), and its close or Try again comes
+ * back to the trigger.
+ */
+function useManageActions() {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const target = () => triggerRef.current;
+  const copyJson = useCopyAccountJson(target);
+  const remove = useDeleteAccount(target);
+  return {
+    triggerRef,
+    copyJson,
+    remove,
+    busy: copyJson.copying || remove.deleting,
+    copied: copyJson.copied,
+  };
+}
+
+type ManageActions = ReturnType<typeof useManageActions>;
+
+/** The menu trigger's icon: a spinner while an action runs, a tick after a copy, else ⋮. */
+function MenuTriggerIcon({ busy, copied }: { busy: boolean; copied: boolean }): JSX.Element {
+  if (busy) return <Spinner aria-hidden="true" />;
+  if (copied) {
+    return (
+      <HugeiconsIcon icon={CheckIcon} aria-hidden="true" className="text-success-foreground" />
+    );
+  }
+  return <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />;
 }
 
 /**
  * Sign in again (when the page can open it), Copy JSON, then Delete after a separator: the end of
  * every account menu.
  */
-function ManageMenuItems({ account }: { account: Account }): JSX.Element {
+function ManageMenuItems({
+  account,
+  manage,
+}: {
+  account: Account;
+  manage: ManageActions;
+}): JSX.Element {
   const { t } = useT("accounts");
-  const copyJson = useCopyAccountJson();
-  const remove = useDeleteAccount();
   const openRelogin = useOpenRelogin();
   return (
     <>
@@ -85,12 +126,19 @@ function ManageMenuItems({ account }: { account: Account }): JSX.Element {
           {t("actions.relogin")}
         </MenuItem>
       ) : null}
-      <MenuItem onClick={() => void copyJson(account.id)}>
+      <MenuItem
+        disabled={manage.copyJson.copying}
+        onClick={() => void manage.copyJson.copy(account.id)}
+      >
         <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
         {t("actions.copyJson")}
       </MenuItem>
       <MenuSeparator />
-      <MenuItem onClick={() => void remove(account)} variant="destructive">
+      <MenuItem
+        disabled={manage.remove.deleting}
+        onClick={() => void manage.remove.remove(account)}
+        variant="destructive"
+      >
         <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
         {t("actions.delete")}
       </MenuItem>
@@ -104,7 +152,9 @@ function IconAction({
   onClick,
   children,
   busy = false,
+  ref,
 }: {
+  ref?: Ref<HTMLButtonElement>;
   label: string;
   /** The row's account, read after the action (aria-description), so 25 Tests are told apart. */
   description: string;
@@ -121,6 +171,7 @@ function IconAction({
             aria-label={label}
             loading={busy}
             onClick={onClick}
+            ref={ref}
             size="icon"
             variant="quiet"
           />
@@ -145,10 +196,16 @@ export function AccountRowActions({
   variant = "inline",
 }: RowActionHandlers & { account: Account; variant?: "inline" | "menu" }): JSX.Element {
   const { t } = useT("accounts");
+  const { t: tc } = useT();
   // Every row has the same actions; the account, read after each one, tells them apart.
   const name = useAccountName()(account).text;
-  const refresh = useRefreshAccount(account.id);
-  const menuItems = <ManageMenuItems account={account} />;
+  const refreshRef = useRef<HTMLButtonElement | null>(null);
+  const manage = useManageActions();
+  // A failed refresh comes back to the refresh button (the menu's trigger on a card).
+  const refresh = useRefreshAccount(account.id, () =>
+    variant === "menu" ? manage.triggerRef.current : refreshRef.current,
+  );
+  const menuItems = <ManageMenuItems account={account} manage={manage} />;
 
   if (variant === "menu") {
     return (
@@ -161,19 +218,17 @@ export function AccountRowActions({
         <MenuTrigger
           render={
             <Button
-              aria-busy={refresh.isPending || undefined}
+              aria-busy={refresh.isPending || manage.busy || undefined}
               aria-description={name}
               aria-label={t("actions.more")}
+              data-account-menu=""
+              ref={manage.triggerRef}
               size="icon"
               variant="quiet"
             />
           }
         >
-          {refresh.isPending ? (
-            <Spinner aria-hidden="true" />
-          ) : (
-            <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
-          )}
+          <MenuTriggerIcon busy={refresh.isPending || manage.busy} copied={manage.copied} />
         </MenuTrigger>
         <MenuPopup align="end">
           <MenuItem disabled={refresh.isPending} onClick={() => refresh.mutate()}>
@@ -201,6 +256,7 @@ export function AccountRowActions({
         description={name}
         label={t("actions.refreshToken")}
         onClick={() => refresh.mutate()}
+        ref={refreshRef}
       >
         <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
       </IconAction>
@@ -214,8 +270,11 @@ export function AccountRowActions({
               <MenuTrigger
                 render={
                   <Button
+                    aria-busy={manage.busy || undefined}
                     aria-description={name}
                     aria-label={t("actions.more")}
+                    data-account-menu=""
+                    ref={manage.triggerRef}
                     size="icon"
                     variant="quiet"
                   />
@@ -223,9 +282,9 @@ export function AccountRowActions({
               />
             }
           >
-            <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
+            <MenuTriggerIcon busy={manage.busy} copied={manage.copied} />
           </TooltipTrigger>
-          <TooltipPopup>{t("actions.more")}</TooltipPopup>
+          <TooltipPopup>{manage.copied ? tc("toast.copied") : t("actions.more")}</TooltipPopup>
         </Tooltip>
         <MenuPopup align="end">
           <MenuItem onClick={() => onDetails(account)}>
@@ -256,7 +315,10 @@ export function AccountSheetActions({
   className?: string;
 }): JSX.Element {
   const { t } = useT("accounts");
-  const refresh = useRefreshAccount(account.id);
+  const { t: tc } = useT();
+  const refreshRef = useRef<HTMLButtonElement | null>(null);
+  const refresh = useRefreshAccount(account.id, () => refreshRef.current);
+  const manage = useManageActions();
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <Button onClick={onTest} size="sm" variant="secondary">
@@ -266,6 +328,7 @@ export function AccountSheetActions({
       <Button
         loading={refresh.isPending}
         onClick={() => refresh.mutate()}
+        ref={refreshRef}
         size="sm"
         variant="secondary"
       >
@@ -282,16 +345,24 @@ export function AccountSheetActions({
             <TooltipTrigger
               render={
                 <MenuTrigger
-                  render={<Button aria-label={t("actions.more")} size="icon-sm" variant="quiet" />}
+                  render={
+                    <Button
+                      aria-busy={manage.busy || undefined}
+                      aria-label={t("actions.more")}
+                      ref={manage.triggerRef}
+                      size="icon-sm"
+                      variant="quiet"
+                    />
+                  }
                 />
               }
             >
-              <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
+              <MenuTriggerIcon busy={manage.busy} copied={manage.copied} />
             </TooltipTrigger>
-            <TooltipPopup>{t("actions.more")}</TooltipPopup>
+            <TooltipPopup>{manage.copied ? tc("toast.copied") : t("actions.more")}</TooltipPopup>
           </Tooltip>
           <MenuPopup align="end">
-            <ManageMenuItems account={account} />
+            <ManageMenuItems account={account} manage={manage} />
           </MenuPopup>
         </Menu>
       </div>

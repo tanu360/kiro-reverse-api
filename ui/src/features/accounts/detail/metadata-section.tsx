@@ -31,7 +31,7 @@ export function NotesRow({ account }: { account: Account }): JSX.Element {
       onOpenChange={setOpen}
       onSubmit={() => save.mutate({ notes: draft.trim() }, { onSuccess: () => setOpen(false) })}
       open={open}
-      saving={save.isPending}
+      save={save}
       multiline
       title={t("metadata.notes")}
       value={mask(account.notes)}
@@ -92,7 +92,7 @@ export function TagsRow({ account }: { account: Account }): JSX.Element {
       onOpenChange={setOpen}
       onSubmit={onSubmit}
       open={open}
-      saving={save.isPending}
+      save={save}
       title={t("metadata.tags")}
       value={tags.length > 0 ? <TagBadges max={MAX_TAGS} tags={tags} wrap /> : ""}
       wide

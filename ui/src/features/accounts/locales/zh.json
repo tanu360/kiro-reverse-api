@@ -159,7 +159,6 @@
   "detail.nickname": "昵称",
   "detail.nicknamePlaceholder": "主账号",
   "detail.saved": "更改已保存。",
-  "detail.saveFailed": "无法保存：{reason}",
   "detail.loadFailed": "无法加载：{reason}",
   "detail.profile": "Kiro Profile",
   "detail.profileRegion": "区域",
@@ -182,7 +181,6 @@
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "请输入 UUID 或 32 位十六进制字符，或留空。",
   "detail.generateRandom": "随机生成机器 ID",
-  "detail.generateFailed": "无法生成机器 ID。",
   "detail.weight": "权重",
   "detail.weightHint": "0 或 1 为默认权重。权重为 N 的账号承接约 N 倍的新请求。",
   "detail.priority": "优先级",
@@ -339,6 +337,5 @@
   "export.downloadJson": "下载 JSON",
   "export.json": "导出 JSON",
   "export.copied": "凭证已复制。",
-  "export.noAccounts": "还没有可导出的账号。",
   "export.noSelection": "请至少选择一个账号。"
 }

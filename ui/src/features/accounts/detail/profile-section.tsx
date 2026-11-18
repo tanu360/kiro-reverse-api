@@ -1,7 +1,8 @@
 import { CircleCheckIcon, ScanSearchIcon, UserSwitchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import { type JSX, useState } from "react";
+import { type JSX, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { ChoiceCard } from "@/components/shared/choice-card";
 import { PropertyList, PropertyRow } from "@/components/shared/property-list";
 import { SectionCard } from "@/components/shared/section-card";
@@ -10,11 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
+import { announce } from "@/lib/announce";
 import { getAccountProfiles, setAccountProfile } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, AccountProfilesResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { supportsKiroProfiles } from "../account-model";
 import { useInvalidateAccounts } from "../use-account-actions";
@@ -27,13 +28,18 @@ function defaultArn(result: AccountProfilesResponse): string {
  * Kiro profile pinning. The sheet shows it only where profiles exist (IAM Identity Center and
  * Microsoft sign-ins), never for api_key accounts (the server answers 400). An account pinned
  * before keeps it whatever its sign-in, with loading disabled where there are no profiles, so it
- * can still return to automatic.
+ * can still return to automatic. No toasts: the pressed button spins ("Verifying profile…"), the
+ * rows above show the new region and mode (a screen reader hears the result), and a failure stays
+ * under the profiles, where Try again sends the same choice.
  */
 export function ProfileSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   const supported = supportsKiroProfiles(account) || account.profileArnPinned;
   const invalidate = useInvalidateAccounts();
   const [selectedArn, setSelectedArn] = useState("");
+  const loadRef = useRef<HTMLButtonElement | null>(null);
+  const pinRef = useRef<HTMLButtonElement | null>(null);
+  const unpinRef = useRef<HTMLButtonElement | null>(null);
 
   // Discovery runs upstream and can take up to 30 s.
   const load = useMutation({
@@ -43,35 +49,26 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
 
   const pin = useMutation({
     mutationFn: (profileArn: string) => setAccountProfile(account.id, profileArn),
-    onMutate: () => ({ toastId: toast.loading(t("detail.profileSaving")) }),
-    onSuccess: (result, _arn, context) => {
-      toast.update(context.toastId, {
-        type: "success",
-        title: result.pinned
+    onSuccess: (result) => {
+      announce(
+        result.pinned
           ? t("detail.profilePinnedTo", { region: result.region })
           : t("detail.profileAutoRestored"),
-      });
+      );
       // activeRegion, profileArn and the pinned flag change; the server also clears the
       // account's model list until the next refresh.
       load.reset();
-      return invalidate();
-    },
-    onError: (error, _arn, context) => {
-      if (!context) return;
-      toast.update(context.toastId, {
-        type: "error",
-        title: t("detail.saveFailed", { reason: errorMessage(error, t) }),
+      // The list and its buttons go: focus, if it was on them, moves to Load profiles.
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (!active || active === document.body) loadRef.current?.focus();
       });
+      return invalidate();
     },
   });
 
-  const onUseSelected = () => {
-    if (!selectedArn) {
-      toast.warning(t("detail.profileNone"));
-      return;
-    }
-    pin.mutate(selectedArn);
-  };
+  /** The button of the failed choice: Use selected profile, or Use automatic. */
+  const pinButton = () => (pin.variables === "" ? unpinRef.current : pinRef.current);
 
   const result = load.data;
   const choices = result && result.profiles.length > 0 ? result : null;
@@ -82,6 +79,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
           disabled={!supported}
           loading={load.isPending}
           onClick={() => load.mutate()}
+          ref={loadRef}
           size="sm"
           variant="secondary"
         >
@@ -95,9 +93,11 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
           <div className="ms-auto flex flex-wrap items-center gap-2">
             {choices.pinned ? (
               <Button
-                disabled={pin.isPending}
+                // The pressed button stays enabled while it spins, so it keeps focus.
+                disabled={pin.isPending && pin.variables !== ""}
                 loading={pin.isPending && pin.variables === ""}
                 onClick={() => pin.mutate("")}
+                ref={unpinRef}
                 size="sm"
                 variant="secondary"
               >
@@ -105,9 +105,11 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
               </Button>
             ) : null}
             <Button
-              disabled={pin.isPending}
+              disabled={(pin.isPending && pin.variables === "") || !selectedArn}
               loading={pin.isPending && pin.variables !== ""}
-              onClick={onUseSelected}
+              loadingText={t("detail.profileSaving")}
+              onClick={() => pin.mutate(selectedArn)}
+              ref={pinRef}
               size="sm"
             >
               {t("detail.profileUse")}
@@ -186,6 +188,20 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
                 </ChoiceCard>
               ))}
             </RadioGroup>
+          ) : null}
+          {result && pin.isError ? (
+            <ActionError
+              className="mt-4"
+              error={pin.error}
+              onDismiss={() => {
+                pinButton()?.focus();
+                pin.reset();
+              }}
+              onRetry={() => {
+                pinButton()?.focus();
+                pin.mutate(pin.variables ?? selectedArn);
+              }}
+            />
           ) : null}
         </div>
       </div>

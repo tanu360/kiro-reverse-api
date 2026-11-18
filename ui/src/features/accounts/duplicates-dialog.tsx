@@ -7,7 +7,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { type JSX, useState } from "react";
+import { type JSX, useRef, useState } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { ChoiceCard } from "@/components/shared/choice-card";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -15,12 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
+import { announce } from "@/lib/announce";
 import { type DuplicateAccount, type DuplicateGroup, mergeDuplicates } from "@/lib/api/duplicates";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatList, formatNumber, formatRelativeTime } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
-import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { STATUS_PILL } from "./account-cells";
 import { authLabel, isApiKeyAccount, isBanned, isHeld } from "./account-model";
@@ -144,7 +145,8 @@ function DuplicateChoice({
  * Lists every duplicate group with the account each keeps, the server's suggestion until the
  * operator picks another, and merges the groups left switched on, one after another. A group the
  * operator switched off (a false match) is left as it is. A group that fails stays listed after
- * the refetch; the dialog closes once every merge went through.
+ * the refetch, its reason said under the groups (Try again merges what is left); the dialog closes
+ * once every merge went through, and a screen reader hears how many copies went.
  */
 export function DuplicatesDialog({
   open,
@@ -161,6 +163,9 @@ export function DuplicatesDialog({
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [skipped, setSkipped] = useState<Record<string, boolean>>({});
   const [merging, setMerging] = useState(false);
+  // The last merge that failed, said in the dialog in place of a toast.
+  const [failure, setFailure] = useState<unknown>(null);
+  const mergeRef = useRef<HTMLButtonElement | null>(null);
   const included = groups.filter((group) => !skipped[groupKey(group)]);
   // Every group switched on merges at once, each down to the one account it keeps.
   const removing = included.reduce((sum, group) => sum + group.accounts.length - 1, 0);
@@ -176,8 +181,10 @@ export function DuplicatesDialog({
   const onMerge = async () => {
     if (merging || included.length === 0) return;
     setMerging(true);
+    setFailure(null);
     let removed = 0;
     let failed = 0;
+    let lastError: unknown = null;
     try {
       for (const group of included) {
         try {
@@ -188,7 +195,7 @@ export function DuplicatesDialog({
           removed += res.removed.length;
         } catch (error) {
           failed += 1;
-          toastError(error, t);
+          lastError = error;
         }
       }
     } finally {
@@ -199,8 +206,9 @@ export function DuplicatesDialog({
       ]);
       setMerging(false);
     }
-    if (removed > 0) toast.success(t("duplicates.mergeSuccess", { count: removed }));
+    if (removed > 0) announce(t("duplicates.mergeSuccess", { count: removed }));
     if (failed === 0) onOpenChange(false);
+    else setFailure(lastError);
   };
 
   return (
@@ -212,7 +220,12 @@ export function DuplicatesDialog({
           <Button disabled={merging} onClick={() => onOpenChange(false)} variant="ghost">
             {tc("actions.cancel")}
           </Button>
-          <Button disabled={included.length === 0} loading={merging} onClick={() => void onMerge()}>
+          <Button
+            disabled={included.length === 0}
+            loading={merging}
+            onClick={() => void onMerge()}
+            ref={mergeRef}
+          >
             {removing > 0 ? t("duplicates.mergeCount", { count: removing }) : t("duplicates.merge")}
           </Button>
         </>
@@ -270,6 +283,19 @@ export function DuplicatesDialog({
             </section>
           );
         })}
+        {failure ? (
+          <ActionError
+            error={failure}
+            onDismiss={() => {
+              mergeRef.current?.focus();
+              setFailure(null);
+            }}
+            onRetry={() => {
+              mergeRef.current?.focus();
+              void onMerge();
+            }}
+          />
+        ) : null}
       </div>
     </ResponsiveDialog>
   );

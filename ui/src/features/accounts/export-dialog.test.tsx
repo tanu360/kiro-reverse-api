@@ -1,8 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { copyText } from "@/lib/clipboard";
 import { saveJson } from "@/lib/download";
 import { mockDb } from "@/lib/mocks/db";
+import { apiUrl } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { ExportDialog } from "./export-dialog";
 
@@ -29,20 +32,19 @@ async function openExport(initialSelection?: string[]) {
 }
 
 describe("ExportDialog", () => {
-  it("warns and copies nothing when no account is selected", async () => {
+  it("asks for a selection and copies nothing when no account is selected", async () => {
     const { dialog, user } = await openExport();
     // The select-all checkbox keeps one name; its checked state says whether all are selected.
     const selectAll = within(dialog).getByRole("checkbox", { name: "Select all" });
     expect(selectAll).toBeChecked();
     expect(within(dialog).queryByRole("checkbox", { name: "Deselect all" })).toBeNull();
     await user.click(selectAll);
-    expect(within(dialog).getByText("0 selected")).toBeInTheDocument();
+    // The count line asks for one, and the actions wait for it.
+    expect(within(dialog).getByText("Select at least one account.")).toBeInTheDocument();
     expect(within(dialog).getByRole("checkbox", { name: "Select all" })).not.toBeChecked();
+    expect(within(dialog).getByRole("button", { name: "Copy JSON" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Download JSON" })).toBeDisabled();
     await user.click(within(dialog).getByRole("button", { name: "Copy JSON" }));
-    // In the dialog itself: the toast sits under its backdrop (modal-notice.tsx).
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-      "Select at least one account.",
-    );
     expect(copyText).not.toHaveBeenCalled();
   });
 
@@ -63,7 +65,32 @@ describe("ExportDialog", () => {
         authMethod: "api_key",
       },
     ]);
-    expect(await screen.findByText("The credentials were copied.")).toBeInTheDocument();
+    // The button says so for a moment; a screen reader hears it.
+    expect(
+      await within(dialog).findByRole("button", { name: "Copied to clipboard" }),
+    ).toBeInTheDocument();
+    const line = await screen.findByText("The credentials were copied.");
+    expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+  });
+
+  it("says a failed export in the dialog, and Try again downloads it", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/export"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { dialog, user } = await openExport();
+    await user.click(within(dialog).getByRole("button", { name: "Download JSON" }));
+    const notice = await within(dialog).findByRole("alert");
+    expect(notice).toHaveTextContent("boom");
+    expect(saveJson).not.toHaveBeenCalled();
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(saveJson).toHaveBeenCalledTimes(1));
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Download JSON" })).toHaveFocus();
   });
 
   it("downloads the full export as kiro-accounts-<date>.json", async () => {
@@ -135,13 +162,15 @@ describe("ExportDialog", () => {
     expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
   });
 
-  it("stays on the list and warns when JSON is picked with nothing selected", async () => {
+  it("stays on the list when JSON is picked with nothing selected", async () => {
     const { dialog, user } = await openExport();
     await user.click(within(dialog).getByRole("checkbox", { name: "Select all" }));
-    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-      "Select at least one account.",
+    expect(within(dialog).getByRole("radio", { name: "JSON" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
     );
+    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
+    expect(within(dialog).getByText("Select at least one account.")).toBeInTheDocument();
     expect(within(dialog).getByRole("radio", { name: "Accounts" })).toBeChecked();
     expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
   });

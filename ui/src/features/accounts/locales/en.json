@@ -176,7 +176,6 @@
   "detail.nickname": "Nickname",
   "detail.nicknamePlaceholder": "Team primary",
   "detail.saved": "The change was saved.",
-  "detail.saveFailed": "Could not save: {reason}",
   "detail.loadFailed": "Could not load: {reason}",
   "detail.profile": "Kiro profile",
   "detail.profileRegion": "Region",
@@ -199,7 +198,6 @@
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "Enter a UUID or 32 hex characters, or leave the field empty.",
   "detail.generateRandom": "Generate random machine ID",
-  "detail.generateFailed": "Could not generate a machine ID.",
   "detail.weight": "Weight",
   "detail.weightHint": "0 or 1 is normal. An account with weight N takes about N times as many new requests.",
   "detail.priority": "Priority",
@@ -365,6 +363,5 @@
   "export.downloadJson": "Download JSON",
   "export.json": "Export JSON",
   "export.copied": "The credentials were copied.",
-  "export.noAccounts": "There are no accounts to export yet.",
   "export.noSelection": "Select at least one account."
 }

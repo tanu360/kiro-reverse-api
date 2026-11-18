@@ -1,45 +1,45 @@
-import { BoxesIcon, ListRestartIcon, ScanSearchIcon } from "@hugeicons/core-free-icons";
+import { BoxesIcon, CheckIcon, ListRestartIcon, ScanSearchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import type { JSX } from "react";
+import { type JSX, useRef } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { ListCard } from "@/components/shared/list-card";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { SectionCard } from "@/components/shared/section-card";
 import { SettingsEmptyRow } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSavedFlash } from "@/hooks/use-saved-flash";
+import { announce } from "@/lib/announce";
 import { getAccountModels, refreshAccountModels } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import { numberFormat } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { modelRate, sortModels } from "../account-model";
 
-/** Live model list (GET /models updates the server cache) and a route-cache refresh. */
+/**
+ * Live model list (GET /models updates the server cache) and a route-cache refresh. No toasts:
+ * the list says how its load went; the refresh button spins, then shows a tick for two seconds
+ * (a screen reader hears the model count), and a failed refresh is said at the top of the card.
+ */
 export function ModelsSection({ accountId }: { accountId: string }): JSX.Element {
   const { t, lang } = useT("accounts");
+  const refreshRef = useRef<HTMLButtonElement | null>(null);
+  const refreshed = useSavedFlash();
 
   const load = useMutation({
     mutationFn: () => getAccountModels(accountId),
-    onError: (error) => {
-      toast.error(t("detail.loadFailed", { reason: errorMessage(error, t) }));
-    },
   });
 
   const refresh = useMutation({
     mutationFn: () => refreshAccountModels(accountId),
-    onMutate: () => ({ toastId: toast.loading(t("detail.refreshingModels")) }),
-    onSuccess: (result, _vars, context) => {
-      toast.update(context.toastId, {
-        type: "success",
-        title: t("detail.modelsRefreshed", { count: result.count ?? 0 }),
-      });
-    },
-    onError: (error, _vars, context) => {
-      if (!context) return;
-      toast.update(context.toastId, { type: "error", title: errorMessage(error, t) });
+    onMutate: () => refreshed.clear(),
+    onSuccess: (result) => {
+      refreshed.flash();
+      announce(t("detail.modelsRefreshed", { count: result.count ?? 0 }));
     },
   });
 
@@ -56,12 +56,21 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
                   aria-label={t("detail.refreshModelCache")}
                   loading={refresh.isPending}
                   onClick={() => refresh.mutate()}
+                  ref={refreshRef}
                   size="icon-sm"
                   variant="secondary"
                 />
               }
             >
-              <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
+              {refreshed.saved ? (
+                <HugeiconsIcon
+                  icon={CheckIcon}
+                  aria-hidden="true"
+                  className="text-success-foreground"
+                />
+              ) : (
+                <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
+              )}
             </TooltipTrigger>
             <TooltipPopup>{t("detail.refreshModelCache")}</TooltipPopup>
           </Tooltip>
@@ -80,6 +89,21 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
       slim
       title={t("detail.models")}
     >
+      {refresh.isError ? (
+        <CardPanel>
+          <ActionError
+            error={refresh.error}
+            onDismiss={() => {
+              refreshRef.current?.focus();
+              refresh.reset();
+            }}
+            onRetry={() => {
+              refreshRef.current?.focus();
+              refresh.mutate();
+            }}
+          />
+        </CardPanel>
+      ) : null}
       {/* Always holds one row (the hint, a state or the list), so the card keeps its hairline. */}
       <div aria-live="polite" className="min-w-0">
         {load.isPending ? (

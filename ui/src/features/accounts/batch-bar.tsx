@@ -17,8 +17,8 @@ import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/compone
 import { Toolbar, ToolbarButton, ToolbarGroup, ToolbarSeparator } from "@/components/ui/toolbar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-media-query";
+import { announce } from "@/lib/announce";
 import { batchAccounts } from "@/lib/api/accounts";
-import { errorMessage } from "@/lib/api/server-errors";
 import type {
   Account,
   AccountActionResult,
@@ -31,8 +31,8 @@ import type {
 } from "@/lib/api/types";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import type { ReportAccountFailure } from "./account-failure";
 import { describeFailures } from "./account-model";
 import { useInvalidateAccounts } from "./use-account-actions";
 
@@ -60,42 +60,94 @@ const ACTION_ICONS: Record<BatchAction, IconSvgElement> = {
   delete: Delete02Icon,
 };
 
-/**
- * Batch actions over the selection, on the purple inverted toolbar. Each confirms first, shows a
- * loading toast and replaces it with the result. Batch endpoints answer 200 even when items
- * fail, so `failed` and the per-id `results` are read; the failures are named in the toast.
- */
-export function BatchBar({
-  selectedIds,
-  accounts,
-  onClear,
-  onExport,
-  onTags,
-}: {
-  selectedIds: string[];
-  /** The whole list, to name failed accounts in a result toast. */
-  accounts: Account[];
-  onClear: () => void;
-  /** Opens the export dialog with the selection checked. */
-  onExport: () => void;
-  /** Opens the dialog that adds or removes a tag on the selection. */
-  onTags: () => void;
-}): JSX.Element {
-  const { t } = useT("accounts");
-  const confirm = useConfirm();
-  const isMobile = useIsMobile();
-  const invalidate = useInvalidateAccounts();
+/** The names of failed accounts, as the list shows them (masked under privacy). */
+export function useAccountNameOf(accounts: readonly Account[]): (id: string) => string {
   const displayEmail = useDisplayEmail();
-  const [running, setRunning] = useState<BatchAction | null>(null);
-  const count = selectedIds.length;
-
-  const nameOf = (id: string) => {
+  return (id) => {
     const account = accounts.find((item) => item.id === id);
     return account ? displayEmail(account.email, account.id) : id;
   };
+}
+
+/** The ids of a batch answer's failed rows that are still in the list, to select again. */
+export function failedIdsIn(
+  results: readonly AccountActionResult[] | undefined,
+  accounts: readonly Account[],
+): string[] {
+  const failed = new Set((results ?? []).filter((row) => !row.ok).map((row) => row.id));
+  return accounts.filter((account) => failed.has(account.id)).map((account) => account.id);
+}
+
+/**
+ * The batch actions over the selection, run for the page (the bar unmounts with the selection).
+ * Each confirms first; while it runs the bar's button spins and its count line says what runs.
+ * Batch endpoints answer 200 even when items fail, so `failed` and the per-id `results` are read.
+ * No toasts: a clean run clears the selection and a screen reader hears the result; a partial
+ * one keeps only the failed accounts selected and names them at the top of the accounts card,
+ * where Try again runs the action on them; a failed request keeps the selection and says why.
+ */
+export function useBatchActions({
+  accounts,
+  selectedIds,
+  select,
+  report,
+  target,
+}: {
+  /** The whole list, to name failed accounts. */
+  accounts: Account[];
+  selectedIds: string[];
+  /** Sets the selection; empty clears it (and the bar goes). */
+  select: (ids: string[]) => void;
+  /** Says a failure in the accounts card. */
+  report: ReportAccountFailure;
+  /** The action's button on the bar (or what stands in for it), for focus after the notice. */
+  target: (action: BatchAction) => HTMLElement | null | undefined;
+}): { running: BatchAction | null; run: (action: BatchAction) => Promise<void> } {
+  const { t } = useT("accounts");
+  const { t: tc } = useT();
+  const confirm = useConfirm();
+  const invalidate = useInvalidateAccounts();
+  const nameOf = useAccountNameOf(accounts);
+  const [running, setRunning] = useState<BatchAction | null>(null);
+
+  const execute = async (action: BatchAction, ids: string[]) => {
+    report(null);
+    setRunning(action);
+    try {
+      const result = await batchAccounts({ ids, action });
+      const outcome = batchOutcome(action, result, nameOf, t);
+      if (outcome.failed) {
+        const again = failedIdsIn(result.results, accounts);
+        select(again);
+        report({
+          error: null,
+          message: outcome.details
+            ? tc("text.joinSentences", { first: outcome.title, second: outcome.details })
+            : outcome.title,
+          retry: again.length > 0 ? () => void execute(action, again) : undefined,
+          target: () => target(action),
+        });
+      } else {
+        announce(outcome.title);
+        select([]);
+      }
+    } catch (error) {
+      report({
+        error,
+        retry: () => {
+          select(ids);
+          void execute(action, ids);
+        },
+        target: () => target(action),
+      });
+    } finally {
+      setRunning(null);
+      await invalidate({ withStatus: true });
+    }
+  };
 
   const run = async (action: BatchAction) => {
-    if (running || count === 0) return;
+    if (running || selectedIds.length === 0) return;
     const ids = [...selectedIds];
     const ok = await confirm({
       title: t(CONFIRM_KEYS[action], { count: ids.length }),
@@ -104,30 +156,53 @@ export function BatchBar({
       variant: action === "disable" || action === "delete" ? "danger" : "default",
     });
     if (!ok) return;
-    setRunning(action);
-    const toastId = toast.loading(
-      action === "delete"
-        ? t("batch.deleting")
-        : action === "refreshModels"
-          ? t("detail.refreshingModels")
-          : t("batch.processing"),
-    );
-    try {
-      const result = await batchAccounts({ ids, action });
-      toast.update(toastId, resultToast(action, result, nameOf, t));
-      onClear();
-    } catch (error) {
-      toast.update(toastId, { type: "error", title: errorMessage(error, t) });
-    } finally {
-      setRunning(null);
-      await invalidate({ withStatus: true });
-    }
+    await execute(action, ids);
+  };
+
+  return { running, run };
+}
+
+/**
+ * Batch actions over the selection, on the purple inverted toolbar. The page runs them
+ * (useBatchActions); while one runs, its button spins and the count line says what runs.
+ */
+export function BatchBar({
+  selectedIds,
+  running,
+  onRun,
+  onClear,
+  onExport,
+  onTags,
+}: {
+  selectedIds: string[];
+  /** The action running now, if any. */
+  running: BatchAction | null;
+  /** Confirms and runs an action over the selection. */
+  onRun: (action: BatchAction) => void;
+  onClear: () => void;
+  /** Opens the export dialog with the selection checked. */
+  onExport: () => void;
+  /** Opens the dialog that adds or removes a tag on the selection. */
+  onTags: () => void;
+}): JSX.Element {
+  const { t } = useT("accounts");
+  const isMobile = useIsMobile();
+  const count = selectedIds.length;
+  const run = (action: BatchAction) => {
+    if (!running && count > 0) onRun(action);
   };
 
   const busy = running !== null;
+  // The live count line says what runs while a batch runs, in place of a loading toast.
   const countLabel = (
     <p aria-live="polite" className="whitespace-nowrap px-1.5 font-medium text-sm tabular-nums">
-      {t("batch.selected", { count })}
+      {running === "delete"
+        ? t("batch.deleting")
+        : running === "refreshModels"
+          ? t("detail.refreshingModels")
+          : running
+            ? t("batch.processing")
+            : t("batch.selected", { count })}
     </p>
   );
 
@@ -136,9 +211,10 @@ export function BatchBar({
     <ToolbarButton
       aria-label={name}
       className={className}
+      data-batch-action={action}
       disabled={busy && running !== action}
       key={action}
-      onClick={() => void run(action)}
+      onClick={() => run(action)}
       render={
         <Button
           loading={running === action}
@@ -196,6 +272,7 @@ export function BatchBar({
           <Menu>
             <ToolbarButton
               aria-label={t("batch.more")}
+              data-batch-more=""
               disabled={busy && !menuLoading}
               render={
                 <MenuTrigger
@@ -206,11 +283,11 @@ export function BatchBar({
               <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
             </ToolbarButton>
             <MenuPopup align="end">
-              <MenuItem onClick={() => void run("refresh")}>
+              <MenuItem onClick={() => run("refresh")}>
                 <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
                 {t("batch.refresh")}
               </MenuItem>
-              <MenuItem onClick={() => void run("refreshModels")}>
+              <MenuItem onClick={() => run("refreshModels")}>
                 <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
                 {t("batch.refreshModels")}
               </MenuItem>
@@ -223,7 +300,7 @@ export function BatchBar({
                 {t("batch.export")}
               </MenuItem>
               <MenuSeparator />
-              <MenuItem onClick={() => void run("delete")} variant="destructive">
+              <MenuItem onClick={() => run("delete")} variant="destructive">
                 <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
                 {t("batch.delete")}
               </MenuItem>
@@ -264,51 +341,55 @@ export function BatchBar({
   );
 }
 
-type ResultToast = { type: "success" | "warning"; title: string; description?: string };
+/** A batch answer in words: counts in the title, the failed accounts named in `details`. */
+interface BatchOutcome {
+  failed: boolean;
+  title: string;
+  details: string;
+}
 
-/** The settled toast of a batch answer: counts in the title, failed accounts named below. */
-function resultToast(
+function batchOutcome(
   action: BatchAction,
   result: BatchAccountsResponse,
   nameOf: (id: string) => string,
   t: TFunction,
-): ResultToast {
+): BatchOutcome {
   const results: AccountActionResult[] | undefined = result.results;
   const failedCount = (result as { failed?: number }).failed ?? 0;
-  const description = describeFailures(results, nameOf, t) || undefined;
-  const type = failedCount > 0 ? "warning" : "success";
+  const details = describeFailures(results, nameOf, t);
+  const failed = failedCount > 0;
   if (action === "refresh") {
     const { refreshed = 0, suspended = 0 } = result as Partial<BatchRefreshResponse>;
     return {
-      type,
+      failed,
       title:
         suspended > 0
           ? t("batch.refreshSuspendedResult", { count: refreshed, suspended, failed: failedCount })
           : t("batch.refreshResult", { count: refreshed, failed: failedCount }),
-      description,
+      details,
     };
   }
   if (action === "refreshModels") {
     const { refreshed = 0 } = result as Partial<BatchRefreshModelsResponse>;
     return {
-      type,
+      failed,
       title: t("batch.refreshModelsResult", { count: refreshed, failed: failedCount }),
-      description,
+      details,
     };
   }
   if (action === "delete") {
     const { deleted = 0 } = result as Partial<BatchDeleteResponse>;
     return {
-      type,
+      failed,
       title: t("batch.deleteResult", { count: deleted, failed: failedCount }),
-      description,
+      details,
     };
   }
   // `count` counts the accounts saved; unknown ids are in `failed`.
   const { count = 0 } = result as Partial<BatchEnableDisableResponse>;
   return {
-    type,
+    failed,
     title: t(action === "enable" ? "batch.enableResult" : "batch.disableResult", { count }),
-    description,
+    details,
   };
 }

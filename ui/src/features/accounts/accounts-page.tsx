@@ -24,17 +24,21 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddAccountDialog } from "@/features/add-account/add-account-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { announce } from "@/lib/announce";
 import { accountsQuery, refreshAllModels } from "@/lib/api/accounts";
-import { errorMessage } from "@/lib/api/server-errors";
-import type { Account } from "@/lib/api/types";
+import type { Account, BatchAction } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
-import { toast } from "@/lib/toast";
 import type { AccountSort, AccountsSearch } from "@/routes/-search";
 import { AccountDetailSheet } from "./account-detail-sheet";
+import {
+  type AccountFailure,
+  AccountFailureNotice,
+  AccountFailureProvider,
+} from "./account-failure";
 import {
   type AccountFilters,
   defaultSortDesc,
@@ -45,7 +49,7 @@ import {
 } from "./account-model";
 import { AccountsTable } from "./accounts-table";
 import { AccountsToolbar } from "./accounts-toolbar";
-import { BatchBar } from "./batch-bar";
+import { BatchBar, useAccountNameOf, useBatchActions } from "./batch-bar";
 import { BatchTagDialog } from "./batch-tag-dialog";
 import { DuplicatesNotice } from "./duplicates-notice";
 import { ExportDialog } from "./export-dialog";
@@ -108,7 +112,6 @@ export function AccountsPage(): JSX.Element {
   const search = useSearch({ from: "/_app/accounts" });
   const navigate = useNavigate({ from: "/accounts" });
   const confirm = useConfirm();
-  const displayEmail = useDisplayEmail();
   const phone = useMediaQuery("max-sm");
 
   const query = useQuery(accountsQuery());
@@ -128,6 +131,16 @@ export function AccountsPage(): JSX.Element {
   const [test, openTest, closeTest] = useDialogTarget();
   const [relogin, openRelogin, closeRelogin] = useDialogTarget();
   const listRef = useRef<HTMLDivElement | null>(null);
+  const refreshAllRef = useRef<HTMLButtonElement | null>(null);
+  // The last failed action on the list (a row's, a batch's, Refresh models), said at the top of
+  // the accounts card in place of a toast; the next action clears it.
+  const [failure, setFailure] = useState<AccountFailure | null>(null);
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  // Focus for a notice whose own control is gone: the list's select-all, else Refresh models.
+  const fallbackFocus = useCallback(
+    () => shownSelectAll(listRef.current) ?? refreshAllRef.current,
+    [],
+  );
 
   // The batch bar unmounts with the selection, so focus in it (or already dropped to <body>)
   // moves to the select-all checkbox first instead of falling to <body>.
@@ -139,6 +152,24 @@ export function AccountsPage(): JSX.Element {
     setSelected(new Set());
   };
 
+  const selectedIds = [...selected];
+  const nameOf = useAccountNameOf(accounts);
+  const batch = useBatchActions({
+    accounts,
+    selectedIds,
+    select: (ids) => (ids.length > 0 ? setSelected(new Set(ids)) : clearSelection()),
+    report: setFailure,
+    // The action's button on the bar; on a phone the bar's menu holds the rarer ones.
+    target: (action: BatchAction) => {
+      const bar = listRef.current?.querySelector('[data-slot="batch-bar"]');
+      return (
+        bar?.querySelector<HTMLElement>(`[data-batch-action="${action}"]`) ??
+        bar?.querySelector<HTMLElement>("[data-batch-more]") ??
+        shownSelectAll(listRef.current)
+      );
+    },
+  });
+
   // Drop selected ids that are gone after a refetch. The selection survives filter changes.
   useEffect(() => {
     if (!query.data) return;
@@ -148,6 +179,13 @@ export function AccountsPage(): JSX.Element {
       return next.size === current.size ? current : next;
     });
   }, [query.data]);
+
+  // A row's failure goes with its account (deleted in its sheet, merged away): its Try again
+  // would only find the account gone.
+  useEffect(() => {
+    const id = failure?.accountId;
+    if (id && query.data && !query.data.some((account) => account.id === id)) setFailure(null);
+  }, [failure, query.data]);
 
   // Filter, sort and page all live in the URL, so a reload or a shared link keeps the view.
   const { q, status, plan, auth, region, enabled, tag } = search;
@@ -217,45 +255,55 @@ export function AccountsPage(): JSX.Element {
     [updateSearch],
   );
 
+  /*
+   * The sweep over every account: the header button spins ("Refreshing models…"); a clean run is
+   * read out, and failed accounts are named in the card, where Try again sweeps again.
+   */
+  const runRefreshAll = async () => {
+    setFailure(null);
+    setRefreshingAll(true);
+    const target = () => refreshAllRef.current;
+    try {
+      const result = await refreshAllModels();
+      // `refreshed` and `failed` count accounts; `models` is the cached model count.
+      const failed = result.failed ?? 0;
+      if (failed > 0) {
+        const title = t("models.refreshAllPartial", { count: result.models ?? 0, failed });
+        const details = describeFailures(result.results, nameOf, t);
+        setFailure({
+          error: null,
+          message: details ? tc("text.joinSentences", { first: title, second: details }) : title,
+          retry: () => void runRefreshAll(),
+          target,
+        });
+      } else {
+        announce(t("models.refreshAllDone", { count: result.models ?? 0 }));
+      }
+    } catch (error) {
+      setFailure({ error, retry: () => void runRefreshAll(), target });
+    } finally {
+      setRefreshingAll(false);
+    }
+  };
+
   const onRefreshAllModels = async () => {
+    if (refreshingAll) return;
     const ok = await confirm({
       title: t("models.refreshAll"),
       description: t("models.confirmRefreshAll"),
       confirmLabel: t("models.refreshAll"),
     });
     if (!ok) return;
-    const toastId = toast.loading(t("models.refreshing"));
-    try {
-      const result = await refreshAllModels();
-      // `refreshed` and `failed` count accounts; `models` is the cached model count.
-      const failed = result.failed ?? 0;
-      const nameOf = (id: string) => {
-        const account = accounts.find((item) => item.id === id);
-        return account ? displayEmail(account.email, account.id) : id;
-      };
-      toast.update(toastId, {
-        type: failed > 0 ? "warning" : "success",
-        title:
-          failed > 0
-            ? t("models.refreshAllPartial", { count: result.models ?? 0, failed })
-            : t("models.refreshAllDone", { count: result.models ?? 0 }),
-        description: describeFailures(result.results, nameOf, t) || undefined,
-      });
-    } catch (error) {
-      toast.update(toastId, { type: "error", title: errorMessage(error, t) });
-    }
+    await runRefreshAll();
   };
 
   const listEmpty = accounts.length === 0;
+  // The Export buttons show only once the list has accounts.
   const onExport = useCallback(
     (ids?: string[]) => {
-      if (listEmpty) {
-        toast.warning(t("export.noAccounts"));
-        return;
-      }
-      setExportState({ open: true, ids });
+      if (!listEmpty) setExportState({ open: true, ids });
     },
-    [listEmpty, t],
+    [listEmpty],
   );
   const onExportOpenChange = useCallback(
     (open: boolean) => setExportState((current) => ({ ...current, open })),
@@ -392,126 +440,154 @@ export function AccountsPage(): JSX.Element {
 
   return (
     <ReloginProvider onRelogin={onRelogin}>
-      <PageHeader
-        actions={
-          // One refresh only: Refresh models, then Add account. The list itself refetches on
-          // focus and after every action, so it needs no refresh button of its own. Export sits
-          // at the end of the status tab row. An empty list shows neither: its empty state
-          // carries the one primary Add account, and the header text gets the full width.
-          noAccounts ? undefined : (
-            <>
-              <Button
-                aria-label={t("models.refreshAll")}
-                onClick={() => void onRefreshAllModels()}
-                variant="secondary"
-              >
-                <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-                <span className="sm:hidden">{t("models.refreshShort")}</span>
-                <span className="max-sm:hidden">{t("models.refreshAll")}</span>
-              </Button>
-              <Button onClick={() => setAddOpen(true)}>
-                <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-                {t("actions.add")}
-              </Button>
-            </>
-          )
-        }
-        description={t("description")}
-        title={t("title")}
-      />
+      <AccountFailureProvider fallbackFocus={fallbackFocus} report={setFailure}>
+        <PageHeader
+          actions={
+            // One refresh only: Refresh models, then Add account. The list itself refetches on
+            // focus and after every action, so it needs no refresh button of its own. Export sits
+            // at the end of the status tab row. An empty list shows neither: its empty state
+            // carries the one primary Add account, and the header text gets the full width.
+            noAccounts ? undefined : (
+              <>
+                <Button
+                  aria-label={t("models.refreshAll")}
+                  loading={refreshingAll}
+                  loadingText={
+                    <>
+                      <span className="sm:hidden">{t("models.refreshShort")}</span>
+                      <span className="max-sm:hidden">{t("models.refreshing")}</span>
+                    </>
+                  }
+                  onClick={() => void onRefreshAllModels()}
+                  ref={refreshAllRef}
+                  variant="secondary"
+                >
+                  <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
+                  <span className="sm:hidden">{t("models.refreshShort")}</span>
+                  <span className="max-sm:hidden">{t("models.refreshAll")}</span>
+                </Button>
+                <Button onClick={() => setAddOpen(true)}>
+                  <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+                  {t("actions.add")}
+                </Button>
+              </>
+            )
+          }
+          description={t("description")}
+          title={t("title")}
+        />
 
-      <div className="flex min-w-0 flex-col gap-4" ref={listRef}>
-        {noAccounts ? null : <DuplicatesNotice />}
-        {/* The accounts container lets the toolbar give the search its own row on narrow cards. */}
-        <DataTableCard className="@container/accounts" toolbar={toolbar}>
-          {loadFailed ? (
-            <ErrorState
-              error={query.error}
-              onRetry={() => void query.refetch()}
-              title={t("loadError")}
+        <div className="flex min-w-0 flex-col gap-4" ref={listRef}>
+          {noAccounts ? null : <DuplicatesNotice />}
+          {/* The accounts container lets the toolbar give the search its own row on narrow cards. */}
+          <DataTableCard className="@container/accounts" toolbar={toolbar}>
+            {loadFailed ? (
+              <ErrorState
+                error={query.error}
+                onRetry={() => void query.refetch()}
+                title={t("loadError")}
+              />
+            ) : (
+              <>
+                {failure ? (
+                  <CardPanel>
+                    <AccountFailureNotice
+                      failure={failure}
+                      fallbackFocus={fallbackFocus}
+                      report={setFailure}
+                    />
+                  </CardPanel>
+                ) : null}
+                <AccountsTable
+                  accounts={pageRows}
+                  desc={desc}
+                  emptyState={emptyState}
+                  filtered={hasFilters && !listEmpty}
+                  loading={pending}
+                  onDetails={onDetails}
+                  onSelectionChange={setSelected}
+                  onSortChange={setSort}
+                  onTest={onTest}
+                  pageSize={pageSize}
+                  selected={selected}
+                  sort={sort}
+                />
+              </>
+            )}
+          </DataTableCard>
+          {pager}
+          {selected.size > 0 ? (
+            <BatchBar
+              onClear={clearSelection}
+              onExport={() => onExport(selectedIds)}
+              onRun={(action) => void batch.run(action)}
+              onTags={() => setTagState({ open: true, ids: selectedIds })}
+              running={batch.running}
+              selectedIds={selectedIds}
             />
-          ) : (
-            <AccountsTable
-              accounts={pageRows}
-              desc={desc}
-              emptyState={emptyState}
-              filtered={hasFilters && !listEmpty}
-              loading={pending}
-              onDetails={onDetails}
-              onSelectionChange={setSelected}
-              onSortChange={setSort}
-              onTest={onTest}
-              pageSize={pageSize}
-              selected={selected}
-              sort={sort}
-            />
-          )}
-        </DataTableCard>
-        {pager}
-        {selected.size > 0 ? (
-          <BatchBar
-            accounts={accounts}
-            onClear={clearSelection}
-            onExport={() => onExport([...selected])}
-            onTags={() => setTagState({ open: true, ids: [...selected] })}
-            selectedIds={[...selected]}
+          ) : null}
+        </div>
+
+        {detail ? (
+          <AccountDetailSheet
+            accountId={detail.id}
+            key={`detail-${detail.session}`}
+            onOpenChange={(open) => {
+              if (!open) closeDetail();
+            }}
+            open={detail.open}
           />
         ) : null}
-      </div>
-
-      {detail ? (
-        <AccountDetailSheet
-          accountId={detail.id}
-          key={`detail-${detail.session}`}
-          onOpenChange={(open) => {
-            if (!open) closeDetail();
-          }}
-          open={detail.open}
+        {test && testAccount ? (
+          <TestAccountDialog
+            account={testAccount}
+            key={`test-${test.session}`}
+            onOpenChange={(open) => {
+              if (!open) closeTest();
+            }}
+            open={test.open}
+          />
+        ) : null}
+        <ExportDialog
+          accounts={accounts}
+          initialSelection={exportState.ids}
+          onOpenChange={onExportOpenChange}
+          open={exportState.open}
         />
-      ) : null}
-      {test && testAccount ? (
-        <TestAccountDialog
-          account={testAccount}
-          key={`test-${test.session}`}
-          onOpenChange={(open) => {
-            if (!open) closeTest();
+        <BatchTagDialog
+          accounts={accounts}
+          ids={tagState.ids}
+          // Once a run clears the selection the Tags button that opened it is gone with the bar.
+          finalFocus={() =>
+            listRef.current?.querySelector('[data-slot="batch-bar"]')
+              ? true
+              : (shownSelectAll(listRef.current) ?? true)
+          }
+          onDone={(failedIds) => {
+            // Failed accounts stay selected, with the dialog on them for another try.
+            if (failedIds.length > 0) {
+              setSelected(new Set(failedIds));
+              setTagState({ open: true, ids: failedIds });
+              return;
+            }
+            setTagState((current) => ({ ...current, open: false }));
+            setSelected(new Set());
           }}
-          open={test.open}
+          onOpenChange={(open) => setTagState((current) => ({ ...current, open }))}
+          open={tagState.open}
         />
-      ) : null}
-      <ExportDialog
-        accounts={accounts}
-        initialSelection={exportState.ids}
-        onOpenChange={onExportOpenChange}
-        open={exportState.open}
-      />
-      <BatchTagDialog
-        accounts={accounts}
-        ids={tagState.ids}
-        // Once a run clears the selection the Tags button that opened it is gone with the bar.
-        finalFocus={() =>
-          listRef.current?.querySelector('[data-slot="batch-bar"]')
-            ? true
-            : (shownSelectAll(listRef.current) ?? true)
-        }
-        onDone={() => {
-          setTagState((current) => ({ ...current, open: false }));
-          setSelected(new Set());
-        }}
-        onOpenChange={(open) => setTagState((current) => ({ ...current, open }))}
-        open={tagState.open}
-      />
-      <AddAccountDialog onOpenChange={setAddOpen} open={search.add === true} />
-      {relogin && reloginAccount ? (
-        <AddAccountDialog
-          key={`relogin-${relogin.session}`}
-          onOpenChange={(open) => {
-            if (!open) closeRelogin();
-          }}
-          open={relogin.open}
-          relogin={reloginAccount}
-        />
-      ) : null}
+        <AddAccountDialog onOpenChange={setAddOpen} open={search.add === true} />
+        {relogin && reloginAccount ? (
+          <AddAccountDialog
+            key={`relogin-${relogin.session}`}
+            onOpenChange={(open) => {
+              if (!open) closeRelogin();
+            }}
+            open={relogin.open}
+            relogin={reloginAccount}
+          />
+        ) : null}
+      </AccountFailureProvider>
     </ReloginProvider>
   );
 }
