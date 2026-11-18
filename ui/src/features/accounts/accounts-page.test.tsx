@@ -448,6 +448,97 @@ describe("AccountsPage layout", () => {
     expect(within(bar).getByRole("button", { name: "Disable selected" })).toHaveFocus();
   });
 
+  it("keeps the batch bar as it was while a batch runs, its close button out of the way", async () => {
+    let release: () => void = () => {};
+    mockServer.use(
+      http.post(apiUrl("/accounts/batch"), async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return undefined;
+      }),
+    );
+    const { table, user } = await renderAccounts();
+    await user.click(within(bodyRows(table)[0]).getAllByRole("checkbox")[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    const disable = within(bar).getByRole("button", { name: "Disable selected" });
+    await user.click(disable);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Disable" }),
+    );
+    await waitFor(() => expect(disable).toHaveAttribute("aria-busy", "true"));
+    // The count stays (the bar keeps its width); the run is named for screen readers.
+    const count = within(bar).getByText("1 selected");
+    expect(within(count).getByText("Processing…")).toHaveClass("sr-only");
+    // Out of sight and out of the tab order, in its own place.
+    const clear = within(bar).getByRole("button", { name: "Clear selection", hidden: true });
+    expect(clear).toHaveClass("invisible");
+    expect(clear).toBeDisabled();
+    release();
+    await waitFor(() => expect(screen.queryByRole("toolbar")).not.toBeInTheDocument());
+  });
+
+  it("drops a batch's failure in the card once its accounts are gone", async () => {
+    mockServer.use(
+      http.post(apiUrl("/accounts/batch"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { table, user, queryClient } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    await user.click(within(row).getAllByRole("checkbox")[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    await user.click(within(bar).getByRole("button", { name: "Disable selected" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Disable" }),
+    );
+    expect(await cardNotice()).toHaveTextContent("boom");
+    // Merged or deleted elsewhere: Try again would only post an id that is gone.
+    mockDb.accounts.splice(
+      mockDb.accounts.findIndex((account) => account.email === DANA),
+      1,
+    );
+    await queryClient.invalidateQueries();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("says a sheet action's failure in the card when it lands after the sheet closed", async () => {
+    let release: () => void = () => {};
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/refresh"), async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return HttpResponse.json({ error: "boom" }, { status: 500 });
+      }),
+    );
+    const { table, user } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    await user.click(within(row).getAllByRole("cell")[2]);
+    const sheet = await screen.findByRole("dialog", { name: DANA_MASKED });
+    const refresh = within(sheet).getByRole("button", { name: "Refresh token" });
+    await user.click(refresh);
+    await waitFor(() => expect(refresh).toHaveAttribute("aria-busy", "true"));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    release();
+    expect(await cardNotice()).toHaveTextContent("boom");
+  });
+
+  it("moves focus to Select all once an account deleted from its sheet is gone", async () => {
+    const { table, user } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    await user.click(within(row).getAllByRole("cell")[2]);
+    const sheet = await screen.findByRole("dialog", { name: DANA_MASKED });
+    await user.click(within(sheet).getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(document.activeElement).toHaveAttribute("aria-label", "Select all"));
+  });
+
   it("says a failed token refresh in the card, and Try again sends it again", async () => {
     let fail = true;
     const calls: string[] = [];

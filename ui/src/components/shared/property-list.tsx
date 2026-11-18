@@ -160,6 +160,11 @@ interface InlineEditRowProps {
   saving: boolean;
   /** The edit view's controls (a Field with its own hint and error). */
   children: ReactNode;
+  /**
+   * A line about the edit itself (a failed save), under the whole row: both columns, after Save
+   * and Cancel, at the row's inset.
+   */
+  notice?: ReactNode;
 }
 
 /**
@@ -183,6 +188,7 @@ export function InlineEditRow({
   onSubmit,
   saving,
   children,
+  notice,
 }: InlineEditRowProps): JSX.Element {
   const { t } = useT();
   const labelId = useId();
@@ -257,6 +263,7 @@ export function InlineEditRow({
             </div>
           </form>
         </dd>
+        {notice ? <dd className="col-span-full min-w-0">{notice}</dd> : null}
       </div>
     );
   }

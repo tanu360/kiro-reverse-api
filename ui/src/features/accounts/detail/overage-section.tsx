@@ -53,11 +53,13 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
   const switchRef = useRef<HTMLElement | null>(null);
   // The switch shows the requested state while the call runs, then the cached snapshot again.
   const [pending, setPending] = useState<boolean | null>(null);
-  // The last call that failed, with its control (focused as the notice goes) and its retry.
+  // The last call that failed, with its control (focused as the notice goes), its retry and the
+  // words for an error without a reason of its own.
   const [failure, setFailure] = useState<{
     error: unknown;
     retry: () => void;
     target: () => HTMLElement | null;
+    fallback?: string;
   } | null>(null);
 
   const sync = useMutation({
@@ -86,6 +88,7 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         error,
         retry: () => toggle.mutate(enabled),
         target: () => switchRef.current,
+        fallback: "accounts:detail.overageSwitchFailed",
       }),
     onSettled: () => setPending(null),
   });
@@ -135,7 +138,7 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         <CardPanel>
           <ActionError
             error={failure.error}
-            message={errorMessage(failure.error, t, "accounts:detail.overageSwitchFailed")}
+            message={errorMessage(failure.error, t, failure.fallback)}
             onDismiss={() => {
               failure.target()?.focus();
               setFailure(null);

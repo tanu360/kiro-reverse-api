@@ -180,11 +180,14 @@ export function AccountsPage(): JSX.Element {
     });
   }, [query.data]);
 
-  // A row's failure goes with its account (deleted in its sheet, merged away): its Try again
-  // would only find the account gone.
+  // A row's failure goes with its account (deleted in its sheet, merged away), a batch's with the
+  // last of its accounts: Try again would only find them gone.
   useEffect(() => {
-    const id = failure?.accountId;
-    if (id && query.data && !query.data.some((account) => account.id === id)) setFailure(null);
+    if (!failure || !query.data) return;
+    const ids = failure.accountIds ?? (failure.accountId ? [failure.accountId] : []);
+    if (ids.length > 0 && !query.data.some((account) => ids.includes(account.id))) {
+      setFailure(null);
+    }
   }, [failure, query.data]);
 
   // Filter, sort and page all live in the URL, so a reload or a shared link keeps the view.
@@ -212,13 +215,12 @@ export function AccountsPage(): JSX.Element {
   const pageSize = search.pageSize ?? DEFAULT_PAGE_SIZE;
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const page = Math.min(shownView.page ?? 1, pageCount);
-  const pageSlice = useMemo(
+  // A new array after each fetch (its clock moves), so every row reads the time again: a token
+  // that expired turns its pill and its time left on the next refetch.
+  const pageRows = useMemo(
     () => sorted.slice((page - 1) * pageSize, page * pageSize),
     [sorted, page, pageSize],
   );
-  // A new array after each fetch (its clock moves), so every row reads the time again: a token
-  // that expired turns its pill and its time left on the next refetch.
-  const pageRows = pageSlice;
 
   // Stable callbacks (navigate is), so the memoised table and toolbar skip unrelated renders.
   const updateSearch = useCallback(

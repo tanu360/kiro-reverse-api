@@ -246,6 +246,8 @@ export function BatchTagDialog({
               selectionBeforeEdit.current = null;
               setPicked(null);
               if (error) setError(null);
+              // The notice names the tag it ran with; Try again would send the new one.
+              setFailure(null);
             }}
             ref={fieldRef}
             spellCheck={false}
@@ -268,6 +270,7 @@ export function BatchTagDialog({
                         setDraft(tag);
                         setPicked(tag);
                         setError(null);
+                        setFailure(null);
                         inputRef.current?.focus();
                       }}
                       type="button"

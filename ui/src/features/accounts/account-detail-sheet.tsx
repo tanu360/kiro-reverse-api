@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, Suspense, useCallback, useState } from "react";
+import { type JSX, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   ResponsiveSheet,
   ResponsiveSheetDescription,
@@ -30,11 +30,12 @@ import { StatisticsSection } from "./detail/usage-sections";
 import { ReloginProvider } from "./relogin-context";
 import { TestAccountDialog } from "./test-account-dialog";
 
-// "Sign in again" opens the add-account dialog over the sheet. Its code loads on first use, so the
-// pages that only open this sheet (Overview, Requests) do not carry it.
-// The sheet's actions are always in it while it is open, so their failure needs no other focus.
+// Opened where no page place is (none says failures or takes focus), the sheet's own actions keep
+// focus in it while it is open.
 const NO_FALLBACK = () => null;
 
+// "Sign in again" opens the add-account dialog over the sheet. Its code loads on first use, so the
+// pages that only open this sheet (Overview, Requests) do not carry it.
 const AddAccountDialog = lazy(() =>
   import("@/features/add-account/add-account-dialog").then((module) => ({
     default: module.AddAccountDialog,
@@ -78,14 +79,25 @@ export function AccountDetailSheet({
   const [failure, setFailure] = useState<AccountFailure | null>(null);
   // The sheet's actions are the page's next actions too: as one starts, the page's notice under
   // the sheet goes as well (it may be this account's failure, out of date once this succeeds).
+  // Once the sheet has closed (its account deleted, or closed by hand while an action ran), an
+  // action's failure is said and its focus lands where the sheet was opened from.
   const parent = useAccountFailurePlace();
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
   const report = useCallback(
     (next: AccountFailure | null) => {
       if (!next) parent?.report(null);
+      else if (parent && !openRef.current) {
+        parent.report(next);
+        return;
+      }
       setFailure(next);
     },
     [parent],
   );
+  const fallbackFocus = parent?.fallbackFocus ?? NO_FALLBACK;
   const showProfile =
     account !== undefined &&
     !isApiKeyAccount(account) &&
@@ -93,7 +105,7 @@ export function AccountDetailSheet({
 
   return (
     <ReloginProvider onRelogin={openRelogin}>
-      <AccountFailureProvider fallbackFocus={NO_FALLBACK} report={report}>
+      <AccountFailureProvider fallbackFocus={fallbackFocus} report={report}>
         <ResponsiveSheet onOpenChange={onOpenChange} open={open && account !== undefined}>
           <ResponsiveSheetHeader className={account ? "gap-4" : undefined}>
             {account ? (
@@ -139,7 +151,7 @@ export function AccountDetailSheet({
                   <div className="-me-8 max-sm:me-0">
                     <AccountFailureNotice
                       failure={failure}
-                      fallbackFocus={NO_FALLBACK}
+                      fallbackFocus={fallbackFocus}
                       report={setFailure}
                     />
                   </div>

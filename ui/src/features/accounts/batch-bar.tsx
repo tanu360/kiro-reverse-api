@@ -52,6 +52,12 @@ const CONFIRM_KEYS: Record<BatchAction, string> = {
   delete: "batch.confirmDelete",
 };
 
+/**
+ * The actions that wait while a batch runs. The app's usual 64 % disabled fade still reads as a
+ * live white label on the purple bar, so they fade further; the running one keeps full strength.
+ */
+const WAITING = "aria-disabled:not-aria-busy:opacity-40";
+
 const ACTION_ICONS: Record<BatchAction, IconSvgElement> = {
   enable: CircleCheckIcon,
   disable: CircleOffIcon,
@@ -80,7 +86,7 @@ export function failedIdsIn(
 
 /**
  * The batch actions over the selection, run for the page (the bar unmounts with the selection).
- * Each confirms first; while it runs the bar's button spins and its count line says what runs.
+ * Each confirms first; while it runs the bar's button spins (BatchBar).
  * Batch endpoints answer 200 even when items fail, so `failed` and the per-id `results` are read.
  * A clean run clears the selection and a screen reader hears the result; a partial
  * one keeps only the failed accounts selected and names them at the top of the accounts card,
@@ -126,6 +132,7 @@ export function useBatchActions({
             : outcome.title,
           retry: again.length > 0 ? () => void execute(action, again) : undefined,
           target: () => target(action),
+          accountIds: again,
         });
       } else {
         announce(outcome.title);
@@ -139,6 +146,7 @@ export function useBatchActions({
           void execute(action, ids);
         },
         target: () => target(action),
+        accountIds: ids,
       });
     } finally {
       setRunning(null);
@@ -164,7 +172,8 @@ export function useBatchActions({
 
 /**
  * Batch actions over the selection, on the purple inverted toolbar. The page runs them
- * (useBatchActions); while one runs, its button spins and the count line says what runs.
+ * (useBatchActions). While one runs the bar keeps its layout: that action's button spins, the
+ * others fade, and the close button steps out of sight (it would do nothing) but keeps its place.
  */
 export function BatchBar({
   selectedIds,
@@ -193,16 +202,22 @@ export function BatchBar({
   };
 
   const busy = running !== null;
-  // The live count line says what runs while a batch runs.
+  const runningLabel =
+    running === "delete"
+      ? t("batch.deleting")
+      : running === "refreshModels"
+        ? t("detail.refreshingModels")
+        : running
+          ? t("batch.processing")
+          : null;
+  // The live count line. While a batch runs, a phone's says what runs in the count's place: the
+  // rarer actions sit in the bar's menu, whose button only spins. A wider bar shows every action,
+  // the running one spinning, so its count stays (and the bar its width); the run is named for
+  // screen readers only.
   const countLabel = (
     <p aria-live="polite" className="whitespace-nowrap px-1.5 font-medium text-sm tabular-nums">
-      {running === "delete"
-        ? t("batch.deleting")
-        : running === "refreshModels"
-          ? t("detail.refreshingModels")
-          : running
-            ? t("batch.processing")
-            : t("batch.selected", { count })}
+      {runningLabel && isMobile ? runningLabel : t("batch.selected", { count })}
+      {runningLabel && !isMobile ? <span className="sr-only">{runningLabel}</span> : null}
     </p>
   );
 
@@ -210,7 +225,7 @@ export function BatchBar({
   const actionButton = (action: BatchAction, label: string, name?: string, className?: string) => (
     <ToolbarButton
       aria-label={name}
-      className={className}
+      className={cn(WAITING, className)}
       data-batch-action={action}
       disabled={busy && running !== action}
       key={action}
@@ -234,7 +249,10 @@ export function BatchBar({
         render={
           <ToolbarButton
             aria-label={t("batch.clear")}
+            className={cn(busy && "invisible")}
             disabled={busy}
+            // Out of the keyboard's way too while it is out of sight.
+            focusableWhenDisabled={false}
             onClick={onClear}
             render={<Button size="icon-sm" variant="on-primary" />}
           />
@@ -272,6 +290,7 @@ export function BatchBar({
           <Menu>
             <ToolbarButton
               aria-label={t("batch.more")}
+              className={WAITING}
               data-batch-more=""
               disabled={busy && !menuLoading}
               render={
@@ -316,6 +335,7 @@ export function BatchBar({
             {actionButton("refresh", t("batch.refresh"))}
             {actionButton("refreshModels", t("batch.refreshModels"))}
             <ToolbarButton
+              className={WAITING}
               disabled={busy}
               onClick={onTags}
               render={<Button size="sm" variant="on-primary" />}
@@ -325,6 +345,7 @@ export function BatchBar({
             </ToolbarButton>
             <ToolbarButton
               aria-label={t("batch.export")}
+              className={WAITING}
               disabled={busy}
               onClick={onExport}
               render={<Button size="sm" variant="on-primary" />}
