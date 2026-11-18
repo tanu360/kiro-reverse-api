@@ -63,7 +63,6 @@
   "dailySummaryTest": "Enviar teste",
   "dailySummaryTestHint": "Envia agora as últimas 24 horas para todos os canais ligados. Não conta como o resumo do dia.",
   "dailySummaryTestNoChannel": "Adicione ou ligue um canal primeiro.",
-  "dailySummaryTestError": "Não foi possível enviar o resumo: {reason}",
   "dailySummaryTestFailed_one": "O resumo não chegou a {failed} de {count} canal. Veja o último resultado dele.",
   "dailySummaryTestFailed_other": "O resumo não chegou a {failed} de {count} canais. Veja o último resultado de cada canal.",
   "dailySummaryTestOk_one": "Resumo enviado para {count} canal.",

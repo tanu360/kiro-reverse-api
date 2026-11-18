@@ -391,7 +391,7 @@
   "confirmResetBody": "O histórico de requisições e os logs de erro são excluídos. O uso por conta e por chave é mantido. Não é possível desfazer.",
   "confirmResetAction": "Redefinir",
   "statsReset": "As estatísticas foram redefinidas.",
-  "resetFailed": "Não foi possível redefinir as estatísticas: {reason}",
+  "resetDone": "Concluído",
   "twoFactor.title": "Login em duas etapas",
   "twoFactor.hint": "Pede um código de um app autenticador depois da senha de administrador.",
   "twoFactor.on": "Ligado",

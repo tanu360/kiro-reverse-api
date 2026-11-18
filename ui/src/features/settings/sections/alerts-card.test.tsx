@@ -80,6 +80,12 @@ async function renderCard() {
   return result;
 }
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 describe("AlertsCard", () => {
   it("shows a channel's target hint and last result, never its secrets", async () => {
     mockServer.use(http.get(apiUrl("/alerts"), () => HttpResponse.json(SAVED)));
@@ -188,7 +194,7 @@ describe("AlertsCard", () => {
     await user.type(within(dialog).getByLabelText("Signing secret"), "s3cret");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Channel saved.");
+    await expectAnnounced("Channel saved.");
     expect(await writes()).toEqual([
       {
         method: "POST",
@@ -306,7 +312,7 @@ describe("AlertsCard", () => {
 
     recorded = [];
     await user.click(screen.getByRole("button", { name: "Send test to Receiver" }));
-    expect(await screen.findByText("Test alert sent to Receiver.")).toBeInTheDocument();
+    await expectAnnounced("Test alert sent to Receiver.");
     const writesSent = await writes();
     expect(writesSent).toHaveLength(1);
     expect(writesSent[0]?.path).toBe("/alerts/test");
@@ -338,7 +344,7 @@ describe("AlertsCard", () => {
     await user.clear(thresholds);
     await user.type(thresholds, "50 75 100");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await screen.findByText("Your settings were saved.");
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       {
         method: "POST",
@@ -416,9 +422,74 @@ describe("AlertsCard daily summary", () => {
     );
     const { user } = await renderCard();
     await user.click(screen.getByRole("button", { name: "Send test" }));
-    expect(await screen.findAllByText("Summary sent to 1 channel.")).not.toHaveLength(0);
+    // Said under the button until the next test, and read out.
+    await waitFor(() => expect(screen.getAllByText("Summary sent to 1 channel.")).toHaveLength(2));
+    const lines = screen.getAllByText("Summary sent to 1 channel.");
+    expect(lines.filter((line) => line.closest('[data-slot="live-announcer"]'))).toHaveLength(1);
+    expect(
+      lines
+        .find((line) => !line.closest('[data-slot="live-announcer"]'))
+        ?.closest('[data-slot="settings-row"]'),
+    ).toHaveTextContent("Test the summary");
     const row = screen.getByText("Ops hook").closest("li") as HTMLElement;
     expect(await within(row).findByText("Daily summary")).toBeInTheDocument();
+  });
+
+  it("shows a failed channel save in the dialog, and Try again saves it", async () => {
+    let fail = true;
+    mockServer.use(
+      http.get(apiUrl("/alerts"), () => HttpResponse.json(SAVED)),
+      http.post(apiUrl("/alerts"), () =>
+        fail
+          ? HttpResponse.json({ error: "store busy" }, { status: 500 })
+          : HttpResponse.json(SAVED),
+      ),
+    );
+    const { user } = await renderCard();
+    await user.click(await screen.findByRole("button", { name: "Edit Ops hook" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit channel" });
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    const notice = await within(dialog).findByRole("alert");
+    expect(notice).toHaveTextContent(/^store busy$/);
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+    await expectAnnounced("Channel saved.");
+    expect(within(dialog).getByRole("button", { name: "Saved" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("shows a failed test under its row, and Try again sends it again", async () => {
+    let fail = true;
+    mockServer.use(
+      http.get(apiUrl("/alerts"), () => HttpResponse.json(SAVED)),
+      http.post(apiUrl("/alerts/test"), () =>
+        fail
+          ? HttpResponse.json({ error: "store busy" }, { status: 500 })
+          : HttpResponse.json({
+              ts: Math.floor(Date.now() / 1000),
+              ok: true,
+              status: 200,
+              attempts: 1,
+              event: "test",
+            }),
+      ),
+    );
+    const { user } = await renderCard();
+    const row = (await screen.findByText("Ops hook")).closest("li") as HTMLElement;
+    const send = within(row).getByRole("button", { name: "Send test to Ops hook" });
+
+    await user.click(send);
+    const notice = await within(row).findByRole("alert");
+    expect(notice).toHaveTextContent(/^store busy$/);
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+    await expectAnnounced("Test alert sent to Ops hook.");
+    expect(within(row).queryByRole("alert")).not.toBeInTheDocument();
+    expect(send).toHaveFocus();
+    expect(await within(row).findByText("Delivered")).toBeInTheDocument();
   });
 
   it("disables the test while no channel is on", async () => {

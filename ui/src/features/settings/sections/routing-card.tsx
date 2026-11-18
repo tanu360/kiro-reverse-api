@@ -8,7 +8,7 @@ import { RpmLimitFooter, RpmLimitRows, useRpmLimitForm } from "./account-rpm-lim
 import { useInstantSetting } from "./general-settings";
 import { RoutingModeRow } from "./routing-mode-row";
 import { SECTION_ID } from "./sections";
-import { Hint, SectionQuery, SettingsSection } from "./settings-section";
+import { Hint, RowActionError, SectionQuery, SettingsSection } from "./settings-section";
 
 export function RoutingCard(): JSX.Element {
   const { t } = useT("settings");
@@ -40,7 +40,15 @@ function RoutingForm({ settings }: { settings: Settings }): JSX.Element {
         description={<Hint more={t("sessionAffinityMore")}>{t("sessionAffinityHint")}</Hint>}
         onCheckedChange={sessionAffinity.onCheckedChange}
         title={t("sessionAffinity")}
-      />
+      >
+        {sessionAffinity.failure ? (
+          <RowActionError
+            error={sessionAffinity.failure.error}
+            onDismiss={sessionAffinity.failure.dismiss}
+            onRetry={sessionAffinity.failure.retry}
+          />
+        ) : null}
+      </SwitchField>
       <RpmLimitRows form={rpmLimit} />
     </SettingsSection>
   );

@@ -3,14 +3,13 @@ import {
   CircleSlashIcon,
   CircleXIcon,
   Delete02Icon,
-  FloppyDiskIcon,
   PencilEdit01Icon,
   PlusSignIcon,
   SentIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useMemo, useState } from "react";
+import { type JSX, type RefObject, useId, useMemo, useRef, useState } from "react";
 import { Code } from "@/components/shared/code";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { PasswordInput } from "@/components/shared/password-input";
@@ -52,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { announce } from "@/lib/announce";
 import {
   ALERT_CHANNEL_TYPES,
   type AlertChannel,
@@ -66,12 +66,11 @@ import {
   testDailySummary,
   updateAlerts,
 } from "@/lib/api/alerts";
-import { isApiError } from "@/lib/api/errors";
-import { errorMessage } from "@/lib/api/server-errors";
+import { ApiError, isApiError } from "@/lib/api/errors";
 import { dateTimeFormat } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { useDraft } from "../lib/dirty";
 import {
   CHAT_ID_MAX,
@@ -104,12 +103,16 @@ import {
 } from "./alerts-model";
 import { SECTION_ID } from "./sections";
 import {
+  DialogSaveButton,
   FieldControl,
+  FooterSaveError,
   fillNodes,
   RowAction,
+  RowActionError,
   SaveFooter,
   SectionQuery,
   SettingsSection,
+  useSavedThenClose,
   useSectionSave,
 } from "./settings-section";
 
@@ -143,8 +146,8 @@ function alertErrorFields(error: unknown): { code?: string; field?: string; inde
   };
 }
 
-/** The server's reason in the UI language: the alert codes here, everything else as usual. */
-function alertsErrorText(error: unknown, t: TFunction): string {
+/** The reason for one of the alert codes, in the UI language; null for any other error. */
+function alertsCodeText(error: unknown, t: TFunction): string | null {
   switch (alertErrorFields(error).code) {
     case "alert_thresholds_invalid":
       return t("alerts:thresholdsInvalid");
@@ -153,8 +156,40 @@ function alertsErrorText(error: unknown, t: TFunction): string {
     case "alert_channel_limit":
       return t("alerts:channelLimit", { max: MAX_CHANNELS });
     default:
-      return errorMessage(error, t);
+      return null;
   }
+}
+
+/**
+ * A POST /alerts that throws the alert codes' reasons in the UI language, so the card's inline
+ * error shows them translated; the code, field and index stay on the error's body.
+ */
+async function postAlerts(
+  body: Parameters<typeof updateAlerts>[0],
+  t: TFunction,
+): Promise<AlertsConfig> {
+  try {
+    return await updateAlerts(body);
+  } catch (error) {
+    const text = isApiError(error) ? alertsCodeText(error, t) : null;
+    if (!isApiError(error) || text === null) throw error;
+    throw new ApiError({
+      status: error.status,
+      serverMessage: text,
+      body: error.body,
+      index: error.index,
+    });
+  }
+}
+
+/** The channel field a failed channel save names, when the dialog can mark it; else null. */
+function channelFieldError(
+  error: unknown,
+  vars: { index: number; draft?: ChannelDraft } | undefined,
+): ChannelField | null {
+  const { code, field, index } = alertErrorFields(error);
+  if (!vars?.draft || code !== "alert_channel_invalid" || index !== vars.index) return null;
+  return isChannelField(field) ? field : null;
 }
 
 function isRulesField(field: string | undefined): field is RulesField {
@@ -287,7 +322,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
     draft.set((prev) => ({ ...prev, ...patch }));
   };
 
-  const rules = useSectionSave((form: RulesForm) => updateAlerts(rulesPatch(form)), {
+  const rules = useSectionSave((form: RulesForm) => postAlerts(rulesPatch(form), t), {
     onSaved: (form) => {
       const patch = rulesPatch(form);
       draft.commit({
@@ -299,7 +334,10 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
     },
     onFailed: (error) => {
       const { field } = alertErrorFields(error);
-      if (isRulesField(field)) setInvalid([field]);
+      if (!isRulesField(field)) return false;
+      // The field shows the reason; the footer shows nothing more.
+      setInvalid([field]);
+      return true;
     },
   });
 
@@ -316,14 +354,14 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
     id: null,
   });
   const [serverErrors, setServerErrors] = useState<ChannelErrors>({});
+  const addRef = useRef<HTMLButtonElement>(null);
+  const testAllRef = useRef<HTMLButtonElement>(null);
   const editing = editor.id
     ? config.channels.find((channel) => channel.id === editor.id)
     : undefined;
-  const openEditor = (id: string | null) => {
-    setServerErrors({});
-    setEditor((prev) => ({ open: true, session: prev.session + 1, id }));
-  };
-  const closeEditor = () => setEditor((prev) => ({ ...prev, open: false }));
+  // No toasts. The dialog's Save reads "Saved", then the dialog closes on the saved row; a
+  // removed row goes. A failure shows in the dialog, or under the row for a removal.
+  const savedClose = useSavedThenClose(() => setEditor((prev) => ({ ...prev, open: false })));
 
   const channels = useMutation({
     mutationFn: (vars: {
@@ -331,27 +369,48 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
       index: number;
       draft?: ChannelDraft;
       removedId?: string;
-    }) => updateAlerts({ channels: vars.inputs }),
+    }) => postAlerts({ channels: vars.inputs }, t),
     onSuccess: (data, vars) => {
       queryClient.setQueryData(alertsQueryKey, data);
-      toast.success(vars.removedId ? t("channelRemoved") : t("channelSaved"));
-      if (!vars.removedId) closeEditor();
+      announce(vars.removedId ? t("channelRemoved") : t("channelSaved"));
+      if (vars.removedId) addRef.current?.focus();
+      else savedClose.done();
     },
     onError: (error, vars) => {
-      const { code, field, index } = alertErrorFields(error);
-      if (vars.draft && code === "alert_channel_invalid" && index === vars.index) {
-        if (isChannelField(field)) {
-          setServerErrors({ [field]: serverChannelProblem(field, vars.draft) });
-          return;
-        }
-      }
-      toast.error(t("settings:saveFailed", { reason: alertsErrorText(error, t) }));
+      const field = channelFieldError(error, vars);
+      if (field && vars.draft)
+        setServerErrors({ [field]: serverChannelProblem(field, vars.draft) });
     },
   });
+  // A failed save that the dialog cannot mark at a field: over its buttons.
+  const dialogError =
+    channels.isError &&
+    channels.variables?.draft &&
+    channelFieldError(channels.error, channels.variables) === null
+      ? channels.error
+      : null;
+  const removeFailedId =
+    channels.isError && channels.variables?.removedId ? channels.variables.removedId : null;
+
+  const openEditor = (id: string | null) => {
+    setServerErrors({});
+    if (channels.variables?.draft) channels.reset();
+    savedClose.reset();
+    setEditor((prev) => ({ open: true, session: prev.session + 1, id }));
+  };
+  const closeEditor = () => {
+    if (channels.variables?.draft) channels.reset();
+    setEditor((prev) => ({ ...prev, open: false }));
+  };
 
   const saveDraft = (next: ChannelDraft) => {
     const { inputs, index } = withDraft(config.channels, next);
     channels.mutate({ inputs, index, draft: next });
+  };
+
+  const removeNow = (channel: AlertChannel) => {
+    const rest = config.channels.filter((item) => item.id !== channel.id);
+    channels.mutate({ inputs: toChannelInputs(rest), index: -1, removedId: channel.id });
   };
 
   const onRemove = async (channel: AlertChannel) => {
@@ -363,16 +422,27 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
       target: name,
       variant: "danger",
     });
-    if (!confirmed) return;
-    const rest = config.channels.filter((item) => item.id !== channel.id);
-    channels.mutate({ inputs: toChannelInputs(rest), index: -1, removedId: channel.id });
+    if (confirmed) removeNow(channel);
   };
 
   // Channels with a test in flight: tests of two channels can overlap, and each keeps its spinner.
   const [testing, setTesting] = useState<ReadonlySet<string>>(() => new Set());
+  // Tests that did not reach the server, by channel: each shows under its row until retried.
+  const [testErrors, setTestErrors] = useState<ReadonlyMap<string, unknown>>(() => new Map());
+  const clearTestError = (id: string) =>
+    setTestErrors((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  // No toast: the row's last result changes on screen, and a screen reader hears it.
   const test = useMutation({
     mutationFn: (channel: AlertChannel) => testAlertChannel(channel.id),
-    onMutate: (channel) => setTesting((prev) => new Set(prev).add(channel.id)),
+    onMutate: (channel) => {
+      clearTestError(channel.id);
+      setTesting((prev) => new Set(prev).add(channel.id));
+    },
     onSettled: (_result, _error, channel) =>
       setTesting((prev) => {
         const next = new Set(prev);
@@ -391,22 +461,23 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
           : old,
       );
       const name = channelLabel(channel, t, mask);
-      if (result.ok) toast.success(t("testOk", { name }));
+      if (result.ok) announce(t("testOk", { name }));
       else {
         const reason =
           mask(alertDeliveryErrorText(result, t)) || t("attempts", { count: result.attempts });
-        toast.error(t("testFailed", { name, reason }));
+        announce(t("testFailed", { name, reason }), { assertive: true });
       }
     },
-    onError: (error, channel) => {
-      toast.error(
-        t("testFailed", { name: channelLabel(channel, t, mask), reason: errorMessage(error, t) }),
-      );
-    },
+    onError: (error, channel) => setTestErrors((prev) => new Map(prev).set(channel.id, error)),
   });
 
+  // The summary test's outcome, said under its button until the next test.
+  const [summaryResult, setSummaryResult] = useState<{ failed: number; count: number } | null>(
+    null,
+  );
   const summaryTest = useMutation({
     mutationFn: testDailySummary,
+    onMutate: () => setSummaryResult(null),
     onSuccess: (data) => {
       const byId = new Map(data.results.map((result) => [result.channelId, result]));
       queryClient.setQueryData<AlertsConfig>(alertsQueryKey, (old) =>
@@ -423,11 +494,10 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
           : old,
       );
       const failed = data.results.filter((result) => !result.ok).length;
-      if (failed === 0) toast.success(t("dailySummaryTestOk", { count: data.results.length }));
-      else toast.error(t("dailySummaryTestFailed", { failed, count: data.results.length }));
-    },
-    onError: (error) => {
-      toast.error(t("dailySummaryTestError", { reason: errorMessage(error, t) }));
+      const count = data.results.length;
+      setSummaryResult({ failed, count });
+      if (failed === 0) announce(t("dailySummaryTestOk", { count }));
+      else announce(t("dailySummaryTestFailed", { failed, count }), { assertive: true });
     },
   });
 
@@ -472,7 +542,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
             setInvalid([]);
             draft.reload();
           }}
-          saving={rules.saving}
+          feedback={rules.feedback}
           serverChanged={draft.serverChanged}
         />
       }
@@ -484,7 +554,13 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
       <SettingsRow
         control={
           <RowAction>
-            <Button disabled={full} onClick={() => openEditor(null)} size="sm" variant="secondary">
+            <Button
+              disabled={full}
+              onClick={() => openEditor(null)}
+              ref={addRef}
+              size="sm"
+              variant="secondary"
+            >
               <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
               {t("addChannel")}
             </Button>
@@ -510,6 +586,23 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
             <li key={channel.id}>
               <ChannelRow
                 channel={channel}
+                failure={
+                  removeFailedId === channel.id
+                    ? {
+                        action: "remove",
+                        error: channels.error,
+                        retry: () => removeNow(channel),
+                        dismiss: channels.reset,
+                      }
+                    : testErrors.has(channel.id)
+                      ? {
+                          action: "test",
+                          error: testErrors.get(channel.id),
+                          retry: () => test.mutate(channel),
+                          dismiss: () => clearTestError(channel.id),
+                        }
+                      : null
+                }
                 onEdit={() => openEditor(channel.id)}
                 onRemove={() => void onRemove(channel)}
                 onTest={() => test.mutate(channel)}
@@ -639,7 +732,9 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
             <Button
               disabled={enabledCount === 0}
               loading={summaryTest.isPending}
+              loadingText={t("sending")}
               onClick={() => summaryTest.mutate()}
+              ref={testAllRef}
               size="sm"
               variant="secondary"
             >
@@ -653,7 +748,28 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
           enabledCount === 0 ? t("dailySummaryTestNoChannel") : t("dailySummaryTestHint")
         }
         title={t("dailySummaryTestTitle")}
-      />
+      >
+        {summaryResult ? (
+          <p
+            className={cn(
+              ROW_DESCRIPTION,
+              summaryResult.failed > 0 && "text-destructive-foreground",
+            )}
+          >
+            {summaryResult.failed === 0
+              ? t("dailySummaryTestOk", { count: summaryResult.count })
+              : t("dailySummaryTestFailed", summaryResult)}
+          </p>
+        ) : null}
+        {summaryTest.isError ? (
+          <RowActionError
+            error={summaryTest.error}
+            focusTarget={testAllRef}
+            onDismiss={summaryTest.reset}
+            onRetry={() => summaryTest.mutate()}
+          />
+        ) : null}
+      </SettingsRow>
 
       <Dialog
         onOpenChange={(open) => {
@@ -662,8 +778,14 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
         open={editor.open}
       >
         <ChannelEditor
+          done={savedClose.saved}
+          error={dialogError}
           key={editor.session}
-          onEdit={() => setServerErrors({})}
+          onDismissError={channels.reset}
+          onEdit={() => {
+            setServerErrors({});
+            if (dialogError !== null) channels.reset();
+          }}
           onSave={saveDraft}
           saved={editing}
           saving={channels.isPending && channels.variables?.removedId === undefined}
@@ -714,6 +836,7 @@ function ChannelRow({
   channel,
   testing,
   removing,
+  failure,
   onTest,
   onEdit,
   onRemove,
@@ -721,12 +844,23 @@ function ChannelRow({
   channel: AlertChannel;
   testing: boolean;
   removing: boolean;
+  /** A test or removal that failed, under the last result until retried or closed. */
+  failure: {
+    action: "test" | "remove";
+    error: unknown;
+    retry: () => void;
+    dismiss: () => void;
+  } | null;
   onTest: () => void;
   onEdit: () => void;
   onRemove: () => void;
 }): JSX.Element {
   const { t } = useT("alerts");
   const mask = useMaskText();
+  const testRef = useRef<HTMLButtonElement>(null);
+  const removeRef = useRef<HTMLButtonElement>(null);
+  const focusTarget: RefObject<HTMLButtonElement | null> =
+    failure?.action === "remove" ? removeRef : testRef;
   const name = channelLabel(channel, t, mask);
   const target = [
     channel.targetHint,
@@ -743,6 +877,7 @@ function ChannelRow({
             loading={testing}
             loadingText={t("sending")}
             onClick={onTest}
+            ref={testRef}
             size="sm"
             variant="secondary"
           >
@@ -762,6 +897,7 @@ function ChannelRow({
             aria-label={t("removeChannelNamed", { name })}
             loading={removing}
             onClick={onRemove}
+            ref={removeRef}
             size="sm"
             variant="danger"
           >
@@ -793,6 +929,15 @@ function ChannelRow({
       title={<span className="wrap-anywhere">{name}</span>}
     >
       <LastResult result={channel.lastResult} />
+      {/* Try again removes at once: the removal was already confirmed. */}
+      {failure ? (
+        <RowActionError
+          error={failure.error}
+          focusTarget={focusTarget}
+          onDismiss={failure.dismiss}
+          onRetry={failure.retry}
+        />
+      ) : null}
     </SettingsRow>
   );
 }
@@ -852,18 +997,27 @@ function problemText(problem: ChannelProblem, t: TFunction): string {
 function ChannelEditor({
   saved,
   saving,
+  done,
+  error: saveError,
   serverErrors,
   onEdit,
   onSave,
+  onDismissError,
 }: {
   saved: AlertChannel | undefined;
   saving: boolean;
+  /** Saved: Save reads "Saved" while the dialog closes. */
+  done: boolean;
+  /** A failed save no field can show, over the buttons until the form changes. */
+  error: unknown;
   serverErrors: ChannelErrors;
   onEdit: () => void;
   onSave: (draft: ChannelDraft) => void;
+  onDismissError: () => void;
 }): JSX.Element {
   const { t } = useT("alerts");
   const id = useId();
+  const saveRef = useRef<HTMLButtonElement>(null);
   const [draft, setDraft] = useState<ChannelDraft>(() =>
     saved ? channelDraft(saved) : newChannelDraft(),
   );
@@ -890,6 +1044,7 @@ function ChannelEditor({
           event.preventDefault();
           // The dialog renders inside the card's form; its submit must not reach that one.
           event.stopPropagation();
+          if (saving || done) return;
           const found = validateChannelDraft(draft, saved);
           setErrors(found);
           if (Object.keys(found).length === 0) onSave(draft);
@@ -1021,15 +1176,16 @@ function ChannelEditor({
               onCheckedChange={(enabled) => update({ enabled })}
             />
           </div>
+          {/* Over the buttons; Try again saves the form again. */}
+          {saveError != null ? (
+            <FooterSaveError error={saveError} onDismiss={onDismissError} saveRef={saveRef} />
+          ) : null}
         </DialogPanel>
         <DialogFooter>
           <DialogClose render={<Button variant="ghost" />}>
             {t("common:actions.cancel")}
           </DialogClose>
-          <Button loading={saving} loadingText={t("common:actions.saving")} type="submit">
-            <HugeiconsIcon icon={FloppyDiskIcon} aria-hidden="true" />
-            {t("common:actions.save")}
-          </Button>
+          <DialogSaveButton ref={saveRef} saved={done} saving={saving} />
         </DialogFooter>
       </form>
     </DialogPopup>

@@ -1,5 +1,5 @@
-import { screen, waitFor } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
+import { screen, waitFor, within } from "@testing-library/react";
+import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
@@ -17,6 +17,12 @@ function capturePosts(): unknown[] {
     }),
   );
   return bodies;
+}
+
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
 }
 
 async function renderCard() {
@@ -43,7 +49,7 @@ describe("RoutingModeRow", () => {
     await user.click(screen.getByRole("radio", { name: "Priority" }));
 
     expect(screen.getByRole("radio", { name: "Priority" })).toBeChecked();
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(posts).toEqual([{ routingMode: "priority" }]);
     expect(mockDb.settings.routingMode).toBe("priority");
     expect(group).toHaveAccessibleDescription(/highest priority number/);
@@ -56,7 +62,7 @@ describe("RoutingModeRow", () => {
     const { user, group } = await renderCard();
     await user.click(screen.getByRole("radio", { name: "Reset first" }));
     expect(screen.getByRole("radio", { name: "Reset first" })).toBeChecked();
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(posts).toEqual([{ routingMode: "reset_first" }]);
     expect(mockDb.settings.routingMode).toBe("reset_first");
     expect(group).toHaveAccessibleDescription(/credits reset soonest/);
@@ -84,13 +90,55 @@ describe("RoutingModeRow", () => {
 
     await user.click(screen.getByRole("radio", { name: "Priority" }));
 
-    // The toast and its live-region copy.
-    expect(
-      await screen.findAllByText(
-        "Could not save settings: Choose a routing mode: weighted, priority or reset first.",
-      ),
-    ).not.toHaveLength(0);
+    // The reason only, under the row.
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /^Choose a routing mode: weighted, priority or reset first\.$/,
+    );
     await waitFor(() => expect(screen.getByRole("radio", { name: "Weighted" })).toBeChecked());
     expect(mockDb.settings.routingMode).toBe("weighted");
+  });
+
+  it("sends the same pick again from Try again, with focus back on the choice", async () => {
+    let fail = true;
+    mockServer.use(
+      // A moment's latency, as on a real network: the pick shows while it saves.
+      http.post(apiUrl("/settings"), async () => {
+        if (fail) return HttpResponse.json({ error: "store busy" }, { status: 500 });
+        await delay(50);
+        return undefined;
+      }),
+    );
+    const posts = capturePosts();
+    const { user } = await renderCard();
+
+    await user.click(screen.getByRole("radio", { name: "Priority" }));
+    const notice = await screen.findByRole("alert");
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Weighted" })).toBeChecked());
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+
+    await expectAnnounced("Your settings were saved.");
+    expect(screen.getByRole("radio", { name: "Priority" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Priority" })).toHaveFocus();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(posts).toEqual([{ routingMode: "priority" }, { routingMode: "priority" }]);
+    expect(mockDb.settings.routingMode).toBe("priority");
+  });
+
+  it("closes a failure with focus back on the choice", async () => {
+    mockServer.use(
+      http.post(apiUrl("/settings"), () =>
+        HttpResponse.json({ error: "store busy" }, { status: 500 }),
+      ),
+    );
+    const { user } = await renderCard();
+
+    await user.click(screen.getByRole("radio", { name: "Priority" }));
+    const notice = await screen.findByRole("alert");
+    await user.click(within(notice).getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Weighted" })).toHaveFocus();
   });
 });

@@ -1,8 +1,17 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
+import { apiUrl } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { MetricsCard, maskMetricsToken, scrapeConfig } from "./metrics-card";
+
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
 
 describe("MetricsCard", () => {
   it("is off until switched on, then shows the address, token and a scrape job", async () => {
@@ -35,7 +44,30 @@ describe("MetricsCard", () => {
     const confirm = await screen.findByRole("alertdialog");
     await user.click(within(confirm).getByRole("button", { name: "New token" }));
     await waitFor(() => expect(mockDb.metrics.token).not.toBe("kpm_old"));
-    expect(await screen.findAllByText("A new token was made.")).not.toHaveLength(0);
+    await expectAnnounced("A new token was made.");
+  });
+
+  it("puts the switch back on a failed save, and Try again switches it", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/metrics"), () =>
+        fail ? HttpResponse.json({ error: "store busy" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = renderWithProviders(<MetricsCard />);
+    const toggle = await screen.findByRole("switch", { name: "Serve /metrics" });
+
+    await user.click(toggle);
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveTextContent(/^store busy$/);
+    await waitFor(() => expect(toggle).not.toBeChecked());
+
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await expectAnnounced("Your settings were saved.");
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(toggle).toHaveFocus();
+    expect(mockDb.metrics.enabled).toBe(true);
   });
 
   it("writes a scrape job for the server's own address", () => {

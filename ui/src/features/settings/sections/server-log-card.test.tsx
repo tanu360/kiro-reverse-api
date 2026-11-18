@@ -33,6 +33,12 @@ afterEach(() => {
   mockServer.events.removeListener("request:start", onRequestStart);
 });
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 async function renderCard(lang?: "zh") {
   const result = renderWithProviders(<ServerLogCard />, { lang });
   const card = await waitFor(() => {
@@ -61,7 +67,7 @@ describe("ServerLogCard", () => {
     expect(options).toEqual(["Debug", "Info (default)", "Warnings and errors", "Errors only"]);
     await user.click(await screen.findByRole("option", { name: "Debug" }));
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await Promise.all(posted)).toEqual([{ logLevel: "debug" }]);
     expect(mockDb.settings.logLevel).toBe("debug");
     expect(select).toHaveTextContent("Debug");
@@ -80,7 +86,8 @@ describe("ServerLogCard", () => {
     await user.click(select);
     await user.click(await screen.findByRole("option", { name: "Errors only" }));
 
-    expect(await screen.findAllByText(/Could not save settings/)).not.toHaveLength(0);
+    // The reason only, under the row.
+    expect(await within(card).findByRole("alert")).toHaveTextContent("settings store unavailable");
     await waitFor(() => expect(select).toHaveTextContent("Info (default)"));
     expect(mockDb.settings.logLevel).toBe("info");
   });

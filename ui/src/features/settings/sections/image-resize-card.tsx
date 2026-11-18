@@ -100,7 +100,7 @@ function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
     imageResizeMaxKB: settings.imageResizeMaxKB || SIZE_KB.fallback,
   });
   const [invalid, setInvalid] = useState({ dimension: false, size: false });
-  const { save, saving } = useGeneralSettingsSave(draft);
+  const { save, feedback } = useGeneralSettingsSave(draft);
 
   const onSubmit = () => {
     const { imageResize, imageResizeMaxDimension, imageResizeMaxKB } = draft.value;
@@ -122,7 +122,7 @@ function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
             setInvalid({ dimension: false, size: false });
             draft.reload();
           }}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

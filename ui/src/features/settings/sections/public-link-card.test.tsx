@@ -1,11 +1,20 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { queryKeys } from "@/lib/api/query-keys";
 import { mockDb } from "@/lib/mocks/db";
+import { apiUrl } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { PublicLinkCard } from "./public-link-card";
 
 const LINK = "https://kiro-proxy.tail1234.ts.net";
+
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
 
 describe("PublicLinkCard", () => {
   it("is off with only the switch and the device name", async () => {
@@ -201,7 +210,7 @@ describe("PublicLinkCard", () => {
     await user.type(field, "kiro-home{Enter}");
     await user.tab();
     await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-home"));
-    expect(await screen.findAllByText("Your settings were saved.")).toHaveLength(1);
+    await expectAnnounced("Your settings were saved.");
     expect(field).toHaveValue("kiro-home");
     await user.click(field);
     await user.type(field, "2{Enter}");
@@ -220,7 +229,32 @@ describe("PublicLinkCard", () => {
     await user.click(within(dialog).getByRole("button", { name: "Sign out of Tailscale" }));
     await waitFor(() => expect(mockDb.tunnel.signedIn).toBe(false));
     expect(mockDb.tunnel.enabled).toBe(false);
-    expect(await screen.findAllByText("Signed out of Tailscale.")).not.toHaveLength(0);
+    await expectAnnounced("Signed out of Tailscale.");
+  });
+
+  it("shows a failed sign-out under its row, and Try again signs out without asking", async () => {
+    mockDb.twoFactor.enabled = true;
+    mockDb.tunnel.signedIn = true;
+    mockDb.tunnel.pinned = { enabled: true, signedIn: true, state: "running", url: LINK };
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/tunnel/logout"), () =>
+        fail ? HttpResponse.json({ error: "helper busy" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    const signOut = await screen.findByRole("button", { name: "Sign out of Tailscale" });
+    await user.click(signOut);
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Sign out of Tailscale" }));
+
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveTextContent(/^helper busy$/);
+    fail = false;
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(mockDb.tunnel.signedIn).toBe(false));
+    await expectAnnounced("Signed out of Tailscale.");
   });
 
   it("asks first when turned off from a page opened through the link", async () => {

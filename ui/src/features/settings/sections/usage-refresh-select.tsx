@@ -1,5 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { type JSX, useState } from "react";
+import type { JSX } from "react";
 import { SettingsRow } from "@/components/shared/settings-rows";
 import {
   Select,
@@ -8,11 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateSettings } from "@/lib/api/settings";
-import type { SettingsPatch } from "@/lib/api/types";
 import { type TFunction, useT } from "@/lib/i18n";
-import { writeSettingsCache } from "./general-settings";
-import { useSectionSave } from "./settings-section";
+import { useInstantValue } from "./general-settings";
+import { RowActionError } from "./settings-section";
 
 /** The intervals the select offers, in minutes; 0 is off. The server takes 0 or 5..1440. */
 const REFRESH_PRESETS: readonly number[] = [0, 5, 10, 15, 30, 60, 120, 360, 720, 1440];
@@ -22,35 +19,6 @@ function intervalLabel(minutes: number, t: TFunction): string {
   if (minutes === 0) return t("usageRefresh.off");
   if (minutes % 60 === 0) return t("usageRefresh.hours", { count: minutes / 60 });
   return t("usageRefresh.minutes", { count: minutes });
-}
-
-/**
- * The interval saves as it is picked, like the switch above it (useInstantSetting): the pick
- * shows at once, a failed save puts the saved value back and the toast says why, and a pick
- * while a save is in flight is ignored so two patches never race.
- */
-function useInstantInterval(saved: number): {
-  value: number;
-  onChange: (minutes: number) => void;
-} {
-  const queryClient = useQueryClient();
-  const [pending, setPending] = useState<number | null>(null);
-  const { save, saving } = useSectionSave((patch: SettingsPatch) => updateSettings(patch), {
-    onSaved: (patch) => {
-      writeSettingsCache(queryClient, patch);
-      setPending(null);
-    },
-    onFailed: () => setPending(null),
-  });
-  const value = pending ?? saved;
-  return {
-    value,
-    onChange: (minutes) => {
-      if (saving || minutes === value) return;
-      setPending(minutes);
-      save({ usageRefreshIntervalMinutes: minutes });
-    },
-  };
 }
 
 type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
@@ -89,15 +57,26 @@ function IntervalSelect({
   );
 }
 
-/** How often the background sweep refreshes every account's usage and tokens; 0 is off. */
+/**
+ * How often the background sweep refreshes every account's usage and tokens; 0 is off. It saves
+ * as it is picked, like the switch above it (useInstantValue).
+ */
 export function UsageRefreshRow({ saved }: { saved: number }): JSX.Element {
   const { t } = useT("settings");
-  const interval = useInstantInterval(saved);
+  const interval = useInstantValue(saved, (minutes) => ({ usageRefreshIntervalMinutes: minutes }));
   return (
     <SettingsRow
       control={<IntervalSelect onChange={interval.onChange} value={interval.value} />}
       description={t("usageRefresh.hint")}
       title={t("usageRefresh.title")}
-    />
+    >
+      {interval.failure ? (
+        <RowActionError
+          error={interval.failure.error}
+          onDismiss={interval.failure.dismiss}
+          onRetry={interval.failure.retry}
+        />
+      ) : null}
+    </SettingsRow>
   );
 }

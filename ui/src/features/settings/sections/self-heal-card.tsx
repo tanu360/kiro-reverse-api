@@ -1,7 +1,7 @@
 import { Alert02Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, type ReactNode, useId, useState } from "react";
+import { type JSX, type ReactNode, useId, useRef, useState } from "react";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { ROW_DESCRIPTION, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
@@ -14,6 +14,7 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from "@/components/ui/number-field";
+import { announce } from "@/lib/announce";
 import {
   type AccountHealth,
   accountHealthKey,
@@ -27,15 +28,14 @@ import {
 } from "@/lib/api/account-health";
 import { formatDuration, formatNumber } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { useDraft } from "../lib/dirty";
 import { SECTION_ID } from "./sections";
 import {
   Hint,
+  RowActionError,
   SaveFooter,
   SectionQuery,
   SettingsSection,
-  toastSaveFailed,
   useSectionSave,
 } from "./settings-section";
 
@@ -110,7 +110,7 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
   });
   const [intervalInvalid, setIntervalInvalid] = useState(false);
   const [roundsInvalid, setRoundsInvalid] = useState(false);
-  const { save, saving } = useSectionSave(
+  const { save, feedback } = useSectionSave(
     (body: { enabled: boolean; minIntervalSec: number; maxRounds: number }) =>
       updateAccountHealth(body),
     {
@@ -153,7 +153,7 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
             setRoundsInvalid(false);
             draft.reload();
           }}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }
@@ -242,14 +242,14 @@ function HealStatusRow({
 }): JSX.Element {
   const { t } = useT("settings");
   const queryClient = useQueryClient();
+  const resumeRef = useRef<HTMLButtonElement>(null);
+  // No toast: the warning goes once the refetch says it is running again; a failure shows
+  // under the warning.
   const resume = useMutation({
     mutationFn: resumeAccountHealth,
     onSuccess: () => {
-      toast.success(t("selfHeal.resumed"));
+      announce(t("selfHeal.resumed"));
       void queryClient.invalidateQueries({ queryKey: accountHealthKey });
-    },
-    onError: (error) => {
-      toastSaveFailed(error, t);
     },
   });
 
@@ -276,6 +276,7 @@ function HealStatusRow({
             <Button
               loading={resume.isPending}
               onClick={() => resume.mutate()}
+              ref={resumeRef}
               size="sm"
               variant="tone"
             >
@@ -284,6 +285,14 @@ function HealStatusRow({
             </Button>
           </AlertAction>
         </Alert>
+      ) : null}
+      {state.halted && resume.isError ? (
+        <RowActionError
+          error={resume.error}
+          focusTarget={resumeRef}
+          onDismiss={resume.reset}
+          onRetry={() => resume.mutate()}
+        />
       ) : null}
     </SettingsRow>
   );

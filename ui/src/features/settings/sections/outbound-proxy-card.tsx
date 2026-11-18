@@ -3,14 +3,13 @@ import {
   CircleSlashIcon,
   ClipboardPasteIcon,
   Delete02Icon,
-  FloppyDiskIcon,
   InformationCircleIcon,
   PencilEdit01Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useMemo, useState } from "react";
+import { type JSX, useId, useMemo, useRef, useState } from "react";
 import { Code } from "@/components/shared/code";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { PasswordInput } from "@/components/shared/password-input";
@@ -54,7 +53,16 @@ import {
   schemeForType,
 } from "../lib/proxy-url";
 import { SECTION_ID } from "./sections";
-import { fillNodes, SectionQuery, SettingsGroup, useSectionSave } from "./settings-section";
+import {
+  DialogSaveButton,
+  FooterSaveError,
+  fillNodes,
+  RowActionError,
+  SectionQuery,
+  SettingsGroup,
+  useSavedThenClose,
+  useSectionSave,
+} from "./settings-section";
 
 /** What the editor offers: SOCKS5, or HTTP CONNECT spoken in plain HTTP or over TLS. */
 type ProxyKind = "socks5" | "http" | "https";
@@ -117,15 +125,35 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
   const poolOn = useQuery(proxyPoolQuery()).data?.mode === "on";
   // `session` remounts the form on each open, so it starts from the saved proxy.
   const [editor, setEditor] = useState({ open: false, session: 0 });
-  const closeEditor = () => setEditor((prev) => ({ ...prev, open: false }));
-
-  const { save, saving } = useSectionSave((proxyURL: string) => updateProxyConfig({ proxyURL }), {
-    onSaved: (proxyURL) => {
-      queryClient.setQueryData(queryKeys.settings.proxy(), { proxyURL });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.settings.proxy() });
-      closeEditor();
+  const removeRef = useRef<HTMLButtonElement>(null);
+  // No toast: the dialog's Save reads "Saved", then the dialog closes on the new route; Remove
+  // changes the row. A failure shows in the dialog, or under the row for Remove.
+  const savedClose = useSavedThenClose(() => setEditor((prev) => ({ ...prev, open: false })));
+  const { save, saving, feedback } = useSectionSave(
+    (proxyURL: string) => updateProxyConfig({ proxyURL }),
+    {
+      onSaved: (proxyURL) => {
+        queryClient.setQueryData(queryKeys.settings.proxy(), { proxyURL });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.settings.proxy() });
+        if (proxyURL !== "") savedClose.done();
+      },
     },
-  });
+  );
+  // Remove sends "" (the form never does): its failure shows under the row, not in the dialog.
+  const [removing, setRemoving] = useState(false);
+  const send = (proxyURL: string) => {
+    setRemoving(proxyURL === "");
+    save(proxyURL);
+  };
+  const openEditor = () => {
+    feedback.dismiss();
+    savedClose.reset();
+    setEditor((prev) => ({ open: true, session: prev.session + 1 }));
+  };
+  const closeEditor = () => {
+    if (!removing) feedback.dismiss();
+    setEditor((prev) => ({ ...prev, open: false }));
+  };
 
   const onRemove = async () => {
     const confirmed = await confirm({
@@ -134,7 +162,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
       confirmLabel: t("proxyRemove"),
       variant: "danger",
     });
-    if (confirmed) save("");
+    if (confirmed) send("");
   };
 
   const kind = KINDS.find((item) => item.value === kindOf(server)) ?? KINDS[0];
@@ -161,19 +189,16 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
           // A group named by the row: the route, then its actions. Under the route on a narrow
           // row, so a long host keeps the row's width; at the row's end on a wide one.
           <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
-            <Button
-              onClick={() => setEditor((prev) => ({ open: true, session: prev.session + 1 }))}
-              size="sm"
-              variant="secondary"
-            >
+            <Button onClick={openEditor} size="sm" variant="secondary">
               <HugeiconsIcon icon={direct ? PlusSignIcon : PencilEdit01Icon} aria-hidden="true" />
               {direct ? t("proxySetUp") : t("common:actions.edit")}
             </Button>
             {direct ? null : (
               <Button
                 aria-label={t("proxyRemove")}
-                loading={saving}
+                loading={saving && removing}
                 onClick={() => void onRemove()}
+                ref={removeRef}
                 size="sm"
                 variant="danger"
               >
@@ -197,7 +222,17 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
             </span>
           )
         }
-      />
+      >
+        {/* Try again removes at once: the removal was already confirmed. */}
+        {removing && feedback.error != null ? (
+          <RowActionError
+            error={feedback.error}
+            focusTarget={removeRef}
+            onDismiss={feedback.dismiss}
+            onRetry={() => send("")}
+          />
+        ) : null}
+      </SettingsRow>
 
       <Dialog
         onOpenChange={(open) => {
@@ -205,7 +240,15 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
         }}
         open={editor.open}
       >
-        <ProxyEditor initial={server} key={editor.session} onSave={save} saving={saving} />
+        <ProxyEditor
+          error={removing ? null : feedback.error}
+          initial={server}
+          key={editor.session}
+          onDismissError={feedback.dismiss}
+          onSave={send}
+          saved={savedClose.saved}
+          saving={saving && !removing}
+        />
       </Dialog>
     </SettingsGroup>
   );
@@ -218,14 +261,23 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
 function ProxyEditor({
   initial,
   saving,
+  saved,
+  error,
   onSave,
+  onDismissError,
 }: {
   initial: ProxyModel;
   saving: boolean;
+  /** Saved: Save reads "Saved" while the dialog closes. */
+  saved: boolean;
+  /** The server's refusal of the last Save, over the buttons until the form changes. */
+  error: unknown;
   onSave: (proxyURL: string) => void;
+  onDismissError: () => void;
 }): JSX.Element {
   const { t } = useT("settings");
   const id = useId();
+  const saveRef = useRef<HTMLButtonElement>(null);
   const isNew = initial.type === "none";
   const [model, setModel] = useState<ProxyModel>(() =>
     isNew ? { ...initial, type: "socks5", scheme: "socks5" } : initial,
@@ -233,6 +285,7 @@ function ProxyEditor({
   const [addressError, setAddressError] = useState(false);
   const update = (next: ProxyModel) => {
     setAddressError(false);
+    if (error != null) onDismissError();
     setModel(next);
   };
 
@@ -266,6 +319,7 @@ function ProxyEditor({
         onSubmit={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (saving || saved) return;
           if (hostProblem !== null || !portValid) {
             setAddressError(true);
             return;
@@ -381,15 +435,16 @@ function ProxyEditor({
               </span>
             </li>
           </ul>
+          {/* Over the buttons; Try again saves the form again. */}
+          {error != null ? (
+            <FooterSaveError error={error} onDismiss={onDismissError} saveRef={saveRef} />
+          ) : null}
         </DialogPanel>
         <DialogFooter>
           <DialogClose render={<Button variant="ghost" />}>
             {t("common:actions.cancel")}
           </DialogClose>
-          <Button loading={saving} loadingText={t("common:actions.saving")} type="submit">
-            <HugeiconsIcon icon={FloppyDiskIcon} aria-hidden="true" />
-            {t("common:actions.save")}
-          </Button>
+          <DialogSaveButton ref={saveRef} saved={saved} saving={saving} />
         </DialogFooter>
       </form>
     </DialogPopup>

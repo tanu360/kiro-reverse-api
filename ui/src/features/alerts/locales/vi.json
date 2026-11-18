@@ -61,7 +61,6 @@
   "dailySummaryTest": "Gửi thử",
   "dailySummaryTestHint": "Gửi ngay 24 giờ qua tới mọi kênh đang bật. Lần gửi này không tính là bản tóm tắt của ngày.",
   "dailySummaryTestNoChannel": "Hãy thêm hoặc bật một kênh trước.",
-  "dailySummaryTestError": "Không gửi được bản tóm tắt: {reason}",
   "dailySummaryTestFailed_other": "{failed} / {count} kênh không nhận được bản tóm tắt. Xem kết quả gần nhất của từng kênh.",
   "dailySummaryTestOk_other": "Đã gửi bản tóm tắt tới {count} kênh.",
   "dialogHint": "Các thông tin bí mật được lưu trên máy chủ và không hiển thị lại.",

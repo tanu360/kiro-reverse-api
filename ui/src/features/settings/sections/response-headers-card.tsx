@@ -97,7 +97,7 @@ export function ResponseHeadersCard(): JSX.Element {
 
 /**
  * A server 400 for one of this card's codes, with the reason in the reader's language, so the
- * save toast shows it translated; the row index stays on the error.
+ * row (or the card's save error) shows it translated; the row index stays on the error.
  */
 function localizedSaveError(error: unknown, t: TFunction): unknown {
   if (!isApiError(error) || typeof error.body !== "object" || error.body === null) return error;
@@ -138,7 +138,7 @@ function ResponseHeadersForm({ data }: { data: ResponseHeadersResponse }): JSX.E
     else menuButtons.current.delete(index);
   };
 
-  const { save, saving } = useSectionSave(
+  const { save, feedback } = useSectionSave(
     async (headers: ResponseHeaderRule[]) => {
       try {
         return await updateResponseHeaders({ headers });
@@ -160,6 +160,8 @@ function ResponseHeadersForm({ data }: { data: ResponseHeadersResponse }): JSX.E
         if (error.index === null || error.index < 0 || error.index >= rows.length) return;
         setRowError({ index: error.index, message: error.serverMessage });
         setPendingFocus({ index: error.index });
+        // The row shows the reason; the footer shows nothing more.
+        return true;
       },
     },
   );
@@ -238,7 +240,7 @@ function ResponseHeadersForm({ data }: { data: ResponseHeadersResponse }): JSX.E
           dirty={draft.dirty}
           note={full ? t("responseHeaders.limit", { max }) : undefined}
           onReload={reload}
-          saving={saving}
+          feedback={feedback}
           serverChanged={draft.serverChanged}
         />
       }

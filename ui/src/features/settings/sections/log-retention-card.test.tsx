@@ -48,6 +48,12 @@ async function renderCard() {
   return { ...result, card, days, save };
 }
 
+/** A line read out by the app's live region (announce()), not a visible notice. */
+async function expectAnnounced(text: string): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
 describe("LogRetentionCard", () => {
   it("shows the saved days and what the last cleanup did", async () => {
     const { card, days, save } = await renderCard();
@@ -76,7 +82,7 @@ describe("LogRetentionCard", () => {
     expect(within(card).getByText("Kept forever")).toBeInTheDocument();
     await user.click(save);
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([{ method: "POST", path: "/log-retention", body: { days: 0 } }]);
     expect(mockDb.logRetention.days).toBe(0);
     await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
@@ -109,7 +115,7 @@ describe("LogRetentionCard", () => {
     await user.type(days, "30");
     await user.click(save);
 
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    await expectAnnounced("Your settings were saved.");
     expect(await writes()).toEqual([
       { method: "POST", path: "/log-retention", body: { days: 30 } },
     ]);

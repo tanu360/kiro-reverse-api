@@ -1,33 +1,35 @@
-import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { CheckIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { JSX } from "react";
+import { type JSX, useRef } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { SettingsRow } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
+import { useSavedFlash } from "@/hooks/use-saved-flash";
+import { announce } from "@/lib/announce";
 import { queryKeys } from "@/lib/api/query-keys";
-import { errorMessage } from "@/lib/api/server-errors";
 import { resetStats } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { SECTION_ID } from "./sections";
-import { RowAction, SettingsGroup } from "./settings-section";
+import { RowAction, RowActionError, SettingsGroup } from "./settings-section";
 
 export function DangerZoneCard(): JSX.Element {
   const { t } = useT("settings");
   const confirm = useConfirm();
   const queryClient = useQueryClient();
+  const resetRef = useRef<HTMLButtonElement>(null);
+  const done = useSavedFlash();
+  // No toast: the button spins, then reads "Done" for a moment; a failure shows under the row.
   const reset = useMutation({
     mutationFn: resetStats,
+    onMutate: () => done.clear(),
     onSuccess: () => {
-      toast.success(t("statsReset"));
+      done.flash();
+      announce(t("statsReset"));
       // Every view built on request history: the stat cards, Overview and Requests.
       for (const queryKey of [queryKeys.status, queryKeys.observe.all, queryKeys.requests.all]) {
         void queryClient.invalidateQueries({ queryKey });
       }
-    },
-    onError: (error) => {
-      toast.error(t("resetFailed", { reason: errorMessage(error, t) }));
     },
   });
 
@@ -53,19 +55,30 @@ export function DangerZoneCard(): JSX.Element {
               aria-label={t("resetStats")}
               loading={reset.isPending}
               onClick={() => void onReset()}
+              ref={resetRef}
               size="sm"
               // Solid red with a white label in both themes: this one cannot be undone.
               variant="destructive"
             >
-              <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-              {t("resetStats")}
+              <HugeiconsIcon icon={done.saved ? CheckIcon : Delete02Icon} aria-hidden="true" />
+              {done.saved ? t("resetDone") : t("resetStats")}
             </Button>
           </RowAction>
         }
         controlWidth="actions"
         description={t("resetStatsHint")}
         title={t("statistics")}
-      />
+      >
+        {/* Try again resets at once: the reset was already confirmed. */}
+        {reset.isError ? (
+          <RowActionError
+            error={reset.error}
+            focusTarget={resetRef}
+            onDismiss={reset.reset}
+            onRetry={() => reset.mutate()}
+          />
+        ) : null}
+      </SettingsRow>
     </SettingsGroup>
   );
 }

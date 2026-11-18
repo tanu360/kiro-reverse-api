@@ -380,7 +380,7 @@
   "confirmResetBody": "リクエスト履歴とエラーログが削除されます。アカウント別とキー別の使用量は残ります。この操作は元に戻せません。",
   "confirmResetAction": "リセット",
   "statsReset": "統計をリセットしました。",
-  "resetFailed": "統計をリセットできませんでした：{reason}",
+  "resetDone": "完了",
   "twoFactor.title": "2 段階認証",
   "twoFactor.hint": "管理者パスワードの後に、認証アプリのコードの入力を求めます。",
   "twoFactor.on": "有効",

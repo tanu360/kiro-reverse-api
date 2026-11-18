@@ -61,7 +61,6 @@
   "dailySummaryTest": "テスト送信",
   "dailySummaryTestHint": "過去 24 時間分を、有効なすべての通知先に今すぐ送信します。その日のサマリーとしては扱われません。",
   "dailySummaryTestNoChannel": "先に通知先を追加するか、有効にしてください。",
-  "dailySummaryTestError": "サマリーを送信できませんでした：{reason}",
   "dailySummaryTestFailed_other": "{count} 件中 {failed} 件の通知先にサマリーが届きませんでした。各通知先の最新の結果を確認してください。",
   "dailySummaryTestOk_other": "{count} 件の通知先にサマリーを送信しました。",
   "dialogHint": "シークレットはサーバーに保存され、二度と表示されません。",

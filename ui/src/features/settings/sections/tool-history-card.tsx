@@ -6,7 +6,7 @@ import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useInstantSetting } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { Hint, SectionQuery, SettingsSection } from "./settings-section";
+import { Hint, RowActionError, SectionQuery, SettingsSection } from "./settings-section";
 
 export function ToolHistoryCard(): JSX.Element {
   const { t } = useT("settings");
@@ -35,7 +35,15 @@ function ToolHistoryForm({ settings }: { settings: Settings }): JSX.Element {
         }
         onCheckedChange={structuredToolHistory.onCheckedChange}
         title={t("structuredToolHistory")}
-      />
+      >
+        {structuredToolHistory.failure ? (
+          <RowActionError
+            error={structuredToolHistory.failure.error}
+            onDismiss={structuredToolHistory.failure.dismiss}
+            onRetry={structuredToolHistory.failure.retry}
+          />
+        ) : null}
+      </SwitchField>
     </SettingsSection>
   );
 }

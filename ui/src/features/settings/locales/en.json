@@ -391,7 +391,7 @@
   "confirmResetBody": "Request history and error logs are deleted. Per-account and per-key usage stay. This cannot be undone.",
   "confirmResetAction": "Reset",
   "statsReset": "The statistics were reset.",
-  "resetFailed": "Could not reset statistics: {reason}",
+  "resetDone": "Done",
   "twoFactor.title": "Two-factor sign-in",
   "twoFactor.hint": "Ask for a code from an authenticator app after the admin password.",
   "twoFactor.on": "On",

@@ -380,7 +380,7 @@
   "confirmResetBody": "Lịch sử yêu cầu và nhật ký lỗi sẽ bị xóa. Mức sử dụng theo tài khoản và theo key được giữ lại. Không thể hoàn tác thao tác này.",
   "confirmResetAction": "Đặt lại",
   "statsReset": "Đã đặt lại thống kê.",
-  "resetFailed": "Không thể đặt lại thống kê: {reason}",
+  "resetDone": "Xong",
   "twoFactor.title": "Đăng nhập hai bước",
   "twoFactor.hint": "Yêu cầu mã từ ứng dụng xác thực sau mật khẩu quản trị.",
   "twoFactor.on": "Bật",

@@ -13,7 +13,7 @@ import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { type Draft, useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
-import { Hint, SaveFooter } from "./settings-section";
+import { Hint, type SaveFeedback, SaveFooter } from "./settings-section";
 
 /** config.MaxAccountRPMLimit */
 const MAX_ACCOUNT_RPM_LIMIT = 1000;
@@ -33,7 +33,7 @@ interface RpmLimitForm {
   /** The number the field shows: the draft's limit, or the one to restore when switched on. */
   shown: number | null;
   invalid: boolean;
-  saving: boolean;
+  feedback: SaveFeedback;
   setOn: (on: boolean) => void;
   setValue: (value: number | null) => void;
   /** Validates and saves; an invalid number marks the field instead. */
@@ -55,7 +55,7 @@ export function useRpmLimitForm(settings: Settings): RpmLimitForm {
   const draft = useDraft<RpmLimitDraft>({ accountRpmLimit: saved });
   const [restore, setRestore] = useState<number | null>(saved > 0 ? saved : null);
   const [invalid, setInvalid] = useState(false);
-  const { save, saving } = useGeneralSettingsSave(draft);
+  const { save, feedback } = useGeneralSettingsSave(draft);
   const current = draft.value.accountRpmLimit;
   const on = draft.value.on === true || current !== 0;
 
@@ -64,7 +64,7 @@ export function useRpmLimitForm(settings: Settings): RpmLimitForm {
     on,
     shown: on ? current : (restore ?? DEFAULT_ACCOUNT_RPM_LIMIT),
     invalid,
-    saving,
+    feedback,
     setOn: (next) => {
       setInvalid(false);
       if (next) {
@@ -179,7 +179,7 @@ export function RpmLimitFooter({ form }: { form: RpmLimitForm }): JSX.Element {
     <SaveFooter
       dirty={form.draft.dirty}
       onReload={form.reload}
-      saving={form.saving}
+      feedback={form.feedback}
       serverChanged={form.draft.serverChanged}
     />
   );
