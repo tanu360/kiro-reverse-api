@@ -6,10 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
 import { isApiError } from "@/lib/api/errors";
-import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowNote, FlowSteps, RegionField, SubmitButton, UrlBox } from "../fields";
+import {
+  FlowError,
+  type FlowFailure,
+  FlowNote,
+  FlowSteps,
+  RegionField,
+  SubmitButton,
+  UrlBox,
+} from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
@@ -28,7 +34,7 @@ interface DeviceCode {
 /** AWS Builder ID device-code sign-in: show the code, then poll until the user approves it. */
 export function BuilderIdFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [region, setRegion] = useState(() => reloginRegion(relogin.target));
@@ -36,14 +42,15 @@ export function BuilderIdFlow(): JSX.Element {
   const [starting, setStarting] = useState(false);
   const [code, setCode] = useState<DeviceCode | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
   useReportBusy(starting);
   const focusAfter = useFocusAfter(starting);
   const regionRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLDivElement>(null);
 
   // The poll chain reads the latest render's helpers, not the ones from when it started.
-  const latest = useRef({ t, relogin, finishAdd, focusAfter });
-  latest.current = { t, relogin, finishAdd, focusAfter };
+  const latest = useRef({ relogin, focusAfter });
+  latest.current = { relogin, focusAfter };
 
   // Stop polling if this view goes away while the dialog stays open.
   useEffect(() => () => sessions.stopBuilderId(), [sessions]);
@@ -53,14 +60,13 @@ export function BuilderIdFlow(): JSX.Element {
       sessions.builderIdTimer = null;
       const sessionId = sessions.builderIdSession;
       if (!sessionId || !sessions.isCurrent(generation)) return;
-      const { t: tr, relogin: again, finishAdd: finish, focusAfter: refocus } = latest.current;
+      const { relogin: again, focusAfter: refocus } = latest.current;
       try {
         const res = await pollBuilderId({ sessionId });
         if (!sessions.isCurrent(generation) || sessions.builderIdSession !== sessionId) return;
         if (res.completed) {
           sessions.stopBuilderId();
-          again.announce(res);
-          finish([res.account]);
+          again.finish(res);
           return;
         }
         setReconnecting(false);
@@ -76,10 +82,8 @@ export function BuilderIdFlow(): JSX.Element {
         sessions.stopBuilderId();
         setCode(null);
         setReconnecting(false);
-        if (!(await again.resolveMismatch(error))) {
-          toast.error(tr(again.failedKey, { error: errorMessage(error, tr) }));
-        }
-        // Back on the first step; the code view and its focus are gone.
+        // Back on the first step, which says why; the code view and its focus are gone.
+        if (!(await again.resolveMismatch(error, setFailure))) setFailure({ error });
         refocus(regionRef);
       }
     }, intervalS * 1000);
@@ -95,6 +99,7 @@ export function BuilderIdFlow(): JSX.Element {
       return;
     }
     setRegionError(null);
+    setFailure(null);
     setStarting(true);
     const generation = sessions.generation;
     try {
@@ -110,7 +115,7 @@ export function BuilderIdFlow(): JSX.Element {
       schedule(generation, res.interval || DEFAULT_INTERVAL_S, 0);
     } catch (error) {
       if (sessions.isCurrent(generation)) {
-        toast.error(t("startFailed", { error: errorMessage(error, t) }));
+        setFailure({ error });
         focusAfter(regionRef);
       }
     } finally {
@@ -202,6 +207,7 @@ export function BuilderIdFlow(): JSX.Element {
         onChange={setRegion}
         value={region}
       />
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton busy={starting} formId={formId} label={t("startSignIn")} />
       </FlowFooter>

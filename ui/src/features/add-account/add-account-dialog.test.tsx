@@ -90,9 +90,38 @@ async function expectClosed(): Promise<void> {
   );
 }
 
-/** The toast island shows the text; the page may repeat it, so any match counts. */
-async function expectToast(text: string | RegExp): Promise<void> {
-  expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
+/** Read out by the app's live region (the result a toast used to show). */
+async function expectAnnounced(text: string | RegExp): Promise<void> {
+  const line = await screen.findByText(text);
+  expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
+/** The flow's one-line error at the end of the open dialog. */
+async function expectFlowError(text: string | RegExp): Promise<void> {
+  const line = await screen.findByText(text, { selector: '[data-slot="alert-description"]' });
+  expect(line.closest('[data-slot="action-error"]')).toHaveAttribute("role", "alert");
+  expect(line.closest('[data-slot="dialog-popup"]')).not.toBeNull();
+}
+
+/** The buttons in the dialog's footer, in order. */
+function footerButtons(): HTMLElement[] {
+  const footer = document.querySelector<HTMLElement>('[data-slot="dialog-footer"]');
+  if (!footer) throw new Error("no dialog footer");
+  return within(footer).getAllByRole("button");
+}
+
+/**
+ * A login that went in with a warning: one amber line in the open dialog, and Close as the
+ * footer's only button, with focus.
+ */
+async function expectSavedWarning(text: string | RegExp): Promise<HTMLElement> {
+  const line = await screen.findByText(text, { selector: '[data-slot="alert-description"]' });
+  expect(line.closest('[data-slot="alert"]')).toHaveAttribute("role", "alert");
+  expect(line.closest('[data-slot="dialog-popup"]')).not.toBeNull();
+  const buttons = footerButtons();
+  expect(buttons.map((button) => button.textContent)).toEqual(["Close"]);
+  await waitFor(() => expect(buttons[0]).toHaveFocus());
+  return buttons[0];
 }
 
 /** Waits until the checklist step with this title is the current one. */
@@ -192,7 +221,7 @@ describe("Builder ID", () => {
     expect(onAdded).toHaveBeenCalledWith([id]);
     expect(polls.count).toBe(3);
     await waitFor(() => expect(refreshed).toEqual([id]));
-    await expectToast(/^Added the account /);
+    await expectAnnounced(/^Added the account /);
   });
 
   it("stops polling when the dialog closes", async () => {
@@ -222,7 +251,8 @@ describe("Builder ID", () => {
     await screen.findByText("ABCD-EFGH");
     await untilPolls(polls, 1);
 
-    await expectToast("Could not add the account: authorization expired");
+    // Back on the first step, which says why.
+    await expectFlowError("authorization expired");
     expect(await screen.findByRole("button", { name: "Start sign-in" })).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(5000));
     expect(polls.count).toBe(1);
@@ -287,21 +317,29 @@ describe("Microsoft SSO", () => {
     await waitFor(() => expect(refreshed).toEqual([id]));
   });
 
-  it("shows the warning when the profile is not resolved yet", async () => {
-    mockRefresh();
-    const { user } = renderWithProviders(<Harness initialMethod="microsoft" />);
+  it("stays open on the warning when the profile is not resolved yet", async () => {
+    const refreshed = mockRefresh();
+    const onAdded = vi.fn();
+    const { user } = renderWithProviders(<Harness initialMethod="microsoft" onAdded={onAdded} />);
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
     await user.type(await screen.findByRole("textbox", { name: "Callback URL" }), "http://x/leg1");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await expectCurrentStep("Sign in with Microsoft");
     await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/?noprofile");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    await expectClosed();
-    await expectToast(/^Added the account /);
-    // Translated from warningCode, with the upstream reason as the detail.
-    await expectToast(
-      "The account was added, but its Kiro profile could not be found yet. It is looked up again on the next request. (Details: no available Kiro profile)",
+
+    // One amber line after the result, translated from warningCode with the upstream reason as
+    // the detail, in place of the finished flow.
+    const close = await expectSavedWarning(
+      /^Added the account \S+ The account was added, but its Kiro profile could not be found yet\. It is looked up again on the next request\. \(Details: no available Kiro profile\)$/,
     );
+    expect(screen.queryByRole("textbox", { name: "Callback URL" })).not.toBeInTheDocument();
+    const id = lastAccountId();
+    expect(onAdded).toHaveBeenCalledWith([id]);
+    await waitFor(() => expect(refreshed).toEqual([id]));
+
+    await user.click(close);
+    await expectClosed();
   });
 
   it("cancels the server session when the dialog closes mid-flow", async () => {
@@ -351,7 +389,7 @@ describe("Microsoft SSO", () => {
     );
     expect(onAdded).not.toHaveBeenCalled();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Could not add the account/)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="action-error"]')).not.toBeInTheDocument();
   });
 
   it("cancels the server session on unmount", async () => {
@@ -366,7 +404,7 @@ describe("Microsoft SSO", () => {
 });
 
 describe("IAM Identity Center", () => {
-  it("stays on step 2 with an error toast when completion fails", async () => {
+  it("stays on step 2 with the error above its buttons when completion fails", async () => {
     const { user } = renderWithProviders(<Harness initialMethod="iam" />);
 
     await user.type(
@@ -380,9 +418,7 @@ describe("IAM Identity Center", () => {
     await user.type(callback, "http://127.0.0.1/oauth/callback?error=denied");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
 
-    await expectToast(
-      "Could not add the account: The callback URL is not valid. Copy the full address again.",
-    );
+    await expectFlowError("The callback URL is not valid. Copy the full address again.");
     expect(
       screen.getByRole("heading", { name: "IAM Identity Center (Enterprise SSO)" }),
     ).toBeVisible();
@@ -437,7 +473,7 @@ describe("IAM Identity Center", () => {
     );
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await expectClosed();
-    await expectToast(/^Updated the existing account /);
+    await expectAnnounced(/^Updated the existing account /);
   });
 });
 
@@ -474,33 +510,57 @@ describe("SSO Token", () => {
     pending.release();
     await expectClosed();
     expect(onAdded).toHaveBeenCalledWith(["acc-sso-1"]);
-    await expectToast("Added 1 account.");
+    await expectAnnounced("Added 1 account.");
   });
 });
 
 describe("Kiro API Key", () => {
-  it("reports a partial import in one toast", async () => {
+  it("reports a partial import in one line and stays open on the key that failed", async () => {
     const refreshed = mockRefresh();
     const imports = logRequests("/auth/credentials");
     const onAdded = vi.fn();
     const { user } = renderWithProviders(<Harness initialMethod="apikey" onAdded={onAdded} />);
 
-    await user.type(
-      await screen.findByRole("textbox", { name: "Kiro API keys" }),
-      "ksk_duplicate{Enter}ksk_duplicate|eu-central-1",
-    );
+    const keys = await screen.findByRole("textbox", { name: "Kiro API keys" });
+    await user.type(keys, "ksk_duplicate{Enter}ksk_duplicate|eu-central-1");
     await user.click(screen.getByRole("button", { name: "Add" }));
 
-    await expectToast("Added 1 account, 1 failed.");
-    await expectToast("This Kiro API key is already added.");
-    await expectClosed();
+    await expectFlowError("Added 1 account, 1 failed. This Kiro API key is already added.");
+    // The added key is listed at once and leaves the field; the one that failed stays.
     const id = lastAccountId();
     expect(onAdded).toHaveBeenCalledWith([id]);
+    expect(keys).toHaveValue("ksk_duplicate|eu-central-1");
+    await waitFor(() => expect(keys).toHaveFocus());
+    expect(screen.getByRole("dialog", { name: "Add account" })).toBeInTheDocument();
+    // An account went in, so the footer's Cancel, which would undo nothing, reads Close.
+    expect(footerButtons().map((button) => button.textContent)).toEqual(["Close", "Add"]);
     expect(imports.bodies).toEqual([
       { kiroApiKey: "ksk_duplicate", authMethod: "api_key", region: "us-east-1" },
       { kiroApiKey: "ksk_duplicate|eu-central-1", authMethod: "api_key", region: "" },
     ]);
     await waitFor(() => expect(refreshed).toEqual([id]));
+  });
+
+  it("shows only the reason when every key fails, and clears it on the next try", async () => {
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/auth/credentials"), () =>
+        fail ? HttpResponse.json({ error: "boom" }, { status: 500 }) : undefined,
+      ),
+    );
+    mockRefresh();
+    const { user } = renderWithProviders(<Harness initialMethod="apikey" />);
+    const keys = await screen.findByRole("textbox", { name: "Kiro API keys" });
+    await user.type(keys, "ksk_one");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await expectFlowError("boom");
+    expect(keys).toHaveValue("ksk_one");
+    expect(footerButtons().map((button) => button.textContent)).toEqual(["Cancel", "Add"]);
+
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await expectClosed();
+    await expectAnnounced("Added 1 account.");
   });
 
   it("asks for a key when the list is empty", async () => {
@@ -562,9 +622,7 @@ describe("Focus after a failed submit or a step change", () => {
 
     await user.type(callback, "http://127.0.0.1/oauth/callback?error=denied");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    await expectToast(
-      "Could not add the account: The callback URL is not valid. Copy the full address again.",
-    );
+    await expectFlowError("The callback URL is not valid. Copy the full address again.");
     await waitFor(() => expect(callback).toHaveFocus());
     expect(callback).toBeEnabled();
   });
@@ -606,7 +664,7 @@ describe("Focus after a failed submit or a step change", () => {
     const tokens = await screen.findByRole("textbox", { name: "SSO tokens" });
     await user.type(tokens, "bad");
     await user.click(screen.getByRole("button", { name: "Add" }));
-    await expectToast(/^Could not add the account: /);
+    await expectFlowError(/./);
     await waitFor(() => expect(tokens).toHaveFocus());
   });
 
@@ -624,7 +682,7 @@ describe("Focus after a failed submit or a step change", () => {
 
       // eu-west-9 makes the mock report an expired authorization on the first poll.
       await act(() => vi.advanceTimersByTimeAsync(6000));
-      await expectToast("Could not add the account: authorization expired");
+      await expectFlowError("authorization expired");
       await waitFor(() => expect(screen.getByRole("textbox", { name: "Region" })).toHaveFocus());
     } finally {
       vi.runOnlyPendingTimers(); // queued Motion frames, see the Builder ID block
@@ -709,6 +767,23 @@ describe("Focus after a failed submit or a step change", () => {
     expect(client).toHaveAccessibleDescription(
       expect.stringContaining("IdC sign-in needs the {hash}.json file."),
     );
+    expect(token).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("Kiro local cache: says under its field when an uploaded file cannot be read", async () => {
+    const { user } = renderWithProviders(<Harness initialMethod="local" />);
+    const token = await screen.findByRole("textbox", { name: /kiro-auth-token\.json/ });
+    const file = new File(["{}"], "kiro-auth-token.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: () => Promise.reject(new Error("unreadable")) });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error("no file input");
+    await user.upload(input, file);
+
+    await waitFor(() => expect(token).toHaveFocus());
+    expect(token).toHaveAttribute("aria-invalid", "true");
+    expect(token).toHaveAccessibleDescription(expect.stringContaining("Could not read the file."));
+    // Pasting instead clears it.
+    await user.type(token, "x");
     expect(token).not.toHaveAttribute("aria-invalid", "true");
   });
 

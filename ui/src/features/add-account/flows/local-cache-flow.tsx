@@ -13,10 +13,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { importCredentials } from "@/lib/api/auth-flows";
-import { errorMessage } from "@/lib/api/server-errors";
 import { fillNodes, useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowGuide, FormField, ProviderLogo, SubmitButton } from "../fields";
+import {
+  FlowError,
+  type FlowFailure,
+  FlowGuide,
+  FormField,
+  ProviderLogo,
+  SubmitButton,
+} from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import {
@@ -37,6 +42,7 @@ function JsonFileInput({
   file,
   value,
   onChange,
+  onReadFailed,
   disabled,
   placeholder,
   textareaRef,
@@ -44,6 +50,8 @@ function JsonFileInput({
   file: string;
   value: string;
   onChange: (value: string) => void;
+  /** The picked file could not be read; the field says so. */
+  onReadFailed: () => void;
   disabled: boolean;
   placeholder: string;
   textareaRef: Ref<HTMLTextAreaElement>;
@@ -55,7 +63,7 @@ function JsonFileInput({
     const picked = event.target.files?.[0];
     event.target.value = "";
     if (!picked) return;
-    picked.text().then(onChange, () => toast.error(t("local.readFailed")));
+    picked.text().then(onChange, onReadFailed);
   };
 
   return (
@@ -99,13 +107,16 @@ function JsonFileInput({
 /** Kiro IDE local cache: kiro-auth-token.json plus, for IdC, the {hash}.json client file. */
 export function LocalCacheFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [provider, setProvider] = useState<LocalProvider>("BuilderId");
   const [tokenJson, setTokenJson] = useState("");
   const [clientJson, setClientJson] = useState("");
   const [problem, setProblem] = useState<LocalCacheError | null>(null);
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
+  // The file whose upload could not be read: its field says so until it changes.
+  const [unreadable, setUnreadable] = useState<"token" | "client" | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
   const focusAfter = useFocusAfter(pending);
@@ -116,6 +127,8 @@ export function LocalCacheFlow(): JSX.Element {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
+    setFailure(null);
+    setUnreadable(null);
     const built = buildLocalCachePayload({ provider, tokenJson, clientJson });
     if (!built.ok) {
       setProblem(built.error);
@@ -133,11 +146,10 @@ export function LocalCacheFlow(): JSX.Element {
         reloginAccountId: relogin.accountId,
       });
       if (!sessions.isCurrent(generation)) return;
-      relogin.announce(res);
-      finishAdd([res.account]);
+      relogin.finish(res);
     } catch (error) {
-      if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error))) {
-        toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
+      if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error, setFailure))) {
+        setFailure({ error });
         focusAfter(tokenRef);
       }
     } finally {
@@ -155,6 +167,19 @@ export function LocalCacheFlow(): JSX.Element {
         })
       : t(`local.${problem.key}`, problem.params)
     : null;
+  // An unreadable upload is said under its own field, before any check of the pasted text.
+  const fieldError = (field: "token" | "client") =>
+    unreadable === field ? t("local.readFailed") : problemField === field ? problemText : null;
+  const onRead = (field: "token" | "client", set: (value: string) => void) => ({
+    onChange: (value: string) => {
+      set(value);
+      if (unreadable === field) setUnreadable(null);
+    },
+    onReadFailed: () => {
+      setUnreadable(field);
+      focusAfter(field === "token" ? tokenRef : clientRef);
+    },
+  });
   const items = LOCAL_PROVIDERS.map((value) => ({
     value,
     label: t(`local.providers.${value}`),
@@ -184,6 +209,7 @@ export function LocalCacheFlow(): JSX.Element {
             if (!value) return;
             setProvider(value as LocalProvider);
             setProblem(null);
+            setUnreadable(null);
           }}
           value={provider}
         >
@@ -210,7 +236,7 @@ export function LocalCacheFlow(): JSX.Element {
         </Select>
       </FormField>
       <FormField
-        error={problemField === "token" ? problemText : null}
+        error={fieldError("token")}
         hint={t("local.pasteOrUpload")}
         label={
           <>
@@ -224,7 +250,7 @@ export function LocalCacheFlow(): JSX.Element {
         <JsonFileInput
           disabled={pending}
           file={t("local.tokenFile")}
-          onChange={setTokenJson}
+          {...onRead("token", setTokenJson)}
           placeholder='{"refreshToken": "…"}'
           textareaRef={tokenRef}
           value={tokenJson}
@@ -232,7 +258,7 @@ export function LocalCacheFlow(): JSX.Element {
       </FormField>
       {showClient ? (
         <FormField
-          error={problemField === "client" ? problemText : null}
+          error={fieldError("client")}
           hint={provider === "Microsoft" ? t("local.clientHintMicrosoft") : t("local.clientHint")}
           label={
             <>
@@ -246,13 +272,14 @@ export function LocalCacheFlow(): JSX.Element {
           <JsonFileInput
             disabled={pending}
             file={t("local.clientFile")}
-            onChange={setClientJson}
+            {...onRead("client", setClientJson)}
             placeholder='{"clientId": "…", "clientSecret": "…"}'
             textareaRef={clientRef}
             value={clientJson}
           />
         </FormField>
       ) : null}
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton
           busy={pending}

@@ -2,10 +2,17 @@ import { type FormEvent, type JSX, useRef, useState } from "react";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Input } from "@/components/ui/input";
 import { completeIamSso, startIamSso } from "@/lib/api/auth-flows";
-import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowNote, FlowSteps, FormField, RegionField, SubmitButton, UrlBox } from "../fields";
+import {
+  FlowError,
+  type FlowFailure,
+  FlowNote,
+  FlowSteps,
+  FormField,
+  RegionField,
+  SubmitButton,
+  UrlBox,
+} from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
@@ -18,7 +25,7 @@ import { useReloginFlow } from "../relogin";
  */
 export function IamFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [startUrl, setStartUrl] = useState("");
@@ -30,6 +37,7 @@ export function IamFlow(): JSX.Element {
   const [errors, setErrors] = useState<{ startUrl?: string; region?: string; callback?: string }>(
     {},
   );
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
   const focusAfter = useFocusAfter(pending);
@@ -63,7 +71,7 @@ export function IamFlow(): JSX.Element {
       focusAfter(stepFocus(formId, callbackRef));
     } catch (error) {
       if (sessions.isCurrent(generation)) {
-        toast.error(t("startFailed", { error: errorMessage(error, t) }));
+        setFailure({ error });
         focusAfter(startUrlRef);
       }
     } finally {
@@ -84,11 +92,10 @@ export function IamFlow(): JSX.Element {
     try {
       const res = await completeIamSso({ sessionId: sessions.iamSession, callbackUrl: callback });
       if (!sessions.isCurrent(generation)) return;
-      relogin.announce(res);
-      finishAdd([res.account]);
+      relogin.finish(res);
     } catch (error) {
       if (!sessions.isCurrent(generation)) return;
-      if (await relogin.resolveMismatch(error)) {
+      if (await relogin.resolveMismatch(error, setFailure)) {
         // The server used up the session; a new attempt starts from the first step.
         sessions.iamSession = "";
         setAuthorizeUrl("");
@@ -96,7 +103,7 @@ export function IamFlow(): JSX.Element {
         focusAfter(startUrlRef);
         return;
       }
-      toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
+      setFailure({ error });
       focusAfter(callbackRef);
     } finally {
       setPending(false);
@@ -106,6 +113,7 @@ export function IamFlow(): JSX.Element {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
+    setFailure(null);
     void (authorizeUrl ? complete() : start());
   };
 
@@ -187,6 +195,7 @@ export function IamFlow(): JSX.Element {
           />
         </>
       )}
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton
           busy={pending}

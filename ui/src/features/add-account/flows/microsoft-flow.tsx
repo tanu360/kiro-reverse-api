@@ -10,11 +10,19 @@ import {
   selectMicrosoftProfile,
   startMicrosoftSso,
 } from "@/lib/api/auth-flows";
-import { errorMessage, serverCodeMessage } from "@/lib/api/server-errors";
+import { serverCodeMessage } from "@/lib/api/server-errors";
 import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/types";
 import { fillNodes, useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowNote, type FlowStepItem, FlowSteps, FormField, SubmitButton, UrlBox } from "../fields";
+import {
+  FlowError,
+  type FlowFailure,
+  FlowNote,
+  type FlowStepItem,
+  FlowSteps,
+  FormField,
+  SubmitButton,
+  UrlBox,
+} from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
 import { useReloginFlow } from "../relogin";
@@ -28,7 +36,7 @@ type Stage = "idle" | "kiro" | "microsoft" | "profile";
  */
 export function MicrosoftFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const { sessions, finishAdd } = useFlow();
+  const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [stage, setStage] = useState<Stage>("idle");
@@ -37,6 +45,7 @@ export function MicrosoftFlow(): JSX.Element {
   const [profiles, setProfiles] = useState<KiroProfile[]>([]);
   const [selectedArn, setSelectedArn] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
   const [busy, setBusy] = useState(false);
   // The state update lands a render later; the ref blocks a second submit right away.
   const busyRef = useRef(false);
@@ -73,7 +82,7 @@ export function MicrosoftFlow(): JSX.Element {
       apply(res);
     } catch (error) {
       if (!sessions.isCurrent(generation)) return;
-      if (await relogin.resolveMismatch(error)) {
+      if (await relogin.resolveMismatch(error, setFailure)) {
         // The server finished this login; a new attempt starts from the first step.
         sessions.cancelMicrosoft();
         setStage("idle");
@@ -81,7 +90,7 @@ export function MicrosoftFlow(): JSX.Element {
         setCallbackUrl("");
         return;
       }
-      toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
+      setFailure({ error });
       onError();
     } finally {
       busyRef.current = false;
@@ -93,12 +102,13 @@ export function MicrosoftFlow(): JSX.Element {
     // The server closed the login when it saved the account; there is nothing to cancel.
     sessions.microsoftSessionId = "";
     sessions.microsoftSelectionId = "";
-    relogin.announce(res);
-    if (res.warning) {
-      const detail = { detail: res.warningDetail };
-      toast.warning(serverCodeMessage(res.warningCode, detail, t) ?? res.warning);
-    }
-    finishAdd([res.account]);
+    // A Kiro profile not found yet (with the upstream reason) can mean the account does not
+    // work, so the dialog stays open on it.
+    const detail = { detail: res.warningDetail };
+    const warning = res.warning
+      ? (serverCodeMessage(res.warningCode, detail, t) ?? res.warning)
+      : undefined;
+    relogin.finish(res, warning);
   };
 
   const start = () =>
@@ -164,6 +174,7 @@ export function MicrosoftFlow(): JSX.Element {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busyRef.current) return;
+    setFailure(null);
     if (stage === "idle") void start();
     else if (stage === "profile") void selectProfile();
     else void complete();
@@ -274,6 +285,7 @@ export function MicrosoftFlow(): JSX.Element {
       tabIndex={-1}
     >
       <FlowSteps steps={steps} />
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton busy={busy} formId={formId} label={submitLabel} />
       </FlowFooter>

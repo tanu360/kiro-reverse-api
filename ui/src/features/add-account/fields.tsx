@@ -1,6 +1,7 @@
 import { ArrowUpRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, type Ref, useEffect, useId, useRef } from "react";
+import { ActionError } from "@/components/shared/action-error";
 import { AwsLogo, GithubLogo, GoogleLogo, MicrosoftLogo } from "@/components/shared/brand-logos";
 import { CopyButton } from "@/components/shared/copy-button";
 import { OpenLinkButton } from "@/components/shared/open-link-button";
@@ -290,6 +291,23 @@ export function RegionField({
       />
     </FormField>
   );
+}
+
+/** A failed request of a flow: the error, and the line itself when the flow words it. */
+export interface FlowFailure {
+  error: unknown;
+  message?: string;
+}
+
+/**
+ * A failed request, as one line at the end of the flow, just above its buttons. The flow's main
+ * button is the retry, so the line has no actions of its own; it goes on the next try. Brought
+ * into view with a margin, clear of the panel's scroll fade.
+ */
+export function FlowError({ failure }: { failure: FlowFailure | null }): JSX.Element | null {
+  return failure ? (
+    <ActionError className="scroll-my-6" error={failure.error} message={failure.message} />
+  ) : null;
 }
 
 /**

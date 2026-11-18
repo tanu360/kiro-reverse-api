@@ -2,17 +2,25 @@ import { type FormEvent, type JSX, useRef, useState } from "react";
 import { AwsLogo } from "@/components/shared/brand-logos";
 import { Code } from "@/components/shared/code";
 import { Textarea } from "@/components/ui/textarea";
+import { announce } from "@/lib/announce";
 import { importSsoToken, reloginSsoToken } from "@/lib/api/auth-flows";
-import { errorMessage, serverMessageText } from "@/lib/api/server-errors";
+import { serverMessageText } from "@/lib/api/server-errors";
 import { fillNodes, useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { FlowGuide, FormField, GuideLink, RegionField, SubmitButton } from "../fields";
+import {
+  FlowError,
+  type FlowFailure,
+  FlowGuide,
+  FormField,
+  GuideLink,
+  RegionField,
+  SubmitButton,
+} from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
 import { reloginRegion } from "../lib/relogin-method";
 import { useReloginFlow } from "../relogin";
-import { showBatchResult } from "../result-toast";
+import { batchResultText } from "../result-text";
 
 /** The AWS access portal, where the SSO cookie is set (a host name, the same in every language). */
 const SSO_START = "view.awsapps.com/start";
@@ -26,6 +34,7 @@ export function SsoTokenFlow(): JSX.Element {
   const [tokens, setTokens] = useState("");
   const [region, setRegion] = useState(() => reloginRegion(relogin.target));
   const [errors, setErrors] = useState<{ tokens?: string; region?: string }>({});
+  const [failure, setFailure] = useState<FlowFailure | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
   const focusAfter = useFocusAfter(pending);
@@ -46,6 +55,7 @@ export function SsoTokenFlow(): JSX.Element {
       region: parsed.ok ? undefined : t("regionInvalid"),
     };
     setErrors(nextErrors);
+    setFailure(null);
     if (nextErrors.tokens || !parsed.ok) {
       focusAfter(nextErrors.tokens ? tokensRef : regionRef);
       return;
@@ -60,11 +70,10 @@ export function SsoTokenFlow(): JSX.Element {
           reloginAccountId: relogin.accountId,
         });
         if (!sessions.isCurrent(generation)) return;
-        relogin.announce(res);
-        finishAdd([res.account]);
+        relogin.finish(res);
       } catch (error) {
-        if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error))) {
-          toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
+        if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error, setFailure))) {
+          setFailure({ error });
           focusAfter(tokensRef);
         }
       } finally {
@@ -77,11 +86,19 @@ export function SsoTokenFlow(): JSX.Element {
       if (!sessions.isCurrent(generation)) return;
       // Each token's error is the AWS sign-in code's Chinese message, sent without a code.
       const failures = res.errors.map((message) => serverMessageText(message, t));
-      showBatchResult(t, res.accounts, failures);
-      finishAdd(res.accounts);
+      const text = batchResultText(t, res.accounts, failures);
+      if (failures.length === 0) {
+        announce(text);
+        finishAdd(res.accounts);
+        return;
+      }
+      // The tokens that went in are listed at once; the dialog stays open on the ones that failed.
+      if (res.accounts.length > 0) finishAdd(res.accounts, { keepOpen: true });
+      setFailure({ error: failures, message: text });
+      focusAfter(tokensRef);
     } catch (error) {
       if (sessions.isCurrent(generation)) {
-        toast.error(t("failed", { error: errorMessage(error, t) }));
+        setFailure({ error });
         focusAfter(tokensRef);
       }
     } finally {
@@ -122,6 +139,7 @@ export function SsoTokenFlow(): JSX.Element {
         onChange={setRegion}
         value={region}
       />
+      <FlowError failure={failure} />
       <FlowFooter>
         <SubmitButton
           busy={pending}
