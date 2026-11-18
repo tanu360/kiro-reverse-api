@@ -17,14 +17,11 @@ import { parseChangelog, stripV } from "./update-dialog";
 import { UserMenu } from "./user-menu";
 
 /**
- * The card's eyebrow: "New version", or where the self-update stands, with its dot's tone.
- * `spoken` is what screen readers hear when it changes: the phase without the percent, which
- * moves several times a second (the status button's label carries it).
+ * The card's eyebrow: "New version", or where the self-update stands, with its dot's tone. Not a
+ * live region: the self-update reads its steps out itself (useSelfUpdateController), also while
+ * the card is out of sight.
  */
-function eyebrow(
-  update: SelfUpdate | null,
-  t: TFunction,
-): { text: string; dot: string; spoken?: string } {
+function eyebrow(update: SelfUpdate | null, t: TFunction): { text: string; dot: string } {
   switch (update?.phase) {
     case "starting":
     case "downloading":
@@ -34,7 +31,6 @@ function eyebrow(
             ? t("shell.update.downloading")
             : t("shell.update.statusDownloading", { percent: update.status.progress }),
         dot: "bg-primary",
-        spoken: t("shell.update.downloading"),
       };
     case "ready":
       return { text: t("shell.update.readyTitle"), dot: "bg-success" };
@@ -78,12 +74,7 @@ function UpdateNotice(): JSX.Element | null {
       >
         <p className="flex items-center gap-1.5 font-medium text-meta text-muted-foreground tabular-nums">
           <span aria-hidden="true" className={cn("size-1.5 rounded-full", status.dot)} />
-          {/* One live region for every phase; while downloading it holds only the phase, and the
-              text with the percent is shown beside it, hidden from screen readers. */}
-          {status.spoken ? <span aria-hidden="true">{status.text}</span> : null}
-          <span aria-live="polite">
-            {status.spoken ? <span className="sr-only">{status.spoken}</span> : status.text}
-          </span>
+          {status.text}
         </p>
         <div className="flex flex-col gap-1">
           <p className="font-medium text-foreground text-sm">

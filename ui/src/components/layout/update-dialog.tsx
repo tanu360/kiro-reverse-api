@@ -483,7 +483,7 @@ function SelfUpdateCard({
       break;
     case "restarting":
       body = (
-        <div aria-live="polite" className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           <p className="inline-flex items-center gap-1.5 font-medium text-foreground text-sm">
             <Spinner aria-hidden="true" className="size-3.5" />
             {t("shell.update.restarting")}
@@ -497,8 +497,9 @@ function SelfUpdateCard({
     case "error":
       body = (
         <div className="flex flex-col gap-3">
-          {/* One plain line: the reason (the card says it failed); the title only without one. */}
-          <Alert variant="error">
+          {/* One plain line: the reason (the card says it failed); the title only without one.
+              No alert role: the self-update reads the failure out once, wherever it shows. */}
+          <Alert role="note" variant="error">
             <HugeiconsIcon aria-hidden="true" icon={AlertCircleIcon} />
             <AlertDescription className="wrap-break-word">
               {update.error ?? t("shell.update.failedTitle")}
