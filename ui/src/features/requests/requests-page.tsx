@@ -220,9 +220,12 @@ export function RequestsPage(): JSX.Element {
       .querySelector<HTMLElement>('[data-slot="page-header-actions"] [data-slot="refresh-button"]')
       ?.focus();
   };
+  // A new element for each failure: an alert that stays up through Try again would not be read
+  // out again when the retry fails too.
   const refetchError = refetchFailed ? (
     <ActionError
       error={error}
+      key={errorUpdatedAt}
       onDismiss={() => {
         setClosedAt(errorUpdatedAt);
         focusAfterError();
