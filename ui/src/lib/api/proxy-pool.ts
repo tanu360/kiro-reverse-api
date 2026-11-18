@@ -7,7 +7,7 @@ import type { SuccessResponse } from "./types";
  * `unknown` until the first check or connection. `failed` only once a proxy failed `maxFailures`
  * times in a row: it is then out of rotation until a check passes.
  */
-export type PoolProxyStatus = "unknown" | "ok" | "failed";
+type PoolProxyStatus = "unknown" | "ok" | "failed";
 
 /**
  * What a proxy shows as: `unhealthy` is failing but still in rotation, `auto_disabled` failed
