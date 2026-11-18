@@ -156,20 +156,18 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
           </Hint>
         }
         disabled={save.isPending || logout.isPending}
+        // A failed Retry of a failed link shows by its button instead.
+        notice={status.state === "error" ? null : switchFailure}
         onCheckedChange={(next) => void toggle(next)}
         title={t("publicLink.switch")}
-      >
-        {/* A failed Retry of a failed link shows by its button instead. */}
-        {status.state === "error" ? null : switchFailure}
-      </SwitchField>
+      />
       {status.state === "off" ? null : (
         <StatusRow
+          notice={status.state === "error" ? switchFailure : null}
           onRetry={() => save.mutate({ enabled: true })}
           retrying={save.isPending}
           status={status}
-        >
-          {status.state === "error" ? switchFailure : null}
-        </StatusRow>
+        />
       )}
       {status.enabled ? <Warnings status={status} /> : null}
       <DeviceNameRow
@@ -206,18 +204,19 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
           }
           controlWidth="actions"
           description={t("publicLink.accountHint")}
+          notice={
+            // Try again signs out at once: the sign-out was already confirmed.
+            logout.isError ? (
+              <RowActionError
+                error={logout.error}
+                focusTarget={signOutRef}
+                onDismiss={logout.reset}
+                onRetry={() => logout.mutate()}
+              />
+            ) : null
+          }
           title={t("publicLink.account")}
-        >
-          {/* Try again signs out at once: the sign-out was already confirmed. */}
-          {logout.isError ? (
-            <RowActionError
-              error={logout.error}
-              focusTarget={signOutRef}
-              onDismiss={logout.reset}
-              onRetry={() => logout.mutate()}
-            />
-          ) : null}
-        </SettingsRow>
+        />
       ) : null}
     </SettingsGroup>
   );
@@ -238,13 +237,13 @@ function StatusRow({
   status,
   onRetry,
   retrying,
-  children,
+  notice,
 }: {
   status: TunnelStatus;
   onRetry: () => void;
   retrying: boolean;
   /** Under a failed link's reason: a failed Retry. */
-  children?: ReactNode;
+  notice?: ReactNode;
 }): JSX.Element {
   const { t } = useT("settings");
   const linkLabel = useId();
@@ -301,10 +300,9 @@ function StatusRow({
             {tunnelErrorText(status, t) ?? t("publicLink.failed")}
           </span>
         }
+        notice={notice}
         title={t("publicLink.status")}
-      >
-        {children}
-      </SettingsRow>
+      />
     );
   }
   return <SetupRow status={status} />;
@@ -651,7 +649,11 @@ function DeviceNameRow({
             disabled={status.viaLink}
             id={inputId}
             maxLength={TUNNEL_HOSTNAME_MAX}
-            onBlur={commit}
+            onBlur={(event) => {
+              // Tab from the field into its failure's Try again or close is no new save.
+              if (event.relatedTarget?.closest('[data-slot="action-error"]')) return;
+              commit();
+            }}
             onChange={(event) => {
               setDraft(deviceNameChars(event.target.value));
               setInvalid(false);
@@ -672,11 +674,12 @@ function DeviceNameRow({
         status.viaLink ? t("publicLink.deviceNameLocked") : t("publicLink.deviceNameHint", { link })
       }
       htmlFor={inputId}
+      notice={
+        failure === null ? null : (
+          <RowActionError error={failure} onDismiss={() => setFailure(null)} onRetry={commit} />
+        )
+      }
       title={t("publicLink.deviceName")}
-    >
-      {failure === null ? null : (
-        <RowActionError error={failure} onDismiss={() => setFailure(null)} onRetry={commit} />
-      )}
-    </SettingsRow>
+    />
   );
 }

@@ -127,10 +127,10 @@ function focusRowControl(row: HTMLElement | null | undefined): void {
 }
 
 /**
- * A failed action of one row (a switch or a select that saves as it is set, a test, a reset),
- * under the row's text: the reason with Try again and close. Either one puts focus back on the
- * row's control (`focusTarget`, else the row's switch, select, chosen segment or first button)
- * before the notice goes, so it never drops to the page.
+ * A failed action of one row (a switch or a select that saves as it is set, a test, a reset), as
+ * the row's `notice`, across the whole row: the reason with Try again and close. Either one puts
+ * focus back on the row's control (`focusTarget`, else the row's switch, select, chosen segment
+ * or first button) before the notice goes, so it never drops to the page.
  */
 export function RowActionError({
   error,
@@ -150,7 +150,7 @@ export function RowActionError({
     else focusRowControl(row());
   };
   return (
-    <div className="mt-1 min-w-0" ref={ref}>
+    <div className="min-w-0" ref={ref}>
       <ActionError
         error={error}
         onDismiss={() => {

@@ -111,13 +111,15 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string; "ari
  * One settings row: the title (with an optional `status` after it) and its description on the
  * left, the control at the end. The title and description ids are put on the control as
  * aria-labelledby and aria-describedby, so a control without a visible label of its own is
- * named and described by the row. `children` go under the description (a current value, an
- * error). `controlWidth` sizes the control slot: a text field or select (`field`), a number
- * field or a select of short options (`number`), a group of buttons at their own width
- * (`actions`), a value to copy at its own width (`value`), or the control's own width (`auto`: a switch or a button, beside the text and
- * centred on it at every width, while `children` such as a warning notice take the row's full
- * width under the description). A Button control keeps its own name (its label, "Add rule"): the row title
- * is not put on it, only the description. `labelControl` overrides that either way.
+ * named and described by the row. `children` go under the description (a current value, a
+ * field's error). `notice` (a failed action with Try again) goes last, across the whole row under
+ * the text and the control. `controlWidth` sizes the control slot: a text field or select
+ * (`field`), a number field or a select of short options (`number`), a group of buttons at their
+ * own width (`actions`), a value to copy at its own width (`value`), or the control's own width
+ * (`auto`: a switch or a button, beside the text and centred on it at every width, while
+ * `children` such as a warning notice take the row's full width under the description). A Button
+ * control keeps its own name (its label, "Add rule"): the row title is not put on it, only the
+ * description. `labelControl` overrides that either way.
  */
 export function SettingsRow({
   title,
@@ -130,6 +132,7 @@ export function SettingsRow({
   labelControl,
   compact = false,
   children,
+  notice,
   className,
 }: {
   title: ReactNode;
@@ -152,6 +155,8 @@ export function SettingsRow({
    */
   compact?: boolean;
   children?: ReactNode;
+  /** A failed action of the row: last, at the row's full width (both columns). */
+  notice?: ReactNode;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
@@ -212,6 +217,9 @@ export function SettingsRow({
           {children ? (
             <div className="col-span-full flex min-w-0 flex-col gap-1 pt-1">{children}</div>
           ) : null}
+          {notice ? (
+            <div className="col-span-full flex min-w-0 flex-col gap-2 pt-2">{notice}</div>
+          ) : null}
         </div>
       </HeadingIdContext.Provider>
     );
@@ -239,6 +247,10 @@ export function SettingsRow({
           {children}
         </div>
         {slot}
+        {/* A line of its own under the text and the control: the row's gap less 4 px, 8 px. */}
+        {notice ? (
+          <div className="-mt-1 flex min-w-0 basis-full flex-col gap-2">{notice}</div>
+        ) : null}
       </div>
     </HeadingIdContext.Provider>
   );
@@ -276,6 +288,7 @@ export function SwitchField({
   disabled,
   switchRef,
   children,
+  notice,
   className,
 }: {
   checked: boolean;
@@ -286,6 +299,8 @@ export function SwitchField({
   disabled?: boolean;
   switchRef?: Ref<HTMLElement>;
   children?: ReactNode;
+  /** A failed action of the row: last, at the row's full width (SettingsRow `notice`). */
+  notice?: ReactNode;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
@@ -305,6 +320,7 @@ export function SwitchField({
       controlWidth="auto"
       description={description}
       htmlFor={switchId}
+      notice={notice}
       status={status}
       title={title}
     >

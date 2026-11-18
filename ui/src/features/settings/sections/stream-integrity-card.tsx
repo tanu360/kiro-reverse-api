@@ -34,6 +34,15 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
       <SwitchField
         checked={lenientStreamIntegrity.checked}
         description={t("lenientStreamIntegrityHint")}
+        notice={
+          lenientStreamIntegrity.failure ? (
+            <RowActionError
+              error={lenientStreamIntegrity.failure.error}
+              onDismiss={lenientStreamIntegrity.failure.dismiss}
+              onRetry={lenientStreamIntegrity.failure.retry}
+            />
+          ) : null
+        }
         onCheckedChange={lenientStreamIntegrity.onCheckedChange}
         title={t("lenientStreamIntegrity")}
       >
@@ -42,13 +51,6 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
           <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
           <AlertDescription>{t("lenientStreamIntegrityRisk")}</AlertDescription>
         </Alert>
-        {lenientStreamIntegrity.failure ? (
-          <RowActionError
-            error={lenientStreamIntegrity.failure.error}
-            onDismiss={lenientStreamIntegrity.failure.dismiss}
-            onRetry={lenientStreamIntegrity.failure.retry}
-          />
-        ) : null}
       </SwitchField>
     </SettingsSection>
   );

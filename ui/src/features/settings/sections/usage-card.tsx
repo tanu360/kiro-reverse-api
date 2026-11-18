@@ -29,17 +29,18 @@ function UsageForm({ settings }: { settings: Settings }): JSX.Element {
       <SwitchField
         checked={allowOverUsage.checked}
         description={t("allowOverUsageHint")}
+        notice={
+          allowOverUsage.failure ? (
+            <RowActionError
+              error={allowOverUsage.failure.error}
+              onDismiss={allowOverUsage.failure.dismiss}
+              onRetry={allowOverUsage.failure.retry}
+            />
+          ) : null
+        }
         onCheckedChange={allowOverUsage.onCheckedChange}
         title={t("allowOverUsage")}
-      >
-        {allowOverUsage.failure ? (
-          <RowActionError
-            error={allowOverUsage.failure.error}
-            onDismiss={allowOverUsage.failure.dismiss}
-            onRetry={allowOverUsage.failure.retry}
-          />
-        ) : null}
-      </SwitchField>
+      />
       {/* Missing (an older server) means the default, 30 minutes. */}
       <UsageRefreshRow saved={settings.usageRefreshIntervalMinutes ?? 30} />
     </SettingsSection>

@@ -38,17 +38,18 @@ function RoutingForm({ settings }: { settings: Settings }): JSX.Element {
       <SwitchField
         checked={sessionAffinity.checked}
         description={<Hint more={t("sessionAffinityMore")}>{t("sessionAffinityHint")}</Hint>}
+        notice={
+          sessionAffinity.failure ? (
+            <RowActionError
+              error={sessionAffinity.failure.error}
+              onDismiss={sessionAffinity.failure.dismiss}
+              onRetry={sessionAffinity.failure.retry}
+            />
+          ) : null
+        }
         onCheckedChange={sessionAffinity.onCheckedChange}
         title={t("sessionAffinity")}
-      >
-        {sessionAffinity.failure ? (
-          <RowActionError
-            error={sessionAffinity.failure.error}
-            onDismiss={sessionAffinity.failure.dismiss}
-            onRetry={sessionAffinity.failure.retry}
-          />
-        ) : null}
-      </SwitchField>
+      />
       <RpmLimitRows form={rpmLimit} />
     </SettingsSection>
   );

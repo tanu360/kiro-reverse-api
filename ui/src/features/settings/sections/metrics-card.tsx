@@ -105,11 +105,12 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
         checked={enabled}
         description={<Hint more={t("metrics.more")}>{t("metrics.switchHint")}</Hint>}
         disabled={save.isPending}
+        notice={
+          failed?.enabled !== undefined ? failure(() => setEnabled(failed.enabled === true)) : null
+        }
         onCheckedChange={setEnabled}
         title={t("metrics.switch")}
-      >
-        {failed?.enabled !== undefined ? failure(() => setEnabled(failed.enabled === true)) : null}
-      </SwitchField>
+      />
       {settings.enabled && settings.token ? (
         <>
           <SettingsRow
@@ -149,13 +150,14 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
               />
             }
             description={t("metrics.tokenHint")}
+            notice={
+              // Try again makes the token at once: the new token was already confirmed.
+              failed?.regenerate
+                ? failure(() => save.mutate({ regenerate: true }), regenerateRef)
+                : null
+            }
             title={<span id={tokenLabel}>{t("metrics.token")}</span>}
-          >
-            {/* Try again makes the token at once: the new token was already confirmed. */}
-            {failed?.regenerate
-              ? failure(() => save.mutate({ regenerate: true }), regenerateRef)
-              : null}
-          </SettingsRow>
+          />
           <div className="p-4">
             {/* The token masked on screen, as above; Copy copies the job with the whole token. */}
             <CodeBlock

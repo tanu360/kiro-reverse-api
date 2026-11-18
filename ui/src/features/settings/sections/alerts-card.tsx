@@ -748,6 +748,16 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
         description={
           enabledCount === 0 ? t("dailySummaryTestNoChannel") : t("dailySummaryTestHint")
         }
+        notice={
+          summaryTest.isError ? (
+            <RowActionError
+              error={summaryTest.error}
+              focusTarget={testAllRef}
+              onDismiss={summaryTest.reset}
+              onRetry={() => summaryTest.mutate()}
+            />
+          ) : null
+        }
         title={t("dailySummaryTestTitle")}
       >
         {summaryResult ? (
@@ -761,14 +771,6 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
               ? t("dailySummaryTestOk", { count: summaryResult.count })
               : t("dailySummaryTestFailed", summaryResult)}
           </p>
-        ) : null}
-        {summaryTest.isError ? (
-          <RowActionError
-            error={summaryTest.error}
-            focusTarget={testAllRef}
-            onDismiss={summaryTest.reset}
-            onRetry={() => summaryTest.mutate()}
-          />
         ) : null}
       </SettingsRow>
 
@@ -845,7 +847,7 @@ function ChannelRow({
   channel: AlertChannel;
   testing: boolean;
   removing: boolean;
-  /** A test or removal that failed, under the last result until retried or closed. */
+  /** A test or removal that failed, under the row until retried or closed. */
   failure: {
     action: "test" | "remove";
     error: unknown;
@@ -915,6 +917,17 @@ function ChannelRow({
           </span>
         ) : undefined
       }
+      notice={
+        // Try again removes at once: the removal was already confirmed.
+        failure ? (
+          <RowActionError
+            error={failure.error}
+            focusTarget={focusTarget}
+            onDismiss={failure.dismiss}
+            onRetry={failure.retry}
+          />
+        ) : null
+      }
       status={
         <>
           <Badge size="sm" tone="neutral">
@@ -930,15 +943,6 @@ function ChannelRow({
       title={<span className="wrap-anywhere">{name}</span>}
     >
       <LastResult result={channel.lastResult} />
-      {/* Try again removes at once: the removal was already confirmed. */}
-      {failure ? (
-        <RowActionError
-          error={failure.error}
-          focusTarget={focusTarget}
-          onDismiss={failure.dismiss}
-          onRetry={failure.retry}
-        />
-      ) : null}
     </SettingsRow>
   );
 }

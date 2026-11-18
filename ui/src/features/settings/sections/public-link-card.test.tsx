@@ -218,6 +218,37 @@ describe("PublicLinkCard", () => {
     expect(field).toHaveFocus();
   });
 
+  it("shows a failed name save under its row; Tab reaches Try again without saving again", async () => {
+    let posts = 0;
+    let fail = true;
+    mockServer.use(
+      http.post(apiUrl("/tunnel"), () => {
+        posts += 1;
+        return fail ? HttpResponse.json({ error: "helper busy" }, { status: 500 }) : undefined;
+      }),
+    );
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    const field = await screen.findByRole("textbox", { name: "Device name" });
+    await user.clear(field);
+    await user.type(field, "kiro-home{Enter}");
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveTextContent(/^helper busy$/);
+    expect(posts).toBe(1);
+
+    // The notice comes after the field: leaving the field for it is no new save.
+    await user.tab();
+    const retry = within(notice).getByRole("button", { name: "Try again" });
+    expect(retry).toHaveFocus();
+    expect(posts).toBe(1);
+
+    fail = false;
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-home"));
+    expect(posts).toBe(2);
+    expect(field).toHaveFocus();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("signs out of Tailscale after a confirm", async () => {
     mockDb.twoFactor.enabled = true;
     mockDb.tunnel.signedIn = true;

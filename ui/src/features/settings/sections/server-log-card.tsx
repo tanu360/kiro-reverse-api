@@ -77,6 +77,15 @@ function ServerLogForm({ settings }: { settings: Settings }): JSX.Element {
       <SettingsRow
         control={<LevelSelect onChange={level.onChange} value={level.value} />}
         description={<Hint more={t("serverLog.more")}>{t("serverLog.hint")}</Hint>}
+        notice={
+          level.failure ? (
+            <RowActionError
+              error={level.failure.error}
+              onDismiss={level.failure.dismiss}
+              onRetry={level.failure.retry}
+            />
+          ) : null
+        }
         title={t("serverLog.level")}
       >
         {/* Notices under the description, each as wide as its text. */}
@@ -85,13 +94,6 @@ function ServerLogForm({ settings }: { settings: Settings }): JSX.Element {
             <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
             <AlertDescription>{t("serverLog.debugWarning")}</AlertDescription>
           </Alert>
-        ) : null}
-        {level.failure ? (
-          <RowActionError
-            error={level.failure.error}
-            onDismiss={level.failure.dismiss}
-            onRetry={level.failure.retry}
-          />
         ) : null}
         {settings.logLevelFromEnv ? (
           <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="info">

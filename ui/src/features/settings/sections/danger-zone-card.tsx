@@ -67,18 +67,19 @@ export function DangerZoneCard(): JSX.Element {
         }
         controlWidth="actions"
         description={t("resetStatsHint")}
+        notice={
+          // Try again resets at once: the reset was already confirmed.
+          reset.isError ? (
+            <RowActionError
+              error={reset.error}
+              focusTarget={resetRef}
+              onDismiss={reset.reset}
+              onRetry={() => reset.mutate()}
+            />
+          ) : null
+        }
         title={t("statistics")}
-      >
-        {/* Try again resets at once: the reset was already confirmed. */}
-        {reset.isError ? (
-          <RowActionError
-            error={reset.error}
-            focusTarget={resetRef}
-            onDismiss={reset.reset}
-            onRetry={() => reset.mutate()}
-          />
-        ) : null}
-      </SettingsRow>
+      />
     </SettingsGroup>
   );
 }

@@ -266,7 +266,20 @@ function HealStatusRow({
   }
 
   return (
-    <SettingsRow description={description} title={t("selfHeal.status")}>
+    <SettingsRow
+      description={description}
+      notice={
+        state.halted && resume.isError ? (
+          <RowActionError
+            error={resume.error}
+            focusTarget={resumeRef}
+            onDismiss={resume.reset}
+            onRetry={() => resume.mutate()}
+          />
+        ) : null
+      }
+      title={t("selfHeal.status")}
+    >
       {state.halted ? (
         <Alert role="status" variant="warning">
           <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
@@ -284,14 +297,6 @@ function HealStatusRow({
             </Button>
           </AlertAction>
         </Alert>
-      ) : null}
-      {state.halted && resume.isError ? (
-        <RowActionError
-          error={resume.error}
-          focusTarget={resumeRef}
-          onDismiss={resume.reset}
-          onRetry={() => resume.mutate()}
-        />
       ) : null}
     </SettingsRow>
   );

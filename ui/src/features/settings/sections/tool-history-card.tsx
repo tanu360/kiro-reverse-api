@@ -33,17 +33,18 @@ function ToolHistoryForm({ settings }: { settings: Settings }): JSX.Element {
         description={
           <Hint more={t("structuredToolHistoryMore")}>{t("structuredToolHistoryHint")}</Hint>
         }
+        notice={
+          structuredToolHistory.failure ? (
+            <RowActionError
+              error={structuredToolHistory.failure.error}
+              onDismiss={structuredToolHistory.failure.dismiss}
+              onRetry={structuredToolHistory.failure.retry}
+            />
+          ) : null
+        }
         onCheckedChange={structuredToolHistory.onCheckedChange}
         title={t("structuredToolHistory")}
-      >
-        {structuredToolHistory.failure ? (
-          <RowActionError
-            error={structuredToolHistory.failure.error}
-            onDismiss={structuredToolHistory.failure.dismiss}
-            onRetry={structuredToolHistory.failure.retry}
-          />
-        ) : null}
-      </SwitchField>
+      />
     </SettingsSection>
   );
 }
