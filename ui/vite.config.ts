@@ -126,7 +126,7 @@ export default defineConfig(async ({ mode }) => {
     optimizeDeps: {
       // Route chunks load lazily, so the dependency scan from index.html misses what only a page
       // imports (dnd-kit in Settings, for example). Vite would find those on first visit and
-      // reload the page, which drops toasts and breaks e2e runs on a cold cache.
+      // reload the page, which drops what it showed and breaks e2e runs on a cold cache.
       entries: ["index.html", "src/{features,components,routes}/**/*.tsx", "!src/**/*.test.tsx"],
     },
     build: {

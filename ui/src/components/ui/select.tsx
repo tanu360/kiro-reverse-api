@@ -127,7 +127,7 @@ export function SelectPopup({
         alignItemWithTrigger={alignItemWithTrigger}
         alignOffset={alignOffset}
         anchor={anchor}
-        // z-70: above the toast layer (toast.tsx, z-60), so a toast never covers an open list.
+        // z-70: above the modal layer (z-50), so a list opened in a dialog or sheet shows over it.
         className="z-70 select-none"
         collisionPadding={collisionPadding}
         data-slot="select-positioner"

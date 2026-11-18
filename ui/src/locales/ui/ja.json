@@ -10,7 +10,6 @@
   "sparkline.summaryDown_other": "{count} 個のデータ点、{first} から {last}、{change}% 下降",
   "pie.total": "合計",
   "spinner.loading": "読み込み中…",
-  "toast.region": "通知",
   "sidebar.toggle": "サイドバーを切り替え",
   "sidebar.title": "サイドバー",
   "sidebar.description": "モバイル用のサイドバーを表示します。",

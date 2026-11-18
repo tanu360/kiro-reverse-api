@@ -13,9 +13,8 @@ import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from "rea
 const TYPING_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 const KEY_WIDGETS =
   '[role="tablist"], [role="radiogroup"], [role="toolbar"], [role="slider"], [role="menu"], [role="menubar"], [role="listbox"], [role="grid"], [role="tree"], [role="combobox"], [role="spinbutton"]';
-/** Overlays that take the keyboard while open (toasts are dialogs too, but never do). */
-const OPEN_OVERLAY =
-  '[role="dialog"]:not([data-slot="toast"]), [role="alertdialog"], [role="menu"], [role="listbox"]';
+/** Overlays that take the keyboard while open. */
+const OPEN_OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
 function ownsKeys(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;

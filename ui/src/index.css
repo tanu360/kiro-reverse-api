@@ -129,47 +129,6 @@
    */
   --skeleton: color-mix(in srgb, var(--muted-foreground) 15%, transparent);
   --skeleton-highlight: color-mix(in srgb, var(--background) 64%, transparent);
-  /*
-   * Toasts sit this far above their usual bottom inset (components/ui/toast.tsx), so they clear
-   * the batch toolbar while one is open; taller on phones, where the bar wraps to two lines.
-   */
-  --toast-stack-offset: 0px;
-  /*
-   * The sticky chrome a top toast (phones) hangs under: none on the sign-in pages, the 48 px
-   * header in the app (below), so a toast never covers the nav toggle, search or header icons.
-   */
-  --toast-top-offset: 0px;
-}
-
-:root:has([data-slot="site-header"]) {
-  --toast-top-offset: 3rem;
-}
-
-:root:has([data-slot="batch-bar"]) {
-  --toast-stack-offset: 5rem;
-}
-
-@media (max-width: 639px) {
-  :root:has([data-slot="batch-bar"]) {
-    --toast-stack-offset: 7rem;
-  }
-}
-
-/*
- * Toasts drop under the modal layer while a dialog, alert dialog, sheet, drawer, the command
- * palette or the phone sidebar is open (components/ui/toast.tsx). Set here on the root, like the
- * offsets above: a `body:has(…) .toast` selector made the browser restyle the whole page (every
- * element) whenever any element was added or removed, about 200 ms a time on Requests.
- */
-:root:has(
-  [data-slot="dialog-popup"],
-  [data-slot="alert-dialog-popup"],
-  [data-slot="sheet-popup"],
-  [data-slot="drawer-popup"],
-  [data-slot="command-dialog-popup"],
-  [data-slot="sidebar"][data-mobile="true"]
-) {
-  --toast-layer: 40;
 }
 
 .dark {
@@ -396,7 +355,7 @@
 }
 
 /*
- * Every floating layer (select, menu, combobox, autocomplete, popover, tooltip, toast) is one
+ * Every floating layer (select, menu, combobox, autocomplete, popover, tooltip) is one
  * popup: the sign-in language picker's solid raised sheet, not glass. The card's sheet with the
  * card's hairline, lifted by the one floating shadow. Rows inside use the accent tone for their
  * highlight (components/ui/popup-row.tsx). --popup is an alias of --popover, kept because the
@@ -991,7 +950,7 @@
  *   primary #7a0ecd 6.1:1.
  * The tints are see-through, so a pill keeps its look on cards, the page and tinted rows. These
  * are the source of the status ramps (--success-foreground, --error-surface… at the top), so a
- * pill, a notice, a toast and a delta of one tone share one colour.
+ * pill, a notice and a delta of one tone share one colour.
  * Dark theme: the tint is the hue at low alpha over near-black, the disc and label lighter
  * steps of it, and the glyph is knocked out to black (white on a light disc was under 2:1).
  * Labels there: neutral 8.9:1, warning 7.4:1, success 7.1:1, error 5.9:1, primary 6.2:1.
@@ -1165,78 +1124,6 @@
 
   /* Sign-in showcase: the paper plane rocks about its tip, so it stays on its trail. */
   --animate-plane-float: plane-float 5s ease-in-out infinite alternate;
-
-  /* coss ui toast: a toast shown again with the same id pulses (success) or shakes (error). */
-  --animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-
-  @keyframes toast-success-odd {
-    0% {
-      scale: 1;
-    }
-    30% {
-      scale: 1.025;
-    }
-    60% {
-      scale: 0.99;
-    }
-    100% {
-      scale: 1;
-    }
-  }
-
-  @keyframes toast-success-even {
-    0% {
-      scale: 1;
-    }
-    30% {
-      scale: 1.025;
-    }
-    60% {
-      scale: 0.99;
-    }
-    100% {
-      scale: 1;
-    }
-  }
-
-  @keyframes toast-error-odd {
-    0% {
-      translate: 0 0;
-    }
-    25% {
-      translate: -3px 0;
-    }
-    50% {
-      translate: 3px 0;
-    }
-    75% {
-      translate: -3px 0;
-    }
-    100% {
-      translate: 0 0;
-    }
-  }
-
-  @keyframes toast-error-even {
-    0% {
-      translate: 0 0;
-    }
-    25% {
-      translate: -3px 0;
-    }
-    50% {
-      translate: 3px 0;
-    }
-    75% {
-      translate: -3px 0;
-    }
-    100% {
-      translate: 0 0;
-    }
-  }
 
   @keyframes plane-float {
     from {

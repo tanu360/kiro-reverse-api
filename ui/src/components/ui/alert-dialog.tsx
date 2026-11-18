@@ -4,7 +4,6 @@ import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog
 import type React from "react";
 import { DIALOG_POPUP_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
-import { ModalNoticeHost, ModalNoticeOutlet } from "@/components/ui/modal-notice";
 import { useOpenAfterMount } from "@/hooks/use-open-after-mount";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +48,6 @@ function AlertDialogViewport({
 
 export function AlertDialogPopup({
   className,
-  children,
   portalProps,
   onKeyDown,
   ...props
@@ -69,9 +67,7 @@ export function AlertDialogPopup({
             wrapTabFocus(event);
           }}
           {...props}
-        >
-          <ModalNoticeHost>{children}</ModalNoticeHost>
-        </AlertDialogPrimitive.Popup>
+        />
       </AlertDialogViewport>
     </AlertDialogPortal>
   );
@@ -102,21 +98,17 @@ export function AlertDialogFooter({
   variant?: "default" | "bare";
 }): React.ReactElement {
   return (
-    <>
-      {/* An error or warning raised while the dialog is open (modal-notice.tsx). */}
-      <ModalNoticeOutlet />
-      <div
-        className={cn(
-          // Phones: Cancel and the action share one row of two (dialog.tsx DialogFooter).
-          "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
-          variant === "default" && "border-t border-border-subtle bg-surface-inset py-4",
-          variant === "bare" && "pb-4",
-          className,
-        )}
-        data-slot="alert-dialog-footer"
-        {...props}
-      />
-    </>
+    <div
+      className={cn(
+        // Phones: Cancel and the action share one row of two (dialog.tsx DialogFooter).
+        "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
+        variant === "default" && "border-t border-border-subtle bg-surface-inset py-4",
+        variant === "bare" && "pb-4",
+        className,
+      )}
+      data-slot="alert-dialog-footer"
+      {...props}
+    />
   );
 }
 

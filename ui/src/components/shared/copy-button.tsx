@@ -6,17 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { announce } from "@/lib/announce";
 import { copyText } from "@/lib/clipboard";
-import { copiedToastWanted } from "@/lib/copy-toast";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const COPIED_MS = 2000;
 
 /**
- * Copies a value and says so on the button itself, with no toast: a tick in place of the copy
- * icon and "Copied" as its tooltip for two seconds; a failed copy shows the alert icon and the
- * reason the same way. A screen reader hears it too, except on a phone, where the OS says it
- * (Android shows its own "Copied").
+ * Whether a successful copy is also read out to a screen reader. Android 13 and later shows its
+ * own "Copied" overlay for every copy, so it would be said twice: never there. On another phone
+ * the button's own tick and "Copied" label are enough as well. A failed copy is always read out.
+ */
+function copyReadOut(): boolean {
+  // The OS's own clipboard overlay is a platform trait no media query reports.
+  if (typeof navigator !== "undefined" && /\bAndroid\b/i.test(navigator.userAgent)) return false;
+  if (typeof window === "undefined" || !window.matchMedia) return true;
+  return !window.matchMedia("(max-width: 39.99rem) and (pointer: coarse)").matches;
+}
+
+/**
+ * Copies a value and says so on the button itself: a tick in place of the copy icon and "Copied"
+ * as its tooltip for two seconds; a failed copy shows the alert icon and the reason the same way.
+ * A screen reader hears it too, except on a phone, where the OS says it (Android shows its own
+ * "Copied").
  * Icon-only by default, with `label` as its accessible name and tooltip; the touch sizes come
  * from the Button's icon sizes. `showLabel` makes it a small outline button with the label.
  */
@@ -60,9 +71,7 @@ export function CopyButton({
     // A lazy value is passed on as a promise so Safari keeps the user activation for the write.
     const ok = await copyText(typeof value === "function" ? value() : value);
     if (!ok) announce(t("toast.copyFailed"), { assertive: true });
-    else if (copiedToastWanted({ marksItself: true })) {
-      announce(copiedMessage ?? t("toast.copiedToClipboard"));
-    }
+    else if (copyReadOut()) announce(copiedMessage ?? t("toast.copiedToClipboard"));
     setResult(ok ? "copied" : "failed");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {

@@ -6,7 +6,6 @@ import { RouterProvider } from "@tanstack/react-router";
 import { MotionConfig } from "motion/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { AppToaster } from "@/components/layout/app-toasts";
 import { LiveAnnouncer } from "@/components/layout/live-announcer";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
@@ -41,7 +40,6 @@ async function bootstrap(): Promise<void> {
                       <RouterProvider router={router} />
                     </ConfirmProvider>
                   </TooltipProvider>
-                  <AppToaster />
                   <LiveAnnouncer />
                 </QueryClientProvider>
               </PrivacyProvider>

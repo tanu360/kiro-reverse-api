@@ -179,8 +179,8 @@ describe("Builder ID", () => {
   });
 
   afterEach(() => {
-    // Fire the frames still queued on the fake clock first: Motion (the toast island) waits
-    // for one, and would stall every later animation in this file without it.
+    // Fire the frames still queued on the fake clock first: Motion waits for one, and would
+    // stall every later animation in this file without it.
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });

@@ -1,4 +1,5 @@
 import { type JSX, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { subscribeAnnouncements } from "@/lib/announce";
 
 /** Long enough to be read out; then the region empties, so a stale line is not found later. */
@@ -9,7 +10,8 @@ const FILL_MS = 50;
 /**
  * The app's hidden live regions for `announce()`: one polite, one assertive. They stay mounted
  * and empty, as a live region must exist before its text changes to be read. No status or alert
- * role, so they never count among the page's own.
+ * role, so they never count among the page's own. A portal puts them at the end of document.body,
+ * out of the app's own markup (and out of a test's render container).
  */
 export function LiveAnnouncer(): JSX.Element {
   const [polite, setPolite] = useState("");
@@ -38,7 +40,7 @@ export function LiveAnnouncer(): JSX.Element {
     };
   }, []);
 
-  return (
+  return createPortal(
     <div className="sr-only" data-slot="live-announcer">
       <div aria-atomic="true" aria-live="polite">
         {polite}
@@ -46,6 +48,7 @@ export function LiveAnnouncer(): JSX.Element {
       <div aria-atomic="true" aria-live="assertive">
         {assertive}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
