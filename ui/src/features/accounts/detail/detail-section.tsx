@@ -36,8 +36,9 @@ interface FieldSave {
 /**
  * One editable field of the sheet, edited in place (InlineEditRow): the label and saved value,
  * the whole row a button that swaps the value for the field's controls with Save and Cancel at
- * their end. The field's hint and error sit under its control, and a failed save under them. The
- * caller owns the draft (reset it in `onEdit`) and closes the edit once the save lands.
+ * their end. The field's hint and error sit under its control; a failed save spans the whole row
+ * under it all. The caller owns the draft (reset it in `onEdit`) and closes the edit once the save
+ * lands.
  */
 export function EditableFieldRow({
   title,
@@ -68,7 +69,7 @@ export function EditableFieldRow({
   onOpenChange: (open: boolean) => void;
   /** Called on Save (or Enter in a field) while no save is running. */
   onSubmit: () => void;
-  /** The field's save: Save spins while it runs, and its failure shows under the controls. */
+  /** The field's save: Save spins while it runs, and its failure shows under the row. */
   save: FieldSave;
   /** Another failed request of the edit's own (the machine ID's dice), shown the same way. */
   extraError?: unknown;
@@ -83,6 +84,7 @@ export function EditableFieldRow({
       label={title}
       mono={mono}
       multiline={multiline}
+      notice={failure ? <ActionError error={failure} /> : null}
       onCancel={() => {
         save.reset();
         onOpenChange(false);
@@ -97,7 +99,6 @@ export function EditableFieldRow({
       wide={wide}
     >
       {children}
-      {failure ? <ActionError className="mt-1.5" error={failure} /> : null}
     </InlineEditRow>
   );
 }

@@ -7,6 +7,7 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
+import { accountStatus } from "./account-model";
 import { ExportDialog } from "./export-dialog";
 
 vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn(async () => true) }));
@@ -28,6 +29,16 @@ async function openExport(initialSelection?: string[]) {
   );
   const dialog = await screen.findByRole("dialog");
   await within(dialog).findByText(`${initialSelection?.length ?? mockDb.accounts.length} selected`);
+  return { ...view, dialog };
+}
+
+/** The dialog over the given accounts only, every one selected. */
+async function openExportOf(accounts: typeof mockDb.accounts) {
+  const view = renderWithProviders(
+    <ExportDialog accounts={accounts} onOpenChange={() => {}} open />,
+  );
+  const dialog = await screen.findByRole("dialog");
+  await within(dialog).findByText(`${accounts.length} selected`);
   return { ...view, dialog };
 }
 
@@ -134,6 +145,23 @@ describe("ExportDialog", () => {
     // The selection is exactly the Active group.
     expect(within(dialog).getByText(`${activeCount} selected`)).toBeInTheDocument();
     expect(activeCount).toBeLessThan(mockDb.accounts.length);
+  });
+
+  it("shows the pressed pick as pressed when two picks hold the same accounts", async () => {
+    // Every account active: All and Active are the same selection.
+    const now = Math.floor(Date.now() / 1000);
+    const active = mockDb.accounts.filter((account) => accountStatus(account, now) === "active");
+    const { dialog, user } = await openExportOf(active);
+    const picks = within(dialog).getByRole("group", { name: "Select a group" });
+    const all = within(picks).getByRole("button", { name: /^All/ });
+    const activePick = within(picks).getByRole("button", { name: /^Active/ });
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    await user.click(activePick);
+    expect(activePick).toHaveAttribute("aria-pressed", "true");
+    expect(all).toHaveAttribute("aria-pressed", "false");
+    await user.click(all);
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    expect(activePick).toHaveAttribute("aria-pressed", "false");
   });
 
   it("masks credentials in the JSON preview until shown, and copies them whole", async () => {

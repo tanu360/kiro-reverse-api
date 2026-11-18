@@ -41,9 +41,13 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
   const pinRef = useRef<HTMLButtonElement | null>(null);
   const unpinRef = useRef<HTMLButtonElement | null>(null);
 
-  // Discovery runs upstream and can take up to 30 s.
+  // Discovery runs upstream and can take up to 30 s. A new list drops a failed choice's notice:
+  // its Try again would pin a profile the new list may not show as chosen.
   const load = useMutation({
     mutationFn: () => getAccountProfiles(account.id),
+    onMutate: () => {
+      if (pin.isError) pin.reset();
+    },
     onSuccess: (result) => setSelectedArn(defaultArn(result)),
   });
 
@@ -155,7 +159,11 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
             <RadioGroup
               aria-label={t("detail.profileList")}
               className="mt-4 gap-2"
-              onValueChange={(value) => setSelectedArn(String(value))}
+              onValueChange={(value) => {
+                setSelectedArn(String(value));
+                // Another choice: the failed one's notice (and its Try again) no longer applies.
+                if (pin.isError) pin.reset();
+              }}
               value={selectedArn}
             >
               {result.profiles.map((profile) => (

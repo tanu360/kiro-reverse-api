@@ -189,10 +189,16 @@ export function useDeleteAccount(target?: Target): {
       if (error) return;
       const next = neighbour.current;
       const fallback = failures.fallbackFocus;
-      // A frame later the refetched list has drawn without the row.
+      const own = target?.();
+      // A frame later the refetched list has drawn without the row. Focus is lost on <body>, in
+      // the confirm, or on the account's own menu while its detail sheet closes with it.
       requestAnimationFrame(() => {
         const active = document.activeElement;
-        const lost = !active || active === document.body || active.closest('[role="alertdialog"]');
+        const lost =
+          !active ||
+          active === document.body ||
+          active === own ||
+          active.closest('[role="alertdialog"]');
         if (lost) (next?.isConnected ? next : fallback?.())?.focus();
       });
     },

@@ -187,6 +187,21 @@ describe("BatchTagDialog", () => {
     expect(within(dialog).getByRole("button", { name: "Add tag" })).toHaveFocus();
   });
 
+  it("drops a failed run's notice once the tag is edited, so Try again cannot send the new one", async () => {
+    mockServer.use(
+      http.post(apiUrl("/accounts/batch"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { user } = renderDialog([mockDb.accounts[0].id]);
+    const dialog = await screen.findByRole("dialog");
+    const field = within(dialog).getByRole("textbox", { name: "Tag" });
+    await user.type(field, "vip{Enter}");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("boom");
+    await user.type(field, "2");
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("asks for one tag and sends nothing for an empty or comma-separated value", async () => {
     const bodies = captureBatch();
     const { user, onDone } = renderDialog([mockDb.accounts[0].id]);

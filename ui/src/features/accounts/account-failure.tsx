@@ -17,6 +17,8 @@ export interface AccountFailure {
   target?: () => HTMLElement | null | undefined;
   /** The account a row's action ran on: the notice goes once the account is gone. */
   accountId?: string;
+  /** The accounts a batch ran on (Try again runs on them): the notice goes once all are gone. */
+  accountIds?: readonly string[];
 }
 
 export type ReportAccountFailure = (failure: AccountFailure | null) => void;
@@ -72,12 +74,10 @@ export function AccountFailureNotice({
   failure,
   report,
   fallbackFocus,
-  className,
-}: FailurePlace & { failure: AccountFailure; className?: string }): JSX.Element {
+}: FailurePlace & { failure: AccountFailure }): JSX.Element {
   const { retry } = failure;
   return (
     <ActionError
-      className={className}
       error={failure.error}
       message={failure.message}
       onDismiss={() => {

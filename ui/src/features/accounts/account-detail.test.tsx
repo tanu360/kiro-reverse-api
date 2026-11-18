@@ -271,6 +271,30 @@ describe("AccountDetailSheet", () => {
     );
   });
 
+  it("drops a failed pin's notice on another choice or a new list", async () => {
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/profile"), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+    const { sheet, user } = await openSheet(notCapable());
+    const profile = section(sheet, "Kiro profile");
+    const load = within(profile).getByRole("button", { name: "Load Kiro profiles" });
+    await user.click(load);
+    const sandbox = await within(profile).findByRole("radio", { name: /Fabrikam Sandbox/ });
+    const use = within(profile).getByRole("button", { name: "Use selected profile" });
+    await user.click(use);
+    expect(await within(profile).findByRole("alert")).toHaveTextContent("boom");
+    // Its Try again would pin the failed choice, not the one now selected.
+    await user.click(sandbox);
+    expect(within(profile).queryByRole("alert")).not.toBeInTheDocument();
+
+    await user.click(use);
+    expect(await within(profile).findByRole("alert")).toHaveTextContent("boom");
+    await user.click(load);
+    await waitFor(() => expect(within(profile).queryByRole("alert")).not.toBeInTheDocument());
+  });
+
   it("lists the live models with auto first", async () => {
     const { sheet, user } = await openSheet(dana());
     const models = section(sheet, "Available models");
@@ -433,7 +457,11 @@ describe("AccountDetailSheet notes and tags", () => {
     const input = within(row).getByRole("textbox", { name: "Weight" });
     await user.clear(input);
     await user.type(input, "4{Enter}");
-    expect(await within(row).findByRole("alert")).toHaveTextContent("boom");
+    const notice = await within(row).findByRole("alert");
+    expect(notice).toHaveTextContent("boom");
+    // Under the whole row (both columns, after Save and Cancel), not beside them with the field.
+    expect(notice.closest("form")).toBeNull();
+    expect(notice.closest("dd")).toHaveClass("col-span-full");
     // The edit stays open on the draft: Save is the retry.
     expect(input).toHaveValue("4");
     await user.click(within(row).getByRole("button", { name: "Cancel" }));
