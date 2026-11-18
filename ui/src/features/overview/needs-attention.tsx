@@ -13,6 +13,7 @@ import {
   type JSX,
   type RefObject,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -23,6 +24,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -32,6 +34,11 @@ import {
   useAccountName,
 } from "@/features/accounts/account-cells";
 import { AccountDetailSheet } from "@/features/accounts/account-detail-sheet";
+import {
+  type AccountFailure,
+  AccountFailureNotice,
+  AccountFailureProvider,
+} from "@/features/accounts/account-failure";
 import { accountStatus, formatResetDate, statusGroup } from "@/features/accounts/account-model";
 import { useRefreshAccount } from "@/features/accounts/use-account-actions";
 import { accountsQuery } from "@/lib/api/accounts";
@@ -140,7 +147,9 @@ function FixAction({
   onRefreshFocus: (id: string | null) => void;
 }): JSX.Element {
   const { t } = useT("accounts");
-  const refresh = useRefreshAccount(row.account.id);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  // A failed refresh is said above the list; its close and Try again come back to this button.
+  const refresh = useRefreshAccount(row.account.id, () => buttonRef.current);
   const refreshes =
     row.status === "expired" || row.status === "noToken" || row.status === "suspended";
   const label = refreshes ? t("actions.refreshToken") : t("actions.details");
@@ -152,6 +161,7 @@ function FixAction({
             aria-label={label}
             data-fix=""
             loading={refreshes && refresh.isPending}
+            ref={buttonRef}
             onClick={(event) => {
               if (!refreshes) {
                 onDetails(row.account);
@@ -257,6 +267,14 @@ export function NeedsAttention(): JSX.Element {
     },
     [rows],
   );
+  // A failed refresh, said above the list in place of a toast (one line, Try again and close).
+  const [failure, setFailure] = useState<AccountFailure | null>(null);
+  const focusViewAll = useCallback(() => viewAllRef.current, []);
+  // It goes with its account once that leaves the list (healthy again, or deleted).
+  useEffect(() => {
+    const id = failure?.accountId;
+    if (id && query.data && !rows.some((row) => row.account.id === id)) setFailure(null);
+  }, [failure, query.data, rows]);
   useLayoutEffect(() => {
     const pending = focusAfterRefresh.current;
     if (!pending || rows.some((row) => row.account.id === pending.id)) return;
@@ -306,23 +324,47 @@ export function NeedsAttention(): JSX.Element {
       </div>
     );
   } else {
+    const retry = failure?.retry;
+    const failedId = failure?.accountId;
     body = (
-      <ul className="flex flex-col divide-y divide-border-subtle" ref={listRef}>
-        {rows.slice(0, LIMIT).map((row) => (
-          <AttentionItem
-            key={row.account.id}
-            onDetails={onDetails}
-            onRefreshFocus={onRefreshFocus}
-            reason={reasonOf(row)}
-            row={row}
-          />
-        ))}
-      </ul>
+      <>
+        {failure ? (
+          // Not flex-1: the card stretches beside Traffic, and the list stays right under it.
+          <CardPanel className="flex-none">
+            <AccountFailureNotice
+              failure={{
+                ...failure,
+                // Try again may take the row out of the list, as a click's refresh does: focus
+                // (back on its button) stays in the list.
+                retry: retry
+                  ? () => {
+                      if (failedId) onRefreshFocus(failedId);
+                      retry();
+                    }
+                  : undefined,
+              }}
+              fallbackFocus={focusViewAll}
+              report={setFailure}
+            />
+          </CardPanel>
+        ) : null}
+        <ul className="flex flex-col divide-y divide-border-subtle" ref={listRef}>
+          {rows.slice(0, LIMIT).map((row) => (
+            <AttentionItem
+              key={row.account.id}
+              onDetails={onDetails}
+              onRefreshFocus={onRefreshFocus}
+              reason={reasonOf(row)}
+              row={row}
+            />
+          ))}
+        </ul>
+      </>
     );
   }
 
   return (
-    <>
+    <AccountFailureProvider fallbackFocus={focusViewAll} report={setFailure}>
       <SectionCard
         actions={<ViewAllLink focusRef={viewAllRef} />}
         description={query.data ? t("attention.count", { count: rows.length }) : undefined}
@@ -344,6 +386,6 @@ export function NeedsAttention(): JSX.Element {
           open={detail.open}
         />
       ) : null}
-    </>
+    </AccountFailureProvider>
   );
 }
