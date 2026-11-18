@@ -47,4 +47,27 @@ describe("InlineEditRow", () => {
     await new Promise((resolve) => setTimeout(resolve, 700));
     expect(screen.getAllByText(LONG)).toHaveLength(1);
   });
+
+  it("puts a failed save under the whole edit row, outside the controls' column", () => {
+    renderWithProviders(
+      <dl>
+        <InlineEditRow
+          editing
+          label="Proxy"
+          notice={<p>Could not save.</p>}
+          onCancel={() => {}}
+          onEdit={() => {}}
+          onSubmit={() => {}}
+          saving={false}
+          value={LONG}
+        >
+          <input aria-label="Proxy" />
+        </InlineEditRow>
+      </dl>,
+    );
+    const notice = screen.getByText("Could not save.").parentElement as HTMLElement;
+    expect(notice).toHaveClass("col-span-full");
+    expect(notice.parentElement).toHaveAttribute("data-editing");
+    expect(notice.closest("form")).toBeNull();
+  });
 });
