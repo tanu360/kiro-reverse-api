@@ -115,7 +115,7 @@ interface Refocus {
   index: number;
 }
 
-/** The last action that failed, said at the top of the list card in place of a toast. */
+/** The last action that failed, said at the top of the list card. */
 type Failure =
   | { action: "create"; error: unknown }
   | { action: BackupAction; entry: BackupEntry; error: unknown }
@@ -155,9 +155,9 @@ export function BackupsPage(): JSX.Element {
   const [refocus, setRefocus] = useState<Refocus | null>(null);
   const [page, setPage] = useState(1);
   /*
-   * No toasts: the list shows a result itself (a row comes or goes, the busy button spins) and a
-   * screen reader hears it; a download leaves a green line with its warning, and a failure shows
-   * at the top of the list card. A restore signs out, so the sign-in page comes next.
+   * The list shows a result itself (a row comes or goes, the busy button spins) and a screen
+   * reader hears it; a download leaves a green line with its warning, and a failure shows at the
+   * top of the list card. A restore signs out, so the sign-in page comes next.
    */
   const [failure, setFailure] = useState<Failure | null>(null);
   // The backup just downloaded, for its green line.
@@ -174,12 +174,18 @@ export function BackupsPage(): JSX.Element {
   );
 
   const createPendingRef = useRef(false);
+  // The page shown when Create backup was pressed.
+  const createPageRef = useRef(1);
   const create = useMutation({
     mutationFn: () => createBackup({ kind: "manual", note: manualNote(new Date()) }),
     onMutate: clearNotices,
     onSuccess: () => {
-      // The new backup is the newest, so it lands at the top of the first page.
-      setPage(1);
+      // The new backup is the newest, so it lands at the top of the first page: show it there,
+      // unless the user has moved on while it was made (to another page, or into the list).
+      // Turning the page then would take their place, and the focused row with it.
+      if (!listRef.current?.contains(document.activeElement)) {
+        setPage((current) => (current === createPageRef.current ? 1 : current));
+      }
       announce(t("created"));
       void invalidate();
     },
@@ -191,6 +197,7 @@ export function BackupsPage(): JSX.Element {
   const startCreate = () => {
     if (createPendingRef.current) return;
     createPendingRef.current = true;
+    createPageRef.current = page;
     create.mutate();
   };
 

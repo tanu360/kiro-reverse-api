@@ -70,10 +70,22 @@ async function renderPage() {
   return view;
 }
 
-/** Said to a screen reader through the app's live region, not shown as a toast. */
+/** Said to a screen reader through the app's live region. */
 async function expectAnnounced(text: string): Promise<void> {
   const line = await screen.findByText(text);
   expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
+}
+
+/** Records what is announced from here on; call it after renderPage. */
+function recordAnnouncements(): string[] {
+  const texts: string[] = [];
+  const stopSession = unsubscribe;
+  const stop = subscribeAnnouncements(({ text }) => texts.push(text));
+  unsubscribe = () => {
+    stopSession();
+    stop();
+  };
+  return texts;
 }
 
 /** The notice for a failed action (one plain line with the server's reason). */
@@ -99,6 +111,33 @@ function scheduleCard(): HTMLElement {
 
 function dialog(): HTMLElement {
   return screen.getByRole("alertdialog");
+}
+
+/** Adds `count` older manual backups, so the list takes more than one page. */
+function addOlderBackups(count: number): void {
+  const oldest = Math.min(...mockDb.backups.map((row) => row.createdAt));
+  for (let i = 1; i <= count; i += 1) {
+    mockDb.backups.push(makeBackupEntry({ createdAt: oldest - i * 3600 }));
+  }
+}
+
+/** Holds a request until `release()`, then lets the default handler answer it. */
+function gate(): { wait: () => Promise<undefined>; release: () => void } {
+  let release: () => void = () => {};
+  const open = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    wait: async () => {
+      await open;
+      return undefined;
+    },
+    release,
+  };
+}
+
+function currentPage(): string | null {
+  return document.querySelector('[aria-current="page"]')?.getAttribute("aria-label") ?? null;
 }
 
 describe("BackupsPage", () => {
@@ -525,6 +564,46 @@ describe("BackupsPage focus", () => {
     expect(screen.getByRole("button", { name: "Create backup" })).toHaveFocus();
   });
 
+  it("shows a new backup on the first page when Create is pressed on another", async () => {
+    addOlderBackups(10);
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
+    expect(dataRows()).toHaveLength(5);
+    await user.click(screen.getByRole("button", { name: "Create backup" }));
+    await expectAnnounced("The backup was created.");
+    expect(currentPage()).toBe("Page 1");
+  });
+
+  it("stays on the page the user went to while a backup was being created", async () => {
+    addOlderBackups(10);
+    const create = gate();
+    mockServer.use(http.post(apiUrl("/backups"), create.wait));
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Create backup" }));
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
+    create.release();
+    await expectAnnounced("The backup was created.");
+    // The refetch adds it to the top of page 1, so page 2 gains a row.
+    await waitFor(() => expect(dataRows()).toHaveLength(6));
+    expect(currentPage()).toBe("Page 2");
+  });
+
+  it("keeps the page and the focused row when focus went into the list while creating", async () => {
+    addOlderBackups(10);
+    const create = gate();
+    mockServer.use(http.post(apiUrl("/backups"), create.wait));
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Page 2" }));
+    await user.click(screen.getByRole("button", { name: "Create backup" }));
+    const download = within(dataRows()[0]).getByRole("button", { name: "Download" });
+    act(() => download.focus());
+    create.release();
+    await expectAnnounced("The backup was created.");
+    await waitFor(() => expect(dataRows()).toHaveLength(6));
+    expect(currentPage()).toBe("Page 2");
+    expect(download).toHaveFocus();
+  });
+
   it("keeps focus on Refresh while the list reloads", async () => {
     const { user } = await renderPage();
     let release: () => void = () => {};
@@ -648,6 +727,7 @@ describe("ScheduleCard", () => {
       }),
     );
     const { user } = await renderPage();
+    const announced = recordAnnouncements();
     const keep = await screen.findByRole("textbox", { name: "Keep latest" });
     await user.clear(keep);
     await user.type(keep, "5");
@@ -659,14 +739,42 @@ describe("ScheduleCard", () => {
       "Scheduled backups over the Keep latest count are still stored. The next save or scheduled run tries again. Details: remove backup: disk full",
     );
     expect(scheduleCard()).toContainElement(notice);
-    expect(screen.queryByText("The schedule was saved.")).toBeNull();
     await waitFor(() => expect(save).toHaveAccessibleName("Saved"));
     expect(keep).toHaveValue("5");
+    // The warning is read out as it appears, in place of "saved".
+    expect(announced).toEqual([]);
     // Try again saves once more, which retries the delete; focus goes to Save.
     await user.click(within(notice).getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(posts).toBe(2));
     expect(save).toHaveFocus();
     expect(await screen.findByTestId("schedule-prune-failed")).toBeInTheDocument();
+  });
+
+  it("retries a failed prune with the stored schedule, leaving a later edit unsaved", async () => {
+    const bodies: unknown[] = [];
+    mockServer.use(
+      http.post(apiUrl("/backups/schedule"), async ({ request }) => {
+        const body = (await request.json()) as typeof mockDb.schedule;
+        bodies.push(body);
+        mockDb.schedule = { ...mockDb.schedule, ...body };
+        return HttpResponse.json({ schedule: body, pruneError: "remove backup: disk full" });
+      }),
+    );
+    const { user } = await renderPage();
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
+    await user.clear(keep);
+    await user.type(keep, "5");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const notice = await screen.findByTestId("schedule-prune-failed");
+    // A lower keep typed since would delete more backups: Try again must not save it.
+    await user.clear(keep);
+    await user.type(keep, "2");
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1]).toEqual({ enabled: true, cadence: "daily", keep: 5 });
+    await screen.findByTestId("schedule-prune-failed");
+    expect(keep).toHaveValue("2");
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
   });
 
   it("shows a failed save in the card, and Try again sends the form again", async () => {

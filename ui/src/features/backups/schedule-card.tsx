@@ -47,7 +47,7 @@ import { announce } from "@/lib/announce";
 import { backupScheduleQuery, updateBackupSchedule } from "@/lib/api/backups";
 import { queryKeys } from "@/lib/api/query-keys";
 import { serverErrorCode } from "@/lib/api/server-errors";
-import type { BackupCadence, BackupSchedule } from "@/lib/api/types";
+import type { BackupCadence, BackupSchedule, BackupScheduleUpdate } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
@@ -232,11 +232,11 @@ function ScheduleFormCard({
   const [enabled, setEnabled] = useState(initial.enabled);
   const [cadence, setCadence] = useState<BackupCadence>(initial.cadence);
   const [keep, setKeep] = useState<number | null>(initial.keep);
-  // A rejected value is marked on its row (the server's 400 names it by code), not toasted.
+  // A rejected value is marked on its row (the server's 400 names it by code).
   const [invalid, setInvalid] = useState<InvalidField | null>(null);
   /*
-   * No toasts: Save reads "Saved" for a moment and a screen reader hears it; any other failure,
-   * or a save whose delete of old backups failed, shows at the top of the card.
+   * Save reads "Saved" for a moment and a screen reader hears it; any other failure, or a save
+   * whose delete of old backups failed, shows at the top of the card.
    */
   const [failure, setFailure] = useState<unknown>(null);
   const [pruneError, setPruneError] = useState<string | null>(null);
@@ -265,12 +265,7 @@ function ScheduleFormCard({
   });
 
   const save = useMutation({
-    mutationFn: () => {
-      // The stored keep goes back as is, so a legacy keep above 200 is not clamped away.
-      const body = { enabled, cadence, keep: clampKeep(keep ?? Number.NaN, initial.keep) };
-      setKeep(body.keep);
-      return updateBackupSchedule(body);
-    },
+    mutationFn: updateBackupSchedule,
     onMutate: () => {
       setFailure(null);
       setPruneError(null);
@@ -296,10 +291,21 @@ function ScheduleFormCard({
     },
   });
 
-  // Try again sends the form as it stands; focus moves to Save first, as the notice goes.
-  const retry = () => {
+  // Sends the form as it stands. The stored keep goes back as is, so a legacy keep above 200 is
+  // not clamped away.
+  const submit = () => {
+    const body = { enabled, cadence, keep: clampKeep(keep ?? Number.NaN, initial.keep) };
+    setKeep(body.keep);
+    save.mutate(body);
+  };
+  // Focus moves to Save first, as the notice goes. A failed save sends the form again; a failed
+  // delete of old backups saves the stored schedule again, so it never saves an edit made since
+  // (a lower Keep latest would delete more backups at once).
+  const retry = (body?: BackupScheduleUpdate) => {
     saveRef.current?.focus();
-    if (!save.isPending) save.mutate();
+    if (save.isPending) return;
+    if (body) save.mutate(body);
+    else submit();
   };
   const dismiss = (clear: () => void) => {
     clear();
@@ -311,7 +317,7 @@ function ScheduleFormCard({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        if (dirty && !save.isPending) save.mutate();
+        if (dirty && !save.isPending) submit();
       }}
     >
       <SettingsFrame
@@ -340,7 +346,7 @@ function ScheduleFormCard({
             <ActionError
               error={failure}
               onDismiss={() => dismiss(() => setFailure(null))}
-              onRetry={retry}
+              onRetry={() => retry()}
             />
           </CardPanel>
         ) : null}
@@ -349,7 +355,7 @@ function ScheduleFormCard({
             <PruneFailedNotice
               detail={pruneError}
               onDismiss={() => dismiss(() => setPruneError(null))}
-              onRetry={retry}
+              onRetry={() => retry(initial)}
             />
           </CardPanel>
         ) : null}
