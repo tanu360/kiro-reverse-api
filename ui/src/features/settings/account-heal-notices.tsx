@@ -44,7 +44,7 @@ export function AccountHealNotices(): JSX.Element | null {
     switch (kind) {
       case "healed":
         if (Number.isInteger(count) && count > 0) {
-          announce(t("selfHeal.toastHealed", { count }));
+          announce(t("selfHeal.healedCount", { count }));
         }
         break;
       case "halted":
@@ -61,7 +61,7 @@ export function AccountHealNotices(): JSX.Element | null {
   return (
     <Alert className={NOTICE_LINE_CLASS} data-slot="self-heal-halted" variant="warning">
       <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-      <AlertDescription>{t("selfHeal.toastHalted")}</AlertDescription>
+      <AlertDescription>{t("selfHeal.haltedNotice")}</AlertDescription>
       <AlertAction className={NOTICE_ACTIONS_CLASS}>
         <NoticeIconButton
           icon={ArrowRight02Icon}

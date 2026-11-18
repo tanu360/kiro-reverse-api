@@ -56,11 +56,11 @@ export interface SaveFeedback {
 }
 
 /**
- * One card's save, with no toast: on success it calls `onSaved`, Save reads "Saved" for a
- * moment and a screen reader hears `successMessage` ("Your settings were saved."). On failure it
- * calls `onFailed`, and the reason shows in the card (`feedback.error`) until the next save; an
- * `onFailed` that returns true has shown it at the field itself, so the card shows nothing more
- * and the reason is only read out. The API client throws on any non-2xx.
+ * One card's save: on success it calls `onSaved`, Save reads "Saved" for a moment and a screen
+ * reader hears "Your settings were saved." On failure it calls `onFailed`, and the reason shows
+ * in the card (`feedback.error`) until the next save; an `onFailed` that returns true has shown
+ * it at the field itself, so the card shows nothing more and the reason is only read out. The
+ * API client throws on any non-2xx.
  */
 export function useSectionSave<V>(
   save: (variables: V) => Promise<unknown>,
@@ -68,7 +68,6 @@ export function useSectionSave<V>(
     onSaved: (variables: V) => void;
     /** Returns true when it showed the reason at a field itself. */
     onFailed?: (error: unknown, variables: V) => unknown;
-    successMessage?: string;
   },
 ): { save: (variables: V) => void; saving: boolean; feedback: SaveFeedback } {
   const { t } = useT("settings");
@@ -83,7 +82,7 @@ export function useSectionSave<V>(
     onSuccess: (_data, variables) => {
       handlers.onSaved(variables);
       savedFlash.flash();
-      announce(handlers.successMessage ?? t("common:toast.saved"));
+      announce(t("common:toast.saved"));
     },
     onError: (error, variables) => {
       if (handlers.onFailed?.(error, variables) !== true) return;
@@ -140,7 +139,7 @@ export function RowActionError({
   focusTarget,
 }: {
   error: unknown;
-  onRetry?: () => void;
+  onRetry: () => void;
   onDismiss: () => void;
   focusTarget?: RefObject<HTMLElement | null>;
 }): JSX.Element {
@@ -158,19 +157,15 @@ export function RowActionError({
           refocus();
           onDismiss();
         }}
-        onRetry={
-          onRetry
-            ? () => {
-                refocus();
-                onRetry();
-                // A segment that takes the pick again moves the choice: focus follows it.
-                if (!focusTarget) {
-                  const element = row();
-                  setTimeout(() => focusRowControl(element), 0);
-                }
-              }
-            : undefined
-        }
+        onRetry={() => {
+          refocus();
+          onRetry();
+          // A segment that takes the pick again moves the choice: focus follows it.
+          if (!focusTarget) {
+            const element = row();
+            setTimeout(() => focusRowControl(element), 0);
+          }
+        }}
       />
     </div>
   );

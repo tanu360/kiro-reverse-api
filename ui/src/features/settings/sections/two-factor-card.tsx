@@ -295,7 +295,7 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
   const enable = useMutation({
     mutationFn: (value: string) => enableTwoFactor(value),
     onSuccess: (result) => {
-      // No toast: the dialog turns into the recovery codes, and the card's pill reads On.
+      // The dialog turns into the recovery codes, and the card's pill reads On.
       setCodes(result.recoveryCodes);
       onDone(result.status);
       announce(t("twoFactor.enabled"));
@@ -460,7 +460,7 @@ function DisableDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }
   const disable = useMutation({
     mutationFn: (proof: TwoFactorProof) => disableTwoFactor(proof),
     onSuccess: (status) => {
-      // No toast: the dialog closes on the card's pill reading Off.
+      // The dialog closes on the card's pill reading Off.
       announce(t("twoFactor.disabled"));
       onDone(status);
     },

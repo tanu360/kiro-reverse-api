@@ -53,7 +53,7 @@ export function ApiAccessCard(): JSX.Element {
     },
   });
 
-  // No toast: Save reads "Saved" for a moment, and a failure shows in the card.
+  // Save reads "Saved" for a moment, and a failure shows in the card.
   const save = useMutation({
     mutationFn: (requireApiKey: boolean) => updateSettings({ requireApiKey }),
     onMutate: () => savedFlash.clear(),

@@ -105,7 +105,7 @@ function noActionError(): void {
   expect(document.querySelector('[data-slot="action-error"]')).toBeNull();
 }
 
-/** Said to a screen reader through the app's live region, not shown as a toast. */
+/** Said to a screen reader through the app's live region. */
 async function expectAnnounced(text: string): Promise<void> {
   const line = await screen.findByText(text);
   expect(line.closest('[data-slot="live-announcer"]')).not.toBeNull();
@@ -285,7 +285,7 @@ describe("ApiPage", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
-  it("says Disabling… in the row while it runs, then Disabled, with no toast", async () => {
+  it("says Disabling… in the row while it runs, then Disabled", async () => {
     const put = gate();
     mockServer.use(
       http.put(apiUrl("/api-keys/:id"), async () => {
@@ -750,7 +750,7 @@ describe("ApiPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(settingsPosts).toEqual([{ requireApiKey: true }]));
     expect(await screen.findByText("Clients must send an API key")).toBeInTheDocument();
-    // No toast: Save reads "Saved" for a moment.
+    // Save reads "Saved" for a moment.
     expect(await screen.findByRole("button", { name: "Saved" })).toBeInTheDocument();
     await expectAnnounced("Your settings were saved.");
   });

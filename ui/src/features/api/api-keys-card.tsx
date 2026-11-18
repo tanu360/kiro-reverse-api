@@ -146,7 +146,7 @@ export function ApiKeysCard(): JSX.Element {
     session: number;
   } | null>(null);
   const [page, setPage] = useState(1);
-  // The last row action that failed, shown in the card instead of a toast.
+  // The last row action that failed, shown at the top of the card.
   const [failure, setFailure] = useState<KeyFailure | null>(null);
   const createRef = useRef<HTMLButtonElement>(null);
   // Row menu triggers by key id (one in the table, one in the cards), so focus can land on a
@@ -210,8 +210,8 @@ export function ApiKeysCard(): JSX.Element {
   }, [keys.data]);
 
   /*
-   * No toasts: the row shows the result itself (the status pill, the usage, the row going away,
-   * the new-key panel), a screen reader hears it, and a failure shows in the card (KeyFailure).
+   * The row shows the result itself (the status pill, the usage, the row going away, the new-key
+   * panel), a screen reader hears it, and a failure shows in the card (KeyFailure).
    * Each stays pending until the list is refetched, so the pill never flips back for a moment.
    */
   const toggle = useMutation({
@@ -654,7 +654,7 @@ export function ApiKeysCard(): JSX.Element {
       </div>
       <ApiKeyFormDialog
         key={dialog.session}
-        onCreated={(key) => setCreatedKey(key)}
+        onCreated={setCreatedKey}
         onOpenChange={(open) => setDialog((prev) => ({ ...prev, open }))}
         open={dialog.open}
         target={dialog.target}

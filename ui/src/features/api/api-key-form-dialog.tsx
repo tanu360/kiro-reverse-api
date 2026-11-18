@@ -83,7 +83,7 @@ import { SheetMark } from "./sheet-mark";
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
 
 /** How long the edit sheet's Save reads "Saved" before the sheet closes. */
-export const SAVED_CLOSE_MS = 700;
+const SAVED_CLOSE_MS = 700;
 
 const CREDIT_FORMAT: Intl.NumberFormatOptions = {
   minimumFractionDigits: 2,
@@ -175,8 +175,8 @@ function useKeyForm(
       const created = await createApiKey(buildCreateRequest(data));
       return created.key;
     },
-    // No toast. Create closes at once on the new-key panel (an alert, read out as it shows);
-    // edit reads "Saved" on its Save for a moment, then closes on the updated row.
+    // Create closes at once on the new-key panel (an alert, read out as it shows); edit reads
+    // "Saved" on its Save for a moment, then closes on the updated row.
     onSuccess: (createdKey) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all });
       if (createdKey) {

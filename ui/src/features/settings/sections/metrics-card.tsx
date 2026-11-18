@@ -58,8 +58,8 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
   const tokenLabel = useId();
   const [pending, setPending] = useState<boolean | null>(null);
   const regenerateRef = useRef<HTMLButtonElement>(null);
-  // No toast: the switch or the token changes on screen and a screen reader hears it; a failure
-  // shows under the row it came from.
+  // The switch or the token changes on screen and a screen reader hears it; a failure shows
+  // under the row it came from.
   const save = useMutation({
     mutationFn: updateMetricsSettings,
     onSuccess: (next, body) => {

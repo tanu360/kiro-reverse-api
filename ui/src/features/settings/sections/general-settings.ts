@@ -13,7 +13,6 @@ import { type SaveFeedback, useSectionSave } from "./settings-section";
  */
 export function useGeneralSettingsSave<D>(draft: Draft<D>): {
   save: (patch: D & SettingsPatch) => void;
-  saving: boolean;
   feedback: SaveFeedback;
 } {
   const queryClient = useQueryClient();
@@ -41,7 +40,7 @@ type SwitchSetting = {
 }[keyof SettingsPatch];
 
 /** A failed instant save, for RowActionError: Try again sends the same pick again. */
-export interface InstantFailure {
+interface InstantFailure {
   error: unknown;
   retry: () => void;
   dismiss: () => void;

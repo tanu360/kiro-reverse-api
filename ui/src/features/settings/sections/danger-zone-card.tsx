@@ -19,7 +19,7 @@ export function DangerZoneCard(): JSX.Element {
   const queryClient = useQueryClient();
   const resetRef = useRef<HTMLButtonElement>(null);
   const done = useSavedFlash();
-  // No toast: the button spins, then reads "Done" for a moment; a failure shows under the row.
+  // The button spins, then reads "Done" for a moment; a failure shows under the row.
   const reset = useMutation({
     mutationFn: resetStats,
     onMutate: () => done.clear(),

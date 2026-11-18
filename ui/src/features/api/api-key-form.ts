@@ -19,10 +19,10 @@ export const KEY_ROUTING_MODES: readonly ApiKeyRoutingMode[] = [
 ];
 
 /** Every account, or only the picked ones. */
-export type ApiKeyAccountScope = "all" | "selected";
+type ApiKeyAccountScope = "all" | "selected";
 
 /** Every model, or only the ticked ones. */
-export type ApiKeyModelScope = "all" | "selected";
+type ApiKeyModelScope = "all" | "selected";
 
 /** Raw dialog values. A null limit is an empty field and means 0 (unlimited). */
 export interface ApiKeyFormValues {
