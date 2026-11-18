@@ -43,6 +43,7 @@ import {
   type DetectedProxy,
   type PoolProxy,
   type PoolProxyHealth,
+  type PoolProxyState,
   type ProxyPoolSettingsPatch,
   type ProxyPoolView,
   proxyPoolQuery,
@@ -54,6 +55,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { formatDuration, formatDurationMs } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
+import { cn } from "@/lib/utils";
 import { proxyFailureSentence } from "./lib/pool-failure";
 import {
   countChips,
@@ -139,7 +141,7 @@ interface PoolFailure {
   retry: () => void;
   /** Where focus goes as the notice goes: the control that ran the action. */
   focus: () => void;
-  /** Nothing is left to run again: its row is gone (or already in the pool). */
+  /** Nothing is left to run again: its row is gone (or already in the pool), so it never shows. */
   moot?: (view: ProxyPoolView) => boolean;
 }
 
@@ -221,11 +223,32 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     target.focus();
   }, [view]);
 
+  // The row a failure is about went meanwhile (another tab): its notice goes too.
+  useEffect(() => {
+    if (!failure?.moot?.(view)) return;
+    const notice = document
+      .getElementById(SECTION_ID.proxyPool)
+      ?.querySelector('[data-slot="action-error"]');
+    const focused = notice?.contains(document.activeElement) ?? false;
+    setFailure(null);
+    if (focused) failure.focus();
+  }, [view, failure]);
+
   const store = (next: ProxyPoolView) => {
     queryClient.setQueryData(queryKeys.settings.proxyPool(), next);
   };
   /** Reads the pool again; resolves once the new view is stored. */
   const reload = () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.proxyPool() });
+  /**
+   * Shows a row's failure, unless the pool as last read makes it moot (a remove that went
+   * through but timed out). Says whether it shows.
+   */
+  const showFailure = (next: PoolFailure): boolean => {
+    const now = queryClient.getQueryData<ProxyPoolView>(queryKeys.settings.proxyPool());
+    if (now && next.moot?.(now)) return false;
+    setFailure(next);
+    return true;
+  };
 
   /** Focus a row's control, else Add proxy (the row is gone). */
   const focusRow = (id: string, action: RowAction) => {
@@ -287,7 +310,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     await reload();
     setTesting((prev) => toggled(prev, id, false));
     if (!result.ok) {
-      setFailure({
+      showFailure({
         error: result.error,
         retry: () => void runTest(id, name, check),
         focus: () => focusRow(id, "test"),
@@ -323,7 +346,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       return next;
     });
     if (!result.ok) {
-      setFailure({
+      showFailure({
         error: result.error,
         retry: () => void toggle(proxy, enabled),
         focus: () => focusRow(proxy.id, "switch"),
@@ -344,17 +367,20 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     refocus.current = mine;
     setBusy((prev) => toggled(prev, proxy.id, true));
     const result = await attempt(() => adoptDetectedProxy(proxy.id));
-    // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
-    if (!result.ok && refocus.current === mine) refocus.current = null;
     await reload();
     setBusy((prev) => toggled(prev, proxy.id, false));
-    if (!result.ok) {
-      setFailure({
+    // A failure the pool shows went through anyway counts as done (its refocus has run).
+    if (
+      !result.ok &&
+      showFailure({
         error: result.error,
         retry: () => void runAdopt(proxy),
         focus: () => focusRow(proxy.id, "adopt"),
         moot: adopted,
-      });
+      })
+    ) {
+      // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
+      if (refocus.current === mine) refocus.current = null;
       return;
     }
     announce(t("detected.adopted", { name: mask(proxy.url) }));
@@ -390,17 +416,20 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     refocus.current = mine;
     setBusy((prev) => toggled(prev, proxy.id, true));
     const result = await attempt(() => removePoolProxy(proxy.id));
-    // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
-    if (!result.ok && refocus.current === mine) refocus.current = null;
     await reload();
     setBusy((prev) => toggled(prev, proxy.id, false));
-    if (!result.ok) {
-      setFailure({
+    // A failure the pool shows went through anyway counts as done (its refocus has run).
+    if (
+      !result.ok &&
+      showFailure({
         error: result.error,
         retry: () => void runRemove(proxy, order),
         focus: () => focusRow(proxy.id, "remove"),
         moot: gone,
-      });
+      })
+    ) {
+      // Another row's remove or add may have taken the refocus meanwhile: leave that one be.
+      if (refocus.current === mine) refocus.current = null;
       return;
     }
     announce(t("card.removed"));
@@ -496,9 +525,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
             onRetry={() => {
               // The notice goes: focus moves to the control that runs the action first.
               failure.focus();
-              // Its row went meanwhile (another tab, or a try that went through but timed out).
-              if (failure.moot?.(view)) setFailure(null);
-              else failure.retry();
+              failure.retry();
             }}
           />
         </CardPanel>
@@ -636,11 +663,20 @@ function CheckFacts({ proxy }: { proxy: PoolProxy | DetectedProxy }): JSX.Elemen
   );
 }
 
+/** Whether a proxy in this state has a StateNote: every state but healthy (and unknown). */
+function hasStateNote(state: PoolProxyState): boolean {
+  return state === "off" || state === "auto_disabled" || state === "unhealthy";
+}
+
 /**
  * Why a proxy is not plainly healthy: how many failures in a row it has (and that the next ones
  * take it out), that it was taken out, or that it is switched off; with the last error behind
  * Details, which opens below so the sentence stays readable on a phone. A switched-off proxy
  * shows its last error only while its last check failed (a Test of it): its state stays Off.
+ *
+ * It goes under the whole row, text and buttons, at the row's padding (the row keeps 12 px of its
+ * bottom padding): in the text column beside the buttons it would wrap narrow. The row and the
+ * note share one element, so the card draws one hairline above both.
  */
 function StateNote({
   proxy,
@@ -673,7 +709,7 @@ function StateNote({
   // Sentences joined the language's way: a space in English, none after "。" in Chinese.
   const join = t("common:text.joinSentences");
   return (
-    <p className={`wrap-anywhere text-xs ${tone}`}>
+    <p className={cn(SETTINGS_ROW_X, "wrap-anywhere pb-4 text-xs", tone)}>
       {error
         ? fillNodes(join, {
             first: lead,
@@ -732,88 +768,91 @@ const ProxyRow = memo(function ProxyRow({
   const mask = useMaskText();
   const look = stateLook(proxy.state);
   const name = mask(proxyName(proxy));
+  const noted = hasStateNote(proxy.state);
   return (
-    <SettingsRow
-      control={
-        // A group named by the row; under the text on a narrow row, at its end on a wide one.
-        <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
-          <Switch
-            aria-label={t("card.switchLabel", { name })}
-            checked={switchingTo ?? proxy.enabled}
-            data-action="switch"
-            data-proxy={proxy.id}
-            disabled={switchingTo !== undefined}
-            onCheckedChange={(next) => actions.onToggle(proxy, next)}
-          />
-          {/* Each action also reads the proxy after its name, so nine Tests are told apart. */}
-          <Button
-            aria-description={name}
-            data-action="test"
-            data-proxy={proxy.id}
-            loading={testing}
-            onClick={() => actions.onTest(proxy)}
-            size="sm"
-            variant="secondary"
-          >
-            <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
-            {t("actions.test")}
-          </Button>
-          <Button
-            aria-description={name}
-            onClick={() => actions.onEdit(proxy)}
-            size="sm"
-            variant="secondary"
-          >
-            <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
-            {t("common:actions.edit")}
-          </Button>
-          <Button
-            aria-description={name}
-            data-action="remove"
-            data-proxy={proxy.id}
-            loading={removing}
-            onClick={() => actions.onRemove(proxy)}
-            size="sm"
-            variant="danger"
-          >
-            <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-            {t("actions.remove")}
-          </Button>
-        </fieldset>
-      }
-      controlWidth="actions"
-      description={
-        <span className="flex flex-wrap gap-x-3 gap-y-1">
-          {proxy.label ? (
-            <span className="wrap-anywhere font-mono" translate="no">
+    <div className="min-w-0">
+      <SettingsRow
+        className={noted ? "pb-3" : undefined}
+        control={
+          // A group named by the row; under the text on a narrow row, at its end on a wide one.
+          <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
+            <Switch
+              aria-label={t("card.switchLabel", { name })}
+              checked={switchingTo ?? proxy.enabled}
+              data-action="switch"
+              data-proxy={proxy.id}
+              disabled={switchingTo !== undefined}
+              onCheckedChange={(next) => actions.onToggle(proxy, next)}
+            />
+            {/* Each action also reads the proxy after its name, so nine Tests are told apart. */}
+            <Button
+              aria-description={name}
+              data-action="test"
+              data-proxy={proxy.id}
+              loading={testing}
+              onClick={() => actions.onTest(proxy)}
+              size="sm"
+              variant="secondary"
+            >
+              <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
+              {t("actions.test")}
+            </Button>
+            <Button
+              aria-description={name}
+              onClick={() => actions.onEdit(proxy)}
+              size="sm"
+              variant="secondary"
+            >
+              <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
+              {t("common:actions.edit")}
+            </Button>
+            <Button
+              aria-description={name}
+              data-action="remove"
+              data-proxy={proxy.id}
+              loading={removing}
+              onClick={() => actions.onRemove(proxy)}
+              size="sm"
+              variant="danger"
+            >
+              <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
+              {t("actions.remove")}
+            </Button>
+          </fieldset>
+        }
+        controlWidth="actions"
+        description={
+          <span className="flex flex-wrap gap-x-3 gap-y-1">
+            {proxy.label ? (
+              <span className="wrap-anywhere font-mono" translate="no">
+                {proxy.url}
+              </span>
+            ) : null}
+            {proxy.username ? (
+              <span>{t("card.signsInAs", { user: mask(proxy.username) })}</span>
+            ) : null}
+            <CheckFacts proxy={proxy} />
+            <span className="tabular-nums">{t("card.accounts", { count: proxy.accounts })}</span>
+          </span>
+        }
+        status={
+          <Badge dot size="sm" tone={look.tone}>
+            {t(look.key)}
+          </Badge>
+        }
+        title={
+          proxy.label ? (
+            mask(proxy.label)
+          ) : (
+            // A long host wraps at its dots and colon first, mid-label only when it must.
+            <span className="wrap-anywhere font-mono text-meta" translate="no">
               {proxy.url}
             </span>
-          ) : null}
-          {proxy.username ? (
-            <span>{t("card.signsInAs", { user: mask(proxy.username) })}</span>
-          ) : null}
-          <CheckFacts proxy={proxy} />
-          <span className="tabular-nums">{t("card.accounts", { count: proxy.accounts })}</span>
-        </span>
-      }
-      status={
-        <Badge dot size="sm" tone={look.tone}>
-          {t(look.key)}
-        </Badge>
-      }
-      title={
-        proxy.label ? (
-          mask(proxy.label)
-        ) : (
-          // A long host wraps at its dots and colon first, mid-label only when it must.
-          <span className="wrap-anywhere font-mono text-meta" translate="no">
-            {proxy.url}
-          </span>
-        )
-      }
-    >
-      <StateNote maxFailures={maxFailures} proxy={proxy} />
-    </SettingsRow>
+          )
+        }
+      />
+      {noted ? <StateNote maxFailures={maxFailures} proxy={proxy} /> : null}
+    </div>
   );
 });
 
@@ -836,69 +875,72 @@ const DetectedRow = memo(function DetectedRow({
   const mask = useMaskText();
   const look = stateLook(proxy.state);
   const accounts = proxy.accountIds.length;
+  const noted = hasStateNote(proxy.state);
   return (
-    <SettingsRow
-      control={
-        <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
-          {/* Each action also reads the proxy after its name, as in the pool's rows. */}
-          <Button
-            aria-description={proxy.url}
-            data-action="test"
-            data-proxy={proxy.id}
-            loading={testing}
-            onClick={() => actions.onTest(proxy)}
-            size="sm"
-            variant="secondary"
-          >
-            <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
-            {t("actions.test")}
-          </Button>
-          {proxy.canAdopt ? (
+    <div className="min-w-0">
+      <SettingsRow
+        className={noted ? "pb-3" : undefined}
+        control={
+          <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
+            {/* Each action also reads the proxy after its name, as in the pool's rows. */}
             <Button
               aria-description={proxy.url}
-              data-action="adopt"
+              data-action="test"
               data-proxy={proxy.id}
-              loading={adopting}
-              onClick={() => actions.onAdopt(proxy)}
+              loading={testing}
+              onClick={() => actions.onTest(proxy)}
               size="sm"
               variant="secondary"
             >
-              <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
-              {t("detected.adopt")}
+              <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
+              {t("actions.test")}
             </Button>
-          ) : null}
-        </fieldset>
-      }
-      controlWidth="actions"
-      description={
-        <span className="flex flex-wrap gap-x-3 gap-y-1">
-          {proxy.global ? <span>{t("detected.global")}</span> : null}
-          {accounts > 0 ? <span>{t("detected.ownOf", { count: accounts })}</span> : null}
-          {proxy.username ? (
-            <span>{t("card.signsInAs", { user: mask(proxy.username) })}</span>
-          ) : null}
-          <CheckFacts proxy={proxy} />
-          {proxy.inPool ? <span>{t("detected.inPool")}</span> : null}
-          {proxy.username || proxy.hasPassword ? <span>{t("detected.notShared")}</span> : null}
-        </span>
-      }
-      status={
-        <span className="flex flex-wrap items-center gap-2">
-          <Badge dot size="sm" tone={look.tone}>
-            {t(look.key)}
-          </Badge>
-          <Badge size="sm" tone="primary">
-            {t("detected.badge")}
-          </Badge>
-        </span>
-      }
-      title={
-        <span className="wrap-anywhere font-mono text-meta" translate="no">
-          {proxy.url}
-        </span>
-      }
-    >
-      <StateNote proxy={proxy} />
-    </SettingsRow>
+            {proxy.canAdopt ? (
+              <Button
+                aria-description={proxy.url}
+                data-action="adopt"
+                data-proxy={proxy.id}
+                loading={adopting}
+                onClick={() => actions.onAdopt(proxy)}
+                size="sm"
+                variant="secondary"
+              >
+                <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
+                {t("detected.adopt")}
+              </Button>
+            ) : null}
+          </fieldset>
+        }
+        controlWidth="actions"
+        description={
+          <span className="flex flex-wrap gap-x-3 gap-y-1">
+            {proxy.global ? <span>{t("detected.global")}</span> : null}
+            {accounts > 0 ? <span>{t("detected.ownOf", { count: accounts })}</span> : null}
+            {proxy.username ? (
+              <span>{t("card.signsInAs", { user: mask(proxy.username) })}</span>
+            ) : null}
+            <CheckFacts proxy={proxy} />
+            {proxy.inPool ? <span>{t("detected.inPool")}</span> : null}
+            {proxy.username || proxy.hasPassword ? <span>{t("detected.notShared")}</span> : null}
+          </span>
+        }
+        status={
+          <span className="flex flex-wrap items-center gap-2">
+            <Badge dot size="sm" tone={look.tone}>
+              {t(look.key)}
+            </Badge>
+            <Badge size="sm" tone="primary">
+              {t("detected.badge")}
+            </Badge>
+          </span>
+        }
+        title={
+          <span className="wrap-anywhere font-mono text-meta" translate="no">
+            {proxy.url}
+          </span>
+        }
+      />
+      {noted ? <StateNote proxy={proxy} /> : null}
+    </div>
   );
 });

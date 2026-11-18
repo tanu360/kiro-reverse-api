@@ -635,6 +635,29 @@ describe("RequestsPage", () => {
     expect(bodyRows()).toHaveLength(25);
   });
 
+  it("shows a failed Try again as a new alert, so it is read out again", async () => {
+    let failures = 0;
+    mockServer.use(
+      http.get(RECENT_REQUESTS, () => {
+        if (failures === 0) return undefined;
+        failures++;
+        return HttpResponse.json({ error: "database is locked" }, { status: 500 });
+      }),
+    );
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    failures = 1;
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const first = (await screen.findByText("database is locked")).closest(
+      '[data-slot="action-error"]',
+    ) as HTMLElement;
+    const before = failures;
+    await user.click(within(first).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(failures).toBeGreaterThan(before));
+    await waitFor(() => expect(first).not.toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent("database is locked");
+  });
+
   it("closes the failed-refresh line until the next failure", async () => {
     let fail = false;
     mockServer.use(
