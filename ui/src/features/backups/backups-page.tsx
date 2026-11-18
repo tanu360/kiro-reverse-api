@@ -21,14 +21,9 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import {
-  NOTICE_ACTIONS_CLASS,
-  NOTICE_LINE_CLASS,
-  NoticeIconButton,
-} from "@/components/shared/notice-line";
+import { NoticeIconButton, NoticeLine } from "@/components/shared/notice-line";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
-import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
@@ -129,15 +124,16 @@ type Failure =
 function DownloadedNotice({ onDismiss }: { onDismiss: () => void }): JSX.Element {
   const { t } = useT("backups");
   return (
-    <Alert className={NOTICE_LINE_CLASS} data-testid="backup-downloaded" variant="success">
-      <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
-      <AlertDescription className="wrap-break-word">
-        {t("common:text.joinSentences", { first: t("downloaded"), second: t("downloadHint") })}
-      </AlertDescription>
-      <AlertAction className={NOTICE_ACTIONS_CLASS}>
+    <NoticeLine
+      actions={
         <NoticeIconButton icon={XIcon} label={t("common:actions.close")} onClick={onDismiss} />
-      </AlertAction>
-    </Alert>
+      }
+      data-testid="backup-downloaded"
+      icon={CircleCheckIcon}
+      variant="success"
+    >
+      {t("common:text.joinSentences", { first: t("downloaded"), second: t("downloadHint") })}
+    </NoticeLine>
   );
 }
 
@@ -160,6 +156,7 @@ export function BackupsPage(): JSX.Element {
    * top of the list card. A restore signs out, so the sign-in page comes next.
    */
   const [failure, setFailure] = useState<Failure | null>(null);
+  const failureRef = useRef<HTMLDivElement | null>(null);
   // The backup just downloaded, for its green line.
   const [downloaded, setDownloaded] = useState<string | null>(null);
   /** A new action starts: the last one's notice goes. */
@@ -261,11 +258,13 @@ export function BackupsPage(): JSX.Element {
           return;
         }
         announce(t("deleted"));
-        const index = (list.data ?? []).findIndex((row) => row.id === entry.id);
+        // The list as it is now: it may have changed while the delete ran.
+        const now = queryClient.getQueryData(backupsQuery().queryKey) ?? [];
+        const index = now.findIndex((row) => row.id === entry.id);
         setRefocus({ id: entry.id, index: Math.max(0, index) });
         await invalidate();
       }),
-    [run, clearNotices, t, invalidate, list.data],
+    [run, clearNotices, t, invalidate, queryClient],
   );
 
   const actions = useMemo<BackupRowActions>(
@@ -324,6 +323,15 @@ export function BackupsPage(): JSX.Element {
     focusFirstShown(targets);
     setRefocus(null);
   }, [refocus, rows]);
+
+  // A failed action on a backup that has since gone (deleted elsewhere, pruned by a schedule
+  // save) has nothing left to retry: its notice goes, and focus in it moves to Create backup.
+  useLayoutEffect(() => {
+    if (!failure || !("entry" in failure) || !list.data) return;
+    if (list.data.some((row) => row.id === failure.entry.id)) return;
+    if (failureRef.current?.contains(document.activeElement)) createRef.current?.focus();
+    setFailure(null);
+  }, [failure, list.data]);
 
   /** A row's first action; Create backup when the row is on another page or gone. */
   const focusRow = (id: string) =>
@@ -469,7 +477,7 @@ export function BackupsPage(): JSX.Element {
         title={t("list.title")}
       >
         {failure ? (
-          <CardPanel>
+          <CardPanel ref={failureRef}>
             <ActionError
               error={failure.error}
               onDismiss={() => {
