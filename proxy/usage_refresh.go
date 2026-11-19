@@ -41,7 +41,7 @@ func (h *Handler) applyUsageRefreshInterval(w http.ResponseWriter, minutes *int)
 // runHousekeeping runs the background jobs until stop is closed: the models
 // listing on its fixed cadence and the usage sweep on the admin's interval.
 func (h *Handler) runHousekeeping(stop <-chan struct{}) {
-	go h.rescheduleOnConfigEvents(stop)
+	go h.rescheduleOnConfigEvents(getBroadcaster(), stop)
 	runHousekeepingJobs(stop, h.usageRefresh, h.listModelsForHousekeeping, h.refreshAllAccounts)
 }
 
@@ -89,8 +89,9 @@ func runHousekeepingJobs(stop <-chan struct{}, usage *refreshScheduler, listMode
 // may have changed: a settings save, or a backup restore, which replaces the
 // whole config without going through the settings API. Without it a restore
 // that turns the sweep back on would wait for the next settings change.
-func (h *Handler) rescheduleOnConfigEvents(stop <-chan struct{}) {
-	b := getBroadcaster()
+// Tests pass a broadcaster of their own: on the shared one, events from other
+// tests' leftover goroutines would wake the loop too.
+func (h *Handler) rescheduleOnConfigEvents(b *broadcaster, stop <-chan struct{}) {
 	id, events := b.Subscribe()
 	defer b.Unsubscribe(id)
 	for {

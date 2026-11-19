@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -109,13 +108,14 @@ func TestUsageRefreshWakesOnConfigEvents(t *testing.T) {
 	wake := make(chan struct{}, 8)
 	h.usageRefresh.wake = wake
 
-	b := getBroadcaster()
-	first := atomic.LoadUint64(&b.nextID) + 1
+	// A broadcaster of its own: a leftover goroutine from another test (a proxy-pool state
+	// change, say) publishes settings_changed on the shared one and wakes the loop once more.
+	b := &broadcaster{subscribers: make(map[uint64]chan Event)}
 	stop := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		h.rescheduleOnConfigEvents(stop)
+		h.rescheduleOnConfigEvents(b, stop)
 	}()
 	defer func() {
 		close(stop)
@@ -124,19 +124,19 @@ func TestUsageRefreshWakesOnConfigEvents(t *testing.T) {
 
 	// The loop subscribes on its own goroutine: wait for it, so no event is published before.
 	deadline := time.Now().Add(2 * time.Second)
-	for subscribed := false; !subscribed; {
+	for {
 		b.mu.RLock()
-		for id := range b.subscribers {
-			subscribed = subscribed || id >= first
-		}
+		subscribed := len(b.subscribers) > 0
 		b.mu.RUnlock()
-		if !subscribed {
-			if time.Now().After(deadline) {
-				t.Fatal("the sweep loop never subscribed to events")
-			}
-			time.Sleep(time.Millisecond)
+		if subscribed {
+			break
 		}
+		if time.Now().After(deadline) {
+			t.Fatal("the sweep loop never subscribed to events")
+		}
+		time.Sleep(time.Millisecond)
 	}
+	publish := func(eventType string) { b.Publish(Event{Type: eventType}) }
 
 	expectWake := func(what string) {
 		t.Helper()
@@ -146,15 +146,15 @@ func TestUsageRefreshWakesOnConfigEvents(t *testing.T) {
 			t.Fatalf("%s did not wake the sweep loop", what)
 		}
 	}
-	publishEvent(eventBackupRestored, "")
+	publish(eventBackupRestored)
 	expectWake("a backup restore")
-	publishEvent(eventSettingsChanged, "")
+	publish(eventSettingsChanged)
 	expectWake("a settings change")
 
 	// The loop reads events in order, so the settings change after the stats reset wakes it
 	// once; a second wake could only be the stats reset's.
-	publishEvent(eventStatsReset, "")
-	publishEvent(eventSettingsChanged, "")
+	publish(eventStatsReset)
+	publish(eventSettingsChanged)
 	expectWake("a settings change")
 	select {
 	case <-wake:
