@@ -15,7 +15,7 @@ export async function startMockWorker(): Promise<void> {
   const scenario = resolveMockScenario();
   const started = performance.now();
   resetMockDb(scenario);
-  // The full dataset also gets the 3.3.0 showcase: pool, headers, a duplicate, the update notes.
+  // The full dataset also gets the showcase: pool, headers, a duplicate, the update notes.
   if (scenario === "full") applyShowcase();
   // The server kind for the update dialog (?server=), and a self-update done earlier in this tab.
   mockDb.server = resolveMockServer();
