@@ -9,7 +9,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { CommandMenuProvider, CommandMenuTrigger } from "./command-menu";
@@ -17,6 +17,7 @@ import { LanguageSwitch } from "./language-switch";
 import { activeNavItem, activeNavView, type NavItem, type NavView } from "./nav-items";
 import { PrivacyToggle } from "./privacy-toggle";
 import { ThemeSwitch } from "./theme-switch";
+import { UpdateDot, useUpdateCheck } from "./update-check";
 
 /**
  * Port of the Studio Admin dashboard header: sticky and 48 px, painted like t3code's page headers
@@ -37,6 +38,8 @@ export function SiteHeader(): JSX.Element {
   const active = activeNavItem(pathname);
   const view = active ? activeNavView(active, status, pathname) : undefined;
   const toggleLabel = t("shell.toggleSidebar");
+  const { isMobile } = useSidebar();
+  const { latest } = useUpdateCheck();
 
   return (
     <header
@@ -51,17 +54,20 @@ export function SiteHeader(): JSX.Element {
          */}
         <div className="mx-auto grid w-full min-w-0 max-w-screen-2xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 sm:grid-cols-[minmax(max-content,1fr)_minmax(0,20rem)_minmax(max-content,1fr)] md:px-6">
           <div className="flex min-w-0 items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <SidebarTrigger
-                    aria-label={toggleLabel}
-                    className="-ms-2 pointer-coarse:-ms-2.5"
-                  />
-                }
-              />
-              <TooltipPopup>{toggleLabel}</TooltipPopup>
-            </Tooltip>
+            {/* The glyph's inset sits on this box, so the dot can be placed from the button's centre. */}
+            <span className="-ms-2 pointer-coarse:-ms-2.5 relative flex shrink-0">
+              <Tooltip>
+                <TooltipTrigger render={<SidebarTrigger aria-label={toggleLabel} />} />
+                <TooltipPopup>{toggleLabel}</TooltipPopup>
+              </Tooltip>
+              {/*
+               * Phones keep the sidebar, and its new-version card, behind this button: the dot on
+               * the panel glyph's top-right corner says a newer release is out, like the rail's bell.
+               */}
+              {isMobile && latest ? (
+                <UpdateDot className="pointer-events-none top-1/2 left-1/2 -mt-2.5 ml-0.5" />
+              ) : null}
+            </span>
             <Separator
               className="-ms-1 me-1 h-4 self-center max-sm:hidden"
               orientation="vertical"
