@@ -1,5 +1,5 @@
 {
-  "version": "4.0.9",
-  "changelog": "📐 Alignment fixes. The ∞ sign beside usage numbers now sits centred on the digits instead of slightly high. In the user panel, \"No key limit\" lines up with the numbers beside it, and the key facts row keeps every label and value on one line on wide screens, \"All models\" included. The update dialog's \"Downloading\" line sits level with the byte count.",
+  "version": "4.1.0",
+  "changelog": "📱 On a phone, the menu button at the top left shows an orange dot when a new version is out, so you see the update without opening the menu.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
