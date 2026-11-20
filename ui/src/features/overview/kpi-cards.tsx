@@ -138,11 +138,7 @@ export function Delta({
   );
 }
 
-/**
- * Pills over the last hour, tallest for the bucket with the most failures; the newest is solid.
- * With no failure at all it is KpiSparkline's empty grey track, so an hour without failures does
- * not read as one with them.
- */
+/** Pills over the last hour, tallest for the bucket with the most failures; the newest is solid. */
 export function FailurePills({
   values,
   className,
@@ -152,7 +148,6 @@ export function FailurePills({
   className?: string;
 }): JSX.Element {
   const peak = Math.max(0, ...values);
-  if (peak === 0) return <KpiTrendFloor />;
   return (
     <div
       aria-hidden="true"
