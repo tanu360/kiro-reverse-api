@@ -1068,6 +1068,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	kiroPayload.StopSequences = req.StopSequences
 	h.applyReasoningEffort(kiroPayload, req.Model, claudeOutputEffort(&req))
 	applyClaudeThinkingBudget(kiroPayload, req.Thinking)
+	h.applyThinkingInstruction(kiroPayload)
 	attachStructuredOutput(kiroPayload, claudeStructuredOutputSpec(&req), req.Stream)
 	thinkingResponseOpts.Format = structuredOutputThinkingFormat(kiroPayload.StructuredOutput, thinkingResponseOpts.Format, "thinking")
 
@@ -1949,6 +1950,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	h.applyReasoningEffort(kiroPayload, req.Model, req.ReasoningEffort)
 	attachStructuredOutput(kiroPayload, chatStructuredOutputSpec(&req), req.Stream)
 
+	h.applyThinkingInstruction(kiroPayload)
 	if req.Stream {
 		r = withChatStreamUsage(r, req.StreamOptions)
 		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)

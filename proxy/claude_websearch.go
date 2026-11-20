@@ -569,6 +569,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 	payload := ClaudeToKiro(req, thinking)
 	h.applyReasoningEffort(payload, req.Model, claudeOutputEffort(req))
 	excluded := make(map[string]bool)
+	h.applyThinkingInstruction(payload)
 	var lastErr error
 	var lastAccount *config.Account
 
