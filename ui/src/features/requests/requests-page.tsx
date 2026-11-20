@@ -174,10 +174,11 @@ export function RequestsPage(): JSX.Element {
   }
 
   const fatalError = isError && !hasData;
-  // Search and the status filter can't narrow an empty log, so they wait for the first request.
+  // Search and the status filter can't narrow an empty log, so they wait for the first request;
+  // nor a log that did not load, so a failed first load is the error alone, as on Accounts.
   // Kept while the previous filter's rows stand in, so clearing a filter that matched nothing
   // does not drop the toolbar (and the focus moved to its tabs) until the new rows arrive.
-  const showFilters = !hasData || total > 0 || filtered || query.isPlaceholderData;
+  const showFilters = (!hasData && !fatalError) || total > 0 || filtered || query.isPlaceholderData;
   const memoryNote =
     data?.persistent === false ? (
       <Alert role="note" size="sm" variant="info">
@@ -236,6 +237,16 @@ export function RequestsPage(): JSX.Element {
       }}
     />
   ) : null;
+  // The notes alone, without the filters (an empty log); none leaves the card without a toolbar,
+  // since an empty fragment would still draw the toolbar's padded band.
+  const notes =
+    conversationNote || memoryNote || refetchError ? (
+      <>
+        {conversationNote}
+        {memoryNote}
+        {refetchError}
+      </>
+    ) : undefined;
 
   return (
     <>
@@ -285,11 +296,7 @@ export function RequestsPage(): JSX.Element {
                 {refetchError}
               </>
             ) : (
-              <>
-                {conversationNote}
-                {memoryNote}
-                {refetchError}
-              </>
+              notes
             )
           }
         >

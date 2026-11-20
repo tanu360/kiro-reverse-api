@@ -138,7 +138,11 @@ export function Delta({
   );
 }
 
-/** Pills over the last hour, tallest for the bucket with the most failures; the newest is solid. */
+/**
+ * Pills over the last hour, tallest for the bucket with the most failures; the newest is solid.
+ * With no failure at all it is KpiSparkline's empty grey track, so an hour without failures does
+ * not read as one with them.
+ */
 export function FailurePills({
   values,
   className,
@@ -148,6 +152,7 @@ export function FailurePills({
   className?: string;
 }): JSX.Element {
   const peak = Math.max(0, ...values);
+  if (peak === 0) return <KpiTrendFloor />;
   return (
     <div
       aria-hidden="true"
@@ -178,17 +183,47 @@ export function FailurePills({
   );
 }
 
-/** A KPI card's trend: the stat tiles' area sparkline, from zero, under the figures. */
+/**
+ * A trend that stayed at zero: the empty grey track of the cards' bars (SegmentBar) on the floor
+ * of the trend's slot, `label` over it.
+ */
+function KpiTrendFloor({ label }: { label?: ReactNode }): JSX.Element {
+  return (
+    <div
+      aria-hidden="true"
+      className="relative mt-3.5 flex min-w-0 items-end"
+      data-slot="kpi-trend-empty"
+      style={{ height: SPARK_HEIGHT }}
+    >
+      <SegmentBar className="mt-0 w-full" parts={[]} />
+      {label ? (
+        <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-meta text-muted-foreground">
+          {label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A KPI card's trend: the stat tiles' area sparkline, from zero, under the figures. A measure
+ * that stayed at zero draws the empty grey track instead, so no series colour reads as traffic;
+ * `emptyLabel` is written over it.
+ */
 export function KpiSparkline({
   data,
   color,
+  emptyLabel,
 }: {
   /** Oldest first. */
   data: readonly { value: number }[];
   /** The area's colour (default the series purple). */
   color?: string;
+  /** Over the empty track when every point is zero (the key holder's "No traffic"). */
+  emptyLabel?: ReactNode;
 }): JSX.Element {
   const animate = !usePrefersReducedMotion();
+  if (data.every((point) => point.value === 0)) return <KpiTrendFloor label={emptyLabel} />;
   return (
     <div aria-hidden="true" className="mt-3.5" style={{ height: SPARK_HEIGHT }}>
       <LazySparkline animate={animate} color={color} data={data} height={SPARK_HEIGHT} />

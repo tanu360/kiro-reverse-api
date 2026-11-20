@@ -112,7 +112,7 @@ function Comparison({
   return previous.requests === 0 ? t(`kpi.noneBefore.${range}`) : t(`kpi.zeroBefore.${range}`);
 }
 
-/** The card's trend, or a flat dashed floor when the measure stayed at zero. */
+/** The card's trend: KpiSparkline, whose empty track says "No traffic" in an idle range. */
 function Trend({
   data,
   color,
@@ -124,24 +124,14 @@ function Trend({
   idle: boolean;
 }): JSX.Element {
   const { t } = useT("user-panel");
-  if (data.every((point) => point.value === 0)) {
-    return (
-      <div
-        aria-hidden="true"
-        className="relative mt-3.5 flex h-13 min-w-0 items-end"
-        data-slot="kpi-trend-empty"
-      >
-        <div className="w-full border-border-strong border-t border-dashed" />
-        {idle ? (
-          <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-meta text-muted-foreground">
-            {t("kpi.noTraffic")}
-          </span>
-        ) : null}
-      </div>
-    );
-  }
   // A lifetime of one bucket still draws a line.
-  return <KpiSparkline color={color} data={data.length === 1 ? [data[0], data[0]] : data} />;
+  return (
+    <KpiSparkline
+      color={color}
+      data={data.length === 1 ? [data[0], data[0]] : data}
+      emptyLabel={idle ? t("kpi.noTraffic") : undefined}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------

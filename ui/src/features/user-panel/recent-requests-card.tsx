@@ -208,10 +208,11 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
   }
 
   const fatalError = isError && !hasData;
-  // The status filter can't narrow an empty log, so it waits for the first request.
+  // The status filter can't narrow an empty log, so it waits for the first request; nor a log
+  // that did not load, so a failed first load is the error alone, as on Accounts.
   // Kept while the previous filter's rows stand in, so clearing a filter that matched nothing
   // does not drop the toolbar (and the focus moved to its tabs) until the new rows arrive.
-  const showFilters = !hasData || total > 0 || filtered || query.isPlaceholderData;
+  const showFilters = (!hasData && !fatalError) || total > 0 || filtered || query.isPlaceholderData;
   // Nothing to page through when the list fits the smallest page, is out of range or failed.
   const showPager = hasData && total > PAGE_SIZES[0] && !outOfRange && !fatalError;
 
