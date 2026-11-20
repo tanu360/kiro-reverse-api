@@ -1,5 +1,5 @@
 {
-  "version": "4.1.1",
-  "changelog": "🎨 Calmer states. A focused field, the keyboard outline and a chosen option card now take a soft grey instead of purple. Everything that loads, the traffic charts included, shows the grey skeleton, and a trend that stayed at zero draws an empty grey track instead of a coloured line. Machine IDs and model mapping names use the regular font.",
+  "version": "4.1.2",
+  "changelog": "🚦 Steadier paid models. When Kiro rate-limits an account, the proxy now tries it again after 5 seconds instead of a minute, and a burst of requests counts as one limit, so a model that only one account serves no longer goes offline for minutes. A request that Kiro calls invalid, such as an image sent to a model without vision, now gets its 400 even when another endpoint is busy, and the account stays in rotation.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
