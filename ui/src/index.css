@@ -65,10 +65,11 @@
   --border-strong: color-mix(in oklab, var(--foreground) 50%, transparent);
   --input: var(--color-zinc-300);
   /*
-   * Focus: neutral, as in shadcn and coss. A focused field's border and the keyboard outline take
-   * the control-edge grey (at least 3:1), never the brand purple.
+   * Focus and the selected-card edge: a muted neutral grey, as in shadcn (its neutral-400 ring,
+   * about 2.5:1), never the brand purple. A focused field's border, the keyboard outline and a
+   * checked choice card's edge all take it.
    */
-  --ring: var(--border-strong);
+  --ring: color-mix(in oklab, var(--foreground) 40%, transparent);
   /*
    * Status ramps, one per tone (the pill colours further down are their source): the bare token
    * is the disc or icon (at least 3:1 on a card), -foreground the text (at least 4.5:1) and
@@ -155,6 +156,7 @@
   --border-subtle: --alpha(var(--color-white) / 5.5%);
   --border: --alpha(var(--color-white) / 8%);
   --border-strong: color-mix(in oklab, var(--color-white) 35%, transparent);
+  --ring: color-mix(in oklab, var(--color-white) 25%, transparent);
   --input: --alpha(var(--color-white) / 11%);
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
   /* Kiro purple-300: 9.7:1 on black. */

@@ -9,8 +9,8 @@ import { cn, placeholderKeys } from "@/lib/utils";
 const CHOICE_BASE =
   "flex min-h-11 cursor-pointer items-start gap-3 transition-colors hover:bg-accent has-data-checked:bg-accent has-data-disabled:pointer-events-none has-data-disabled:opacity-64 [&_[data-slot=checkbox]:focus-visible]:outline-none [&_[data-slot=radio]:focus-visible]:outline-none";
 const CHOICE_VARIANT = {
-  // A bordered card on its own; checked adds the primary edge.
-  card: "rounded-lg border border-border p-3 has-data-checked:border-primary/48 has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:outline-offset-2 has-focus-visible:outline-solid",
+  // A bordered card on its own; checked adds the muted ring-grey edge.
+  card: "rounded-lg border border-border p-3 has-data-checked:border-ring has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:outline-offset-2 has-focus-visible:outline-solid",
   // A row divided inside a ChoiceList: no border of its own, checked is the accent fill only,
   // and the focus ring is drawn inside the row so the list's edges do not clip it.
   row: "w-full px-4 py-3 has-focus-visible:outline-1 has-focus-visible:outline-ring has-focus-visible:-outline-offset-1 has-focus-visible:outline-solid",

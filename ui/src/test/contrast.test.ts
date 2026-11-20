@@ -314,11 +314,12 @@ const PAIRS: [string, string, string[], number][] = [
   ["warning-foreground on a card", "warning-foreground", ["background", "card"], 4.5],
   ["destructive-foreground on a card", "destructive-foreground", ["background", "card"], 4.5],
   ["info-foreground on a card", "info-foreground", ["background", "card"], 4.5],
-  ["field-border-focus on a card", "field-border-focus", ["background", "card"], 3],
+  // Focus is a muted grey like shadcn's neutral-400 (about 2.5:1); the field's fill and caret mark it too.
+  ["field-border-focus on a card", "field-border-focus", ["background", "card"], 2],
   ["border-strong on a card", "border-strong", ["background", "card"], 3],
   ["success disc on a card", "success", ["background", "card"], 3],
   ["warning disc on a card", "warning", ["background", "card"], 3],
-  ["ring on the page", "ring", ["background"], 3],
+  ["ring on the page", "ring", ["background"], 2],
 ];
 
 function ratio(theme: Theme, fg: string, surfaces: string[]): number {

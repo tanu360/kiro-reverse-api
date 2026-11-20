@@ -18,7 +18,7 @@ import { cn, placeholderKeys } from "@/lib/utils";
 
 const CARD_OPEN_HOVER = "has-[[data-slot=list-card-open]:hover]:bg-(--card-hover)";
 // The selected tint is laid over the card's own fill as an image, so the card stays opaque.
-const CARD_SELECTED = "border-primary/40 bg-linear-to-b from-(--row-selected) to-(--row-selected)";
+const CARD_SELECTED = "border-ring bg-linear-to-b from-(--row-selected) to-(--row-selected)";
 const ROW_CLASS = "relative flex min-w-0 flex-col gap-3 p-4 transition-colors";
 const ROW_OPEN_HOVER = "has-[[data-slot=list-card-open]:hover]:bg-(--row-hover)";
 const ROW_SELECTED = "bg-(--row-selected)";
