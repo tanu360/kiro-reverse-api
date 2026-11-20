@@ -20,6 +20,9 @@ func setRPMLimitForTest(t *testing.T, n int) *time.Time {
 	if err := config.UpdateAccountRPMLimit(n); err != nil {
 		t.Fatalf("set limit %d: %v", n, err)
 	}
+	//! The limit lives in the global config, so a test that left it at 1 failed whichever pool
+	//! test ran next and picked one account twice (CI shard 1/2 after new tests reshuffled them).
+	t.Cleanup(func() { _ = config.UpdateAccountRPMLimit(0) })
 	now := time.Unix(1_800_000_000, 0)
 	old := rpmNow
 	rpmNow = func() time.Time { return now }
