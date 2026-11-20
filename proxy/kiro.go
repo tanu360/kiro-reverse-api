@@ -206,6 +206,8 @@ type KiroPayload struct {
 	// ForcedToolChoice is "any" or "tool" when the client's tool_choice requires a tool call;
 	// see tool_choice_call.go.
 	ForcedToolChoice string `json:"-"`
+	// SingleToolCall is set when the client turned parallel tool use off; see parallel_tool_calls.go.
+	SingleToolCall bool `json:"-"`
 }
 
 type KiroUserInputMessage struct {

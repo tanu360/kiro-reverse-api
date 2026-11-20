@@ -311,9 +311,14 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 	if len(kiroTools) > 0 && (choice == "any" || choice == "tool") {
 		finalContent = joinHistoryText(finalContent, toolChoiceDirective(choice, kiroTools[0].ToolSpecification.Name))
 	}
+	singleToolCall := len(kiroTools) > 0 && claudeDisablesParallelToolUse(req.ToolChoice)
+	if singleToolCall {
+		finalContent = joinHistoryText(finalContent, singleToolCallDirective)
+	}
 
 	payload := &KiroPayload{}
 	payload.ToolNameMap = toolNameMap
+	payload.SingleToolCall = singleToolCall
 	if len(kiroTools) > 0 && (choice == "any" || choice == "tool") {
 		payload.ForcedToolChoice = choice
 	}
