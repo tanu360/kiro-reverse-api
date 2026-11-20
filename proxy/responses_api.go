@@ -277,6 +277,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 		return
 	}
 	recordFinalRequestForApiKey(ctx, apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.noteThrottleRetryAfter(ctx, model, lastErr)
 	h.sendOpenAIUpstreamError(w, lastErr)
 }
 
@@ -777,6 +778,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 		return
 	}
 	recordFinalRequestForApiKey(ctx, apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.noteThrottleRetryAfter(ctx, model, lastErr)
 	h.sendOpenAIUpstreamError(w, lastErr)
 }
 

@@ -1601,6 +1601,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 	}
 
 	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.noteThrottleRetryAfter(r.Context(), model, lastErr)
 	h.sendClaudeUpstreamError(w, lastErr)
 }
 
@@ -1843,6 +1844,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 	}
 
 	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.noteThrottleRetryAfter(r.Context(), model, lastErr)
 	h.sendClaudeUpstreamError(w, lastErr)
 }
 
@@ -1948,9 +1950,9 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	kiroPayload := OpenAIToKiro(&req, thinking)
 	kiroPayload.StopSequences, _ = openAIStopSequences(req.Stop)
 	h.applyReasoningEffort(kiroPayload, req.Model, req.ReasoningEffort)
+	h.applyThinkingInstruction(kiroPayload)
 	attachStructuredOutput(kiroPayload, chatStructuredOutputSpec(&req), req.Stream)
 
-	h.applyThinkingInstruction(kiroPayload)
 	if req.Stream {
 		r = withChatStreamUsage(r, req.StreamOptions)
 		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)
@@ -2458,6 +2460,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 	}
 
 	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.noteThrottleRetryAfter(r.Context(), model, lastErr)
 	h.sendOpenAIUpstreamError(w, lastErr)
 }
 
@@ -2596,6 +2599,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 	}
 
 	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.noteThrottleRetryAfter(r.Context(), model, lastErr)
 	h.sendOpenAIUpstreamError(w, lastErr)
 }
 

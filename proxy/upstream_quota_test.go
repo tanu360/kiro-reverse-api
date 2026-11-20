@@ -116,3 +116,34 @@ func TestOtherClientErrorsKeepTheirText(t *testing.T) {
 		t.Fatalf("a malformed request is not over the context window: %s", rec.Body.String())
 	}
 }
+
+// Kiro's throttle, as captured live: a 429 ThrottlingException that names no wait at all.
+func TestThrottle429TellsTheClientTheCooldown(t *testing.T) {
+	for _, path := range []string{"/v1/messages", "/v1/chat/completions", "/v1/responses"} {
+		t.Run(path, func(t *testing.T) {
+			h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("x-amzn-ErrorType", "ThrottlingException:http://internal.amazon.com/coral/com.amazon.coral.availability/")
+				http.Error(w, `{"message":"Too many requests, please wait before trying again.","reason":"USER_REQUEST_RATE_EXCEEDED"}`, http.StatusTooManyRequests)
+			})
+			t.Cleanup(func() { h.pool.RecordSuccess("only") })
+			body := `{"model":"claude-sonnet-4.5","max_tokens":100,"messages":[{"role":"user","content":"hi"}]}`
+			if path == "/v1/responses" {
+				body = `{"model":"claude-sonnet-4.5","input":"hi"}`
+			}
+			rec := httptest.NewRecorder()
+			w, r, finish := wrapClientResponse(rec, httptest.NewRequest("POST", path, strings.NewReader(body)))
+			switch path {
+			case "/v1/messages":
+				h.handleClaudeMessages(w, r)
+			case "/v1/responses":
+				h.handleOpenAIResponses(w, r)
+			default:
+				h.handleOpenAIChat(w, r)
+			}
+			finish()
+			if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "5" {
+				t.Fatalf("status %d Retry-After %q, want 429 with the 5 s throttle cooldown: %s", rec.Code, rec.Header().Get("Retry-After"), rec.Body.String())
+			}
+		})
+	}
+}

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"errors"
 	"kiro-proxy/proxypool"
 	"net/http"
@@ -110,6 +111,18 @@ func upstreamFailureStatusOr(err error, fallback int) int {
 		return http.StatusServiceUnavailable
 	}
 	return fallback
+}
+
+// noteThrottleRetryAfter gives the 429 for a Kiro throttle the wait the pool set for it. Kiro's
+// throttle names no wait (no Retry-After, x-amzn-kiro-ratelimit-retry-after or
+// retryAfterMilliseconds, live), so the 429 had no Retry-After and clients retried at once, into
+// a 503 for the same cooldown. A wait Kiro did name still goes out through setUpstreamRetryAfter.
+func (h *Handler) noteThrottleRetryAfter(ctx context.Context, model string, err error) {
+	var quota *upstreamQuotaError
+	if !errors.As(err, &quota) || !quota.throttled || quota.retryFor > 0 {
+		return
+	}
+	noteRetryAfter(ctx, h.pool.CooldownRetryAfter(model, allowedAccountsFromContext(ctx)))
 }
 
 func setUpstreamRetryAfter(w http.ResponseWriter, err error) {

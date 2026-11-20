@@ -441,6 +441,7 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 			}
 			//! The same status, type and Retry-After as the plain path: a 400 must not read as retryable.
 			finish(false, upstreamFailureStatus(err), err.Error())
+			h.noteThrottleRetryAfter(ctx, req.Model, err)
 			h.sendClaudeUpstreamError(w, err)
 			return
 		}
@@ -568,8 +569,8 @@ func (h *Handler) recordWebSearchLoop(ctx context.Context, apiKeyReservation *ap
 func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRequest, thinking bool, estimatedInputTokens int) (*claudeWebSearchRound, *config.Account, error) {
 	payload := ClaudeToKiro(req, thinking)
 	h.applyReasoningEffort(payload, req.Model, claudeOutputEffort(req))
-	excluded := make(map[string]bool)
 	h.applyThinkingInstruction(payload)
+	excluded := make(map[string]bool)
 	var lastErr error
 	var lastAccount *config.Account
 
