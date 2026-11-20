@@ -43,7 +43,6 @@ interface FieldSave {
 export function EditableFieldRow({
   title,
   value,
-  mono = false,
   multiline = false,
   wide = false,
   open,
@@ -57,8 +56,6 @@ export function EditableFieldRow({
   title: string;
   /** The saved value (text, or a node such as the proxy's inherited value); empty shows a dash. */
   value: ReactNode;
-  /** An ID or a URL: set in mono. */
-  mono?: boolean;
   /** Free text: the read view keeps line breaks (InlineEditRow `multiline`). */
   multiline?: boolean;
   /** The edit view gives its controls the whole row (InlineEditRow `wide`). */
@@ -82,7 +79,6 @@ export function EditableFieldRow({
     <InlineEditRow
       editing={open}
       label={title}
-      mono={mono}
       multiline={multiline}
       notice={failure ? <ActionError error={failure} /> : null}
       onCancel={() => {

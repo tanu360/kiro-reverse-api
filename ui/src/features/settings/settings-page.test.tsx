@@ -282,7 +282,10 @@ describe("SettingsPage", () => {
       return within(card)
         .getAllByRole("listitem")
         .map((row) =>
-          [...row.querySelectorAll("code")].map((code) => code.textContent).join(" -> "),
+          // The two model names are the row's only untranslated text.
+          [...row.querySelectorAll("[translate='no']")]
+            .map((name) => name.textContent)
+            .join(" -> "),
         );
     }
 
