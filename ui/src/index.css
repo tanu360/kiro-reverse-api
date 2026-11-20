@@ -64,7 +64,11 @@
   --border: var(--color-zinc-200);
   --border-strong: color-mix(in oklab, var(--foreground) 50%, transparent);
   --input: var(--color-zinc-300);
-  --ring: var(--primary);
+  /*
+   * Focus: neutral, as in shadcn and coss. A focused field's border and the keyboard outline take
+   * the control-edge grey (at least 3:1), never the brand purple.
+   */
+  --ring: var(--border-strong);
   /*
    * Status ramps, one per tone (the pill colours further down are their source): the bare token
    * is the disc or icon (at least 3:1 on a card), -foreground the text (at least 4.5:1) and
@@ -418,7 +422,7 @@
  * Form fields (input, textarea, select trigger, number field, input group): the sign-in
  * password field's soft fill. A faint foreground tint with a hairline border barely darker than
  * it, kept soft on purpose (the sign-in look; the label and the fill mark the field); hover
- * deepens the tint a step, and focus turns the border solid Kiro purple (at least 3:1) and
+ * deepens the tint a step, and focus turns the border the neutral ring grey (at least 3:1) and
  * lightens the fill. No focus ring. Checkboxes and radios take the same fill with the firmer
  * --border-strong edge (--field-border-strong), so the box reads at 3:1 at 16 px.
  */
@@ -428,7 +432,7 @@
   --field-focus: color-mix(in oklab, var(--foreground) 2%, transparent);
   --field-border: color-mix(in oklab, var(--foreground) 8%, transparent);
   --field-border-strong: var(--border-strong);
-  --field-border-focus: var(--primary);
+  --field-border-focus: var(--ring);
   /* The text-control step: 16 px (text-base) on phones, 14 px (text-sm) from sm. */
   --control-text: 1rem;
   --control-text-leading: 1.5;
