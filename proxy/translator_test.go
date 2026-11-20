@@ -619,3 +619,19 @@ func TestEnsureObjectSchemaKeepsDeclaredTypeWithoutComposition(t *testing.T) {
 		t.Fatalf("expected flattened schema forced to object, got %#v", flattened["type"])
 	}
 }
+
+func TestAnswerFromContentTakesACutThinkingBlockAsReasoning(t *testing.T) {
+	for _, tc := range []struct {
+		name, content, answer, reasoning string
+	}{
+		{"cut mid-thought", "<thinking>\nThe user asks 2+2", "", "\nThe user asks 2+2"},
+		{"cut after a closed block", "<thinking>plan</thinking>\n<thinking>more", "", "planmore"},
+		{"closed block", "<thinking>plan</thinking>\n\nFour.", "Four.", "plan"},
+		{"answer quoting the tag", "Wrap it in a <thinking> tag", "Wrap it in a <thinking> tag", ""},
+	} {
+		answer, reasoning := answerFromContent(tc.content, "max_tokens")
+		if answer != tc.answer || reasoning != tc.reasoning {
+			t.Fatalf("%s: got answer %q reasoning %q, want %q and %q", tc.name, answer, reasoning, tc.answer, tc.reasoning)
+		}
+	}
+}

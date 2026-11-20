@@ -2142,6 +2142,13 @@ func splitInlineThinking(content string) (string, string) {
 		}
 		end := strings.Index(result[start:], "</thinking>")
 		if end == -1 {
+			//! A block that opens the answer and never closes was cut off mid-thought (max_tokens),
+			//! as the stream reads it too; left in, the answer began with a raw <thinking> tag. A
+			//! tag after answer text is the answer quoting it.
+			if strings.TrimSpace(result[:start]) == "" {
+				reasoning += result[start+10:]
+				result = result[:start]
+			}
 			break
 		}
 		end += start
