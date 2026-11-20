@@ -10,6 +10,7 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, memo, useEffect, useId, useRef, useState } from "react";
+import { Skeleton as SkulletSkeleton } from "skullet/react";
 import { CodeBlock } from "@/components/shared/code-block";
 import { CopyButton } from "@/components/shared/copy-button";
 import { ModelLogo } from "@/components/shared/model-logo";
@@ -17,6 +18,7 @@ import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { assignedProxy, proxyName, routesThroughPool } from "@/features/proxy-pool/lib/pool-model";
@@ -35,7 +37,7 @@ import {
 } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
-import { cn } from "@/lib/utils";
+import { cn, placeholderKeys } from "@/lib/utils";
 import { authLabel, planLabel, proxyDisplayUrl } from "./account-model";
 import { TestModelPicker } from "./test-model-picker";
 
@@ -585,10 +587,14 @@ export function TestAccountDialog({
               className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-start outline-none focus-visible:outline-1 focus-visible:outline-ring disabled:cursor-default"
               disabled={cached.isPending}
             >
-              {rows.length === 0 ? (
-                <span className="truncate text-muted-foreground text-sm">
-                  {cached.isPending ? t("test.modelsLoading") : t("test.noPicked")}
-                </span>
+              {cached.isPending ? (
+                // A bar in the skeleton tint while the models load, as the list below.
+                <>
+                  <Skeleton aria-hidden="true" className="h-4 w-1/3" />
+                  <span className="sr-only">{t("test.modelsLoading")}</span>
+                </>
+              ) : rows.length === 0 ? (
+                <span className="truncate text-muted-foreground text-sm">{t("test.noPicked")}</span>
               ) : (
                 // The first pick in full, then how many more: a second name would only fit cut.
                 <>
@@ -644,14 +650,24 @@ export function TestAccountDialog({
             {t("test.runSelected", { count: rows.length })}
           </Button>
         </div>
-        <p
-          className={cn(
-            "-mt-1 text-meta text-muted-foreground",
-            cached.isError && "text-warning-foreground",
-          )}
-        >
-          {`${status} · ${t("test.hint")}`}
-        </p>
+        {cached.isPending ? (
+          // The model count is a skullet bar measured from a sample count while the models load.
+          <div className="-mt-1 flex min-w-0 items-center gap-1 text-meta text-muted-foreground">
+            <SkulletSkeleton label={status} loading>
+              <span>{t("test.modelsReady", { count: 12 })}</span>
+            </SkulletSkeleton>
+            <span className="min-w-0">{`· ${t("test.hint")}`}</span>
+          </div>
+        ) : (
+          <p
+            className={cn(
+              "-mt-1 text-meta text-muted-foreground",
+              cached.isError && "text-warning-foreground",
+            )}
+          >
+            {`${status} · ${t("test.hint")}`}
+          </p>
+        )}
 
         {/* The status line, summed over the picked models. */}
         {outcomes.length > 0 ? (
@@ -695,9 +711,28 @@ export function TestAccountDialog({
             <span className="text-end max-sm:hidden">{t("test.column.credits")}</span>
             <span />
           </div>
-          {rows.length === 0 ? (
+          {cached.isPending ? (
+            // Skeleton rows on the table's grid while the models load, like every other list.
+            <div aria-busy="true" role="status">
+              <span className="sr-only">{t("test.modelsLoading")}</span>
+              <ul aria-hidden="true" className="divide-y divide-border-subtle">
+                {placeholderKeys("test-row", 3).map((row, index) => (
+                  <li className={cn(ROW_GRID, "min-h-10")} key={row}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Skeleton className="size-4 shrink-0" />
+                      <Skeleton className={cn("h-3.5", index === 1 ? "w-2/5" : "w-1/2")} />
+                    </span>
+                    <Skeleton className="h-5 w-16 max-sm:hidden" />
+                    <Skeleton className="ms-auto h-3.5 w-8" />
+                    <Skeleton className="ms-auto h-3.5 w-10 max-sm:hidden" />
+                    <span />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : rows.length === 0 ? (
             <p className="px-3 py-4 text-center text-muted-foreground text-sm">
-              {cached.isPending ? t("test.modelsLoading") : t("test.noRows")}
+              {t("test.noRows")}
             </p>
           ) : (
             <ul className="divide-y divide-border-subtle">

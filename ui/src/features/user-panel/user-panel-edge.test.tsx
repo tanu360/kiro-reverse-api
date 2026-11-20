@@ -513,9 +513,13 @@ describe("empty and partial data", () => {
     });
     const { user } = await renderPanel();
     const refresh = screen.getByRole("button", { name: "Refresh" });
-    // The key answers first; the page must still hear when the usage settles after it.
-    await waitFor(() => expect(refresh).not.toHaveAttribute("aria-busy"));
+    // The first load shows its skeletons; Refresh does not spin over them as well.
+    const kpis = document.querySelector("[data-slot=usage-kpis]") as HTMLElement;
+    expect(kpis).toHaveAttribute("aria-busy", "true");
+    expect(refresh).not.toHaveAttribute("aria-busy");
+    await waitFor(() => expect(kpis).not.toHaveAttribute("aria-busy"));
     expect(refresh).not.toHaveAttribute("aria-disabled");
+    // The key answers first; the page must still hear when the usage settles after it.
     await user.click(refresh);
     await waitFor(() => expect(refresh).toHaveAttribute("aria-busy", "true"));
     await waitFor(() => expect(refresh).not.toHaveAttribute("aria-busy"));

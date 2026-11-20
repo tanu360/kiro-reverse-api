@@ -2,6 +2,7 @@ import { Alert02Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type JSX, useId, useState } from "react";
+import { Skeleton as SkulletSkeleton } from "skullet/react";
 import { CodeBlock } from "@/components/shared/code-block";
 import { CreditAmount } from "@/components/shared/credit-amount";
 import { StatStrip } from "@/components/shared/stat-strip";
@@ -144,16 +145,25 @@ function ReplayForm({ id, record }: { id: number; record: RequestRecord }): JSX.
               </datalist>
             </Field>
           </div>
-          <p className="text-muted-foreground text-xs">
-            {body.data
-              ? t("replay.bodyKept", {
-                  size: formatBytes(body.data.size, lang),
-                  endpoint: endpointLabel(body.data.endpoint as RequestRecord["endpoint"], t),
-                })
-              : body.isError
-                ? errorMessage(body.error, t)
-                : t("replay.bodyLoading")}
-          </p>
+          <div className="text-muted-foreground text-xs">
+            {body.isError && !body.data ? (
+              errorMessage(body.error, t)
+            ) : (
+              // skullet measures the line it will show (a sample size while it loads), so the
+              // bar has the text's own width, like every other loading line.
+              <SkulletSkeleton label={t("replay.bodyLoading")} loading={body.isPending}>
+                <span>
+                  {t("replay.bodyKept", {
+                    size: formatBytes(body.data?.size ?? 12_345, lang),
+                    endpoint: endpointLabel(
+                      (body.data?.endpoint ?? "claude") as RequestRecord["endpoint"],
+                      t,
+                    ),
+                  })}
+                </span>
+              </SkulletSkeleton>
+            )}
+          </div>
           {run.isError ? (
             <Alert role="alert" size="sm" variant="error">
               <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />

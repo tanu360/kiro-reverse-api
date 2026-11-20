@@ -1,7 +1,8 @@
 import { type JSX, type ReactNode, useId } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn, placeholderKeys } from "@/lib/utils";
 
 // The card carries the keyboard focus, so the Radio's or Checkbox's own ring is turned off: one
 // ring, not two concentric ones.
@@ -119,6 +120,42 @@ export function ChoiceList({
       render={<ul />}
     >
       {children}
+    </Card>
+  );
+}
+
+/**
+ * A scrolling ChoiceList while its items load: rows of the same padding, each a checkbox and a
+ * title bar (and a description bar with `description`), in the skeleton tint like every other
+ * loading state. `label` is read to screen readers.
+ */
+export function ChoiceListSkeleton({
+  label,
+  rows = 4,
+  description = false,
+}: {
+  label: string;
+  rows?: number;
+  /** The rows carry a second line (an account's plan and region). */
+  description?: boolean;
+}): JSX.Element {
+  return (
+    <Card aria-busy="true" className="overflow-hidden" data-slot="choice-list" role="status">
+      <span className="sr-only">{label}</span>
+      <ul aria-hidden="true" className={LIST_CLASS}>
+        {placeholderKeys("choice", rows).map((row, index) => (
+          <li className="flex min-h-11 items-start gap-3 px-4 py-3" key={row}>
+            {/* The 16 px control on the title's 20 px first line, as ChoiceCard. */}
+            <span className="flex h-5 shrink-0 items-center">
+              <Skeleton className="size-4" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-1.5 py-0.5">
+              <Skeleton className={cn("h-4", index % 2 === 0 ? "w-2/5" : "w-1/3")} />
+              {description ? <Skeleton className="h-3 w-1/4" /> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

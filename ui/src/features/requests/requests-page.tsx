@@ -240,7 +240,10 @@ export function RequestsPage(): JSX.Element {
   return (
     <>
       <PageHeader
-        actions={<RefreshButton fetching={query.isFetching} onRefresh={refresh} />}
+        // The first load shows the table's skeleton, so Refresh spins only over rows on screen.
+        actions={
+          <RefreshButton fetching={query.isFetching && !query.isPending} onRefresh={refresh} />
+        }
         description={t("description")}
         title={t("title")}
       />

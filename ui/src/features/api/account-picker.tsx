@@ -2,7 +2,7 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, type Ref, useId, useMemo, useState } from "react";
-import { ChoiceCard, ChoiceList } from "@/components/shared/choice-card";
+import { ChoiceCard, ChoiceList, ChoiceListSkeleton } from "@/components/shared/choice-card";
 import { ErrorState } from "@/components/shared/error-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -140,7 +140,7 @@ export function AccountPicks({
         title={t("form.accountsLoadFailed")}
       />
     ) : (
-      <p className="py-4 text-center text-muted-foreground text-sm">{tc("state.loading")}</p>
+      <ChoiceListSkeleton description label={tc("state.loading")} />
     )
   ) : visible.length + visibleRemoved.length > 0 ? (
     <ChoiceList aria-label={t("form.accounts")} scroll>

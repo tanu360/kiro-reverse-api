@@ -29,20 +29,26 @@ function useUserSignOut(): { signOut: () => Promise<void>; signingOut: boolean }
 }
 
 /**
- * The page heading with its Refresh, which spins while any panel query fetches. Its own
- * component, so the start and end of every poll render the heading again, not every card.
+ * The page heading with its Refresh, which spins while any panel query refetches what is on
+ * screen. Its own component, so the start and end of every poll render the heading again, not
+ * every card.
  */
 function PanelHeading(): JSX.Element {
   const queryClient = useQueryClient();
   const key = useQuery(userKeyQuery());
   // Subscribed, so Refresh stops spinning when the last panel query settles, not at the next
-  // render something else happens to cause.
-  const refreshing = useIsFetching({ queryKey: queryKeys.userPanel.all }) > 0;
+  // render something else happens to cause. Only queries that already have data: a first load
+  // (or a range not fetched yet) shows its skeletons, not a spinning Refresh too.
+  const refreshing =
+    useIsFetching({
+      queryKey: queryKeys.userPanel.all,
+      predicate: (query) => query.state.data !== undefined,
+    }) > 0;
   return (
     <KeyHeading
       apiKey={key.data}
       failed={key.isError}
-      fetching={key.isFetching || refreshing}
+      fetching={refreshing}
       // Only the queries on screen: a cached range or page would spend the key's usage budget
       // (20 builds a minute) too, and it loads again when shown once stale.
       onRefresh={() =>

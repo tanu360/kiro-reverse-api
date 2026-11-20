@@ -547,7 +547,8 @@ export function ApiKeysCard(): JSX.Element {
   );
   const headerRefresh = (
     <RefreshButton
-      fetching={keys.isFetching}
+      // The first load shows the table's skeleton, so it spins only over rows on screen.
+      fetching={keys.isFetching && !keys.isPending}
       onRefresh={() => void keys.refetch()}
       variant="icon"
     />
