@@ -29,7 +29,7 @@ import { Card } from "@/components/ui/card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { FAILED_COLOR, MODEL_COLORS, SUCCEEDED_COLOR } from "@/features/overview/colors";
-import { PLOT_HEIGHT } from "@/features/overview/traffic-card";
+import { TrafficChartSkeleton } from "@/features/overview/traffic-card";
 import type { StackedBar, TrafficSeries } from "@/features/overview/traffic-chart";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import {
@@ -226,7 +226,7 @@ interface UsageChartCardProps {
  * One row's usage as a chart card: requests (succeeded and failed), tokens (input and output) or
  * credits per hour, day, week, month or year, behind a measure switch, with the legend's totals
  * over the chart. The chart is the Overview's traffic chart (hatched stacked bars over their
- * tracks), at its height. The loading state is the chart's own skeleton; an empty range keeps
+ * tracks), at its height. The loading state is the Overview's grey columns; an empty range keeps
  * the bare axis under a notice.
  */
 export function UsageChartCard({
@@ -291,7 +291,8 @@ export function UsageChartCard({
     </Legend>
   );
   // Until the chart code arrives, an empty box of the plot's height holds the layout.
-  const placeholder = <div aria-hidden="true" className={PLOT_HEIGHT} />;
+  // The Overview's loading columns, while the range loads and until the chart code arrives.
+  const placeholder = <TrafficChartSkeleton />;
 
   const loading = !data;
   const showEmpty = !loading && empty;
@@ -316,20 +317,23 @@ export function UsageChartCard({
         <div className="relative">
           {/* Empty, the bare axis recedes, so the notice over it is what reads. */}
           <div aria-hidden="true" className={cn(showEmpty && "opacity-40")}>
-            <Suspense fallback={placeholder}>
-              <TrafficChart
-                bars={bars}
-                bucketMin={bucketSeconds / 60}
-                empty={showEmpty}
-                formatValue={formatValue}
-                lang={lang}
-                period={period}
-                reducedMotion={reducedMotion}
-                series={stack}
-                status={loading ? "loading" : "ready"}
-                wholeNumbers={metric !== "credits"}
-              />
-            </Suspense>
+            {loading ? (
+              placeholder
+            ) : (
+              <Suspense fallback={placeholder}>
+                <TrafficChart
+                  bars={bars}
+                  bucketMin={bucketSeconds / 60}
+                  empty={showEmpty}
+                  formatValue={formatValue}
+                  lang={lang}
+                  period={period}
+                  reducedMotion={reducedMotion}
+                  series={stack}
+                  wholeNumbers={metric !== "credits"}
+                />
+              </Suspense>
+            )}
           </div>
           {showEmpty ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">

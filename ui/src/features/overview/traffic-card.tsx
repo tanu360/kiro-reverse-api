@@ -12,6 +12,7 @@ import {
   LegendValue,
   useLegendItem,
 } from "@/components/charts/legend";
+import { BarChartSkeleton } from "@/components/shared/chart-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
@@ -47,6 +48,15 @@ const PHONE_BUCKET_MIN: Readonly<Record<HeatmapRange, number>> = { "1h": 4, "6h"
  * The API key usage cards draw their chart at this height too.
  */
 export const PLOT_HEIGHT = "h-64 @2xl:h-72";
+
+/**
+ * The traffic chart's loading state, here and on the API key usage cards: grey columns at the
+ * plot's height, inset like the chart's plot (traffic-chart MARGIN), so the bars land where the
+ * columns stood. Drawn without the chart code, so it shows while that chunk loads too.
+ */
+export function TrafficChartSkeleton(): JSX.Element {
+  return <BarChartSkeleton className={cn(PLOT_HEIGHT, "pt-2 pr-9 pb-7 pl-2")} />;
+}
 
 function isRange(value: unknown): value is OverviewRange {
   return typeof value === "string" && (RANGES as readonly string[]).includes(value);
@@ -211,21 +221,8 @@ export function TrafficCard(): JSX.Element {
       <TrafficLegendItem reservePrevious={!hourView} />
     </Legend>
   );
-  const loadingChart = (
-    <TrafficChart
-      bars={[]}
-      bucketMin={bucketMin}
-      bucketSize={labels.bucket}
-      lang={lang}
-      period={period}
-      previousLabel={labels.previous}
-      reducedMotion={reducedMotion}
-      series={series}
-      status="loading"
-    />
-  );
-  // Until the chart code arrives, an empty box of the plot's height holds the layout.
-  const placeholder = <div aria-hidden="true" className={PLOT_HEIGHT} />;
+  // Until the chart code arrives, the loading columns hold the layout.
+  const placeholder = <TrafficChartSkeleton />;
 
   let body: JSX.Element;
   if (!data) {
@@ -243,9 +240,7 @@ export function TrafficCard(): JSX.Element {
       body = (
         <div className="flex flex-col gap-3">
           {legend}
-          <div aria-hidden="true">
-            <Suspense fallback={placeholder}>{loadingChart}</Suspense>
-          </div>
+          <TrafficChartSkeleton />
         </div>
       );
     }

@@ -39,3 +39,36 @@ export function ChartSkeleton({
     </svg>
   );
 }
+
+// Twelve columns of uneven height (percent of the plot), fixed so the skeleton does not jump.
+const BAR_HEIGHTS = [46, 62, 38, 70, 54, 80, 48, 66, 58, 74, 42, 60];
+
+/**
+ * A bar chart's loading state: columns in the skeleton tint with 4 px corners, breathing like
+ * every other skeleton (index.css animate-skeleton), standing on the floor of the box. No axis
+ * and no series colour, so it never reads as data. Decorative: the slot's own label says it is
+ * loading.
+ */
+export function BarChartSkeleton({
+  className,
+}: {
+  /** Size and padding classes; the padding is the plot's inset, the columns fill the rest. */
+  className?: string;
+}): JSX.Element {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("flex w-full animate-skeleton items-end gap-[3%]", className)}
+      data-slot="chart-skeleton"
+    >
+      {BAR_HEIGHTS.map((height, index) => (
+        <div
+          className="flex-1 rounded-sm bg-skeleton"
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list that never reorders.
+          key={index}
+          style={{ height: `${height}%` }}
+        />
+      ))}
+    </div>
+  );
+}

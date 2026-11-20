@@ -145,9 +145,10 @@ const partKey = (index: number) => `part${index}`;
 /**
  * Lazy-loaded Bklit bar chart for the traffic card: one stacked bar per bucket, each series
  * hatched in its colour over a faint full-height track (the Overview: succeeded, retried and
- * failed in purple, amber and red), and (1 h) the previous hour as a dashed grey curve. In the
- * loading state BarChart draws its own skeleton; with no traffic only the tracks remain. The API
- * key usage cards draw a key's requests, tokens or credits with it.
+ * failed in purple, amber and red), and (1 h) the previous hour as a dashed grey curve. With no
+ * traffic only the time axis remains. Loading is not drawn here: the cards show the grey columns
+ * of traffic-card's TrafficChartSkeleton instead. The API key usage cards draw a key's requests,
+ * tokens or credits with it.
  */
 export default function TrafficChart({
   bars,
@@ -160,7 +161,6 @@ export default function TrafficChart({
   formatValue,
   wholeNumbers = false,
   reducedMotion,
-  status = "ready",
   empty = false,
 }: {
   bars: StackedBar[];
@@ -179,7 +179,6 @@ export default function TrafficChart({
   /** Counts that can be small: the axis skips fractional labels. */
   wholeNumbers?: boolean;
   reducedMotion: boolean;
-  status?: "loading" | "ready";
   empty?: boolean;
 }): JSX.Element {
   const phone = useIsMobile();
@@ -248,7 +247,6 @@ export default function TrafficChart({
       margin={margin}
       stacked
       stackGap={1}
-      status={status}
       xDataKey="name"
     >
       {series.map((part, index) => (
