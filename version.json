@@ -1,5 +1,5 @@
 {
-  "version": "4.1.0",
-  "changelog": "📱 On a phone, the menu button at the top left shows an orange dot when a new version is out, so you see the update without opening the menu.",
+  "version": "4.1.1",
+  "changelog": "🎨 Calmer states. A focused field, the keyboard outline and a chosen option card now take a soft grey instead of purple. Everything that loads, the traffic charts included, shows the grey skeleton, and a trend that stayed at zero draws an empty grey track instead of a coloured line. Machine IDs and model mapping names use the regular font.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
