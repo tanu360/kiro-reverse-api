@@ -13,7 +13,10 @@ import (
 	"github.com/google/uuid"
 )
 
-var claudeVersionPattern = regexp.MustCompile(`^(claude-(?:opus|sonnet|haiku)-\d+)-(\d+)$`)
+// ! Anthropic's own IDs carry a snapshot date (claude-sonnet-4-5-20250929); Kiro lists the
+// ! model without it, so the date is dropped. The minor is one or two digits, so a dated
+// ! major-only ID (claude-opus-4-20250514) is not read as minor 20250514.
+var claudeVersionPattern = regexp.MustCompile(`^(claude-(?:opus|sonnet|haiku)-\d+)[-.](\d{1,2})(?:-\d{8})?$`)
 
 const ThinkingModePrompt = `<thinking_mode>enabled</thinking_mode>
 <max_thinking_length>200000</max_thinking_length>`
