@@ -16,7 +16,7 @@ import { EditableFieldRow, useSaveAccountField } from "./detail-section";
 /**
  * A UUID or 32 hex characters, or empty. The dice button at the field's end fills a random UUID
  * from the server; a spinner takes the dice's place while the server answers. The edit takes the
- * whole row (`wide`), so a UUID fits on one line in the desktop sheet; a phone's 16 px mono line
+ * whole row (`wide`), so a UUID fits on one line in the desktop sheet; a phone's 16 px line
  * (no zoom on focus) is still narrower than one, and there the field scrolls rather than wraps.
  * A failed dice shows its reason under the field, as a failed save does; the dice is the retry.
  */
@@ -52,7 +52,6 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
 
   return (
     <EditableFieldRow
-      mono
       extraError={generate.error}
       onEdit={() => {
         setValue(account.machineId);
@@ -82,7 +81,6 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
             placeholder={t("detail.machineIdPlaceholder")}
             spellCheck={false}
             value={value}
-            variant="code"
           />
           <InputGroupAddon align="inline-end">
             <Tooltip>

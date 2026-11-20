@@ -544,9 +544,9 @@ const MappingRowItem = memo(function MappingRowItem({
         {/* Each name with the mark of the company behind it. */}
         <span className="flex min-w-0 items-center gap-2">
           <ModelLogo model={row.key} />
-          <code className="min-w-0 text-foreground text-meta" translate="no">
+          <span className="min-w-0 text-foreground text-meta" translate="no">
             <TruncatedText>{row.key}</TruncatedText>
-          </code>
+          </span>
         </span>
         <span className="flex min-w-0 items-center gap-1.5 sm:contents">
           <HugeiconsIcon
@@ -556,12 +556,12 @@ const MappingRowItem = memo(function MappingRowItem({
           />
           <span className="flex min-w-0 items-center gap-2">
             <ModelLogo model={row.value} />
-            <code
+            <span
               className="min-w-0 text-meta text-muted-foreground sm:text-foreground"
               translate="no"
             >
               <TruncatedText>{row.value}</TruncatedText>
-            </code>
+            </span>
           </span>
         </span>
       </div>
