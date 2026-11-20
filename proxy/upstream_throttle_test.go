@@ -69,8 +69,8 @@ func TestUpstream429CooldownDependsOnBody(t *testing.T) {
 		body     string
 		min, max time.Duration
 	}{
-		{"throttling", `{"__type":"ThrottlingException","message":"Too many requests"}`, 30 * time.Second, 2 * time.Minute},
-		{"capacity", `{"message":"high traffic","reason":"INSUFFICIENT_MODEL_CAPACITY"}`, 30 * time.Second, 2 * time.Minute},
+		{"throttling", `{"__type":"ThrottlingException","message":"Too many requests"}`, time.Second, 10 * time.Second},
+		{"capacity", `{"message":"high traffic","reason":"INSUFFICIENT_MODEL_CAPACITY"}`, time.Second, 10 * time.Second},
 		{"monthly quota", `{"message":"limit reached","reason":"MONTHLY_REQUEST_COUNT"}`, 20 * time.Hour, 1 << 62},
 	}
 	for _, tc := range cases {

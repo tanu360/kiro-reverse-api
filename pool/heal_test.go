@@ -98,9 +98,11 @@ func TestThrottleKeepsQuotaKindWhenNotGrowing(t *testing.T) {
 	}
 
 	//! A backoff that outgrows an upstream hint must not make the hinted wait healable.
-	p.RecordThrottleError("hinted", 30*time.Second)
+	p.RecordThrottleError("hinted", time.Second)
 	p.RecordThrottleError("hinted", 0)
-	p.RecordThrottleError("hinted", 0)
+	if left := time.Until(p.CooldownUntil("hinted")); left <= time.Second {
+		t.Fatalf("the backoff did not outgrow the one-second hint: %v", left)
+	}
 	if got := p.CooldownKindOf("hinted"); got != CooldownRetryAfter {
 		t.Fatalf("a grown throttle over a retry hint has kind %q, want retry_after", got)
 	}
@@ -108,6 +110,10 @@ func TestThrottleKeepsQuotaKindWhenNotGrowing(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		p.RecordError("erroring", false)
 	}
+	//! The error cooldown is about to run out, so the throttle's backoff outgrows it.
+	p.mu.Lock()
+	p.cooldowns["erroring"] = time.Now().Add(time.Second)
+	p.mu.Unlock()
 	p.RecordThrottleError("erroring", 0)
 	if got := p.CooldownKindOf("erroring"); got != CooldownThrottle {
 		t.Fatalf("a throttle over an error cooldown has kind %q, want throttle", got)
@@ -156,6 +162,7 @@ func TestClearTransientKeepsQuotaAndRetryAfter(t *testing.T) {
 func TestClearTransientKeepsThrottleBackoff(t *testing.T) {
 	p := newTestPool(config.Account{ID: "storm", AccessToken: "t"})
 	for i := 0; i < 4; i++ {
+		expireCooldown(p, "storm")
 		p.RecordThrottleError("storm", 0)
 	}
 	if cleared := p.ClearTransient([]string{"storm"}); !slices.Equal(cleared, []string{"storm"}) {
@@ -164,9 +171,9 @@ func TestClearTransientKeepsThrottleBackoff(t *testing.T) {
 	if !p.CooldownUntil("storm").IsZero() {
 		t.Fatal("the throttle cooldown survived the heal")
 	}
-	//! The fifth throttle in a row waits the full ten minutes, heal or no heal.
+	//! The fifth throttle in a row waits the fifth rung (80 s), heal or no heal.
 	p.RecordThrottleError("storm", 0)
-	if left := time.Until(p.CooldownUntil("storm")); left < 9*time.Minute {
+	if left := time.Until(p.CooldownUntil("storm")); left < 75*time.Second {
 		t.Fatalf("backoff after a heal = %v, want the ladder to keep climbing", left)
 	}
 }

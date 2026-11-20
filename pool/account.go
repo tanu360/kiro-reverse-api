@@ -406,17 +406,23 @@ func (p *AccountPool) RecordQuotaError(id string, retryAfter time.Duration) int 
 }
 
 const (
-	throttleBaseCooldown = time.Minute
+	//! Kiro's throttle clears within a second or two, and a model only one account serves is
+	//! offline for the whole wait, so the first rung is seconds, not a minute.
+	throttleBaseCooldown = 5 * time.Second
 	throttleMaxCooldown  = 10 * time.Minute
 )
 
 // RecordThrottleError cools an account after transient upstream throttling.
-// Without a retry hint the cooldown starts at a minute and doubles with every
-// consecutive failure, capped at ten minutes; a success resets it.
+// Without a retry hint the cooldown starts at five seconds and doubles with every
+// consecutive throttle, capped at ten minutes; a success resets it. A throttle
+// that lands while the account is already cooling came from a request picked
+// before the cooldown began, so it is the same throttle and does not climb.
 func (p *AccountPool) RecordThrottleError(id string, retryAfter time.Duration) int {
 	p.mu.Lock()
-	p.errorCounts[id]++
-	count := p.errorCounts[id]
+	if !time.Now().Before(p.cooldowns[id]) {
+		p.errorCounts[id]++
+	}
+	count := max(p.errorCounts[id], 1)
 
 	delay := retryAfter
 	if delay <= 0 {
