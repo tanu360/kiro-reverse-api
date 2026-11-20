@@ -1,5 +1,5 @@
 {
-  "version": "4.1.2",
-  "changelog": "🚦 Steadier paid models. When Kiro rate-limits an account, the proxy now tries it again after 5 seconds instead of a minute, and a burst of requests counts as one limit, so a model that only one account serves no longer goes offline for minutes. A request that Kiro calls invalid, such as an image sent to a model without vision, now gets its 400 even when another endpoint is busy, and the account stays in rotation.",
+  "version": "4.1.3",
+  "changelog": "🧠 Thinking, tools and model names. Reasoning effort now reaches GPT, Grok and Kimi, and DeepSeek, GLM and Qwen think when thinking is on. A thinking block cut off by max_tokens arrives as thinking instead of a raw thinking tag at the start of the answer. A 429 from a busy model now says when to retry, so clients wait instead of failing again at once. Anthropic's dated model IDs such as claude-sonnet-4-5-20250929 work, tools whose names differ only in - and _ no longer fail with TOOL_DUPLICATE, and disable_parallel_tool_use gets one tool call per reply.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
