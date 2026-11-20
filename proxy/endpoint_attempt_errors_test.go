@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"kiro-proxy/config"
@@ -78,7 +79,7 @@ func TestEndpointAttemptsKeepTheirOwn429Text(t *testing.T) {
 }
 
 // The last endpoint's attempt shows its own failure even when the request ends on an
-// earlier endpoint's error (a 429 outranks a later 500 or 400).
+// earlier endpoint's error (a 429 outranks a later 500).
 func TestLastEndpointAttemptKeepsItsOwnErrorUnderAnEarlier429(t *testing.T) {
 	h := newAttemptChainHandler(t, 1, http.NotFound)
 	threeKiroEndpoints(t, func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +89,7 @@ func TestLastEndpointAttemptKeepsItsOwnErrorUnderAnEarlier429(t *testing.T) {
 		case "/cw":
 			http.Error(w, `{"message":"boom two"}`, http.StatusInternalServerError)
 		default:
-			http.Error(w, `{"message":"bad three"}`, http.StatusBadRequest)
+			http.Error(w, `{"message":"boom three"}`, http.StatusBadGateway)
 		}
 	})
 
@@ -109,12 +110,44 @@ func TestLastEndpointAttemptKeepsItsOwnErrorUnderAnEarlier429(t *testing.T) {
 	}{
 		{"Kiro IDE", 429, "HTTP 429 from Kiro IDE:"},
 		{"CodeWhisperer", 500, "HTTP 500 from CodeWhisperer:"},
-		{"AmazonQ", 400, "HTTP 400 from AmazonQ:"},
+		{"AmazonQ", 502, "HTTP 502 from AmazonQ:"},
 	}
 	for i, w := range want {
 		a := attempts[i]
 		if a.Endpoint != w.endpoint || a.Status != w.status || !strings.HasPrefix(a.Message, w.text) {
 			t.Errorf("attempt %d = %+v, want status %d and text starting %q", i, a, w.status, w.text)
+		}
+	}
+}
+
+// One endpoint throttling while the others call the request invalid is an invalid request, not a
+// throttled account. Live on 2026-11-20 an image sent to minimax-m2.1 got 400 from Kiro IDE and
+// AmazonQ but 429 from CodeWhisperer; the 429 cooled the only account that served the paid
+// models, and every request for them answered 503 "No available accounts" for a minute.
+func TestThrottleBesideAnInvalidRequestIsTheClientError(t *testing.T) {
+	h := newAttemptChainHandler(t, 1, http.NotFound)
+	var calls atomic.Int32
+	threeKiroEndpoints(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Path == "/cw" {
+			http.Error(w, `{"__type":"ThrottlingException","message":"Too many requests, please wait before trying again."}`, http.StatusTooManyRequests)
+			return
+		}
+		http.Error(w, `{"message":"Model does not support image modality","reason":"IMAGE_FORMAT_UNSUPPORTED"}`, http.StatusBadRequest)
+	})
+
+	rec := httptest.NewRecorder()
+	req := withRequestTrace(httptest.NewRequest(http.MethodPost, "/v1/messages", nil), requestEndpointClaude)
+	h.handleClaudeNonStream(rec, req, testKiroPayload(), "claude-sonnet-4.5", false, claudeThinkingResponseOptions{}, 1, nil, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d, want the 400 the request earned; body %s", rec.Code, rec.Body.String())
+	}
+	if n := calls.Load(); n != 3 {
+		t.Fatalf("upstream calls = %d, want 3: an invalid request must not move to another account", n)
+	}
+	for _, acc := range config.GetAccounts() {
+		if until := h.pool.CooldownUntil(acc.ID); !until.IsZero() {
+			t.Fatalf("account %s cooled until %v by a 429 beside an invalid request", acc.ID, until)
 		}
 	}
 }

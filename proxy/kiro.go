@@ -612,11 +612,13 @@ endpointLoop:
 
 	var final error
 	switch {
+	case clientErr != nil && (quotaErr == nil || quotaErr.throttled):
+		//! Any endpoint calling the request invalid means another account would reject it too.
+		//! An endpoint that answered also shows the account is not throttled as a whole, so a
+		//! throttle from another endpoint must not cool the account or move the request on.
+		final = clientErr
 	case quotaErr != nil:
 		final = quotaErr
-	case clientErr != nil:
-		//! Any endpoint calling the request invalid means another account would reject it too.
-		final = clientErr
 	case lastErr != nil:
 		final = lastErr
 	default:
