@@ -154,3 +154,39 @@ func TestApplyReasoningEffortSendsSchemaSpelling(t *testing.T) {
 		}
 	}
 }
+
+// GPT, Grok and Kimi list their effort as reasoning.effort, live; the proxy only read
+// output_config.effort, so a client's effort never reached them.
+func TestApplyReasoningEffortUsesTheReasoningField(t *testing.T) {
+	h := &Handler{cachedModels: []ModelInfo{{
+		ModelId: "kimi-k3",
+		AdditionalModelRequestFieldsSchema: map[string]interface{}{
+			"properties": map[string]interface{}{
+				"reasoning": map[string]interface{}{
+					"properties": map[string]interface{}{
+						"effort": map[string]interface{}{"enum": []interface{}{"low", "high", "max"}},
+					},
+				},
+			},
+		},
+	}}}
+	for effort, want := range map[string]string{"low": "low", "medium": "low", "high": "high", "xhigh": "max", "max": "max"} {
+		payload := &KiroPayload{}
+		h.applyReasoningEffort(payload, "kimi-k3", effort)
+		reasoning, _ := payload.AdditionalModelRequestFields["reasoning"].(map[string]interface{})
+		if reasoning["effort"] != want || len(payload.AdditionalModelRequestFields) != 1 {
+			t.Fatalf("effort %s: additionalModelRequestFields = %#v, want reasoning.effort=%s", effort, payload.AdditionalModelRequestFields, want)
+		}
+	}
+}
+
+// Kiro lists the model's own id; the client may name a -thinking variant or an alias of it.
+func TestApplyReasoningEffortLooksUpTheKiroModel(t *testing.T) {
+	h := &Handler{cachedModels: []ModelInfo{effortSchemaModel("claude-opus-4.8", "low", "medium", "high")}}
+	payload := ClaudeToKiro(&ClaudeRequest{Model: "claude-opus-4.8-thinking", MaxTokens: 64, Messages: []ClaudeMessage{{Role: "user", Content: "hi"}}}, true)
+	h.applyReasoningEffort(payload, "claude-opus-4.8-thinking", "medium")
+	outputConfig, _ := payload.AdditionalModelRequestFields["output_config"].(map[string]interface{})
+	if outputConfig["effort"] != "medium" {
+		t.Fatalf("additionalModelRequestFields = %#v, want output_config.effort=medium", payload.AdditionalModelRequestFields)
+	}
+}

@@ -53,9 +53,14 @@ func (h *Handler) applyReasoningEffort(payload *KiroPayload, model, rawEffort st
 	if payload == nil || effort == effortUnset || effort == effortMinimal {
 		return
 	}
-	if native, ok := resolveModelEffort(effort, h.effortLevelsForModel(model)); ok {
+	//! Kiro lists models by their own id; the client's name may carry -thinking or be an alias.
+	if id := currentMessageModelID(payload); id != "" {
+		model = id
+	}
+	field, levels := h.effortSettingForModel(model)
+	if native, ok := resolveModelEffort(effort, levels); ok {
 		payload.AdditionalModelRequestFields = map[string]interface{}{
-			"output_config": map[string]interface{}{"effort": native},
+			field: map[string]interface{}{"effort": native},
 		}
 		return
 	}
@@ -64,27 +69,46 @@ func (h *Handler) applyReasoningEffort(payload *KiroPayload, model, rawEffort st
 	setThinkingLength(payload, effortThinkingLength[effort])
 }
 
-func (h *Handler) effortLevelsForModel(model string) []string {
-	model = strings.ToLower(strings.TrimSpace(model))
+// effortSettingForModel is where model takes an effort level and the levels it lists.
+func (h *Handler) effortSettingForModel(model string) (string, []string) {
+	schema, _ := h.modelRequestFieldsSchema(model)
+	return effortSettingFromSchema(schema)
+}
+
+// modelRequestFieldsSchema is the additionalModelRequestFieldsSchema Kiro lists for model, and
+// whether Kiro lists model at all.
+func (h *Handler) modelRequestFieldsSchema(model string) (map[string]interface{}, bool) {
+	model = strings.TrimSpace(model)
 	if model == "" {
-		return nil
+		return nil, false
 	}
 	h.modelsCacheMu.RLock()
 	defer h.modelsCacheMu.RUnlock()
 	for _, m := range h.cachedModels {
 		if strings.EqualFold(strings.TrimSpace(m.ModelId), model) {
-			return effortLevelsFromSchema(m.AdditionalModelRequestFieldsSchema)
+			return m.AdditionalModelRequestFieldsSchema, true
 		}
 	}
-	return nil
+	return nil, false
 }
 
-func effortLevelsFromSchema(schema map[string]interface{}) []string {
+// effortSettingFromSchema is the request field that takes the effort level and the levels its
+// enum lists: Claude models list output_config.effort, and GPT, Grok and Kimi reasoning.effort.
+func effortSettingFromSchema(schema map[string]interface{}) (string, []string) {
+	for _, field := range []string{"output_config", "reasoning"} {
+		if levels := effortLevelsFromSchema(schema, field); len(levels) > 0 {
+			return field, levels
+		}
+	}
+	return "", nil
+}
+
+func effortLevelsFromSchema(schema map[string]interface{}, field string) []string {
 	if len(schema) == 0 {
 		return nil
 	}
-	outputConfig, _ := nestedSchemaMap(schema, "properties", "output_config")
-	effort, _ := nestedSchemaMap(outputConfig, "properties", "effort")
+	parent, _ := nestedSchemaMap(schema, "properties", field)
+	effort, _ := nestedSchemaMap(parent, "properties", "effort")
 	rawEnum, ok := effort["enum"].([]interface{})
 	if !ok {
 		return nil
