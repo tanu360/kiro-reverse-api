@@ -799,13 +799,16 @@ func convertClaudeTools(tools []ClaudeTool) ([]KiroToolWrapper, map[string]strin
 	tools = withKiroWebSearchTool(tools)
 	result := make([]KiroToolWrapper, 0, len(tools))
 	nameMap := make(map[string]string)
+	usedNames := make(map[string]bool)
 	for _, tool := range tools {
 		desc := tool.Description
 		if len(desc) > maxToolDescLen {
 			desc = desc[:maxToolDescLen] + "..."
 		}
 		//! Kiro rejects long or namespaced tool names; responses are mapped back later.
-		sanitized := shortenToolName(sanitizeToolName(tool.Name))
+		//! get_weather and get-weather, or two long names sharing their first 64 characters,
+		//! sanitize to one name, which Kiro rejects as TOOL_DUPLICATE.
+		sanitized := uniqueKiroToolName(shortenToolName(sanitizeToolName(tool.Name)), usedNames)
 		if sanitized != tool.Name {
 			nameMap[sanitized] = tool.Name
 		}
