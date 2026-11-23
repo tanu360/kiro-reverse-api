@@ -129,7 +129,7 @@ func adminRequestForTest(t *testing.T, h *Handler, method, path string) *http.Re
 	if h.adminSessions == nil {
 		h.adminSessions = newAdminSessionStore()
 	}
-	token, _, err := h.adminSessions.Issue()
+	token, _, err := h.adminSessions.Issue(false)
 	if err != nil {
 		t.Fatalf("admin session: %v", err)
 	}

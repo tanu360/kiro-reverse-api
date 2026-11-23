@@ -107,7 +107,7 @@ describe("UserLoginPage", () => {
     await user.type(keyInput(), ` ${KEY} `);
     await user.click(submitButton());
     await waitFor(() => expect(router.state.location.pathname).toBe("/user"));
-    expect(bodies).toEqual([{ key: KEY }]);
+    expect(bodies).toEqual([{ key: KEY, remember: false }]);
     expect(storedToken()).toEqual({ local: null, session: "a".repeat(64) });
   });
 

@@ -11,12 +11,14 @@ import type {
 
 /**
  * POST /session, auth: false. The only request that ever carries the admin password. With
- * two-factor sign-in on, the answer is a challenge instead of a token.
+ * two-factor sign-in on, the answer is a challenge instead of a token. `remember` ("Stay signed
+ * in") asks for a token that lasts 30 days instead of 12 hours.
  */
 export function createSession(
   password: string,
+  remember = false,
 ): Promise<SessionCreateResponse | SessionChallengeResponse> {
-  return apiRequest("/session", { method: "POST", body: { password }, auth: false });
+  return apiRequest("/session", { method: "POST", body: { password, remember }, auth: false });
 }
 
 /** The second step: a code from the authenticator app, or a recovery code instead. */
@@ -32,10 +34,11 @@ export interface SecondFactor {
 export function completeSession(
   challenge: string,
   factor: SecondFactor,
+  remember = false,
 ): Promise<SessionCreateResponse> {
   return apiRequest("/session", {
     method: "POST",
-    body: { challenge, ...factor },
+    body: { challenge, ...factor, remember },
     auth: false,
   });
 }

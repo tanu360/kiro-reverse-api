@@ -541,7 +541,7 @@ describe("SettingsPage", () => {
       expect(within(card).getByRole("button", { name: "Saved" })).toBeInTheDocument();
       expect(await writes()).toEqual([
         { method: "POST", path: "/settings", body: { password: "correct horse" } },
-        { method: "POST", path: "/session", body: { password: "correct horse" } },
+        { method: "POST", path: "/session", body: { password: "correct horse", remember: true } },
       ]);
       const token = localStorage.getItem(TOKEN_KEY);
       expect(token).toMatch(/^mock-/);

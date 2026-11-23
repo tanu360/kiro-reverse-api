@@ -13,7 +13,7 @@ import (
 func TestAdminSessionTokenLifecycle(t *testing.T) {
 	store := newAdminSessionStore()
 
-	token, expiry, err := store.Issue()
+	token, expiry, err := store.Issue(false)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
@@ -39,20 +39,20 @@ func TestAdminSessionTokenLifecycle(t *testing.T) {
 
 func TestAdminSessionExpiryRejected(t *testing.T) {
 	store := newAdminSessionStore()
-	token, _, err := store.Issue()
+	token, _, err := store.Issue(false)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
 
 	store.mu.Lock()
-	store.sessions[token] = time.Now().Add(-time.Second)
+	store.sessions[hashSessionToken(token)] = time.Now().Add(-time.Second)
 	store.mu.Unlock()
 
 	if store.Valid(token) {
 		t.Fatal("expired token accepted")
 	}
 	store.mu.Lock()
-	_, present := store.sessions[token]
+	_, present := store.sessions[hashSessionToken(token)]
 	store.mu.Unlock()
 	if present {
 		t.Fatal("expired token left in the store")
@@ -63,7 +63,7 @@ func TestAdminSessionExpiryRejected(t *testing.T) {
 // RevokeAll has to clear tickets as well as sessions.
 func TestAdminSessionRevokeAllClearsTickets(t *testing.T) {
 	store := newAdminSessionStore()
-	token, _, err := store.Issue()
+	token, _, err := store.Issue(false)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
@@ -124,12 +124,12 @@ func TestAdminTicketExpiryRejected(t *testing.T) {
 // A login loop must not pin unbounded memory.
 func TestAdminSessionsEvictOldest(t *testing.T) {
 	store := newAdminSessionStore()
-	first, _, err := store.Issue()
+	first, _, err := store.Issue(false)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
 	for i := 0; i < maxAdminSessions; i++ {
-		if _, _, err := store.Issue(); err != nil {
+		if _, _, err := store.Issue(false); err != nil {
 			t.Fatalf("issue %d: %v", i, err)
 		}
 	}
@@ -149,7 +149,7 @@ func TestAdminTokensAreDistinct(t *testing.T) {
 	store := newAdminSessionStore()
 	seen := make(map[string]bool)
 	for i := 0; i < 64; i++ {
-		token, _, err := store.Issue()
+		token, _, err := store.Issue(false)
 		if err != nil {
 			t.Fatalf("issue %d: %v", i, err)
 		}

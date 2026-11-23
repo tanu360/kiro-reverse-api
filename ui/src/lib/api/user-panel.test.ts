@@ -322,7 +322,7 @@ describe("requests", () => {
     );
     const reasons = recordReasons();
     await signInWithKey("sk-test", true);
-    expect(await seen[0].json()).toEqual({ key: "sk-test" });
+    expect(await seen[0].json()).toEqual({ key: "sk-test", remember: true });
     expect(seen[0].headers.has("X-Admin-Token")).toBe(false);
     expect(localStorage.getItem(USER_TOKEN_KEY)).toBe("a".repeat(64));
     expect(localStorage.getItem("kiro_user_token_exp")).toBe("2000000000000");

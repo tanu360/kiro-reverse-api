@@ -60,6 +60,8 @@ func main() {
 	pool.GetPool()
 
 	handler := proxy.NewHandler()
+	// Before the handoff: its sessions are then saved as well.
+	handler.LoadSessions()
 	handoff := filepath.Join(dataDir, restartSessionsFile)
 	if data := updater.TakeHandoff(handoff, restartHandoffMaxAge); data != nil {
 		if n := handler.ImportAdminSessions(data); n > 0 {

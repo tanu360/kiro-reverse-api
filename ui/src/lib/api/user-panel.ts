@@ -484,7 +484,7 @@ export async function signInWithKey(key: string, staySignedIn: boolean): Promise
   const res = record(
     await apiRequest<unknown>("/session", {
       method: "POST",
-      body: { key },
+      body: { key, remember: staySignedIn },
       auth: false,
       base: USER_API_BASE,
     }),

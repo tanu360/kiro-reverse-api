@@ -11,7 +11,7 @@ import (
 
 func TestPasswordUpdateRevokesSessionsForWhitespacePassword(t *testing.T) {
 	h := newAdminAuthTestHandler(t, "original-password")
-	token, _, err := h.adminSessions.Issue()
+	token, _, err := h.adminSessions.Issue(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestBackupRestoreRevokesSessionsAndKeepsPasswordPrivate(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHandlerWithoutBackgroundForTest(t)
-			token, _, err := h.adminSessions.Issue()
+			token, _, err := h.adminSessions.Issue(false)
 			if err != nil {
 				t.Fatal(err)
 			}

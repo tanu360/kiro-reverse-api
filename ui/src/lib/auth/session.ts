@@ -147,7 +147,7 @@ async function startSession(
   remember: boolean,
   reason: SessionChangeReason,
 ): Promise<SignInResult> {
-  const res = await createSession(password);
+  const res = await createSession(password, remember);
   if (isChallenge(res)) {
     return { kind: "two-factor", challenge: res.challenge, expiresAt: Number(res.expiresAt) || 0 };
   }
@@ -165,7 +165,7 @@ export async function completeSignIn(
   factor: SecondFactor,
   remember: boolean,
 ): Promise<void> {
-  storeToken(await completeSession(challenge, factor), remember, "signin");
+  storeToken(await completeSession(challenge, factor, remember), remember, "signin");
 }
 
 /** Revokes the token server-side when possible; the local session ends either way. */

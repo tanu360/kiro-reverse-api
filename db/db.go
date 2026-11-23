@@ -71,6 +71,19 @@ CREATE TABLE IF NOT EXISTS alert_deliveries (
   error      TEXT NOT NULL DEFAULT ''
 );
 
+-- The admin's and the user panel's sign-ins, so a restart or a redeploy keeps them
+-- (proxy/session_persist.go). token_hash is the SHA-256 of the token the browser
+-- holds; the token itself is never stored. kind is 'admin' or 'user'; key_id and
+-- key_hash (the key's value at sign-in) are set for 'user' only. expires_at is in
+-- Unix milliseconds.
+CREATE TABLE IF NOT EXISTS web_sessions (
+  token_hash TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL,
+  key_id     TEXT NOT NULL DEFAULT '',
+  key_hash   TEXT NOT NULL DEFAULT '',
+  expires_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts INTEGER NOT NULL,

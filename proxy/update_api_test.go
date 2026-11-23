@@ -259,7 +259,7 @@ func TestAdminSessionHandoffRoundTrip(t *testing.T) {
 	if src.Export() != nil {
 		t.Fatal("an empty store exported sessions")
 	}
-	live, _, err := src.Issue()
+	live, _, err := src.Issue(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,8 +272,9 @@ func TestAdminSessionHandoffRoundTrip(t *testing.T) {
 	src.mu.Unlock()
 
 	data := src.Export()
-	if strings.Contains(string(data), ticket) || strings.Contains(string(data), "expired-token") {
-		t.Fatalf("export carries a ticket or an expired session: %s", data)
+	if strings.Contains(string(data), ticket) || strings.Contains(string(data), "expired-token") ||
+		strings.Contains(string(data), live) {
+		t.Fatalf("export carries a ticket, an expired session or a raw token: %s", data)
 	}
 
 	dst := newAdminSessionStore()
@@ -287,7 +288,8 @@ func TestAdminSessionHandoffRoundTrip(t *testing.T) {
 		t.Fatal("a ticket survived the handoff")
 	}
 
-	// A handoff written by hand: expired entries are dropped and none outlives the session TTL.
+	// A handoff written by hand (raw tokens, as releases before sessions were saved by hash
+	// wrote): expired entries are dropped and none outlives the longest session TTL.
 	now := time.Now()
 	crafted, _ := json.Marshal([]sessionHandoff{
 		{Token: "old", Expires: now.Add(-time.Second)},
@@ -301,7 +303,7 @@ func TestAdminSessionHandoffRoundTrip(t *testing.T) {
 	if dst.Valid("old") || !dst.Valid("forever") {
 		t.Fatal("wrong sessions imported")
 	}
-	if expiry := dst.sessions["forever"]; expiry.After(time.Now().Add(adminSessionTTL)) {
+	if expiry := dst.sessions[hashSessionToken("forever")]; expiry.After(time.Now().Add(adminRememberTTL)) {
 		t.Fatalf("imported session expires %v, past the TTL", expiry)
 	}
 	if n := newAdminSessionStore().Import([]byte("not json")); n != 0 {

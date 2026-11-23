@@ -182,9 +182,9 @@ func TestUserSessionEnds(t *testing.T) {
 
 	token := userSignIn(t, h, key.Key)
 	h.userSessions.mu.Lock()
-	session := h.userSessions.sessions[token]
+	session := h.userSessions.sessions[hashSessionToken(token)]
 	session.expiry = time.Now().Add(-time.Second)
-	h.userSessions.sessions[token] = session
+	h.userSessions.sessions[hashSessionToken(token)] = session
 	h.userSessions.mu.Unlock()
 	assertUserError(t, get(token), http.StatusUnauthorized, codeUserSessionExpired)
 
@@ -217,19 +217,19 @@ func TestUserSessionCapPerKey(t *testing.T) {
 	var s userSessionStore
 	busy := config.ApiKeyEntry{ID: "busy", Key: "sk-busy"}
 	quiet := config.ApiKeyEntry{ID: "quiet", Key: "sk-quiet"}
-	quietToken, _, err := s.issue(quiet)
+	quietToken, _, err := s.issue(quiet, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < maxUserSessionsPerKey*3; i++ {
-		if _, _, err := s.issue(busy); err != nil {
+		if _, _, err := s.issue(busy, false); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if len(s.sessions) != maxUserSessionsPerKey+1 {
 		t.Fatalf("%d sessions, want %d", len(s.sessions), maxUserSessionsPerKey+1)
 	}
-	if _, ok := s.sessions[quietToken]; !ok {
+	if _, ok := s.sessions[hashSessionToken(quietToken)]; !ok {
 		t.Fatal("another key's sign-ins evicted this key's session")
 	}
 }
@@ -722,7 +722,7 @@ func TestUserSessionsAreSeparate(t *testing.T) {
 	}
 
 	// The admin and user sessions are separate: neither token opens the other API.
-	admin, _, err := h.adminSessions.Issue()
+	admin, _, err := h.adminSessions.Issue(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1310,8 +1310,8 @@ func TestUserSessionsSurviveARestartIntoAnUpdate(t *testing.T) {
 	if data == nil {
 		t.Fatal("no sessions exported")
 	}
-	if strings.Contains(string(data), entry.Key) {
-		t.Fatal("the handoff carries the key's value")
+	if strings.Contains(string(data), entry.Key) || strings.Contains(string(data), token) {
+		t.Fatal("the handoff carries the key's value or the session token")
 	}
 
 	// The process the update restarts into: the same data folder, a new handler.
@@ -1346,11 +1346,11 @@ func TestUserSessionsSurviveARestartIntoAnUpdate(t *testing.T) {
 	if n := fresh.Import([]byte("not json")); n != 0 {
 		t.Fatalf("imported %d from garbage", n)
 	}
-	// None outlives the TTL it was issued with.
-	far := []userSessionHandoff{{Token: "far", KeyID: "k2", KeyHash: hash, Expires: time.Now().Add(30 * 24 * time.Hour)}}
+	// None outlives the longest TTL a sign-in is issued with.
+	far := []userSessionHandoff{{Token: "far", KeyID: "k2", KeyHash: hash, Expires: time.Now().Add(100 * 24 * time.Hour)}}
 	raw, _ = json.Marshal(far)
 	fresh.Import(raw)
-	if got := fresh.sessions["far"].expiry; got.After(time.Now().Add(userSessionTTL + time.Second)) {
+	if got := fresh.sessions[hashSessionToken("far")].expiry; got.After(time.Now().Add(userRememberTTL + time.Second)) {
 		t.Fatalf("imported expiry %v outlives the TTL", got)
 	}
 }

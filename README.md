@@ -303,7 +303,7 @@ Require API keys from the **API** page (**API access → Require an API key**). 
 - **Regenerate key** gives a key a new value, and the old value stops working at once. The name, limits, accounts and usage stay.
 - **Usage by key** charts each key's requests, tokens and credits over 24 hours, 7 days, 30 days or lifetime, split into succeeded and failed, with separate rows for requests without a key, invalid keys and deleted keys.
 - Key holders sign in at `/user/login` with their own API key. On `/user` they see that key's status, limits and settings, its usage over time, by model and by client, its recent requests with their details, the endpoints, and client setup. They never see accounts, other keys, upstream error messages or request bodies.
-- Every key can sign in there, even one that is turned off, expired or at a limit, and the page says why its requests are refused. With **Require an API key** off, calls to the server's own address count for no key, and the page says so. A sign-in lasts 12 hours and ends when the key is deleted or regenerated.
+- Every key can sign in there, even one that is turned off, expired or at a limit, and the page says why its requests are refused. With **Require an API key** off, calls to the server's own address count for no key, and the page says so. A sign-in lasts 12 hours, or 30 days with **Stay signed in**, survives a server restart, and ends when the key is deleted or regenerated.
 - When you create a key, the API page shows the usage page link to give its holder: the public link while it is live, else the address the admin panel is open on.
 
 ---

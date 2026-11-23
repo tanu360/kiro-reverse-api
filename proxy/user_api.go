@@ -23,6 +23,8 @@ import (
 const (
 	// userSessionTTL matches the admin session: a stolen token stops working on its own.
 	userSessionTTL = adminSessionTTL
+	// userRememberTTL is a "Stay signed in" sign-in's life, as the admin's is.
+	userRememberTTL = adminRememberTTL
 	// maxUserSessions caps memory growth from repeated sign-ins over every key.
 	maxUserSessions = 1024
 	// maxUserSessionsPerKey keeps one key's sign-in loop from signing other keys out.
@@ -189,16 +191,19 @@ type userSession struct {
 	expiry  time.Time
 }
 
-// userSessionStore holds the user panel's sessions. The zero value is ready to use.
+// userSessionStore holds the user panel's sessions, keyed by hashSessionToken. The zero value
+// is ready to use.
 type userSessionStore struct {
 	mu       sync.Mutex
 	sessions map[string]userSession
+	// table saves sessions to the database once restore turns it on.
+	table sessionTable
 }
 
 func (s *userSessionStore) pruneLocked(now time.Time) {
-	for token, session := range s.sessions {
+	for hash, session := range s.sessions {
 		if now.After(session.expiry) {
-			delete(s.sessions, token)
+			delete(s.sessions, hash)
 		}
 	}
 }
@@ -206,22 +211,38 @@ func (s *userSessionStore) pruneLocked(now time.Time) {
 // evictOldestLocked drops the session that expires first among those match accepts.
 func (s *userSessionStore) evictOldestLocked(match func(userSession) bool) {
 	oldest, oldestExpiry := "", time.Time{}
-	for token, session := range s.sessions {
+	for hash, session := range s.sessions {
 		if match(session) && (oldest == "" || session.expiry.Before(oldestExpiry)) {
-			oldest, oldestExpiry = token, session.expiry
+			oldest, oldestExpiry = hash, session.expiry
 		}
 	}
 	delete(s.sessions, oldest)
+	s.table.delete(oldest)
 }
 
-// issue mints a session for entry. The caller must have already checked the key's value.
-func (s *userSessionStore) issue(entry config.ApiKeyEntry) (string, time.Time, error) {
+func (session userSession) stored(hash string) storedSession {
+	return storedSession{
+		tokenHash: hash,
+		keyID:     session.keyID,
+		keyHash:   hex.EncodeToString(session.keyHash[:]),
+		expiry:    session.expiry,
+	}
+}
+
+// issue mints a session for entry that lasts userRememberTTL with "Stay signed in", else
+// userSessionTTL. The caller must have already checked the key's value.
+func (s *userSessionStore) issue(entry config.ApiKeyEntry, remember bool) (string, time.Time, error) {
 	token, err := newSecret()
 	if err != nil {
 		return "", time.Time{}, err
 	}
 	now := time.Now()
-	session := userSession{keyID: entry.ID, keyHash: sha256.Sum256([]byte(entry.Key)), expiry: now.Add(userSessionTTL)}
+	ttl := userSessionTTL
+	if remember {
+		ttl = userRememberTTL
+	}
+	session := userSession{keyID: entry.ID, keyHash: sha256.Sum256([]byte(entry.Key)), expiry: now.Add(ttl)}
+	hash := hashSessionToken(token)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -243,7 +264,8 @@ func (s *userSessionStore) issue(entry config.ApiKeyEntry) (string, time.Time, e
 	if len(s.sessions) >= maxUserSessions {
 		s.evictOldestLocked(func(userSession) bool { return true })
 	}
-	s.sessions[token] = session
+	s.sessions[hash] = session
+	s.table.save(session.stored(hash), now)
 	return token, session.expiry, nil
 }
 
@@ -254,7 +276,7 @@ func (s *userSessionStore) key(token string) (config.ApiKeyEntry, bool) {
 		return config.ApiKeyEntry{}, false
 	}
 	s.mu.Lock()
-	session, ok := s.sessions[token]
+	session, ok := s.sessions[hashSessionToken(token)]
 	s.mu.Unlock()
 	if !ok {
 		return config.ApiKeyEntry{}, false
@@ -271,17 +293,74 @@ func (s *userSessionStore) key(token string) (config.ApiKeyEntry, bool) {
 }
 
 func (s *userSessionStore) revoke(token string) {
+	hash := hashSessionToken(token)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.sessions, token)
+	delete(s.sessions, hash)
+	s.table.delete(hash)
+}
+
+// addLocked takes one saved or handed-off session into the store: unexpired, none past
+// userRememberTTL from now, within both caps. perKey counts the sessions each key holds.
+func (s *userSessionStore) addLocked(row storedSession, now time.Time, perKey map[string]int) bool {
+	hash, err := hex.DecodeString(row.keyHash)
+	if err != nil || len(hash) != sha256.Size || row.keyID == "" || row.tokenHash == "" ||
+		!row.expiry.After(now) || len(s.sessions) >= maxUserSessions || perKey[row.keyID] >= maxUserSessionsPerKey {
+		return false
+	}
+	session := userSession{keyID: row.keyID, expiry: row.expiry}
+	if latest := now.Add(userRememberTTL); session.expiry.After(latest) {
+		session.expiry = latest
+	}
+	copy(session.keyHash[:], hash)
+	s.sessions[row.tokenHash] = session
+	perKey[row.keyID]++
+	return true
+}
+
+func (s *userSessionStore) perKeyLocked() map[string]int {
+	perKey := make(map[string]int)
+	for _, session := range s.sessions {
+		perKey[session.keyID]++
+	}
+	return perKey
+}
+
+// restore turns saving on and takes back the sessions an earlier run saved. It returns how many
+// it kept. A session whose key was deleted or changed since ends on its next request, as any
+// other.
+func (s *userSessionStore) restore() (int, error) {
+	now := time.Now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.table = sessionTable{kind: sessionKindUser}
+	list, err := s.table.load(now)
+	if err != nil {
+		return 0, err
+	}
+	if s.sessions == nil {
+		s.sessions = make(map[string]userSession)
+	}
+	s.pruneLocked(now)
+	perKey := s.perKeyLocked()
+	kept := 0
+	for _, row := range list {
+		if s.addLocked(row, now, perKey) {
+			kept++
+		}
+	}
+	return kept, nil
 }
 
 // userSessionHandoff is one key holder's session carried across a restart into an update.
+// Export writes TokenHash; Token is what a release from before sessions were saved by hash
+// wrote, and Import still takes it.
 type userSessionHandoff struct {
-	Token   string    `json:"token"`
-	KeyID   string    `json:"keyId"`
-	KeyHash string    `json:"keyHash"`
-	Expires time.Time `json:"expires"`
+	Token     string    `json:"token,omitempty"`
+	TokenHash string    `json:"tokenHash,omitempty"`
+	KeyID     string    `json:"keyId"`
+	KeyHash   string    `json:"keyHash"`
+	Expires   time.Time `json:"expires"`
 }
 
 // Export returns the unexpired sessions as JSON, or nil when there are none, so the process a
@@ -291,12 +370,12 @@ func (s *userSessionStore) Export() []byte {
 	s.mu.Lock()
 	s.pruneLocked(now)
 	list := make([]userSessionHandoff, 0, len(s.sessions))
-	for token, session := range s.sessions {
+	for hash, session := range s.sessions {
 		list = append(list, userSessionHandoff{
-			Token:   token,
-			KeyID:   session.keyID,
-			KeyHash: hex.EncodeToString(session.keyHash[:]),
-			Expires: session.expiry,
+			TokenHash: hash,
+			KeyID:     session.keyID,
+			KeyHash:   hex.EncodeToString(session.keyHash[:]),
+			Expires:   session.expiry,
 		})
 	}
 	s.mu.Unlock()
@@ -311,7 +390,7 @@ func (s *userSessionStore) Export() []byte {
 }
 
 // Import adds the sessions Export wrote and returns how many it kept: unexpired ones, none
-// outliving the TTL it was issued with, within both caps. A session whose key was deleted or
+// outliving userRememberTTL from now, within both caps. A session whose key was deleted or
 // changed in the meantime ends on its next request, as any other.
 func (s *userSessionStore) Import(data []byte) int {
 	var list []userSessionHandoff
@@ -319,38 +398,28 @@ func (s *userSessionStore) Import(data []byte) int {
 		return 0
 	}
 	now := time.Now()
-	latest := now.Add(userSessionTTL)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.sessions == nil {
 		s.sessions = make(map[string]userSession)
 	}
 	s.pruneLocked(now)
-	perKey := make(map[string]int)
-	for _, session := range s.sessions {
-		perKey[session.keyID]++
-	}
+	perKey := s.perKeyLocked()
 	kept := 0
 	for _, entry := range list {
-		hash, err := hex.DecodeString(entry.KeyHash)
-		if err != nil || len(hash) != sha256.Size || entry.KeyID == "" || entry.Token == "" ||
-			len(entry.Token) > maxHandoffTokenLen || !entry.Expires.After(now) {
-			continue
+		row := storedSession{
+			tokenHash: handoffHash(entry.Token, entry.TokenHash),
+			keyID:     entry.KeyID,
+			keyHash:   entry.KeyHash,
+			expiry:    entry.Expires,
 		}
 		if len(s.sessions) >= maxUserSessions {
 			break
 		}
-		if perKey[entry.KeyID] >= maxUserSessionsPerKey {
-			continue
+		if s.addLocked(row, now, perKey) {
+			s.table.save(s.sessions[row.tokenHash].stored(row.tokenHash), now)
+			kept++
 		}
-		session := userSession{keyID: entry.KeyID, expiry: entry.Expires}
-		if session.expiry.After(latest) {
-			session.expiry = latest
-		}
-		copy(session.keyHash[:], hash)
-		s.sessions[entry.Token] = session
-		perKey[entry.KeyID]++
-		kept++
 	}
 	return kept
 }
@@ -416,6 +485,8 @@ func (h *Handler) handleUserAPI(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) apiCreateUserSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Key string `json:"key"`
+		// Remember is "Stay signed in": the token lasts userRememberTTL instead of userSessionTTL.
+		Remember bool `json:"remember"`
 	}
 	_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req)
 	value := strings.TrimSpace(req.Key)
@@ -437,7 +508,7 @@ func (h *Handler) apiCreateUserSession(w http.ResponseWriter, r *http.Request) {
 		writeAdminError(w, http.StatusUnauthorized, codeUserKeyInvalid, "Invalid API key")
 		return
 	}
-	token, expiry, err := h.userSessions.issue(entry)
+	token, expiry, err := h.userSessions.issue(entry, req.Remember)
 	if err != nil {
 		writeUserInternalError(w, err)
 		return

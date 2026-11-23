@@ -17,12 +17,23 @@ import (
 const (
 	// adminSessionTTL bounds how long a stolen browser token stays useful.
 	adminSessionTTL = 12 * time.Hour
+	// adminRememberTTL is a "Stay signed in" sign-in's life. The token then sits in
+	// localStorage, so it outlives the browser; changing the password still ends it.
+	adminRememberTTL = 30 * 24 * time.Hour
 	// adminTicketTTL covers one EventSource connect. Tickets ride in a URL, so
 	// they expire fast enough that an access log entry is worthless.
 	adminTicketTTL = 30 * time.Second
 	// maxAdminSessions caps memory growth from repeated logins.
 	maxAdminSessions = 128
 )
+
+// adminSessionLife is how long a sign-in lasts: adminRememberTTL with "Stay signed in".
+func adminSessionLife(remember bool) time.Duration {
+	if remember {
+		return adminRememberTTL
+	}
+	return adminSessionTTL
+}
 
 // secureCompare compares two secrets without leaking their common prefix length.
 func secureCompare(a, b string) bool {
@@ -41,9 +52,13 @@ func newSecret() (string, error) {
 // password itself: a session token sent as a header, and single-use tickets for
 // EventSource, which cannot set headers.
 type adminSessionStore struct {
-	mu       sync.Mutex
+	mu sync.Mutex
+	// sessions is keyed by hashSessionToken, as web_sessions is.
 	sessions map[string]time.Time
 	tickets  map[string]time.Time
+	// table saves sessions to the database once restore turns it on. Tickets are never saved:
+	// they last seconds.
+	table sessionTable
 }
 
 func newAdminSessionStore() *adminSessionStore {
@@ -54,9 +69,9 @@ func newAdminSessionStore() *adminSessionStore {
 }
 
 func (s *adminSessionStore) pruneLocked(now time.Time) {
-	for token, expiry := range s.sessions {
+	for hash, expiry := range s.sessions {
 		if now.After(expiry) {
-			delete(s.sessions, token)
+			delete(s.sessions, hash)
 		}
 	}
 	for ticket, expiry := range s.tickets {
@@ -66,15 +81,16 @@ func (s *adminSessionStore) pruneLocked(now time.Time) {
 	}
 }
 
-// Issue mints a session token. The caller must have already verified the
-// password.
-func (s *adminSessionStore) Issue() (string, time.Time, error) {
+// Issue mints a session token that lasts adminSessionLife(remember). The caller must have
+// already verified the password.
+func (s *adminSessionStore) Issue(remember bool) (string, time.Time, error) {
 	token, err := newSecret()
 	if err != nil {
 		return "", time.Time{}, err
 	}
 	now := time.Now()
-	expiry := now.Add(adminSessionTTL)
+	expiry := now.Add(adminSessionLife(remember))
+	hash := hashSessionToken(token)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -88,8 +104,10 @@ func (s *adminSessionStore) Issue() (string, time.Time, error) {
 			}
 		}
 		delete(s.sessions, oldest)
+		s.table.delete(oldest)
 	}
-	s.sessions[token] = expiry
+	s.sessions[hash] = expiry
+	s.table.save(storedSession{tokenHash: hash, expiry: expiry}, now)
 	return token, expiry, nil
 }
 
@@ -97,15 +115,17 @@ func (s *adminSessionStore) Valid(token string) bool {
 	if token == "" {
 		return false
 	}
+	hash := hashSessionToken(token)
 	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	expiry, ok := s.sessions[token]
+	expiry, ok := s.sessions[hash]
 	if !ok {
 		return false
 	}
 	if now.After(expiry) {
-		delete(s.sessions, token)
+		delete(s.sessions, hash)
+		s.table.delete(hash)
 		return false
 	}
 	return true
@@ -115,9 +135,11 @@ func (s *adminSessionStore) Revoke(token string) {
 	if token == "" {
 		return
 	}
+	hash := hashSessionToken(token)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.sessions, token)
+	delete(s.sessions, hash)
+	s.table.delete(hash)
 }
 
 // RevokeAll invalidates every session. Called when the password changes, so a
@@ -127,25 +149,73 @@ func (s *adminSessionStore) RevokeAll() {
 	defer s.mu.Unlock()
 	s.sessions = make(map[string]time.Time)
 	s.tickets = make(map[string]time.Time)
+	s.table.deleteAllExcept("")
 }
 
 // RevokeAllExcept invalidates every session but keep, as turning two-factor
 // sign-in on does: the session that turned it on just proved a code.
 func (s *adminSessionStore) RevokeAllExcept(keep string) {
+	hash := ""
+	if keep != "" {
+		hash = hashSessionToken(keep)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	expiry, ok := s.sessions[keep]
+	expiry, ok := s.sessions[hash]
 	s.sessions = make(map[string]time.Time)
 	s.tickets = make(map[string]time.Time)
-	if ok && keep != "" {
-		s.sessions[keep] = expiry
+	if ok && hash != "" {
+		s.sessions[hash] = expiry
+	} else {
+		hash = ""
 	}
+	s.table.deleteAllExcept(hash)
 }
 
-// sessionHandoff is one session as Export writes it.
+// restore turns saving on and takes back the sessions an earlier run saved: unexpired ones,
+// none past adminRememberTTL from now, within the cap. It returns how many it kept.
+func (s *adminSessionStore) restore() (int, error) {
+	now := time.Now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.table = sessionTable{kind: sessionKindAdmin}
+	list, err := s.table.load(now)
+	if err != nil {
+		return 0, err
+	}
+	s.pruneLocked(now)
+	latest := now.Add(adminRememberTTL)
+	kept := 0
+	for _, row := range list {
+		if row.tokenHash == "" || len(s.sessions) >= maxAdminSessions {
+			continue
+		}
+		if row.expiry.After(latest) {
+			row.expiry = latest
+		}
+		s.sessions[row.tokenHash] = row.expiry
+		kept++
+	}
+	return kept, nil
+}
+
+// sessionHandoff is one session as Export writes it. Export writes TokenHash; Token is what a
+// release from before sessions were saved by hash wrote, and Import still takes it.
 type sessionHandoff struct {
-	Token   string    `json:"token"`
-	Expires time.Time `json:"expires"`
+	Token     string    `json:"token,omitempty"`
+	TokenHash string    `json:"tokenHash,omitempty"`
+	Expires   time.Time `json:"expires"`
+}
+
+// handoffHash returns the session key a handoff entry names, or "" for neither or an oversized one.
+func handoffHash(token, tokenHash string) string {
+	switch {
+	case tokenHash != "" && len(tokenHash) <= maxHandoffTokenLen:
+		return tokenHash
+	case token != "" && len(token) <= maxHandoffTokenLen:
+		return hashSessionToken(token)
+	}
+	return ""
 }
 
 // maxHandoffTokenLen bounds an imported token; the store's own are 64 characters.
@@ -159,8 +229,8 @@ func (s *adminSessionStore) Export() []byte {
 	s.mu.Lock()
 	s.pruneLocked(now)
 	list := make([]sessionHandoff, 0, len(s.sessions))
-	for token, expiry := range s.sessions {
-		list = append(list, sessionHandoff{Token: token, Expires: expiry})
+	for hash, expiry := range s.sessions {
+		list = append(list, sessionHandoff{TokenHash: hash, Expires: expiry})
 	}
 	s.mu.Unlock()
 	if len(list) == 0 {
@@ -174,20 +244,21 @@ func (s *adminSessionStore) Export() []byte {
 }
 
 // Import adds the sessions Export wrote and returns how many it kept. Expired ones are dropped,
-// none outlives the TTL it was issued with, and the store's cap still holds.
+// none outlives adminRememberTTL from now, and the store's cap still holds.
 func (s *adminSessionStore) Import(data []byte) int {
 	var list []sessionHandoff
 	if err := json.Unmarshal(data, &list); err != nil {
 		return 0
 	}
 	now := time.Now()
-	latest := now.Add(adminSessionTTL)
+	latest := now.Add(adminRememberTTL)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pruneLocked(now)
 	kept := 0
 	for _, entry := range list {
-		if entry.Token == "" || len(entry.Token) > maxHandoffTokenLen || !entry.Expires.After(now) {
+		hash := handoffHash(entry.Token, entry.TokenHash)
+		if hash == "" || !entry.Expires.After(now) {
 			continue
 		}
 		if len(s.sessions) >= maxAdminSessions {
@@ -196,7 +267,8 @@ func (s *adminSessionStore) Import(data []byte) int {
 		if entry.Expires.After(latest) {
 			entry.Expires = latest
 		}
-		s.sessions[entry.Token] = entry.Expires
+		s.sessions[hash] = entry.Expires
+		s.table.save(storedSession{tokenHash: hash, expiry: entry.Expires}, now)
 		kept++
 	}
 	return kept
@@ -246,6 +318,9 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 		Challenge    string `json:"challenge"`
 		Code         string `json:"code"`
 		RecoveryCode string `json:"recoveryCode"`
+		// Remember is "Stay signed in": the token lasts adminRememberTTL instead of
+		// adminSessionTTL. With two-factor on, the request that answers the token decides.
+		Remember bool `json:"remember"`
 	}
 	_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req)
 
@@ -259,7 +334,7 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		h.totpState().consumeChallenge(req.Challenge)
-		h.issueAdminSession(w)
+		h.issueAdminSession(w, req.Remember)
 		return
 	}
 
@@ -275,7 +350,7 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 			if !h.checkSecondFactor(w, r, req.Code, req.RecoveryCode, http.StatusUnauthorized) {
 				return
 			}
-			h.issueAdminSession(w)
+			h.issueAdminSession(w, req.Remember)
 			return
 		}
 		challenge, expiry, err := h.totpState().issueChallenge(time.Now())
@@ -290,11 +365,11 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 		})
 		return
 	}
-	h.issueAdminSession(w)
+	h.issueAdminSession(w, req.Remember)
 }
 
-func (h *Handler) issueAdminSession(w http.ResponseWriter) {
-	token, expiry, err := h.adminSessions.Issue()
+func (h *Handler) issueAdminSession(w http.ResponseWriter, remember bool) {
+	token, expiry, err := h.adminSessions.Issue(remember)
 	if err != nil {
 		writeInternalError(w, err)
 		return

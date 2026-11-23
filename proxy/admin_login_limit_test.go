@@ -37,7 +37,7 @@ func TestAdminPasswordLimitsCoverBothRoutes(t *testing.T) {
 			t.Fatal("missing retry hint")
 		}
 	}
-	token, _, err := h.adminSessions.Issue()
+	token, _, err := h.adminSessions.Issue(false)
 	if err != nil {
 		t.Fatal(err)
 	}
