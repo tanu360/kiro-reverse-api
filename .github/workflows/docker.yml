@@ -11,13 +11,15 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  # The merge job copies each tagged manifest here too, once the DOCKERHUB_USERNAME and
+  # The merge job copies each published manifest here too, once the DOCKERHUB_USERNAME and
   # DOCKERHUB_TOKEN secrets are set; without them it pushes to ghcr.io only.
   DOCKERHUB_IMAGE: docker.io/tarun360/kiro-reverse-api
 
 # Each platform builds in its own job, at the same time, and pushes its image by digest. The merge
-# job then tags one multi-platform manifest that lists both. Pull requests build both platforms and
-# push nothing.
+# job then tags one multi-platform manifest that lists both. Only a version tag publishes, as
+# <version> and latest (a prerelease such as 4.2.0-rc1 as <version> only), so latest is always the
+# newest release. A branch push or a pull request builds and smoke-tests both platforms and pushes
+# nothing. release.yml starts this workflow on the tag it creates.
 jobs:
   build:
     name: Build ${{ matrix.platform }}
@@ -65,7 +67,7 @@ jobs:
           cleanup: false
 
       - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
+        if: github.ref_type == 'tag'
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -102,13 +104,13 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=${{ github.ref_type == 'tag' }}
           cache-from: type=gha,scope=docker-${{ steps.image.outputs.pair }}
           cache-to: type=gha,scope=docker-${{ steps.image.outputs.pair }},mode=max
           provenance: false
 
       - name: Export digest
-        if: github.event_name != 'pull_request'
+        if: github.ref_type == 'tag'
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
@@ -116,7 +118,7 @@ jobs:
           touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
 
       - name: Upload digest
-        if: github.event_name != 'pull_request'
+        if: github.ref_type == 'tag'
         uses: actions/upload-artifact@v7
         with:
           name: digests-${{ steps.image.outputs.pair }}
@@ -127,7 +129,7 @@ jobs:
   # Tags one manifest that lists both platforms' images.
   merge:
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -163,12 +165,9 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image.outputs.name }}
+          # flavor latest=auto (the default) adds latest beside a version that is not a prerelease.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
 
       - name: Create and push the manifest
         working-directory: ${{ runner.temp }}/digests
@@ -198,27 +197,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Docker Hub gets only latest (a push to the default branch) and the full version (a version
-      # tag such as 4.1.4); the branch, sha and major.minor tags stay on ghcr.io. imagetools copies
-      # the layers between registries, so nothing builds twice.
+      # The same manifest under the same tags (<version>, and latest for a release). imagetools
+      # copies the layers between registries, so nothing builds twice.
       - name: Copy the manifest to Docker Hub
         if: env.DOCKERHUB_USERNAME != ''
         env:
           IMAGE: ${{ steps.image.outputs.name }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          tags=()
-          while read -r tag; do
-            tag=${tag##*:}
-            if [ "$tag" = latest ] || [[ $tag =~ ^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$ ]]; then
-              tags+=("$tag")
-            fi
-          done < <(jq -r '.tags[]' <<<"$DOCKER_METADATA_OUTPUT_JSON")
-          if [ ${#tags[@]} -eq 0 ]; then
-            echo "No latest or version tag on this push; Docker Hub left as it is."
-            exit 0
-          fi
           args=()
-          for tag in "${tags[@]}"; do args+=(-t "$DOCKERHUB_IMAGE:$tag"); done
+          while read -r tag; do args+=(-t "$DOCKERHUB_IMAGE:${tag##*:}"); done < <(jq -r '.tags[]' <<<"$DOCKER_METADATA_OUTPUT_JSON")
           docker buildx imagetools create "${args[@]}" "$IMAGE:$VERSION"
-          docker buildx imagetools inspect "$DOCKERHUB_IMAGE:${tags[0]}"
+          docker buildx imagetools inspect "$DOCKERHUB_IMAGE:$VERSION"

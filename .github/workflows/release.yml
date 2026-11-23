@@ -408,7 +408,7 @@ jobs:
             --notes-file "$notes" "${flags[@]}"
 
           # A tag made with GITHUB_TOKEN starts no workflow, so start the Docker build for it here;
-          # its semver rules read the tag ref and push the <version> and <major>.<minor> images.
+          # its semver rule reads the tag ref and pushes the <version> and latest images.
           if [ "$REF_TYPE" != tag ]; then
             gh workflow run docker.yml --ref "$TAG"
           fi
