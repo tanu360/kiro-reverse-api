@@ -161,18 +161,26 @@ func (s *reloginStash) stash(accountID string, account config.Account) string {
 }
 
 // take hands out a stashed login once, and only for the account it was made for.
-func (s *reloginStash) take(id, accountID string) (config.Account, bool) {
+func (s *reloginStash) take(id, accountID string) (reloginPendingEntry, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	entry, ok := s.entries[id]
 	if !ok || entry.accountID != accountID {
-		return config.Account{}, false
+		return reloginPendingEntry{}, false
 	}
 	delete(s.entries, id)
 	if !time.Now().Before(entry.expiresAt) {
-		return config.Account{}, false
+		return reloginPendingEntry{}, false
 	}
-	return entry.account, true
+	return entry, true
+}
+
+// putBack returns a login take handed out, under its id and with its expiry, for a confirm
+// that could not save it.
+func (s *reloginStash) putBack(id string, entry reloginPendingEntry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.entries[id] = entry
 }
 
 func (s *reloginStash) drop(id, accountID string) {
@@ -529,6 +537,9 @@ func (h *Handler) replaceRelogin(ctx context.Context, targetID string, incoming 
 	}
 	forgetProfileLookups(&before)
 	forgetProfileLookups(&saved)
+	//! The guess that the old login was Builder ID would send the new one the fixed profile
+	//! without a lookup; a new login that is Builder ID too is guessed again on its first lookup.
+	inferredBuilderIDAccounts.Delete(saved.ID)
 	logger.Infof("[Relogin] %s (%s) replaced=%t", saved.Email, saved.ID, outcome.identityReplaced)
 	go reloginVerify(h, saved)
 	return outcome, nil
@@ -706,13 +717,19 @@ func (h *Handler) apiConfirmRelogin(w http.ResponseWriter, r *http.Request, id s
 	if !ok {
 		return
 	}
-	incoming, found := reloginPending.take(pendingID, id)
+	entry, found := reloginPending.take(pendingID, id)
 	if !found {
 		writeAdminError(w, http.StatusNotFound, codeReloginPendingNotFound, "Re-login not found or expired")
 		return
 	}
-	outcome, err := h.saveReloginGuarded(r.Context(), id, incoming, true)
-	writeReloginResult(w, id, incoming, outcome, err, nil)
+	outcome, err := h.saveReloginGuarded(r.Context(), id, entry.account, true)
+	//! The login is one-shot: unless it was saved somewhere or its account is gone, a failed
+	//! save (a busy database, a dropped request) leaves it for the admin to confirm again.
+	var other *reloginOtherAccountError
+	if err != nil && !errors.Is(err, errReloginTargetGone) && !(errors.As(err, &other) && other.saved) {
+		reloginPending.putBack(pendingID, entry)
+	}
+	writeReloginResult(w, id, entry.account, outcome, err, nil)
 }
 
 // apiDiscardRelogin drops a stashed login at once instead of letting it expire.

@@ -101,5 +101,8 @@ INSERT INTO requests (ts, api_key_id, api_key) VALUES
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

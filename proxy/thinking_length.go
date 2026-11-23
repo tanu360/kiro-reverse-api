@@ -22,32 +22,43 @@ var effortThinkingLength = map[string]int{
 // minThinkingLength is the smallest budget the Messages API takes.
 const minThinkingLength = 1024
 
-func thinkingModePrompt(length int) string {
-	return strings.Replace(ThinkingModePrompt, strconv.Itoa(defaultThinkingLength), strconv.Itoa(length), 1)
-}
-
 // setThinkingLength puts length into the thinking prompt the translator added to the payload.
 // A payload without the prompt (thinking off) is left alone.
 func setThinkingLength(payload *KiroPayload, length int) {
-	if payload == nil || length < minThinkingLength || length == defaultThinkingLength {
+	if payload == nil || length < minThinkingLength {
 		return
 	}
-	replacement := thinkingModePrompt(length)
 	current := &payload.ConversationState.CurrentMessage.UserInputMessage
-	if strings.Contains(current.Content, ThinkingModePrompt) {
-		current.Content = strings.Replace(current.Content, ThinkingModePrompt, replacement, 1)
+	if replaceThinkingLength(&current.Content, length) {
 		return
 	}
 	for i := range payload.ConversationState.History {
 		message := payload.ConversationState.History[i].UserInputMessage
-		if message != nil && strings.Contains(message.Content, ThinkingModePrompt) {
-			message.Content = strings.Replace(message.Content, ThinkingModePrompt, replacement, 1)
+		if message != nil && replaceThinkingLength(&message.Content, length) {
 			return
 		}
 	}
 }
 
-// applyClaudeThinkingBudget makes the thinking prompt ask for the client's budget_tokens.
+// replaceThinkingLength puts length between the thinking prompt's <max_thinking_length> tags in
+// content. It looks for the tags rather than ThinkingModePrompt, whose length an earlier call
+// (the reasoning effort's) may have changed.
+func replaceThinkingLength(content *string, length int) bool {
+	start := strings.Index(*content, thinkingModeOpen+"\n"+thinkingLengthOpenTag)
+	if start == -1 {
+		return false
+	}
+	from := start + len(thinkingModeOpen+"\n"+thinkingLengthOpenTag)
+	end := strings.Index((*content)[from:], thinkingLengthCloseTag)
+	if end == -1 {
+		return false
+	}
+	*content = (*content)[:from] + strconv.Itoa(length) + (*content)[from+end:]
+	return true
+}
+
+// applyClaudeThinkingBudget makes the thinking prompt ask for the client's budget_tokens. It runs
+// after applyReasoningEffort, so an explicit budget wins over the effort's length.
 func applyClaudeThinkingBudget(payload *KiroPayload, thinking *ClaudeThinkingConfig) {
 	if thinking == nil || !strings.EqualFold(strings.TrimSpace(thinking.Type), "enabled") {
 		return
@@ -62,6 +73,7 @@ const thinkingInstruction = "Before you respond, reason step by step inside <thi
 
 const (
 	thinkingModeOpen       = "<thinking_mode>enabled</thinking_mode>"
+	thinkingLengthOpenTag  = "<max_thinking_length>"
 	thinkingLengthCloseTag = "</max_thinking_length>"
 )
 

@@ -430,6 +430,38 @@ func TestSecondUpdateKeepsTheRunningProgramAsBackup(t *testing.T) {
 	}
 }
 
+// A second download that fails leaves the first update in place, and the server can still
+// restart into it.
+func TestFailedSecondUpdateKeepsTheFirstReady(t *testing.T) {
+	mux := http.NewServeMux()
+	rel := &release{version: "3.6.0", archive: "kiro-proxy-linux-x64.tar.gz"}
+	rel.data = tarGz(t, []entry{{name: "kiro-proxy-linux-x64/kiro-proxy", body: "program 3.6.0"}})
+	mux.Handle("/3.6.0/", rel)
+	srv := httptest.NewServer(mux) // 3.7.0 is not published: 404
+	defer srv.Close()
+	f := newFixture(t, "linux", "amd64", srv.URL)
+
+	if _, err := f.m.Start("3.6.0"); err != nil {
+		t.Fatal(err)
+	}
+	if st := waitFor(t, f.m, StateReady, StateError); st.State != StateReady {
+		t.Fatalf("3.6.0: %+v", st)
+	}
+	if _, err := f.m.Start("3.7.0"); err != nil {
+		t.Fatal(err)
+	}
+	if st := waitFor(t, f.m, StateError); st.Version != "3.7.0" || st.ErrorCode != FailNotPublished || st.Installed != "3.6.0" {
+		t.Fatalf("3.7.0: %+v; want the failure, naming 3.6.0 as still in place", st)
+	}
+	if got := readFile(t, f.exe); got != "program 3.6.0" {
+		t.Fatalf("executable holds %q", got)
+	}
+	st, ok := f.m.BeginRestart()
+	if !ok || st.State != StateRestarting || st.Version != "3.6.0" || st.Error != "" {
+		t.Fatalf("BeginRestart = %+v, %v; want a restart into 3.6.0", st, ok)
+	}
+}
+
 func TestDownloadFailures(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -169,3 +169,48 @@ func TestAllowedKnowsModel(t *testing.T) {
 		t.Fatal("nil allowlist asks the whole pool")
 	}
 }
+
+// A Reload that brings an account outside the allowlist into rotation while a
+// bound key picks must not let that pick count an RPM start for it: the account
+// served nothing, yet its start would hold a slot of its limit for a minute.
+func TestAllowedPickNeverTakesAnRPMStartOutsideTheList(t *testing.T) {
+	setRPMLimitForTest(t, config.MaxAccountRPMLimit)
+	a, x := config.Account{ID: "a"}, config.Account{ID: "x"}
+	p := newTestPool(a)
+	allowed := AllowedSet([]string{"a"})
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for in := false; ; in = !in {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			p.mu.Lock()
+			if in {
+				p.setAccountsLocked([]config.Account{x, a})
+			} else {
+				p.setAccountsLocked([]config.Account{a})
+			}
+			p.mu.Unlock()
+		}
+	}()
+	for i := 0; i < config.MaxAccountRPMLimit-100; i++ {
+		if acc := p.GetNextForModelAllowed("", nil, allowed); acc != nil && acc.ID != "a" {
+			close(stop)
+			<-done
+			t.Fatalf("pick %d got %s, outside the allowlist", i, acc.ID)
+		}
+	}
+	close(stop)
+	<-done
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if starts := p.rpm.m["x"]; len(starts) != 0 {
+		t.Fatalf("x holds %d RPM starts for picks it never served", len(starts))
+	}
+}

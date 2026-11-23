@@ -146,3 +146,31 @@ func TestUpstreamErrorMetricCounts(t *testing.T) {
 		}
 	}
 }
+
+// A request refused before any account served it names the model the client sent; that must
+// not become a label, or any caller could grow /metrics without bound.
+func TestMetricsRefusedRequestModelIsNotALabel(t *testing.T) {
+	setupApiKeyUsageTest(t)
+	metrics = newMetricsRegistry()
+	t.Cleanup(func() { metrics = newMetricsRegistry() })
+	addUsageKey(t, "team", "sk-metrics-0123456789abcdef", true)
+	required := true
+	if err := config.UpdateSettingsPatch(&required, ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, model := range []string{"probe-one", "probe-two"} {
+		req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"`+model+`"}`))
+		req.Header.Set("X-Api-Key", "sk-wrong-0123456789abcdef")
+		rec := httptest.NewRecorder()
+		if (&Handler{}).authenticateForClaudeRequest(rec, req) != nil || rec.Code != http.StatusUnauthorized {
+			t.Fatalf("wrong key: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	text := (&Handler{}).renderMetrics()
+	if strings.Contains(text, "probe-") {
+		t.Fatalf("a refused request's model became a label:\n%s", text)
+	}
+	if want := `kiro_requests_total{outcome="failed",status="401",model="none",account="none",api_key="none"} 2`; !strings.Contains(text, want) {
+		t.Fatalf("metrics lack %s:\n%s", want, text)
+	}
+}

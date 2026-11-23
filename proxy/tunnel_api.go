@@ -99,9 +99,9 @@ func (h *Handler) tunnelResponse(r *http.Request) tunnelResponse {
 	}
 }
 
-// answerThenStop sends resp, the link as it will be, to a request that came through the link,
-// then makes the change to the helper once the answer is out.
-func answerThenStop(w http.ResponseWriter, resp tunnelResponse, stop func()) {
+// answerThenStop sends resp (for a tunnel change, the link as it will be) to a request that came
+// through the link, then makes the change to the helper once the answer is out.
+func answerThenStop(w http.ResponseWriter, resp any, stop func()) {
 	json.NewEncoder(w).Encode(resp)
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()

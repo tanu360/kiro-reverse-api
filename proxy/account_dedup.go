@@ -168,21 +168,26 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	stats := h.poolStatsByID()
-	var counters config.AccountCounters
-	for _, a := range accounts {
-		if !seen[a.ID] {
-			continue
+	//! The counters are read and the sum saved under the pool's hold: a request finishing on the
+	//! kept account in between would otherwise write its old counters over the sum.
+	var kept config.Account
+	err := h.pool.ReloadAfter(func(stats map[string]config.Account) error {
+		var counters config.AccountCounters
+		for _, a := range config.GetAccounts() {
+			if !seen[a.ID] {
+				continue
+			}
+			c := accountStats(stats, a)
+			counters.RequestCount += c.RequestCount
+			counters.ErrorCount += c.ErrorCount
+			counters.TotalTokens += c.TotalTokens
+			counters.TotalCredits += c.TotalCredits
+			counters.LastUsed = max(counters.LastUsed, c.LastUsed)
 		}
-		c := accountStats(stats, a)
-		counters.RequestCount += c.RequestCount
-		counters.ErrorCount += c.ErrorCount
-		counters.TotalTokens += c.TotalTokens
-		counters.TotalCredits += c.TotalCredits
-		counters.LastUsed = max(counters.LastUsed, c.LastUsed)
-	}
-
-	kept, err := config.MergeAccounts(keepID, removeIDs, counters)
+		var err error
+		kept, err = config.MergeAccounts(keepID, removeIDs, counters)
+		return err
+	})
 	if errors.Is(err, config.ErrAccountNotFound) {
 		writeAdminError(w, http.StatusConflict, codeDuplicatesChanged, "These accounts are no longer duplicates of each other. Review the duplicates again.")
 		return
@@ -191,7 +196,6 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 		writeAdminErr(w, http.StatusInternalServerError, fmt.Errorf("could not merge the accounts: %w", err), codeSaveFailed)
 		return
 	}
-	h.pool.Reload()
 	//! The kept account keeps its own pool proxy; the removed copies give theirs up.
 	proxypool.Default().ForgetAccounts(removeIDs...)
 
@@ -236,9 +240,9 @@ func sameDuplicateGroup(groups []config.DuplicateGroup, keepID string, others []
 	return false
 }
 
-// moveAccountHistory points the request and error rows of removed accounts at
-// the kept one, so the history matches the summed counters. It reports how
-// many request rows moved.
+// moveAccountHistory points the request and error rows of removed accounts, and
+// their rollups, at the kept one, so the history matches the summed counters. It
+// reports how many request rows moved.
 func moveAccountHistory(keepID string, removed []string) (int64, error) {
 	if len(removed) == 0 {
 		return 0, nil
@@ -267,10 +271,44 @@ func moveAccountHistory(keepID string, removed []string) (int64, error) {
 	if _, err := tx.Exec(`UPDATE errors SET account_id=? WHERE account_id IN (`+placeholders+`)`, args...); err != nil {
 		return 0, err
 	}
+	//! The rows log retention pruned live on in the rollups; the forecast reads them by account.
+	for _, m := range rollupMoves {
+		sums := make([]string, len(m.sums))
+		updates := make([]string, len(m.sums))
+		for i, col := range m.sums {
+			sums[i] = "SUM(" + col + ")"
+			updates[i] = col + " = " + col + " + excluded." + col
+		}
+		if _, err := tx.Exec(`INSERT INTO `+m.table+` (`+m.keys+`, account_id, `+strings.Join(m.sums, ", ")+`, last_ts)
+SELECT `+m.keys+`, ?, `+strings.Join(sums, ", ")+`, MAX(last_ts) FROM `+m.table+`
+WHERE account_id IN (`+placeholders+`) GROUP BY `+m.keys+`
+ON CONFLICT (`+m.keys+`, account_id) DO UPDATE SET `+strings.Join(updates, ", ")+`, last_ts = MAX(last_ts, excluded.last_ts)`, args...); err != nil {
+			return 0, fmt.Errorf("move %s: %w", m.table, err)
+		}
+		if _, err := tx.Exec(`DELETE FROM `+m.table+` WHERE account_id IN (`+placeholders+`)`, args[1:]...); err != nil {
+			return 0, fmt.Errorf("move %s: %w", m.table, err)
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 	return moved, nil
+}
+
+// rollupMove is a rollup table moveAccountHistory moves: its key columns but account_id, and
+// the columns it sums.
+type rollupMove struct {
+	table, keys string
+	sums        []string
+}
+
+var requestRollupSums = []string{"request_count", "in_tokens", "out_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "credits"}
+
+var rollupMoves = []rollupMove{
+	{"request_rollup", "model, api_key_id, success", requestRollupSums},
+	{"request_rollup_daily", "day, model, api_key_id, keyless, success", requestRollupSums},
+	{"error_rollup", "model", []string{"error_count"}},
+	{"error_rollup_daily", "day, model", []string{"error_count"}},
 }
 
 // moveAccountRings folds the live numbers of removed accounts into the kept

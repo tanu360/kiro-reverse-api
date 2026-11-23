@@ -46,5 +46,8 @@ INSERT INTO cooldowns (account_id, expires_at) VALUES ('legacy', 4102444800);`);
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

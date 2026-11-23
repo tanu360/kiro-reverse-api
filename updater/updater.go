@@ -59,6 +59,9 @@ type Status struct {
 	// language, and ErrorDetail is the Failure's detail; Error stays the English sentence.
 	ErrorCode   string `json:"errorCode,omitempty"`
 	ErrorDetail string `json:"errorDetail,omitempty"`
+	// Installed is the release an earlier update put in place, set while a later download has
+	// failed: a restart still runs it (BeginRestart), so the admin UI offers one.
+	Installed string `json:"installed,omitempty"`
 }
 
 // Options configures a Manager.
@@ -108,9 +111,9 @@ type Manager struct {
 
 	mu     sync.Mutex
 	status Status
-	// installed says an update replaced exe since this process started, so exe+".old" is the
-	// program that is running.
-	installed bool
+	// installed is the version an update put at exe since this process started, so exe+".old"
+	// is the program that is running; empty when none did.
+	installed string
 }
 
 // tempPrefix starts every file the updater writes next to the executable before it is complete.
@@ -295,6 +298,10 @@ func unsupportedMessage(reason, path string) string {
 // when no update is ready.
 func (m *Manager) BeginRestart() (Status, bool) {
 	m.mu.Lock()
+	if m.status.State == StateError && m.installed != "" {
+		// A later download failed, but the update installed before it is still at exe.
+		m.status = Status{State: StateReady, Version: m.installed, Supported: m.status.Supported, Reason: m.status.Reason, Path: m.status.Path}
+	}
 	if m.status.State != StateReady {
 		st := copyStatus(m.status)
 		m.mu.Unlock()
@@ -338,6 +345,9 @@ func (m *Manager) run(version string) {
 func (m *Manager) setStatus(st Status) {
 	m.mu.Lock()
 	st.Supported, st.Reason, st.Path = m.status.Supported, m.status.Reason, m.status.Path
+	if st.State == StateError {
+		st.Installed = m.installed
+	}
 	changed := !sameStatus(m.status, st)
 	m.status = st
 	st = copyStatus(st)

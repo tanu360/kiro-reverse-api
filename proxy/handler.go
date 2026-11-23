@@ -1438,11 +1438,6 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				},
 				OnToolUse: func(tu KiroToolUse) {
 					processClaudeText("", false, true)
-					rawContentBuilder.WriteString(tu.Name)
-					if b, err := json.Marshal(tu.Input); err == nil {
-						rawContentBuilder.Write(b)
-					}
-
 					toolUses = append(toolUses, tu)
 					ensureMessageStart()
 					closeActiveBlock()
@@ -2289,8 +2284,6 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 					processText("", false, true)
 
 					args, _ := json.Marshal(tu.Input)
-					rawContentBuilder.WriteString(tu.Name)
-					rawContentBuilder.Write(args)
 					tc := ToolCall{ID: tu.ToolUseID, Type: "function"}
 					tc.Function.Name = tu.Name
 					tc.Function.Arguments = string(args)
@@ -3628,7 +3621,7 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 	if status == "pending" || status == "slow_down" {
 
 		interval := 5
-		if session := auth.GetBuilderIdSession(req.SessionID); session != nil {
+		if session, ok := auth.GetBuilderIdSession(req.SessionID); ok {
 			interval = session.Interval
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{

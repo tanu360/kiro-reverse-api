@@ -12,6 +12,7 @@ import (
 
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
+	"kiro-proxy/tunnel"
 )
 
 const (
@@ -87,16 +88,30 @@ func (h *Handler) apiBackupsDownload(w http.ResponseWriter, _ *http.Request, id 
 	w.Write(data)
 }
 
-func (h *Handler) apiBackupsRestore(w http.ResponseWriter, _ *http.Request, id string) {
+func (h *Handler) apiBackupsRestore(w http.ResponseWriter, r *http.Request, id string) {
 	if err := config.RestoreBackup(id); err != nil {
 		writeBackupError(w, err)
 		return
 	}
+	h.finishRestore(w, r, id)
+}
+
+// finishRestore brings the running server in line with the config a restore wrote, and answers.
+// The restore brings back another password and two-factor secret, so every admin session ends,
+// and so does every sign-in that passed the old password and waits for its code. The public link
+// follows the restored settings only after a request that came through it is answered: stopping
+// or moving the link drops the connection the answer goes out on.
+func (h *Handler) finishRestore(w http.ResponseWriter, r *http.Request, payload string) {
 	h.adminSessions.RevokeAll()
+	h.totpState().clearChallenges()
 	h.pool.Reload()
 	applyRestoredLogLevel()
+	publishEvent(eventBackupRestored, payload)
+	if tunnel.FromTunnel(r) {
+		answerThenStop(w, map[string]bool{"success": true}, h.applyTunnelSettings)
+		return
+	}
 	h.applyTunnelSettings()
-	publishEvent(eventBackupRestored, id)
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -143,12 +158,7 @@ func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request
 		writeBackupError(w, err)
 		return
 	}
-	h.adminSessions.RevokeAll()
-	h.pool.Reload()
-	applyRestoredLogLevel()
-	h.applyTunnelSettings()
-	publishEvent(eventBackupRestored, "upload")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.finishRestore(w, r, "upload")
 }
 
 // backupScheduleView is the schedule as GET and POST /backups/schedule return

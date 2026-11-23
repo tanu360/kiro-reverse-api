@@ -134,6 +134,15 @@ func evalPoolUsage(pct float64, thresholds []int, cooldown time.Duration, st ale
 	return send, next
 }
 
+// rearmAlertLevel is st with its notified level lowered to level, the one reached now, keeping
+// the time of the last message: a level reached again later notifies again, within the cooldown.
+func rearmAlertLevel(st alertState, level int) alertState {
+	if level < st.Level {
+		st.Level = level
+	}
+	return st
+}
+
 // evalBanned decides one account's ban alert: once per ban. A ban older than
 // alertStaleBan when first seen is recorded without a message.
 //

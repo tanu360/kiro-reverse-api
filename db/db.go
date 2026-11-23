@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -256,6 +257,10 @@ func Init(dir string) error {
 	}
 	mu.Lock()
 	dataDir = dir
+	// Init opens a closed database again.
+	if handle == nil {
+		openErr = nil
+	}
 	mu.Unlock()
 	_, err := Get()
 	return err
@@ -416,7 +421,7 @@ func Read() (*sql.DB, error) {
 	}
 	if handle == nil {
 		// Closed again between Get and here.
-		return nil, fmt.Errorf("db: closed")
+		return nil, errClosed
 	}
 	if !walMode {
 		reader = handle
@@ -434,12 +439,17 @@ func Read() (*sql.DB, error) {
 	return reader, nil
 }
 
-// Close closes both handles; the next Get or Read opens the database again. The read pool
-// closes first, so the writer is the last connection and folds the WAL back into the file.
+// errClosed is what Get and Read return after Close, until Init opens the database again.
+var errClosed = errors.New("db: closed")
+
+// Close closes both handles. The read pool closes first, so the writer is the last connection
+// and folds the WAL back into the file. Get and Read fail from then on, until Init: a request or
+// background job still running at a stop must not open the database again, or the WAL would be
+// left beside kiro.db.
 func Close() error {
 	mu.Lock()
 	r, h := reader, handle
-	reader, handle, openErr, walMode = nil, nil, nil, false
+	reader, handle, openErr, walMode = nil, nil, errClosed, false
 	mu.Unlock()
 	var err error
 	if r != nil && r != h {
@@ -458,7 +468,7 @@ func ResetForTest(dir string) error {
 		return err
 	}
 	mu.Lock()
-	dataDir = dir
+	dataDir, openErr = dir, nil
 	mu.Unlock()
 	for _, suffix := range []string{"", "-wal", "-shm"} {
 		_ = os.Remove(filepath.Join(dir, fileName+suffix))

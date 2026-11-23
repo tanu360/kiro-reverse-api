@@ -39,17 +39,14 @@ func (p *AccountPool) setKindLocked(id string, kind CooldownKind) {
 	p.cooldownKinds[id] = kind
 }
 
-// throttleKindLocked is the kind a throttle backoff that outgrows id's current
-// cooldown takes. An active cooldown self-heal must not clear keeps its kind,
-// so a throttle cannot turn a quota wait into a healable one.
-func (p *AccountPool) throttleKindLocked(id string, retryAfter time.Duration) CooldownKind {
+// extendKindLocked is the kind a cooldown of kind takes when it outgrows id's
+// current cooldown. An active cooldown self-heal must not clear keeps its kind,
+// so a throttle or an error streak cannot turn a quota wait into a healable one.
+func (p *AccountPool) extendKindLocked(id string, kind CooldownKind) CooldownKind {
 	if until, ok := p.cooldowns[id]; ok && time.Now().Before(until) && !p.cooldownKinds[id].Healable() {
 		return p.cooldownKinds[id]
 	}
-	if retryAfter > 0 {
-		return CooldownRetryAfter
-	}
-	return CooldownThrottle
+	return kind
 }
 
 // CooldownKindOf returns the kind of id's active cooldown, or "" when it has none.

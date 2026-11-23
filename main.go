@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"kiro-proxy/config"
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
@@ -12,10 +11,12 @@ import (
 	"kiro-proxy/tunnel"
 	"kiro-proxy/updater"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -91,7 +92,8 @@ func main() {
 		Logf:     logger.Infof,
 	})
 
-	addr := fmt.Sprintf("%s:%d", config.GetHost(), config.GetPort())
+	// JoinHostPort brackets an IPv6 LISTEN_HOST (::1 listens on [::1]:8080).
+	addr := net.JoinHostPort(config.GetHost(), strconv.Itoa(config.GetPort()))
 	srv := &http.Server{Addr: addr, Handler: handler}
 	srv.RegisterOnShutdown(handler.CloseEventStreams)
 	handler.SetUpdater(upd, func() {

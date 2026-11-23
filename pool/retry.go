@@ -17,9 +17,12 @@ func (rc RetryConfig) CalculateBackoff(attempt int) time.Duration {
 		attempt = 0
 	}
 
-	delay := rc.BaseDelay * time.Duration(1<<uint(attempt))
-
-	delay = min(delay, rc.MaxDelay)
+	//! Doubling past MaxDelay overflows int64 within a few dozen attempts and wraps to a
+	//! negative or zero delay, so the cap is checked before the shift.
+	delay := rc.MaxDelay
+	if attempt < 63 && rc.BaseDelay <= rc.MaxDelay>>attempt {
+		delay = rc.BaseDelay << attempt
+	}
 	if delay <= 0 {
 		return 0
 	}

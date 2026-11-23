@@ -458,3 +458,58 @@ func TestFoldMinuteBucketKeepsTheNewerMinute(t *testing.T) {
 		t.Fatalf("an empty slot changed the kept one: %+v", dst)
 	}
 }
+
+// The pruned history of a removed copy lives in the rollups; a merge moves it onto the kept
+// account, adding to a row the kept account already has, so its forecast still counts it.
+func TestApiMergeDuplicateAccountsMovesRollups(t *testing.T) {
+	h := newDedupHandler(t,
+		config.Account{ID: "keep", Email: "dev@example.com", AuthMethod: "social", Provider: "Google", RefreshToken: "rt-k", Enabled: true},
+		config.Account{ID: "dup", Email: "DEV@example.com", AuthMethod: "social", Provider: "Google", RefreshToken: "rt-d", Enabled: true},
+	)
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	day := time.Now().Unix() / daySeconds
+	for _, stmt := range []string{
+		`INSERT INTO request_rollup (model, account_id, success, request_count, credits, last_ts) VALUES ('m', 'keep', 1, 2, 1.0, 100), ('m', 'dup', 1, 3, 2.0, 200), ('n', 'dup', 0, 1, 0, 50)`,
+		`INSERT INTO request_rollup_daily (day, model, account_id, success, request_count, credits, last_ts) VALUES (?, 'm', 'keep', 1, 2, 1.0, 100), (?, 'm', 'dup', 1, 3, 2.0, 200)`,
+		`INSERT INTO error_rollup (model, account_id, error_count, last_ts) VALUES ('m', 'dup', 4, 10)`,
+		`INSERT INTO error_rollup_daily (day, model, account_id, error_count, last_ts) VALUES (?, 'm', 'keep', 1, 5), (?, 'm', 'dup', 4, 10)`,
+	} {
+		var args []interface{}
+		for range strings.Count(stmt, "?") {
+			args = append(args, day)
+		}
+		if _, err := d.Exec(stmt, args...); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+
+	if rec := postMerge(h, `{"keepId":"keep","ids":["dup"]}`); rec.Code != http.StatusOK {
+		t.Fatalf("merge status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	for _, table := range []string{"request_rollup", "request_rollup_daily", "error_rollup", "error_rollup_daily"} {
+		var left int
+		if err := d.QueryRow(`SELECT COUNT(*) FROM ` + table + ` WHERE account_id = 'dup'`).Scan(&left); err != nil || left != 0 {
+			t.Fatalf("%s rows left on the removed id: %d (%v)", table, left, err)
+		}
+	}
+	var reqs int
+	var credits float64
+	var last int64
+	if err := d.QueryRow(`SELECT request_count, credits, last_ts FROM request_rollup WHERE model = 'm' AND account_id = 'keep' AND success = 1`).Scan(&reqs, &credits, &last); err != nil || reqs != 5 || credits != 3 || last != 200 {
+		t.Fatalf("merged rollup = %d, %v, %d (%v); want 5, 3, 200", reqs, credits, last, err)
+	}
+	var errs int
+	if err := d.QueryRow(`SELECT SUM(error_count) FROM error_rollup_daily WHERE account_id = 'keep'`).Scan(&errs); err != nil || errs != 5 {
+		t.Fatalf("merged daily errors = %d (%v), want 5", errs, err)
+	}
+	spent, err := loadAccountSpend(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := spent["keep"].credits; got != 3 {
+		t.Fatalf("forecast credits of the kept account = %v, want 3", got)
+	}
+}

@@ -538,3 +538,25 @@ func mustJSON(t *testing.T, v interface{}) []byte {
 	}
 	return data
 }
+
+func TestClaudeWebSearchLoopKeepsThinkingBudget(t *testing.T) {
+	var prompt atomic.Value
+	h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		var payload KiroPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode payload: %v", err)
+		}
+		prompt.Store(payloadText(t, &payload))
+		writeKiroTextResponse(t, w, "Go 1.26 is the latest.")
+	})
+	stubMCPWebSearch(t, http.StatusOK, mcpOneResult)
+
+	decodeClaudeMessage(t, postClaudeMessages(t, h, `{"model":"claude-sonnet-4.5","max_tokens":4000,
+		"thinking":{"type":"enabled","budget_tokens":2048},
+		"tools":[{"type":"web_search_20250305","name":"web_search"}],
+		"messages":[{"role":"user","content":"What is the latest Go?"}]}`))
+
+	if text, _ := prompt.Load().(string); !strings.Contains(text, "<max_thinking_length>2048</max_thinking_length>") {
+		t.Fatalf("the web search loop must ask for the client's thinking budget: %s", text)
+	}
+}

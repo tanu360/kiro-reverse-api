@@ -226,3 +226,35 @@ func TestApiKeyLockoutGuardHoldsUnderConcurrentDeletes(t *testing.T) {
 		t.Fatalf("a refused settings patch saved part of itself")
 	}
 }
+
+// FindApiKeyByValue compares hashes over every key (no early exit on a byte mismatch); it must
+// still find exactly the key sent, and nothing for a near miss or a prefix.
+func TestFindApiKeyByValueMatchesOnlyTheExactValue(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+	first, err := AddApiKey(ApiKeyEntry{Name: "first", Key: "sk-0123456789abcdef", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := AddApiKey(ApiKeyEntry{Name: "second", Key: "sk-fedcba9876543210", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for value, want := range map[string]string{
+		first.Key:             first.ID,
+		second.Key:            second.ID,
+		"sk-0123456789abcdee": "",
+		"sk-0123456789abcde":  "",
+		first.Key + "0":       "",
+		"":                    "",
+	} {
+		got := ""
+		if entry := FindApiKeyByValue(value); entry != nil {
+			got = entry.ID
+		}
+		if got != want {
+			t.Errorf("FindApiKeyByValue(%q) = %q, want %q", value, got, want)
+		}
+	}
+}

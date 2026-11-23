@@ -79,5 +79,8 @@ INSERT INTO errors (ts, account_id, model, status) VALUES (150, 'acc-b', 'auto',
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

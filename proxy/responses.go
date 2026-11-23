@@ -484,7 +484,8 @@ func responsesContentPartToOpenAI(part interface{}) interface{} {
 	case "input_text", "output_text":
 		return map[string]interface{}{"type": "text", "text": responseTextFromItem(obj)}
 	case "refusal":
-		return map[string]interface{}{"type": "text", "text": responseTextFromItem(obj)}
+		//! A refusal part carries its text in "refusal", not "text".
+		return map[string]interface{}{"type": "text", "text": firstString(obj["refusal"], obj["text"])}
 	default:
 		return obj
 	}

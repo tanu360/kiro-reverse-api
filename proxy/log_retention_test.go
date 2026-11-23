@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -389,15 +390,27 @@ func TestResetStatsClearsRollup(t *testing.T) {
 	if reqs, errs, err := pruneRequestLog(now, 30, nil); err != nil || reqs == 0 || errs == 0 {
 		t.Fatalf("prune = %d, %d, %v", reqs, errs, err)
 	}
-
-	if rec := adminRequest(t, h, http.MethodPost, "/stats/reset", ""); rec.Code != http.StatusOK {
-		t.Fatalf("reset = %d %s", rec.Code, rec.Body.String())
-	}
 	d, err := db.Get()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup", "request_rollup_daily", "error_rollup_daily"} {
+	var kept int64
+	if err := d.QueryRow(`SELECT MAX(id) FROM requests`).Scan(&kept); err != nil {
+		t.Fatal(err)
+	}
+	storeRequestBody(kept, &requestTrace{body: []byte(`{"model":"m","messages":[]}`)}, "", now.Unix())
+	if rec := adminRequest(t, h, http.MethodGet, fmt.Sprintf("/observe/requests/%d/body", kept), ""); rec.Code != http.StatusOK {
+		t.Fatalf("body before reset = %d %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := adminRequest(t, h, http.MethodPost, "/stats/reset", ""); rec.Code != http.StatusOK {
+		t.Fatalf("reset = %d %s", rec.Code, rec.Body.String())
+	}
+	//! The kept prompts belong to the rows the reset removed; none may still be served.
+	if rec := adminRequest(t, h, http.MethodGet, fmt.Sprintf("/observe/requests/%d/body", kept), ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("body after reset = %d %s", rec.Code, rec.Body.String())
+	}
+	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup", "request_rollup_daily", "error_rollup_daily", "request_bodies"} {
 		var n int
 		if err := d.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
 			t.Fatal(err)

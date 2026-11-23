@@ -879,7 +879,7 @@ func newProxyID() string {
 	return "px_" + hex.EncodeToString(b[:])
 }
 
-// Add stores a new proxy and checks it in the background.
+// Add stores a new proxy and checks it in the background, unless it is added switched off.
 func (m *Manager) Add(in ProxyInput) (config.PoolProxy, error) {
 	m.adminMu.Lock()
 	defer m.adminMu.Unlock()
@@ -907,7 +907,9 @@ func (m *Manager) Add(in ProxyInput) (config.PoolProxy, error) {
 	m.persistLocked()
 	m.mu.Unlock()
 	m.fire(true)
-	m.checkSoon(p.ID)
+	if !p.Disabled {
+		m.checkSoon(p.ID)
+	}
 	return p, nil
 }
 

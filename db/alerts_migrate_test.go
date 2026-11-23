@@ -46,5 +46,8 @@ INSERT INTO settings (key, value) VALUES ('config', '{"port":8080}');`); err != 
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

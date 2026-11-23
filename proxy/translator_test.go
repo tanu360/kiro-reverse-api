@@ -639,3 +639,37 @@ func TestAnswerFromContentTakesACutThinkingBlockAsReasoning(t *testing.T) {
 		}
 	}
 }
+
+// A parameter whose name is a schema keyword the cleaner drops ("required", "encrypted",
+// "additionalProperties") is still a parameter: only real keywords are removed.
+func TestEnsureObjectSchemaKeepsPropertiesNamedLikeKeywords(t *testing.T) {
+	var schema map[string]interface{}
+	if err := json.Unmarshal([]byte(`{"type":"object",
+		"properties":{"name":{"type":"string"},"required":{"type":"boolean"},"encrypted":{"type":"boolean"},
+			"options":{"type":"object","additionalProperties":false,"properties":{"additionalProperties":{"type":"string"}}}},
+		"$defs":{"required":{"type":"string","additionalProperties":false}},
+		"required":["name","required"]}`), &schema); err != nil {
+		t.Fatalf("bad fixture: %v", err)
+	}
+	got := ensureObjectSchema(schema).(map[string]interface{})
+	props := got["properties"].(map[string]interface{})
+	for _, name := range []string{"name", "required", "encrypted", "options"} {
+		if _, ok := props[name]; !ok {
+			t.Fatalf("property %q was dropped: %#v", name, props)
+		}
+	}
+	options := props["options"].(map[string]interface{})
+	if _, ok := options["additionalProperties"]; ok {
+		t.Fatalf("the additionalProperties keyword must still go: %#v", options)
+	}
+	if _, ok := options["properties"].(map[string]interface{})["additionalProperties"]; !ok {
+		t.Fatalf("a property named additionalProperties was dropped: %#v", options)
+	}
+	def := got["$defs"].(map[string]interface{})["required"].(map[string]interface{})
+	if _, ok := def["additionalProperties"]; ok {
+		t.Fatalf("definitions are still cleaned: %#v", def)
+	}
+	if req, _ := got["required"].([]interface{}); len(req) != 2 {
+		t.Fatalf("required list changed: %#v", got["required"])
+	}
+}

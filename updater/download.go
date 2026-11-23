@@ -129,23 +129,26 @@ func (m *Manager) install(version string) error {
 		return fail(FailWrite, err, "Could not save the new program: %v", err)
 	}
 	_ = archive.Close()
-	return m.swap(program.Name())
+	return m.swap(program.Name(), version)
 }
 
-// swap puts the new program at the executable's path and keeps the running one as
+// swap puts version's new program at the executable's path and keeps the running one as
 // <exe>.old. Renaming a running program works on Linux, macOS and Windows alike.
-func (m *Manager) swap(newPath string) error {
+func (m *Manager) swap(newPath, version string) error {
 	exe := m.exe
 	old := exe + ".old"
 	m.mu.Lock()
 	installed := m.installed
 	m.mu.Unlock()
-	if installed {
+	if installed != "" {
 		// An earlier update already moved the running program to .old, which stays the backup;
 		// the new download replaces the update that never ran.
 		if err := os.Rename(newPath, exe); err != nil {
 			return fail(FailSwap, err, "Could not put the new program in place: %v", err)
 		}
+		m.mu.Lock()
+		m.installed = version
+		m.mu.Unlock()
 		return nil
 	}
 	if err := os.Remove(old); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -163,7 +166,7 @@ func (m *Manager) swap(newPath string) error {
 		return fail(FailSwap, err, "Could not put the new program in place: %v", err)
 	}
 	m.mu.Lock()
-	m.installed = true
+	m.installed = version
 	m.mu.Unlock()
 	return nil
 }

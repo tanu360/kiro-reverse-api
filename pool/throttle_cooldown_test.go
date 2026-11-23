@@ -75,3 +75,31 @@ func TestThrottleNeverShortensLongerCooldown(t *testing.T) {
 		t.Fatalf("a throttle shortened a quota cooldown to %v", left)
 	}
 }
+
+// A request that fails alongside one that hit the quota or got a retry hint ends a third error
+// in a row. Its one-minute cooldown must not cut the longer wait short, nor turn it into an
+// error cooldown that self-heal may clear.
+func TestErrorStreakNeverShortensLongerCooldown(t *testing.T) {
+	p := newTestPool(
+		config.Account{ID: "drained", Enabled: true, AccessToken: "token"},
+		config.Account{ID: "hinted", Enabled: true, AccessToken: "token"},
+	)
+	p.RecordQuotaError("drained", 0)
+	p.RecordThrottleError("hinted", 5*time.Minute)
+	for i := 0; i < 3; i++ {
+		p.RecordError("drained", false)
+		p.RecordError("hinted", false)
+	}
+	if left := cooldownLeft(t, p, "drained"); left < 23*time.Hour {
+		t.Fatalf("an error streak shortened a quota cooldown to %v", left)
+	}
+	if kind := p.CooldownKindOf("drained"); kind != CooldownQuota {
+		t.Fatalf("quota cooldown kind = %q after an error streak, want %q", kind, CooldownQuota)
+	}
+	if left := cooldownLeft(t, p, "hinted"); left < 4*time.Minute {
+		t.Fatalf("an error streak shortened a retry hint to %v", left)
+	}
+	if kind := p.CooldownKindOf("hinted"); kind != CooldownRetryAfter {
+		t.Fatalf("retry hint kind = %q after an error streak, want %q", kind, CooldownRetryAfter)
+	}
+}

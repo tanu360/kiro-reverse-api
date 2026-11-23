@@ -252,3 +252,16 @@ func TestAlertsAPIDailySummarySettings(t *testing.T) {
 		}
 	}
 }
+
+// DISABLED is the admin's switch kept over an auth ban (keepOffForAdmin), not a ban: the summary
+// leaves such an account out like any other one the admin switched off.
+func TestDailySummaryLeavesOutAnAdminDisable(t *testing.T) {
+	accounts := []config.Account{
+		{ID: "kept-off", Email: "kept-off@example.com", BanStatus: "DISABLED", BanReason: banReasonAuthFailed},
+		{ID: "banned", Email: "banned@example.com", BanStatus: "BANNED", BanReason: banReasonSuspended},
+	}
+	got := summaryAttentionFor(accounts, nil)
+	if len(got) != 1 || got[0].ID != "banned" {
+		t.Fatalf("attention = %+v, want only the banned account", got)
+	}
+}

@@ -228,6 +228,23 @@ func TestResponsesStreamTextOnlyInDone(t *testing.T) {
 	}
 }
 
+// A refusal part that sent deltas must not hide a later part that arrives only as done.
+func TestResponsesStreamRefusalPartsAreTrackedApart(t *testing.T) {
+	stream := sseLines(
+		`{"type":"response.refusal.delta","item_id":"m1","content_index":0,"delta":"No."}`,
+		`{"type":"response.refusal.done","item_id":"m1","content_index":0,"refusal":"No."}`,
+		`{"type":"response.refusal.done","item_id":"m2","content_index":0,"refusal":" Still no."}`,
+		responsesCompleted,
+	)
+	r, _, err := runResponsesStream(t, stream)
+	if err != nil {
+		t.Fatalf("consume: %v", err)
+	}
+	if r.text != "No. Still no." {
+		t.Fatalf("text = %q", r.text)
+	}
+}
+
 func TestResponsesStreamToolCallVariants(t *testing.T) {
 	stream := sseLines(
 		// Arguments only in output_item.added.

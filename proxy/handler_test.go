@@ -1248,3 +1248,83 @@ func TestAccountFieldWritesAndCooldownsPublishAccountsChanged(t *testing.T) {
 		}
 	}
 }
+
+// The streamed answer's tool calls are counted once, as the non-stream answer counts them.
+// A <thinking> tag inside tool arguments is not reasoning.
+func TestStreamOutputTokensCountToolCallsOnce(t *testing.T) {
+	input := map[string]interface{}{"path": "a.go", "note": "<thinking>not reasoning</thinking>"}
+	upstream := func(w http.ResponseWriter, _ *http.Request) {
+		encoded, _ := json.Marshal(input)
+		writeFrames(w,
+			awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "Let me read that file."}),
+			awsEventStreamFrame(t, "toolUseEvent", map[string]interface{}{"toolUseId": "toolu_1", "name": "read", "input": string(encoded), "stop": true}),
+			awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": "tool_use"}),
+			meteringFrame(t),
+		)
+	}
+	want := estimateClaudeOutputTokens("Let me read that file.", "", []KiroToolUse{{Name: "read", Input: input}})
+
+	t.Run("claude", func(t *testing.T) {
+		h := newStreamTestHandler(t, upstream)
+		rec := httptest.NewRecorder()
+		h.handleClaudeStream(rec, httptest.NewRequest(http.MethodPost, "/v1/messages", nil), testKiroPayload(), "claude-sonnet-4.5", true, claudeThinkingResponseOptions{}, 1, nil, nil)
+		body := rec.Body.String()
+		if strings.Contains(body, `"thinking_delta"`) {
+			t.Fatalf("tool arguments must not stream as thinking: %s", body)
+		}
+		var got int
+		for _, line := range strings.Split(body, "\n") {
+			data, ok := strings.CutPrefix(line, "data: ")
+			if !ok || !strings.Contains(data, `"message_delta"`) {
+				continue
+			}
+			var event struct {
+				Usage struct {
+					OutputTokens int `json:"output_tokens"`
+				} `json:"usage"`
+			}
+			if err := json.Unmarshal([]byte(data), &event); err != nil {
+				t.Fatalf("decode message_delta: %v", err)
+			}
+			got = event.Usage.OutputTokens
+		}
+		if got != want {
+			t.Fatalf("output_tokens = %d, want %d: %s", got, want, body)
+		}
+	})
+
+	t.Run("openai", func(t *testing.T) {
+		h := newStreamTestHandler(t, upstream)
+		rec := httptest.NewRecorder()
+		h.handleOpenAIStream(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil), testKiroPayload(), "claude-sonnet-4.5", true, 1, nil)
+		body := rec.Body.String()
+		args, _ := json.Marshal(input)
+		wantOpenAI := estimateApproxTokens("Let me read that file.") + estimateApproxTokens("read") + estimateApproxTokens(string(args))
+		var got int
+		var reasoning bool
+		for _, line := range strings.Split(body, "\n") {
+			data, ok := strings.CutPrefix(line, "data: ")
+			if !ok || data == "[DONE]" {
+				continue
+			}
+			var chunk struct {
+				Usage *struct {
+					CompletionTokens        int `json:"completion_tokens"`
+					CompletionTokensDetails *struct {
+						ReasoningTokens int `json:"reasoning_tokens"`
+					} `json:"completion_tokens_details"`
+				} `json:"usage"`
+			}
+			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+				t.Fatalf("decode chunk: %v", err)
+			}
+			if chunk.Usage != nil {
+				got = chunk.Usage.CompletionTokens
+				reasoning = chunk.Usage.CompletionTokensDetails != nil && chunk.Usage.CompletionTokensDetails.ReasoningTokens > 0
+			}
+		}
+		if got != wantOpenAI || reasoning {
+			t.Fatalf("completion_tokens = %d (reasoning %t), want %d and no reasoning: %s", got, reasoning, wantOpenAI, body)
+		}
+	})
+}

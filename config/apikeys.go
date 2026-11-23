@@ -2,6 +2,8 @@ package config
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"strings"
@@ -232,19 +234,25 @@ func countEnabledApiKeysLocked() int {
 	return n
 }
 
+// FindApiKeyByValue returns the configured key whose value is key, or nil. It compares the
+// hashes of every key's value in constant time, so the time taken says nothing about how close
+// a guess came.
 func FindApiKeyByValue(key string) *ApiKeyEntry {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	if cfg == nil || key == "" {
 		return nil
 	}
+	sum := sha256.Sum256([]byte(key))
+	var match *ApiKeyEntry
 	for i := range cfg.ApiKeys {
-		if cfg.ApiKeys[i].Key == key {
+		other := sha256.Sum256([]byte(cfg.ApiKeys[i].Key))
+		if subtle.ConstantTimeCompare(sum[:], other[:]) == 1 {
 			cp := cfg.ApiKeys[i]
-			return &cp
+			match = &cp
 		}
 	}
-	return nil
+	return match
 }
 
 func HasApiKeys() bool {

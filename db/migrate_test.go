@@ -56,6 +56,9 @@ INSERT INTO requests (ts, model, in_tokens, out_tokens, total_tokens) VALUES (1,
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -113,6 +116,9 @@ INSERT INTO requests (ts, model, total_tokens) VALUES (1, 'legacy', 10);`); err 
 			t.Fatalf("insert with request_id on open %d: %v", i, err)
 		}
 		if err := Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := Init(dir); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -179,6 +185,9 @@ INSERT INTO requests (ts, model, api_key) VALUES (1, 'legacy', '****');`); err !
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -240,6 +249,9 @@ INSERT INTO requests (ts, model, endpoint) VALUES (1, 'legacy', 'claude');`); er
 			t.Fatalf("insert with client on open %d: %v", i, err)
 		}
 		if err := Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := Init(dir); err != nil {
 			t.Fatal(err)
 		}
 	}

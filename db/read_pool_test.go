@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -92,7 +93,7 @@ func ResetForTestKeep(dir string) error {
 		return err
 	}
 	mu.Lock()
-	dataDir = dir
+	dataDir, openErr = dir, nil
 	mu.Unlock()
 	return nil
 }
@@ -172,8 +173,10 @@ func TestCloseRacesGetAndRead(t *testing.T) {
 		_ = Close()
 	}
 	close(done)
-	// The goroutines stop before the test ends, so none opens this folder after it is deleted.
 	wg.Wait()
+	if err := Init(dir); err != nil {
+		t.Fatal(err)
+	}
 	r, err := Read()
 	if err != nil {
 		t.Fatal(err)
@@ -181,5 +184,54 @@ func TestCloseRacesGetAndRead(t *testing.T) {
 	var n int
 	if err := r.QueryRow(`SELECT COUNT(*) FROM settings`).Scan(&n); err != nil {
 		t.Fatalf("read after the races: %v", err)
+	}
+}
+
+// A stop closes the database for good: a request or job still running cannot open it again, so
+// the WAL is folded back into kiro.db and stays gone. Init opens it again.
+func TestCloseIsFinalUntilInit(t *testing.T) {
+	dir := t.TempDir()
+	if err := ResetForTest(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Close() })
+	if err := Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	w, err := Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Exec(`INSERT INTO settings VALUES ('kept', 'yes')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Read(); err != nil {
+		t.Fatal(err)
+	}
+	if err := Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Get(); !errors.Is(err, errClosed) {
+		t.Fatalf("Get after Close = %v, want errClosed", err)
+	}
+	if _, err := Read(); !errors.Is(err, errClosed) {
+		t.Fatalf("Read after Close = %v, want errClosed", err)
+	}
+	for _, name := range []string{fileName + "-wal", fileName + "-shm"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("%s beside kiro.db after Close: %v", name, err)
+		}
+	}
+
+	if err := Init(dir); err != nil {
+		t.Fatalf("Init after Close: %v", err)
+	}
+	r, err := Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kept string
+	if err := r.QueryRow(`SELECT value FROM settings WHERE key = 'kept'`).Scan(&kept); err != nil || kept != "yes" {
+		t.Fatalf("row after Init = %q, %v", kept, err)
 	}
 }

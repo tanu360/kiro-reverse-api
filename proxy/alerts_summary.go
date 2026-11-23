@@ -143,11 +143,12 @@ GROUP BY `+column+` ORDER BY COUNT(*) DESC, SUM(credits) DESC, `+column+` LIMIT 
 // summaryAttentionFor lists the accounts that need attention: banned or
 // suspended (a ban also switches an account off), and, among the enabled ones,
 // out of credits or running out before their credits reset. An account the
-// admin switched off is left out.
+// admin switched off is left out, DISABLED included: it is the admin's switch
+// kept over an auth ban (keepOffForAdmin, banAccount), never one the proxy sets.
 func summaryAttentionFor(accounts []config.Account, forecasts map[string]accountForecast) []summaryAttention {
 	var out []summaryAttention
 	for _, acc := range accounts {
-		banned := acc.BanStatus != "" && acc.BanStatus != "ACTIVE"
+		banned := acc.BanStatus != "" && acc.BanStatus != "ACTIVE" && acc.BanStatus != "DISABLED"
 		if !acc.Enabled && !banned {
 			continue
 		}
@@ -155,9 +156,6 @@ func summaryAttentionFor(accounts []config.Account, forecasts map[string]account
 		switch f := forecasts[acc.ID]; {
 		case banned:
 			text := label + ": banned or suspended"
-			if acc.BanStatus != "BANNED" {
-				text = label + ": switched off by the proxy"
-			}
 			if reason := strings.TrimSpace(acc.BanReason); reason != "" {
 				text += " (" + reason + ")"
 			}

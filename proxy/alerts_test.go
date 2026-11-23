@@ -624,3 +624,91 @@ func TestBackgroundAlertsEvaluatesAfterAccountChange(t *testing.T) {
 		t.Fatalf("message = %s (%v)", received()[0].body, err)
 	}
 }
+
+// A restore replaces the accounts without an accounts event; the alerter evaluates on the
+// restore's own event instead of waiting for its safety tick.
+func TestBackgroundAlertsEvaluatesAfterRestore(t *testing.T) {
+	initAlertsTest(t)
+	srv, received := alertReceiver(t)
+	off := false
+	if err := config.UpdateAlertsConfig(func(c *config.AlertsConfig) error {
+		c.PoolUsage, c.AllUnavailable = &off, &off
+		c.Channels = []config.AlertChannel{{ID: "ch_restore", Type: config.AlertChannelWebhook, Enabled: true, URL: srv.URL + "/hook"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	//! Written before the loop subscribes, as a restore writes its accounts unannounced.
+	if err := config.AddAccount(usageAccount("rs1", 91, 100, "2026-12-01")); err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{stopRefresh: make(chan struct{})}
+	done := make(chan struct{})
+	go func() {
+		h.backgroundAlerts()
+		close(done)
+	}()
+	defer func() {
+		close(h.stopRefresh)
+		<-done
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	publishEvent(eventBackupRestored, "upload")
+	deadline := time.Now().Add(alertDebounceQuiet + 5*time.Second)
+	for len(received()) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("no alert after the restore")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	var msg alertMessage
+	if err := json.Unmarshal(received()[0].body, &msg); err != nil || msg.Event != alertEventAccountUsage {
+		t.Fatalf("message = %s (%v)", received()[0].body, err)
+	}
+}
+
+// An outage that ends while the rule is off, or while no channel is on, re-arms the rule, so the
+// next outage alerts once the rule can send again.
+func TestAllUnavailableRearmsWhileItCannotSend(t *testing.T) {
+	for _, mute := range []string{"rule off", "no channel"} {
+		t.Run(mute, func(t *testing.T) {
+			initAlertsTest(t)
+			a := newAlerter()
+			on := usageOnly(testAlertsConfig(), alertEventAllUnavailable)
+			muted := on
+			if mute == "rule off" {
+				off := false
+				muted.AllUnavailable = &off
+			} else {
+				muted.Channels = []config.AlertChannel{{ID: "ch_off", Type: config.AlertChannelWebhook, URL: "http://127.0.0.1:1/hook"}}
+			}
+			const t0 = int64(1_800_000_000)
+			mustEvaluate(t, a, on, nil, 3, 0, t0)
+			if msgs, _ := mustEvaluate(t, a, on, nil, 3, 0, t0+60); len(msgs) != 1 {
+				t.Fatalf("first outage = %v", eventsOf(msgs))
+			}
+			mustEvaluate(t, a, muted, nil, 3, 1, t0+120) // recovered, unwatched
+			mustEvaluate(t, a, on, nil, 3, 0, t0+4000)   // a new outage, past the cooldown
+			if msgs, _ := mustEvaluate(t, a, on, nil, 3, 0, t0+4060); len(msgs) != 1 || msgs[0].Event != alertEventAllUnavailable {
+				t.Fatalf("second outage = %v, want an alert", eventsOf(msgs))
+			}
+		})
+	}
+}
+
+// Pool usage that drops while the rule is off re-arms it, so crossing the threshold again alerts.
+func TestPoolAlertRearmsWhileTheRuleIsOff(t *testing.T) {
+	initAlertsTest(t)
+	a := newAlerter()
+	on := usageOnly(testAlertsConfig(), alertEventPoolUsage)
+	off := usageOnly(testAlertsConfig(), "")
+	const t0 = int64(1_800_000_000)
+	if msgs, _ := mustEvaluate(t, a, on, []config.Account{usageAccount("p1", 95, 100, "")}, 0, 0, t0); len(msgs) != 1 {
+		t.Fatalf("first peak = %v", eventsOf(msgs))
+	}
+	mustEvaluate(t, a, off, []config.Account{usageAccount("p1", 5, 100, "")}, 0, 0, t0+60)
+	if msgs, _ := mustEvaluate(t, a, on, []config.Account{usageAccount("p1", 95, 100, "")}, 0, 0, t0+4000); len(msgs) != 1 || msgs[0].Event != alertEventPoolUsage {
+		t.Fatalf("second peak = %v, want an alert", eventsOf(msgs))
+	}
+}

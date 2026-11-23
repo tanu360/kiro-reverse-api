@@ -92,6 +92,11 @@ func recordRequestMetrics(rec requestRecord) {
 	account := metricsAccount(rec.AccountID, rec.Email)
 	apiKey := metricsLabel(rec.APIKeyID)
 	model := metricsLabel(rec.Model)
+	//! A request no account served (a wrong key, an unknown model) names whatever model the
+	//! client sent; as a label it would let any caller add series without bound.
+	if rec.AccountID == "" {
+		model = "none"
+	}
 	endpoint := metricsLabel(rec.Endpoint)
 	m := metrics
 	m.mu.Lock()

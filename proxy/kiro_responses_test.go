@@ -752,3 +752,33 @@ func TestEndpointConfigChatAPI(t *testing.T) {
 		t.Fatalf("bad chatApi: %d %s, endpoint %q", rec.Code, rec.Body, config.GetPreferredEndpoint())
 	}
 }
+
+// The tool results the translator repeats as text for generateAssistantResponse travel as
+// function_call_output items here; text the client wrote beside them must not carry them again.
+func TestBuildKiroResponsesRequestDropsRepeatedToolResultsBesideClientText(t *testing.T) {
+	req := &ClaudeRequest{
+		Model: "claude-sonnet-4.5", MaxTokens: 100,
+		Tools: []ClaudeTool{{Name: "read_file", InputSchema: map[string]interface{}{"type": "object"}}},
+		Messages: []ClaudeMessage{
+			{Role: "user", Content: "Read a.go"},
+			{Role: "assistant", Content: []interface{}{map[string]interface{}{"type": "tool_use", "id": "toolu_1", "name": "read_file", "input": map[string]interface{}{"path": "a.go"}}}},
+			{Role: "user", Content: []interface{}{
+				map[string]interface{}{"type": "tool_result", "tool_use_id": "toolu_1", "content": "package main"},
+				map[string]interface{}{"type": "text", "text": "Now explain it."},
+			}},
+		},
+	}
+	for _, choice := range []interface{}{nil, map[string]interface{}{"type": "any"}} {
+		req.ToolChoice = choice
+		payload := ClaudeToKiro(req, false)
+		if !strings.Contains(payload.ConversationState.CurrentMessage.UserInputMessage.Content, "package main") {
+			t.Fatalf("generateAssistantResponse keeps the results as text: %q", payload.ConversationState.CurrentMessage.UserInputMessage.Content)
+		}
+		input := buildKiroResponsesRequest(payload).Input
+		last := input[len(input)-1]
+		text, _ := last["content"].(string)
+		if input[len(input)-2]["type"] != "function_call_output" || !strings.HasPrefix(text, "Now explain it.") || strings.Contains(text, "package main") {
+			t.Fatalf("tool_choice %v: last items = %v / %v", choice, input[len(input)-2], last)
+		}
+	}
+}

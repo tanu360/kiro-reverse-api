@@ -424,19 +424,14 @@ func (s *userSessionStore) Import(data []byte) int {
 	return kept
 }
 
-// findUserKey returns the configured key whose value is value. It compares the hashes of every
-// key's value in constant time, so the time taken says nothing about how close a guess came.
+// findUserKey returns the configured key whose value is value (config.FindApiKeyByValue, which
+// takes the same time however close a guess came).
 func findUserKey(value string) (config.ApiKeyEntry, bool) {
-	sum := sha256.Sum256([]byte(value))
-	var match config.ApiKeyEntry
-	found := false
-	for _, entry := range config.ListApiKeys() {
-		other := sha256.Sum256([]byte(entry.Key))
-		if subtle.ConstantTimeCompare(sum[:], other[:]) == 1 && entry.ID != "" {
-			match, found = entry, true
-		}
+	entry := config.FindApiKeyByValue(value)
+	if entry == nil || entry.ID == "" {
+		return config.ApiKeyEntry{}, false
 	}
-	return match, found
+	return *entry, true
 }
 
 // isUserAPIPath reports whether path belongs to the user panel's API. The bare root is one of

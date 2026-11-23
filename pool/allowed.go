@@ -11,10 +11,6 @@ import (
 // outside the list into one more exclusion and hand off to the plain pickers,
 // so rotation, cooldowns and model checks work exactly as for an unbound key.
 
-// allowedPickAttempts bounds the re-picks after a Reload races a pick and
-// rotation hands back an account the list does not hold.
-const allowedPickAttempts = 3
-
 // AllowedSet is the lookup set for an allowlist. Empty means every account,
 // which is nil.
 func AllowedSet(ids []string) map[string]bool {
@@ -49,15 +45,7 @@ func (p *AccountPool) GetPreferredForModelAllowed(preferredID, model string, exc
 // routing mode: the preferred account is kept, or outranked, by scope.Mode's
 // rules, and a new pick uses scope.Mode.
 func (p *AccountPool) GetPreferredForModelScoped(preferredID, model string, excluded map[string]bool, scope Scope) *config.Account {
-	if scope.Allowed == nil {
-		return p.getPreferredForModel(preferredID, model, excluded, scope.Mode)
-	}
-	if !scope.Allowed[preferredID] {
-		preferredID = ""
-	}
-	return p.pickAllowed(scope.Allowed, excluded, func(merged map[string]bool) *config.Account {
-		return p.getPreferredForModel(preferredID, model, merged, scope.Mode)
-	})
+	return p.getPreferredForModel(preferredID, model, excluded, scope)
 }
 
 // GetNextForModelAllowed is GetNextForModelExcluding limited to the accounts
@@ -68,34 +56,18 @@ func (p *AccountPool) GetNextForModelAllowed(model string, excluded, allowed map
 
 // GetNextForModelScoped is GetNextForModelAllowed with the key's own routing mode.
 func (p *AccountPool) GetNextForModelScoped(model string, excluded map[string]bool, scope Scope) *config.Account {
-	if scope.Allowed == nil {
-		return p.getNextForModel(model, excluded, scope.Mode)
-	}
-	return p.pickAllowed(scope.Allowed, excluded, func(merged map[string]bool) *config.Account {
-		return p.getNextForModel(model, merged, scope.Mode)
-	})
+	return p.getNextForModel(model, excluded, scope)
 }
 
-// pickAllowed runs pick with the caller's exclusions plus every account
-// outside allowed. The pick takes the pool lock again, so a Reload in between
-// can add an account; the result is checked against allowed and, on a miss,
-// picked again from fresh exclusions.
-func (p *AccountPool) pickAllowed(allowed, excluded map[string]bool, pick func(map[string]bool) *config.Account) *config.Account {
-	for attempt := 0; attempt < allowedPickAttempts; attempt++ {
-		acc := pick(p.excludeOutside(allowed, excluded))
-		if acc == nil || allowed[acc.ID] {
-			return acc
-		}
+// excludeOutsideLocked is the exclusions a pick limited to allowed uses: the
+// caller's, plus every pooled account allowed does not hold, as a new set. Nil
+// allowed is every account, so the caller's set comes back as it is. The
+// caller's map is never written. Caller holds p.mu.
+func (p *AccountPool) excludeOutsideLocked(allowed, excluded map[string]bool) map[string]bool {
+	if allowed == nil {
+		return excluded
 	}
-	return nil
-}
-
-// excludeOutside is a new exclusion set: the caller's, plus every pooled
-// account allowed does not hold. The caller's map is never written.
-func (p *AccountPool) excludeOutside(allowed, excluded map[string]bool) map[string]bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	merged := make(map[string]bool, len(excluded)+len(p.enabledIDs))
+	merged := make(map[string]bool, len(excluded)+len(p.accounts))
 	for id, out := range excluded {
 		if out {
 			merged[id] = true

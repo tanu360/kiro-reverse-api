@@ -329,3 +329,21 @@ func mustParse(t *testing.T, raw string) *url.URL {
 	}
 	return u
 }
+
+// A proxy added switched off is never checked, as one switched off later is not.
+func TestProxyAddedSwitchedOffIsNotChecked(t *testing.T) {
+	m := setupPool(t)
+	off := false
+	p, err := m.Add(ProxyInput{URL: strPtr(fakeProxy(t, http.StatusOK)), Enabled: &off})
+	if err != nil || !p.Disabled {
+		t.Fatalf("add switched off: %+v %v", p, err)
+	}
+	m.mu.Lock()
+	for m.bgRunning > 0 {
+		m.bgIdle.Wait()
+	}
+	m.mu.Unlock()
+	if h := m.Health(p.ID); h.CheckedAt != 0 || h.Status != StatusUnknown {
+		t.Fatalf("a proxy added switched off was checked: %+v", h)
+	}
+}

@@ -60,6 +60,9 @@ INSERT INTO requests (ts, model, in_tokens, out_tokens, total_tokens, cache_read
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	d, err := Get()

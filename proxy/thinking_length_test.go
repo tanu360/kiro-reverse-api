@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -131,5 +132,28 @@ func TestThinkingInstructionNeedsTheThinkingPrompt(t *testing.T) {
 	h.applyThinkingInstruction(payload)
 	if payloadText(t, payload) != before {
 		t.Fatalf("thinking off: the payload must not change")
+	}
+}
+
+// An explicit budget_tokens wins over output_config.effort on a model without an effort
+// setting, whichever length the effort set first.
+func TestThinkingLengthBudgetWinsOverEffort(t *testing.T) {
+	h := &Handler{}
+	for _, budget := range []int{8000, defaultThinkingLength} {
+		req := &ClaudeRequest{
+			Model:        "claude-sonnet-4.5",
+			MaxTokens:    4000,
+			Thinking:     &ClaudeThinkingConfig{Type: "enabled", BudgetTokens: budget},
+			OutputConfig: &ClaudeOutputConfig{Effort: "high"},
+			Messages:     []ClaudeMessage{{Role: "user", Content: "What is 6*7?"}},
+		}
+		payload := ClaudeToKiro(req, true)
+		h.applyReasoningEffort(payload, req.Model, claudeOutputEffort(req))
+		applyClaudeThinkingBudget(payload, req.Thinking)
+		text := payloadText(t, payload)
+		want := "<max_thinking_length>" + strconv.Itoa(budget) + "</max_thinking_length>"
+		if !strings.Contains(text, want) || strings.Count(text, "<max_thinking_length>") != 1 {
+			t.Fatalf("budget %d: want %s once in %s", budget, want, text)
+		}
 	}
 }

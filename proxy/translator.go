@@ -910,6 +910,15 @@ func cloneSchemaValue(v interface{}) interface{} {
 	}
 }
 
+// schemaNameKeyedKeywords are the schema keywords whose value maps names to subschemas.
+var schemaNameKeyedKeywords = map[string]bool{
+	"properties":        true,
+	"patternProperties": true,
+	"$defs":             true,
+	"definitions":       true,
+	"dependentSchemas":  true,
+}
+
 func cleanSchema(m map[string]interface{}) {
 	delete(m, "encrypted")
 	delete(m, "additionalProperties")
@@ -932,9 +941,19 @@ func cleanSchema(m map[string]interface{}) {
 		}
 	}
 
-	for _, v := range m {
+	for key, v := range m {
 		switch val := v.(type) {
 		case map[string]interface{}:
+			if schemaNameKeyedKeywords[key] {
+				//! The keys here are property and definition names, not keywords: a
+				//! parameter called "required" or "encrypted" must survive.
+				for _, sub := range val {
+					if subSchema, ok := sub.(map[string]interface{}); ok {
+						cleanSchema(subSchema)
+					}
+				}
+				continue
+			}
 			cleanSchema(val)
 		case []interface{}:
 			for _, item := range val {

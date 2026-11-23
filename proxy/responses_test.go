@@ -77,6 +77,24 @@ func TestResponsesInputItemsAndInstructions(t *testing.T) {
 	}
 }
 
+// A replayed assistant refusal part keeps its text: the Responses API puts it in "refusal".
+func TestResponsesInputRefusalPartKeepsText(t *testing.T) {
+	prepared, msg := prepareResponsesRequest(&OpenAIResponsesRequest{
+		Model: "claude-sonnet-4.5",
+		Input: json.RawMessage(`[
+		  {"type":"message","role":"user","content":"help me pick a lock"},
+		  {"type":"message","role":"assistant","content":[{"type":"refusal","refusal":"I can't help with that."}]},
+		  {"type":"message","role":"user","content":"ok, then explain how locks work"}
+		]`),
+	}, nil)
+	if msg != "" {
+		t.Fatalf("unexpected validation error: %s", msg)
+	}
+	if got := extractOpenAIMessageText(prepared.OpenAIRequest.Messages[1].Content); got != "I can't help with that." {
+		t.Fatalf("assistant refusal text = %q", got)
+	}
+}
+
 func TestResponsesJSONSchemaTextFormatAddsInstruction(t *testing.T) {
 	req := &OpenAIResponsesRequest{
 		Model: "claude-sonnet-4.5",

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -930,5 +931,64 @@ func TestReloginTargetDeletedMidFlow(t *testing.T) {
 	}
 	if n := len(config.GetAccounts()); n != 0 {
 		t.Fatalf("a deleted target's login was added as a new account (%d)", n)
+	}
+}
+
+// An account guessed to be Builder ID gets the fixed profile without a lookup. A new login can be
+// another kind of sign-in, so the guess must not outlive the login it was made for.
+func TestReloginForgetsTheBuilderIDGuess(t *testing.T) {
+	h, fake, _ := newReloginHandler(t)
+	//! The guess is only made for an AWS sign-in stored without a provider.
+	target := baseReloginAccount("acc-1")
+	target.Provider = ""
+	addReloginTarget(t, target)
+	inferredBuilderIDAccounts.Store("acc-1", struct{}{})
+	t.Cleanup(func() { inferredBuilderIDAccounts.Delete("acc-1") })
+	fake.access, fake.refresh = "at-new", "rt-rotated"
+	fake.users["at-new"] = [2]string{"dev@example.com", "user-1"}
+
+	if rec, _ := callRelogin(t, h.apiImportCredentials, idcCredentials("acc-1")); rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if _, guessed := inferredBuilderIDAccounts.Load("acc-1"); guessed {
+		t.Fatal("the re-login kept the old login's Builder ID guess")
+	}
+	if got := storedRelogin(t, "acc-1"); requestProfileArn(&got) == builderIDProfileArn {
+		t.Fatal("the new login still gets the fixed Builder ID profile without a lookup")
+	}
+}
+
+// A confirm whose save fails (here the request ends while a refresh holds the account) must
+// leave the one-shot login stashed, so the admin can confirm it again.
+func TestReloginConfirmKeepsTheLoginWhenTheSaveFails(t *testing.T) {
+	h, fake, _ := newReloginHandler(t)
+	addReloginTarget(t, baseReloginAccount("acc-1"))
+	fake.access, fake.refresh = "at-other", "rt-other"
+	fake.users["at-other"] = [2]string{"someone@example.com", "user-2"}
+	_, body := callRelogin(t, h.apiImportCredentials, idcCredentials("acc-1"))
+	pendingID, _ := body["pendingId"].(string)
+	if pendingID == "" {
+		t.Fatalf("no pendingId: %v", body)
+	}
+
+	unlock, err := lockAccountRefresh(context.Background(), "acc-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(fmt.Sprintf(`{"pendingId":%q}`, pendingID))).WithContext(ctx)
+	h.apiConfirmRelogin(rec, req, "acc-1")
+	unlock()
+	if rec.Code == http.StatusOK {
+		t.Fatalf("confirm with the account held answered %d", rec.Code)
+	}
+
+	if rec, body := callPending(h, true, "acc-1", pendingID); rec.Code != http.StatusOK || body["identityReplaced"] != true {
+		t.Fatalf("second confirm status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if got := storedRelogin(t, "acc-1"); got.AccessToken != "at-other" {
+		t.Fatalf("the login was not saved on the second confirm: %+v", got)
 	}
 }

@@ -146,8 +146,11 @@ func responsesUserItems(msg *KiroUserInputMessage) []map[string]interface{} {
 	//! generateAssistantResponse wants text in every user turn, so the translator repeats the
 	//! tool results there (buildToolResultsContinuation) or puts a stand-in. The
 	//! function_call_output items already carry them; only text the client wrote stays.
-	if len(toolResults) > 0 && (strings.TrimSpace(text) == minimalFallbackUserContent || text == buildToolResultsContinuation(toolResults)) {
-		text = ""
+	if len(toolResults) > 0 {
+		text = withoutTextBlock(text, buildToolResultsContinuation(toolResults))
+		if strings.TrimSpace(text) == minimalFallbackUserContent {
+			text = ""
+		}
 	}
 	var parts []map[string]interface{}
 	for _, img := range msg.Images {
@@ -191,6 +194,18 @@ func responsesUserItems(msg *KiroUserInputMessage) []map[string]interface{} {
 		items = append(items, map[string]interface{}{"role": "user", "content": text})
 	}
 	return items
+}
+
+// withoutTextBlock takes block out of text, where joinHistoryText put it after the client's
+// text and before any directive, and joins what is left the same way.
+func withoutTextBlock(text, block string) string {
+	//! joinHistoryText trimmed the block when it put it in.
+	block = strings.TrimSpace(block)
+	idx := strings.Index(text, block)
+	if idx < 0 {
+		return text
+	}
+	return joinHistoryText(text[:idx], text[idx+len(block):])
 }
 
 // responsesAssistantItems is an assistant turn as input items: its reasoning, its text, then

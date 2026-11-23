@@ -36,11 +36,10 @@ type responsesSSEAdapter struct {
 	open map[string]bool
 	// argued holds the calls whose arguments already arrived.
 	argued map[string]bool
-	// textStreamed holds the output_text parts (item and content index) that sent deltas.
+	// textStreamed holds the output_text and refusal parts (item and content index) that sent deltas.
 	textStreamed map[string]bool
 	// reasoningStreamed is whether the reasoning item in progress sent its text as deltas.
 	reasoningStreamed bool
-	refusalStreamed   bool
 }
 
 // responsesSSESource reads a CreateResponse event stream as generateAssistantResponse events.
@@ -123,11 +122,11 @@ func (a *responsesSSEAdapter) event(event map[string]interface{}) error {
 		}
 	case "response.refusal.delta":
 		if delta, _ := event["delta"].(string); delta != "" {
-			a.refusalStreamed = true
+			a.textStreamed[responsesPartKey(event)] = true
 			a.emit("assistantResponseEvent", map[string]interface{}{"content": delta})
 		}
 	case "response.refusal.done":
-		if refusal, _ := event["refusal"].(string); refusal != "" && !a.refusalStreamed {
+		if refusal, _ := event["refusal"].(string); refusal != "" && !a.textStreamed[responsesPartKey(event)] {
 			a.emit("assistantResponseEvent", map[string]interface{}{"content": refusal})
 		}
 	case "response.reasoning_text.delta", "response.reasoning.delta":
@@ -183,7 +182,7 @@ func (a *responsesSSEAdapter) event(event map[string]interface{}) error {
 	return nil
 }
 
-// responsesPartKey names an output_text part: its item and content index.
+// responsesPartKey names an output_text or refusal part: its item and content index.
 func responsesPartKey(event map[string]interface{}) string {
 	itemID, _ := event["item_id"].(string)
 	return itemID + "\x00" + fmt.Sprint(event["content_index"])

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"tailscale.com/client/local"
@@ -48,11 +47,13 @@ func (t *tunnel) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	st, err := t.waitRunning(ctx, lc)
-	if err != nil {
+	if _, err := t.waitRunning(ctx, lc); err != nil {
 		return err
 	}
-	if err := t.waitFunnel(ctx, lc); err != nil {
+	// The link's name comes from the status that showed Funnel on: the one from sign-in may
+	// predate HTTPS, with no certificate domain yet.
+	st, err := t.waitFunnel(ctx, lc)
+	if err != nil {
 		return err
 	}
 
@@ -73,10 +74,7 @@ func (t *tunnel) run(ctx context.Context) error {
 	// Fetch the certificate before the link goes out, so the first visitor does not wait for it.
 	// "running" without a link says Funnel is on and only the certificate is left.
 	t.status.emit(Status{State: stateRunning})
-	domain := strings.TrimSuffix(st.Self.DNSName, ".")
-	if len(st.CertDomains) > 0 {
-		domain = st.CertDomains[0]
-	}
+	domain := st.CertDomains[0]
 	certCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	_, _, _ = lc.CertPair(certCtx, domain)
 	cancel()
@@ -178,14 +176,15 @@ func loginStatus(st *ipnstate.Status) (Status, bool) {
 	}
 }
 
-// waitFunnel reports the tailnet's HTTPS and Funnel switches until both are on. The control
-// server hands out a link that turns on both in one click, as `tailscale funnel` shows it.
-func (t *tunnel) waitFunnel(ctx context.Context, lc *local.Client) error {
+// waitFunnel reports the tailnet's HTTPS and Funnel switches until both are on, and returns the
+// status that shows them on. The control server hands out a link that turns on both in one
+// click, as `tailscale funnel` shows it.
+func (t *tunnel) waitFunnel(ctx context.Context, lc *local.Client) (*ipnstate.Status, error) {
 	for {
 		st, err := lc.StatusWithoutPeers(ctx)
 		if err == nil && st.Self != nil {
 			if ipn.CheckFunnelAccess(443, st.Self) == nil && len(st.CertDomains) > 0 {
-				return nil
+				return st, nil
 			}
 			link := fallbackFunnelURL
 			if resp, err := lc.QueryFeature(ctx, "funnel"); err == nil {
@@ -202,7 +201,7 @@ func (t *tunnel) waitFunnel(ctx context.Context, lc *local.Client) error {
 		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		case <-time.After(funnelPoll):
 		}
 	}

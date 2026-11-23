@@ -59,6 +59,28 @@ func GetPool() *AccountPool {
 func (p *AccountPool) Reload() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.reloadLocked()
+}
+
+// ReloadAfter runs change while no request can save an account's counters, then reloads.
+// change gets the counters of the accounts in rotation, by id: counters it saves from them
+// cannot be overwritten by a request that finishes in between, since updateStats waits for
+// the pool's lock and then writes the counters it holds.
+func (p *AccountPool) ReloadAfter(change func(inRotation map[string]config.Account) error) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	stats := make(map[string]config.Account, len(p.accounts))
+	for _, a := range p.accounts {
+		stats[a.ID] = a
+	}
+	if err := change(stats); err != nil {
+		return err
+	}
+	p.reloadLocked()
+	return nil
+}
+
+func (p *AccountPool) reloadLocked() {
 	enabled := config.GetEnabledAccounts()
 	allowOverUsage := config.GetAllowOverUsage()
 	var inRotation []config.Account
@@ -233,17 +255,17 @@ func (p *AccountPool) GetNextForModel(model string) *config.Account {
 }
 
 func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string]bool) *config.Account {
-	return p.getNextForModel(model, excluded, "")
+	return p.getNextForModel(model, excluded, Scope{})
 }
 
-// getNextForModel is GetNextForModelExcluding with a routing mode; "" (or an
-// unknown mode) is the global one.
-func (p *AccountPool) getNextForModel(model string, excluded map[string]bool, mode string) *config.Account {
-	mode = resolveRoutingMode(mode)
+// getNextForModel is GetNextForModelExcluding limited to scope: its allowlist
+// and its routing mode ("" or an unknown mode is the global one).
+func (p *AccountPool) getNextForModel(model string, excluded map[string]bool, scope Scope) *config.Account {
+	mode := resolveRoutingMode(scope.Mode)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.nextAccountLocked(model, excluded, mode)
+	return p.nextAccountLocked(model, p.excludeOutsideLocked(scope.Allowed, excluded), mode)
 }
 
 // resolveRoutingMode is mode when it is a routing mode, and the global routing
@@ -263,16 +285,19 @@ func resolveRoutingMode(mode string) string {
 // day does not. A preferred hit leaves the rotation cursor alone, so sticky
 // conversations do not skew where new conversations land.
 func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, excluded map[string]bool) *config.Account {
-	return p.getPreferredForModel(preferredID, model, excluded, "")
+	return p.getPreferredForModel(preferredID, model, excluded, Scope{})
 }
 
-// getPreferredForModel is GetPreferredForModelExcluding with a routing mode;
-// "" (or an unknown mode) is the global one.
-func (p *AccountPool) getPreferredForModel(preferredID, model string, excluded map[string]bool, mode string) *config.Account {
-	mode = resolveRoutingMode(mode)
+// getPreferredForModel is GetPreferredForModelExcluding limited to scope: its
+// allowlist and its routing mode ("" or an unknown mode is the global one).
+func (p *AccountPool) getPreferredForModel(preferredID, model string, excluded map[string]bool, scope Scope) *config.Account {
+	mode := resolveRoutingMode(scope.Mode)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	//! The allowlist joins the exclusions under the same hold as the pick, so a Reload cannot
+	//! slip in an account outside it between the two.
+	excluded = p.excludeOutsideLocked(scope.Allowed, excluded)
 	if preferredID != "" {
 		allowOverUsage := config.GetAllowOverUsage()
 		now := time.Now()
@@ -436,7 +461,11 @@ func (p *AccountPool) RecordThrottleError(id string, retryAfter time.Duration) i
 	until := time.Now().Add(delay)
 	grew := until.After(p.cooldowns[id])
 	if grew {
-		p.setKindLocked(id, p.throttleKindLocked(id, retryAfter))
+		kind := CooldownThrottle
+		if retryAfter > 0 {
+			kind = CooldownRetryAfter
+		}
+		p.setKindLocked(id, p.extendKindLocked(id, kind))
 		p.cooldowns[id] = until
 	}
 	p.mu.Unlock()
@@ -473,10 +502,14 @@ func (p *AccountPool) recordError(id string, isQuotaError bool, retryAfter time.
 			changed = true
 		}
 	} else if count >= 3 {
-
-		p.cooldowns[id] = time.Now().Add(time.Minute)
-		p.setKindLocked(id, CooldownError)
-		changed = true
+		//! As for a throttle: never shorten a longer cooldown, such as a quota one a concurrent
+		//! request set, nor turn one self-heal must leave into a healable one.
+		until := time.Now().Add(time.Minute)
+		if until.After(p.cooldowns[id]) {
+			p.setKindLocked(id, p.extendKindLocked(id, CooldownError))
+			p.cooldowns[id] = until
+			changed = true
+		}
 	}
 	p.mu.Unlock()
 

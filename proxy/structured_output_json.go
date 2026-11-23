@@ -288,15 +288,24 @@ func (v *schemaValidator) check(value interface{}, schema map[string]interface{}
 		if !ok || len(branches) == 0 || v.stopped() {
 			continue
 		}
-		matched := false
+		//! anyOf needs one matching branch; oneOf needs exactly one, so it looks for a second.
+		enough := 1
+		if keyword == "oneOf" {
+			enough = 2
+		}
+		matched := 0
 		for _, branch := range branches {
 			if v.matches(value, branch, refHops) {
-				matched = true
-				break
+				if matched++; matched == enough {
+					break
+				}
 			}
 		}
-		if !matched {
+		switch {
+		case matched == 0:
 			v.fail(path, "does not match any allowed schema (%s)", keyword)
+		case matched > 1 && keyword == "oneOf":
+			v.fail(path, "matches more than one schema (oneOf)")
 		}
 	}
 	if branches, ok := schema["allOf"].([]interface{}); ok {

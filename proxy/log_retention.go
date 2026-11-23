@@ -256,8 +256,9 @@ last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
 	return n, nil
 }
 
-// resetRequestLog empties the request and error logs and their rollups (the
-// daily ones too), in one transaction (Settings > Reset statistics).
+// resetRequestLog empties the request and error logs, their rollups (the daily
+// ones too) and the request bodies kept for replay, in one transaction
+// (Settings > Reset statistics).
 func resetRequestLog() error {
 	d, err := db.Get()
 	if err != nil {
@@ -268,7 +269,7 @@ func resetRequestLog() error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup", "request_rollup_daily", "error_rollup_daily"} {
+	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup", "request_rollup_daily", "error_rollup_daily", "request_bodies"} {
 		if _, err := tx.Exec(`DELETE FROM ` + table); err != nil {
 			return fmt.Errorf("clear %s: %w", table, err)
 		}

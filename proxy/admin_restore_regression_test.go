@@ -3,10 +3,15 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
-	"kiro-proxy/config"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
+
+	"kiro-proxy/config"
+	"kiro-proxy/tunnel"
 )
 
 func TestPasswordUpdateRevokesSessionsForWhitespacePassword(t *testing.T) {
@@ -88,5 +93,74 @@ func TestBackupRestoreRevokesSessionsAndKeepsPasswordPrivate(t *testing.T) {
 				t.Error("restart publicly exposed restored password")
 			}
 		})
+	}
+}
+
+// A restore brings back another password: a sign-in that passed the old one and waits for its
+// two-factor code must end with the sessions.
+func TestBackupRestoreEndsPendingTwoFactorSignIns(t *testing.T) {
+	t.Setenv("ADMIN_PASSWORD", "")
+	if err := config.Init(tempDBPath(t)); err != nil {
+		t.Fatal(err)
+	}
+	backup, err := config.CreateBackup("manual", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newHandlerWithoutBackgroundForTest(t)
+	challenge, _, err := h.totpState().issueChallenge(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	h.apiBackupsRestore(rec, httptest.NewRequest(http.MethodPost, "/", nil), backup.ID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("restore: %d %s", rec.Code, rec.Body.String())
+	}
+	if h.totpState().challengeValid(challenge, time.Now()) {
+		t.Fatal("a sign-in waiting for its code survived the restore")
+	}
+}
+
+// A restore made through the public link answers before the link follows the restored settings:
+// changing the link drops the connection the answer goes out on.
+func TestBackupRestoreThroughTheLinkAnswersBeforeChangingIt(t *testing.T) {
+	t.Setenv("ADMIN_PASSWORD", "")
+	if err := config.Init(tempDBPath(t)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateTunnelSettings(config.TunnelSettings{Enabled: true, Hostname: "box"}); err != nil {
+		t.Fatal(err)
+	}
+	backup, err := config.CreateBackup("manual", "link on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateTunnelSettings(config.TunnelSettings{Enabled: false, Hostname: "box"}); err != nil {
+		t.Fatal(err)
+	}
+	h := newHandlerWithoutBackgroundForTest(t)
+	h.tunnel = tunnel.New(tunnel.Options{DataDir: t.TempDir(), Binary: filepath.Join(t.TempDir(), "no-helper"), RestartMin: time.Hour, RestartMax: time.Hour})
+	t.Cleanup(h.tunnel.Close)
+	grace := tunnelAnswerGrace
+	tunnelAnswerGrace = 50 * time.Millisecond
+	t.Cleanup(func() { tunnelAnswerGrace = grace })
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req = req.WithContext(tunnel.WithTunnel(req.Context()))
+	rec := httptest.NewRecorder()
+	h.apiBackupsRestore(rec, req, backup.ID)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"success":true`) {
+		t.Fatalf("restore: %d %s", rec.Code, rec.Body.String())
+	}
+	if st := h.tunnel.Status(); st.State != tunnel.StateOff {
+		t.Fatalf("the link changed to %q before the answer was out", st.State)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for h.tunnel.Status().State == tunnel.StateOff {
+		if time.Now().After(deadline) {
+			t.Fatal("the link never followed the restored settings")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

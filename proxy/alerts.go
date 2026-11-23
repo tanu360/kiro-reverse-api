@@ -92,14 +92,11 @@ func newAlerter() *alerter {
 // and available are the outage rule's counts (alertPoolSize and the accounts
 // able to serve). wait > 0 asks for another evaluation after that long (an
 // outage still in its grace). Nothing is evaluated, and no state used up,
-// while no channel is enabled.
+// while no channel is enabled; a rule that sends nothing only re-arms.
 func (a *alerter) evaluate(cfg config.AlertsConfig, accounts []config.Account, pooled, available int, now int64) (msgs []alertMessage, wait time.Duration, err error) {
 	a.evalMu.Lock()
 	defer a.evalMu.Unlock()
-	if len(cfg.EnabledChannels()) == 0 {
-		a.unavailableSince = 0
-		return nil, 0, nil
-	}
+	watching := len(cfg.EnabledChannels()) > 0
 	states, err := loadAlertStates()
 	if err != nil {
 		return nil, 0, err
@@ -111,6 +108,23 @@ func (a *alerter) evaluate(cfg config.AlertsConfig, accounts []config.Account, p
 		}
 	}
 	cooldown := time.Duration(cfg.PoolCooldownMinutes) * time.Minute
+
+	//! A pool rule that is off, or has no channel to send to, still re-arms: a usage peak or an
+	//! outage that ended unwatched must not hold back the alert for the next one.
+	if !watching || !cfg.PoolUsageOn() {
+		if used, limit, n := poolUsage(accounts); n > 0 && limit > 0 {
+			put(alertKeyPool, rearmAlertLevel(states[alertKeyPool], highestCrossed(cfg.PoolThresholds, used/limit*100)))
+		}
+	}
+	if !watching || !cfg.AllUnavailableOn() {
+		a.unavailableSince = 0
+		if pooled == 0 || available > 0 {
+			put(alertKeyAllUnavailable, rearmAlertLevel(states[alertKeyAllUnavailable], 0))
+		}
+	}
+	if !watching {
+		return nil, 0, saveAlertStates(changed, nil)
+	}
 
 	live := make(map[string]bool, len(accounts))
 	for _, acc := range accounts {
@@ -151,8 +165,6 @@ func (a *alerter) evaluate(cfg config.AlertsConfig, accounts []config.Account, p
 		if send {
 			msgs = append(msgs, allUnavailableMessage(pooled, since, now))
 		}
-	} else {
-		a.unavailableSince = 0
 	}
 
 	// Rows of deleted accounts go; an empty list is more likely a load glitch than a wipe.
@@ -287,11 +299,8 @@ func (h *Handler) evaluateAlerts(now time.Time) time.Duration {
 	a := getAlerter()
 	cfg := config.GetAlertsConfig()
 	accounts := config.GetAccounts()
-	var pooled, available int
-	if len(cfg.EnabledChannels()) > 0 {
-		_, available = h.accountAvailabilityNow()
-		pooled = alertPoolSize(accounts)
-	}
+	_, available := h.accountAvailabilityNow()
+	pooled := alertPoolSize(accounts)
 	msgs, wait, err := a.evaluate(cfg, accounts, pooled, available, now.Unix())
 	if err != nil {
 		logger.Warnf("[Alerts] Evaluation failed: %v", err)
@@ -359,10 +368,11 @@ func (h *Handler) backgroundAlerts() {
 			if !ok {
 				return
 			}
-			if evt.Type == eventAccountsChanged {
+			//! A restore replaces the accounts and the alert settings without either event.
+			if evt.Type == eventAccountsChanged || evt.Type == eventBackupRestored {
 				kick()
 			}
-			if evt.Type == eventSettingsChanged {
+			if evt.Type == eventSettingsChanged || evt.Type == eventBackupRestored {
 				//! A new summary time takes effect at once; an unchanged one re-arms to the same moment.
 				armSummary()
 			}

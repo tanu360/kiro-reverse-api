@@ -569,6 +569,7 @@ func (h *Handler) recordWebSearchLoop(ctx context.Context, apiKeyReservation *ap
 func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRequest, thinking bool, estimatedInputTokens int) (*claudeWebSearchRound, *config.Account, error) {
 	payload := ClaudeToKiro(req, thinking)
 	h.applyReasoningEffort(payload, req.Model, claudeOutputEffort(req))
+	applyClaudeThinkingBudget(payload, req.Thinking)
 	h.applyThinkingInstruction(payload)
 	excluded := make(map[string]bool)
 	var lastErr error

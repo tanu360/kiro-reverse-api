@@ -233,10 +233,16 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 	return "", "", "", "", "", 0, "", flowErrorDetail(CodeSSOCheckFailed, "unexpected response", strconv.Itoa(tokenResp.StatusCode))
 }
 
-func GetBuilderIdSession(sessionID string) *BuilderIdSession {
+// GetBuilderIdSession returns a copy of the session, taken under the lock: a slow_down poll
+// raises Interval while another request may be reading it.
+func GetBuilderIdSession(sessionID string) (BuilderIdSession, bool) {
 	builderIdMu.RLock()
 	defer builderIdMu.RUnlock()
-	return builderIdSessions[sessionID]
+	session, ok := builderIdSessions[sessionID]
+	if !ok {
+		return BuilderIdSession{}, false
+	}
+	return *session, true
 }
 
 func cleanupExpiredBuilderIdSessions() {

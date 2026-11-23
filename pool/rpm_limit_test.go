@@ -357,3 +357,27 @@ func TestRPMRetryAfterIsWhenTheOldestStartLeaves(t *testing.T) {
 		t.Fatalf("an account the key cannot use does not count: wait %v", wait)
 	}
 }
+
+// Lowering the limit leaves an account more starts than it now allows. Retry-After must wait
+// for enough of them to leave the window, not only the oldest, or the retry is refused again.
+func TestRPMRetryAfterWaitsForTheLoweredLimit(t *testing.T) {
+	now := setRPMLimitForTest(t, 5)
+	p := newTestPool(config.Account{ID: "a"})
+	for i := 0; i < 3; i++ {
+		if acc := p.GetNext(); acc == nil {
+			t.Fatalf("pick %d = nil under limit 5", i)
+		}
+		*now = now.Add(10 * time.Second)
+	}
+	// Starts at 0s, 10s and 20s; the clock is at 30s.
+	if err := config.UpdateAccountRPMLimit(2); err != nil {
+		t.Fatalf("lower limit: %v", err)
+	}
+	if wait := p.RPMRetryAfter("", nil); wait != 40*time.Second {
+		t.Fatalf("wait = %v, want 40s: the 10s start must leave too", wait)
+	}
+	*now = now.Add(40 * time.Second)
+	if acc := p.GetNext(); acc == nil {
+		t.Fatal("no pick once Retry-After passed")
+	}
+}

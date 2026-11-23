@@ -117,5 +117,8 @@ ON CONFLICT (day, model, account_id) DO UPDATE SET error_count = error_count + e
 		if err := Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

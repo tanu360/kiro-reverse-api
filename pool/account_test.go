@@ -735,3 +735,43 @@ func TestRefusedModelIsSkippedUntilTheNextListing(t *testing.T) {
 		t.Fatal("every account refused model-a, yet the pool still offers it")
 	}
 }
+
+// A change run by ReloadAfter saves counters read from the pool; a request finishing meanwhile
+// must wait and count on top of them, not write its older counters over them.
+func TestReloadAfterHoldsCounterWritesUntilTheChangeIsSaved(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	for _, a := range []config.Account{{ID: "a", Enabled: true, RequestCount: 5}, {ID: "b", Enabled: true, RequestCount: 7}} {
+		if err := config.AddAccount(a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := newTestPool()
+	p.Reload()
+
+	done := make(chan struct{})
+	err := p.ReloadAfter(func(stats map[string]config.Account) error {
+		go func() {
+			p.RecordOutcome("a", true, 0, 0)
+			close(done)
+		}()
+		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-done:
+			t.Error("a request saved its counters while the change held them")
+		default:
+		}
+		sum := stats["a"].RequestCount + stats["b"].RequestCount
+		return config.UpdateAccountStats("a", sum, 0, 0, 0, 0)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	for _, a := range config.GetAccounts() {
+		if a.ID == "a" && a.RequestCount != 13 {
+			t.Fatalf("a counts %d requests, want the sum 12 plus the one that finished", a.RequestCount)
+		}
+	}
+}
