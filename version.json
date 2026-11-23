@@ -1,5 +1,5 @@
 {
-  "version": "4.1.3",
-  "changelog": "🧠 Thinking, tools and model names. Reasoning effort now reaches GPT, Grok and Kimi, and DeepSeek, GLM and Qwen think when thinking is on. A thinking block cut off by max_tokens arrives as thinking instead of a raw thinking tag at the start of the answer. A 429 from a busy model now says when to retry, so clients wait instead of failing again at once. Anthropic's dated model IDs such as claude-sonnet-4-5-20250929 work, tools whose names differ only in - and _ no longer fail with TOOL_DUPLICATE, and disable_parallel_tool_use gets one tool call per reply.",
+  "version": "4.1.4",
+  "changelog": "🔐 Stay signed in for real. Ticking \"Stay signed in\" now keeps the admin page and the user panel signed in for 30 days instead of 12 hours, and a server restart or redeploy no longer signs anyone out: sign-ins are saved in the database, by hash only. Signing out, changing the admin password or turning on two-factor sign-in still ends them, and a restart cannot bring them back.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
