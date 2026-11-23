@@ -1,5 +1,5 @@
 {
-  "version": "4.1.4",
-  "changelog": "🔐 Stay signed in for real. Ticking \"Stay signed in\" now keeps the admin page and the user panel signed in for 30 days instead of 12 hours, and a server restart or redeploy no longer signs anyone out: sign-ins are saved in the database, by hash only. Signing out, changing the admin password or turning on two-factor sign-in still ends them, and a restart cannot bring them back.",
+  "version": "4.1.5",
+  "changelog": "🛠️ A round of fixes from a full review. Streamed tool calls no longer count twice in output tokens, an explicit thinking budget is no longer dropped when an effort is set, and tool parameters named required or encrypted survive. An error streak can no longer cut a quota cooldown to a minute, and merging duplicate accounts keeps every counter and its history. A backup restore ends two-factor sign-ins in progress and re-checks alerts, Reset statistics also clears stored prompts, and unauthenticated requests can no longer grow /metrics. The Plan credits card now counts this billing cycle, an update that failed after another was installed can still restart into that one, and LISTEN_HOST accepts an IPv6 address.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
