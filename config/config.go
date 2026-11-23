@@ -472,16 +472,25 @@ const legacyDefaultHost = "0.0.0.0"
 
 // GetHost is the address to listen on: LISTEN_HOST when set (0.0.0.0 accepts other machines,
 // as Docker needs), else the stored host, else DefaultHost.
+// GetHost is the address the server listens on, without brackets: main joins it with the port
+// (net.JoinHostPort), which brackets an IPv6 host itself, so "[::1]" reads as "::1".
 func GetHost() string {
 	if host := strings.TrimSpace(os.Getenv("LISTEN_HOST")); host != "" {
-		return host
+		return unbracketHost(host)
 	}
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	if cfg.Host == "" || cfg.Host == legacyDefaultHost {
 		return DefaultHost
 	}
-	return cfg.Host
+	return unbracketHost(cfg.Host)
+}
+
+func unbracketHost(host string) string {
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		return host[1 : len(host)-1]
+	}
+	return host
 }
 
 func GetAccounts() []Account {

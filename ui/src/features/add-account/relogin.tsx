@@ -123,7 +123,8 @@ export function useReloginFlow(): ReloginFlow {
         }
         return true;
       } finally {
-        setBusy(false);
+        // A dialog opened since keeps its own busy state.
+        if (sessions.isCurrent(generation)) setBusy(false);
       }
     },
     [confirm, display, finish, relogin, sessions, setBusy, t],

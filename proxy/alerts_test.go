@@ -712,3 +712,36 @@ func TestPoolAlertRearmsWhileTheRuleIsOff(t *testing.T) {
 		t.Fatalf("second peak = %v, want an alert", eventsOf(msgs))
 	}
 }
+
+// While no channel is on, the outage rule still sees the real pool: an outage that is still on
+// keeps its notified level, so turning a channel back on mid-outage sends nothing new for it.
+func TestAllUnavailableStaysNotifiedWhileNoChannelDuringTheOutage(t *testing.T) {
+	initAlertsTest(t)
+	banned := config.Account{ID: "out1", Email: "out1@example.test", Enabled: true, BanStatus: "BANNED"}
+	if err := config.AddAccount(banned); err != nil {
+		t.Fatal(err)
+	}
+	a := getAlerter()
+	on := usageOnly(testAlertsConfig(), alertEventAllUnavailable)
+	const t0 = int64(1_800_000_000)
+	mustEvaluate(t, a, on, nil, 1, 0, t0)
+	if msgs, _ := mustEvaluate(t, a, on, nil, 1, 0, t0+60); len(msgs) != 1 {
+		t.Fatalf("outage = %v", eventsOf(msgs))
+	}
+	if err := config.UpdateAlertsConfig(func(c *config.AlertsConfig) error {
+		*c = on
+		c.Channels = []config.AlertChannel{{ID: "ch_off", Type: config.AlertChannelWebhook, URL: "http://127.0.0.1:1/hook"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{}
+	h.evaluateAlerts(time.Unix(t0+120, 0))
+	states, err := loadAlertStates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := states[alertKeyAllUnavailable].Level; got != 1 {
+		t.Fatalf("level = %d during the same outage, want 1 (still notified)", got)
+	}
+}

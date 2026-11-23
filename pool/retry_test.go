@@ -5,8 +5,9 @@ import (
 	"time"
 )
 
-// maxRetriesPerRequest has no upper bound, so a pool of many accounts can reach attempts where
-// doubling the base delay overflows int64. The delay must stay at its cap, not wrap to zero.
+// maxRetriesPerRequest has no upper bound (a hand-edited config or a restored backup can set it
+// past 37), so attempts can reach where doubling the base delay overflows int64. The delay must
+// stay at its cap, not wrap to zero.
 func TestCalculateBackoffStaysAtTheCapForLargeAttempts(t *testing.T) {
 	rc := RetryConfig{BaseDelay: 100 * time.Millisecond, MaxDelay: 5 * time.Second}
 	for _, attempt := range []int{6, 37, 40, 62, 63, 64, 100} {

@@ -201,7 +201,8 @@ func responsesUserItems(msg *KiroUserInputMessage) []map[string]interface{} {
 func withoutTextBlock(text, block string) string {
 	//! joinHistoryText trimmed the block when it put it in.
 	block = strings.TrimSpace(block)
-	idx := strings.Index(text, block)
+	//! The last copy is the one joinHistoryText appended; client text quoting it stays.
+	idx := strings.LastIndex(text, block)
 	if idx < 0 {
 		return text
 	}

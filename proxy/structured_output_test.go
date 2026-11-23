@@ -438,3 +438,27 @@ func TestJSONFenceStripperStream(t *testing.T) {
 		})
 	}
 }
+
+// A oneOf probe the step budget or the $ref cap cut short counts as matching, so a second such
+// match is not reported as "more than one": valid data must not fail and trigger a retry.
+func TestValidateJSONSchemaOneOfCutShortIsNotTwoMatches(t *testing.T) {
+	var arrays map[string]interface{}
+	if err := json.Unmarshal([]byte(`{"oneOf":[{"type":"array","items":{"type":"string"}},{"type":"array","items":{"type":"integer"}}]}`), &arrays); err != nil {
+		t.Fatal(err)
+	}
+	items := strings.TrimSuffix(strings.Repeat(`"s",`, 200), ",")
+	value, _ := decodeJSONNumbers("[" + items + "]")
+	steps := 150
+	if errs, complete := validateJSONSchemaWithin(value, arrays, false, &steps); len(errs) != 0 || complete {
+		t.Fatalf("budget cut short: errs = %v, complete = %v; want none, incomplete", errs, complete)
+	}
+
+	var loop map[string]interface{}
+	if err := json.Unmarshal([]byte(`{"oneOf":[{"$ref":"#/$defs/loop"},{"type":"string"}],"$defs":{"loop":{"$ref":"#/$defs/loop"}}}`), &loop); err != nil {
+		t.Fatal(err)
+	}
+	steps = maxSchemaSteps
+	if errs, complete := validateJSONSchemaWithin("x", loop, false, &steps); len(errs) != 0 || complete {
+		t.Fatalf("ref cap: errs = %v, complete = %v; want none, incomplete", errs, complete)
+	}
+}

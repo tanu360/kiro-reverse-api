@@ -127,7 +127,6 @@ export function subscribeSession(listener: Listener): () => void {
  */
 function onStorage(event: StorageEvent): void {
   if (event.key !== null && event.key !== TOKEN_KEY) return;
-  if (readStorage(TOKEN_KEY, "session")) return;
   const previous = snapshot;
   const next = getSession();
   if (next === previous) return;

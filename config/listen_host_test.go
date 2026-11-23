@@ -53,6 +53,13 @@ func TestListenHostEnvironmentWins(t *testing.T) {
 	if got := GetHost(); got != "192.168.1.20" {
 		t.Fatalf("LISTEN_HOST=192.168.1.20 gives %q", got)
 	}
+	// The listener brackets an IPv6 host itself; one written with brackets must not get two.
+	for _, host := range []string{"::1", "[::1]"} {
+		t.Setenv("LISTEN_HOST", host)
+		if got := GetHost(); got != "::1" {
+			t.Fatalf("LISTEN_HOST=%s gives %q, want ::1", host, got)
+		}
+	}
 }
 
 func TestPortEnvironmentWins(t *testing.T) {

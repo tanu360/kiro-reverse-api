@@ -247,7 +247,8 @@ func FindApiKeyByValue(key string) *ApiKeyEntry {
 	var match *ApiKeyEntry
 	for i := range cfg.ApiKeys {
 		other := sha256.Sum256([]byte(cfg.ApiKeys[i].Key))
-		if subtle.ConstantTimeCompare(sum[:], other[:]) == 1 {
+		//! The first match wins, as before; the loop still visits every key.
+		if subtle.ConstantTimeCompare(sum[:], other[:]) == 1 && match == nil {
 			cp := cfg.ApiKeys[i]
 			match = &cp
 		}

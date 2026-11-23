@@ -304,7 +304,9 @@ func (v *schemaValidator) check(value interface{}, schema map[string]interface{}
 		switch {
 		case matched == 0:
 			v.fail(path, "does not match any allowed schema (%s)", keyword)
-		case matched > 1 && keyword == "oneOf":
+		case matched > 1 && keyword == "oneOf" && !v.run.exhausted && !v.run.refCapped:
+			//! A probe the step budget or the $ref cap cut short counts as matching, so a second
+			//! match proves nothing then: only a complete check reports one.
 			v.fail(path, "matches more than one schema (oneOf)")
 		}
 	}

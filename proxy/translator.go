@@ -917,6 +917,16 @@ var schemaNameKeyedKeywords = map[string]bool{
 	"$defs":             true,
 	"definitions":       true,
 	"dependentSchemas":  true,
+	"dependencies":      true,
+}
+
+// schemaDataKeywords are the schema keywords whose value is data, not a schema, so cleaning
+// must leave it as written: a default of {"required": true} is a value, not a keyword.
+var schemaDataKeywords = map[string]bool{
+	"default":  true,
+	"const":    true,
+	"enum":     true,
+	"examples": true,
 }
 
 func cleanSchema(m map[string]interface{}) {
@@ -942,6 +952,9 @@ func cleanSchema(m map[string]interface{}) {
 	}
 
 	for key, v := range m {
+		if schemaDataKeywords[key] {
+			continue
+		}
 		switch val := v.(type) {
 		case map[string]interface{}:
 			if schemaNameKeyedKeywords[key] {
@@ -1926,6 +1939,11 @@ func extractOpenAITextPart(part map[string]interface{}) (string, bool) {
 	switch partType {
 	case "text", "input_text", "output_text":
 		if t, ok := part["text"].(string); ok {
+			return t, true
+		}
+	case "refusal":
+		//! An assistant refusal part carries its text in "refusal", not "text".
+		if t, ok := part["refusal"].(string); ok {
 			return t, true
 		}
 	}

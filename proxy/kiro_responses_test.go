@@ -782,3 +782,13 @@ func TestBuildKiroResponsesRequestDropsRepeatedToolResultsBesideClientText(t *te
 		}
 	}
 }
+
+// Client text that quotes the tool-result block keeps its quote: only the copy the translator
+// appended after it goes.
+func TestWithoutTextBlockRemovesTheAppendedCopy(t *testing.T) {
+	block := "Tool results:\n[read_file] package main"
+	text := "Compare with this:\n" + block + "\n\n" + block
+	if got, want := withoutTextBlock(text, block), "Compare with this:\n"+block; got != want {
+		t.Fatalf("withoutTextBlock = %q, want %q", got, want)
+	}
+}

@@ -257,4 +257,12 @@ func TestFindApiKeyByValueMatchesOnlyTheExactValue(t *testing.T) {
 			t.Errorf("FindApiKeyByValue(%q) = %q, want %q", value, got, want)
 		}
 	}
+
+	// A restored backup can hold two keys with one value; the first still wins, as before.
+	cfgLock.Lock()
+	cfg.ApiKeys = append(cfg.ApiKeys, ApiKeyEntry{ID: "dup", Name: "dup", Key: first.Key, Enabled: true})
+	cfgLock.Unlock()
+	if entry := FindApiKeyByValue(first.Key); entry == nil || entry.ID != first.ID {
+		t.Fatalf("duplicate value: FindApiKeyByValue = %+v, want %s", entry, first.ID)
+	}
 }

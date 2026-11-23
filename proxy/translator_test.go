@@ -673,3 +673,48 @@ func TestEnsureObjectSchemaKeepsPropertiesNamedLikeKeywords(t *testing.T) {
 		t.Fatalf("required list changed: %#v", got["required"])
 	}
 }
+
+// Draft-07 dependencies maps property names like properties does, and data keywords hold values:
+// cleaning keeps their keys as written.
+func TestEnsureObjectSchemaKeepsDependencyNamesAndDataValues(t *testing.T) {
+	var schema map[string]interface{}
+	if err := json.Unmarshal([]byte(`{"type":"object",
+		"properties":{"encrypted":{"type":"boolean"},
+			"opts":{"type":"object","default":{"required":true,"encrypted":false,"additionalProperties":1},
+				"enum":[{"encrypted":1}],"examples":[{"required":2}],"const":{"additionalProperties":3}}},
+		"dependencies":{"encrypted":{"properties":{"key":{"type":"string","additionalProperties":false}}}}}`), &schema); err != nil {
+		t.Fatalf("bad fixture: %v", err)
+	}
+	got := ensureObjectSchema(schema).(map[string]interface{})
+	dep, ok := got["dependencies"].(map[string]interface{})["encrypted"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("dependency on a property named encrypted was dropped: %#v", got["dependencies"])
+	}
+	if key := dep["properties"].(map[string]interface{})["key"].(map[string]interface{}); key["additionalProperties"] != nil {
+		t.Fatalf("a dependency's schema is still cleaned: %#v", key)
+	}
+	opts := got["properties"].(map[string]interface{})["opts"].(map[string]interface{})
+	if def := opts["default"].(map[string]interface{}); len(def) != 3 {
+		t.Fatalf("default value changed: %#v", def)
+	}
+	if e := opts["enum"].([]interface{})[0].(map[string]interface{}); len(e) != 1 {
+		t.Fatalf("enum value changed: %#v", e)
+	}
+	if e := opts["examples"].([]interface{})[0].(map[string]interface{}); len(e) != 1 {
+		t.Fatalf("examples value changed: %#v", e)
+	}
+	if c := opts["const"].(map[string]interface{}); len(c) != 1 {
+		t.Fatalf("const value changed: %#v", c)
+	}
+}
+
+// A Chat Completions assistant refusal part reaches the model as its text, not raw JSON.
+func TestOpenAIRefusalPartKeepsText(t *testing.T) {
+	var content interface{}
+	if err := json.Unmarshal([]byte(`[{"type":"refusal","refusal":"I can't help with that."}]`), &content); err != nil {
+		t.Fatal(err)
+	}
+	if got := extractOpenAIMessageText(content); got != "I can't help with that." {
+		t.Fatalf("refusal part text = %q", got)
+	}
+}

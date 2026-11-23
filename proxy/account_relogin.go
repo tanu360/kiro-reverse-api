@@ -531,15 +531,16 @@ func (h *Handler) replaceRelogin(ctx context.Context, targetID string, incoming 
 	}
 	outcome.account = saved
 
+	//! The guess that the old login was Builder ID would send the new one the fixed profile
+	//! without a lookup; a new login that is Builder ID too is guessed again on its first lookup.
+	//! It goes before the reload puts the new login in rotation.
+	inferredBuilderIDAccounts.Delete(saved.ID)
 	if h.pool != nil {
 		h.pool.ClearCooldown(targetID)
 		h.pool.Reload()
 	}
 	forgetProfileLookups(&before)
 	forgetProfileLookups(&saved)
-	//! The guess that the old login was Builder ID would send the new one the fixed profile
-	//! without a lookup; a new login that is Builder ID too is guessed again on its first lookup.
-	inferredBuilderIDAccounts.Delete(saved.ID)
 	logger.Infof("[Relogin] %s (%s) replaced=%t", saved.Email, saved.ID, outcome.identityReplaced)
 	go reloginVerify(h, saved)
 	return outcome, nil
