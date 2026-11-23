@@ -42,6 +42,7 @@ import {
   apiKeyUsageQuery,
 } from "@/lib/api/api-key-usage";
 import { apiKeysQuery } from "@/lib/api/api-keys";
+import type { ApiKey } from "@/lib/api/types";
 import {
   EMPTY,
   formatCompact,
@@ -52,6 +53,7 @@ import {
   formatNumber,
 } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { KeyStatus } from "./api-keys-card";
 import { UsageBreakdownCard } from "./key-usage-breakdown";
@@ -244,7 +246,6 @@ export function UsageChartCard({
   const [metric, setMetric] = useState<UsageMetric>("requests");
   const series = metricSeries(metric, t);
   const totals = entry?.totals;
-  const empty = (totals?.requests ?? 0) === 0;
   // All time: requests pruned before daily totals were kept count in the totals, not in a bar.
   const earlier = entry?.earlier?.requests ?? 0;
   const bucket = data?.bucket ?? (range === "24h" ? "hour" : "day");
@@ -266,6 +267,9 @@ export function UsageChartCard({
         : [],
     [data, entry, metric],
   );
+  //! Empty follows the chosen measure's bars, not the request count: a key whose requests all
+  //! failed has no credits to chart, and all-zero bars drew a made-up 0 to 100 axis.
+  const empty = !bars.some((bar) => bar.parts.some((value) => (value ?? 0) > 0));
   const formatValue = (value: number) =>
     metric === "credits" ? formatCredits(value, 2, lang) : formatNumber(value, lang);
 
@@ -406,6 +410,7 @@ export function ApiKeyUsageSheet({
 }: ApiKeyUsageSheetProps): JSX.Element {
   const { t, lang } = useT("api");
   const label = useUsageLabel();
+  const mask = useMaskText();
   const [range, setRange] = useState<ApiKeyUsageRange>(initialRange);
   const query = useQuery({ ...apiKeyUsageQuery(range), enabled: open });
   const breakdown = useQuery({ ...apiKeyUsageBreakdownQuery(ref, range), enabled: open });
@@ -418,6 +423,30 @@ export function ApiKeyUsageSheet({
     : undefined;
   // The latest name and masked key when the range has the row; what the opener knew otherwise.
   const shown = label(entry ?? identity);
+  // The picked accounts and the tags that pick more (each limits the key, as on the server);
+  // every account only when there are neither.
+  const allowedAccounts = (key: ApiKey): string => {
+    const bound = key.accountIds?.length ?? 0;
+    const tags = key.accountTags ?? [];
+    const parts: string[] = [];
+    if (bound > 0) {
+      parts.push(t("keys.boundAccounts", { count: bound, n: formatNumber(bound, lang) }));
+    }
+    if (tags.length > 0) {
+      parts.push(
+        t("common:text.labelValue", {
+          label: t("form.accountTags"),
+          value: formatItems(
+            tags.map((tag) => mask(tag)),
+            lang,
+          ),
+        }),
+      );
+    }
+    const [first, second] = parts;
+    if (!first) return t("usage.everyAccount");
+    return second ? t("common:text.joinList", { first, second }) : first;
+  };
 
   return (
     <ResponsiveSheet onOpenChange={onOpenChange} open={open}>
@@ -473,15 +502,7 @@ export function ApiKeyUsageSheet({
                     // A list of models takes the full width; "Every model" pairs up.
                     span: apiKey.allowedModels?.length ? 2 : 1,
                   },
-                  {
-                    label: t("usage.allowedAccounts"),
-                    value: apiKey.accountIds?.length
-                      ? t("keys.boundAccounts", {
-                          count: apiKey.accountIds.length,
-                          n: formatNumber(apiKey.accountIds.length, lang),
-                        })
-                      : t("usage.everyAccount"),
-                  },
+                  { label: t("usage.allowedAccounts"), value: allowedAccounts(apiKey) },
                   {
                     label: t("form.rpmLimit"),
                     value: apiKey.rpmLimit ? (

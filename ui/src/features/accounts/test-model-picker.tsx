@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { CommandHint } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
+import { formatDecimal } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { modelOrigin } from "@/lib/model-maker";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ import { cn } from "@/lib/utils";
 type PickerRun =
   | { kind: "queued" }
   | { kind: "running" }
-  | { kind: "ok"; seconds: string }
+  | { kind: "ok"; seconds: number }
   | { kind: "err" };
 
 /** The key the search row shows; a key name, the same in every language. */
@@ -83,7 +84,7 @@ function RunHint({ run }: { run: PickerRun | undefined }): JSX.Element | null {
     return (
       <span className="inline-flex items-center gap-1 text-success-foreground tabular-nums">
         <HugeiconsIcon aria-hidden="true" className="size-3.5" icon={CircleCheckIcon} />
-        {t("test.seconds", { seconds: run.seconds })}
+        {t("test.seconds", { seconds: formatDecimal(run.seconds, 1) })}
       </span>
     );
   }

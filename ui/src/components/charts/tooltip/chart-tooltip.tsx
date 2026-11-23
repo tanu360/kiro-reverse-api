@@ -410,11 +410,11 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
     }
     // For bar charts (horizontal or vertical), use the category name
     if (barXAccessor) {
-      return barXAccessor(tooltipData.point);
+      return dateLabels[tooltipData.index] ?? barXAccessor(tooltipData.point);
     }
     // For line/area charts, use the date
     return weekdayDateFmt.format(xAccessor(tooltipData.point));
-  }, [tooltipData, barXAccessor, xAccessor]);
+  }, [tooltipData, barXAccessor, dateLabels, xAccessor]);
 
   const tooltipContent = (
     <>

@@ -155,6 +155,7 @@
   "shell.update.restartConfirmTitle": "Reiniciar na versão {latest} agora?",
   "shell.update.failedTitle": "A atualização não terminou",
   "shell.update.retry": "Tentar de novo",
+  "shell.update.restartInstalled": "Reiniciar na {version}, já instalada",
   "shell.update.manual": "Atualizar à mão",
   "shell.update.automatic": "Atualizar automaticamente",
   "shell.update.readyAnnouncement": "O Kiro Proxy {latest} está pronto para instalar.",

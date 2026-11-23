@@ -15,12 +15,11 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { VersionResponse } from "@/lib/api/types";
 import {
-  restartForUpdate,
+  restartAndWait,
   startUpdate,
   type UpdateStatus,
   updateErrorText,
   updateStatusQuery,
-  waitForVersion,
 } from "@/lib/api/update";
 import { type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -103,22 +102,20 @@ export function useSelfUpdateController({
     // The server is down for a moment: the card and the dialog say "Restarting…" until it reloads.
     setRestarting(true);
     announce(tRef.current("shell.update.restarting"));
-    restartForUpdate()
-      .then(() => waitForVersion(target))
-      .then(
-        () => window.location.reload(),
-        (error: unknown) => {
-          setRestarting(false);
-          // Said in the card and the dialog; Try again asks the server where it stands (a release
-          // still in place comes back as ready to restart).
-          setRestartError(
-            error instanceof Error && error.message === "timeout"
-              ? tRef.current("shell.update.restartTimeout")
-              : errorMessage(error, tRef.current),
-          );
-          void queryClient.invalidateQueries({ queryKey: queryKeys.update });
-        },
-      );
+    restartAndWait(target).then(
+      () => window.location.reload(),
+      (error: unknown) => {
+        setRestarting(false);
+        // Said in the card and the dialog; Try again asks the server where it stands (a release
+        // still in place comes back as ready to restart).
+        setRestartError(
+          error instanceof Error && error.message === "timeout"
+            ? tRef.current("shell.update.restartTimeout")
+            : errorMessage(error, tRef.current),
+        );
+        void queryClient.invalidateQueries({ queryKey: queryKeys.update });
+      },
+    );
   }, [queryClient, target]);
 
   const confirmRestart = useCallback(() => {

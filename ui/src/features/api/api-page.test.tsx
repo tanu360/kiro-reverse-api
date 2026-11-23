@@ -597,6 +597,36 @@ describe("ApiPage", () => {
     });
   });
 
+  it("leaves a sheet open when a save from a sheet closed before it answered lands", async () => {
+    const teamA = mockDb.apiKeys[0];
+    if (!teamA) throw new Error("missing seeded key");
+    const put = gate();
+    mockServer.use(
+      http.put(apiUrl("/api-keys/:id"), async () => {
+        await put.wait();
+      }),
+    );
+    const { user } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const first = await screen.findByRole("dialog");
+    await user.click(within(first).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(sent("PUT", `/api-keys/${teamA.id}`)).toHaveLength(1));
+    // Closed while it saves, then another key's sheet opens.
+    await user.click(within(first).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for ci-runner" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const second = await screen.findByRole("dialog");
+    const listReads = sent("GET", "/api-keys").length;
+    put.release();
+    // The first save lands (the list is read again) and its "Saved" pause passes.
+    await waitFor(() => expect(sent("GET", "/api-keys").length).toBeGreaterThan(listReads));
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(screen.getByRole("dialog")).toBe(second);
+    expect(within(second).getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
   it("shows tags, accounts and models only under Only selected", async () => {
     const first = mockDb.accounts[0];
     if (!first) throw new Error("missing seeded data");

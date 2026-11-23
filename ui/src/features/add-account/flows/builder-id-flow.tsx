@@ -82,8 +82,14 @@ export function BuilderIdFlow(): JSX.Element {
         sessions.stopBuilderId();
         setCode(null);
         setReconnecting(false);
-        // Back on the first step, which says why; the code view and its focus are gone.
-        if (!(await again.resolveMismatch(error, setFailure))) setFailure({ error });
+        // Back on the first step, which says why; the code view and its focus are gone. The
+        // step stays busy while a mismatch is confirmed and applied, so no second login starts.
+        setStarting(true);
+        try {
+          if (!(await again.resolveMismatch(error, setFailure))) setFailure({ error });
+        } finally {
+          setStarting(false);
+        }
         refocus(regionRef);
       }
     }, intervalS * 1000);

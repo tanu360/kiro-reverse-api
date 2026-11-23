@@ -11,6 +11,14 @@ describe("rightAxisMargin", () => {
     expect(rightAxisMargin(1000, 36, "en")).toBe(38);
   });
 
+  it("widens for the decimals of a small fraction", () => {
+    // A key's credits: bars up to 0.0083 put ticks at 0, 0.002 … 0.01, five characters.
+    expect(rightAxisMargin(0.0083, 36, "en")).toBe(Math.ceil(5 * 6.8) + 10);
+    expect(rightAxisMargin(0.0083, 36, "pt-BR")).toBe(Math.ceil(5 * 6.8) + 10);
+    // Up to 0.8, ticks step by 0.2: "0.2" … "0.8" fit the chart's margin.
+    expect(rightAxisMargin(0.8, 36, "en")).toBe(36);
+  });
+
   it("widens for languages that spell compact numbers longer", () => {
     // pt-BR prints 1,250 as "1,3 mil" and 4.1 million as "5,1 mi".
     expect(rightAxisMargin(1000, 36, "pt-BR")).toBeGreaterThan(rightAxisMargin(1000, 36, "en"));

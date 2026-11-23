@@ -436,6 +436,28 @@ describe("UpdateDialog self-update", () => {
     expect(update.start).toHaveBeenCalledOnce();
   });
 
+  it("offers the restart into the release still in place after a later download failed", async () => {
+    const update = selfUpdate({
+      phase: "error",
+      error: "Version 2.2.0 is not published yet.",
+      status: { state: "error", supported: true, version: "2.2.0", installed: "2.1.5" },
+    });
+    const { user } = renderSelfUpdate(update);
+    await user.click(
+      await screen.findByRole("button", { name: "Restart on 2.1.5, already in place" }),
+    );
+    expect(update.restart).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("offers no restart after a failure with nothing in place", async () => {
+    renderSelfUpdate(
+      selfUpdate({ phase: "error", status: { state: "error", supported: true, version: "2.2.0" } }),
+    );
+    expect(await screen.findByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Restart/ })).toBeNull();
+  });
+
   it("says the update did not finish when the server gave no reason", async () => {
     renderSelfUpdate(selfUpdate({ phase: "error" }));
     expect(await screen.findByRole("note")).toHaveTextContent("The update did not finish");

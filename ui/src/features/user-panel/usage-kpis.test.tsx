@@ -1,5 +1,5 @@
-import { screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, screen, within } from "@testing-library/react";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ApiKeyUsageTotals } from "@/lib/api/api-key-usage";
 import type { UserKey, UserUsage, UserUsageRange } from "@/lib/api/user-panel";
 import { renderWithProviders } from "@/test/render";
@@ -280,6 +280,20 @@ describe("key facts", () => {
     expect(value).toHaveTextContent(text);
     // Soon and past are amber; a later expiry is plain.
     expect(value?.classList.contains("text-warning-foreground")).toBe(kind !== "later");
+  });
+
+  it("counts the expiry down while the key stays the same", () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const now = Math.floor(Date.now() / 1000);
+    renderWithProviders(<KeyFacts apiKey={key({ expiresAt: now + 10 * 60 + 30 })} />);
+    expect(fact("Expires")).toHaveTextContent("In 10m");
+    act(() => {
+      vi.advanceTimersByTime(3 * 60_000);
+    });
+    expect(fact("Expires")).toHaveTextContent("In 7m");
   });
 
   it("lists a restricted key's models as chips, a long ID cut to the strip", () => {

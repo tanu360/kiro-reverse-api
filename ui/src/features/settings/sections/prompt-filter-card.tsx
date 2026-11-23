@@ -11,7 +11,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useRef, useState } from "react";
+import { type JSX, useId, useLayoutEffect, useRef, useState } from "react";
 import { Code } from "@/components/shared/code";
 import {
   ROW_DESCRIPTION,
@@ -130,11 +130,18 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
       ...prev,
       rules: prev.rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)),
     }));
-  // Removing a rule removes its menu button; focus goes on to Add rule.
+  // Removing a rule removes its menu button; focus goes on to Add rule once the row is gone, or
+  // the closing menu hands it back to that button and it drops to the page.
   const addButton = useRef<HTMLButtonElement>(null);
+  const [focusAdd, setFocusAdd] = useState(false);
+  useLayoutEffect(() => {
+    if (!focusAdd) return;
+    setFocusAdd(false);
+    addButton.current?.focus();
+  }, [focusAdd]);
   const removeRule = (index: number) => {
     draft.set((prev) => ({ ...prev, rules: prev.rules.filter((_, i) => i !== index) }));
-    addButton.current?.focus();
+    setFocusAdd(true);
   };
 
   // Every built-in filter and rule at once: checked when all are on, mixed when some are.

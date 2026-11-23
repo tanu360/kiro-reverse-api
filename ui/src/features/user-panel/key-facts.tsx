@@ -10,7 +10,7 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
 import { MakerLogo, ModelLogo } from "@/components/shared/model-logo";
 import type { ModelMaker } from "@/components/shared/model-logos";
-import { RelativeTime } from "@/components/shared/relative-time";
+import { RelativeTime, useMinuteClock } from "@/components/shared/relative-time";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -54,8 +54,9 @@ function Fact({
 /** When the key expires: never, in how long (amber under three days) or how long ago. */
 function Expiry({ apiKey }: { apiKey: UserKey }): JSX.Element {
   const { t, lang } = useT("user-panel");
+  // The countdown moves on with the clock, not only when the key is fetched again.
+  const now = useMinuteClock() / 1000;
   if (!apiKey.expiresAt) return <>{t("details.never")}</>;
-  const now = Date.now() / 1000;
   const left = apiKey.expiresAt - now;
   const expired = userKeyStatus({ ...apiKey, enabled: true }, now) === "expired";
   // A minute at least, so a key on its last seconds never reads "In 0s".

@@ -175,23 +175,35 @@ function useKeyForm(
       const created = await createApiKey(buildCreateRequest(data));
       return created.key;
     },
-    // Create closes at once on the new-key panel (an alert, read out as it shows); edit reads
-    // "Saved" on its Save for a moment, then closes on the updated row.
-    onSuccess: (createdKey) => {
+    // The list refreshes even when this form is gone (closed while it saved, another opened).
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all });
-      if (createdKey) {
-        onCreated(createdKey);
-        onOpenChange(false);
-        return;
-      }
-      setSaved(true);
-      closeTimer.current = setTimeout(() => {
-        closeTimer.current = null;
-        onOpenChange(false);
-        announce(t("form.updated"));
-      }, SAVED_CLOSE_MS);
     },
   });
+
+  /*
+   * What follows a save belongs to this form, so it goes with the mutate() call: TanStack runs a
+   * call's own callbacks only while the form is mounted. A save that lands after its form was
+   * closed and another one opened (a new session remounts it) then never closes the new one.
+   * Create closes at once on the new-key panel (an alert, read out as it shows); edit reads
+   * "Saved" on its Save for a moment, then closes on the updated row.
+   */
+  const send = (data: ApiKeyFormData) =>
+    mutation.mutate(data, {
+      onSuccess: (createdKey) => {
+        if (createdKey) {
+          onCreated(createdKey);
+          onOpenChange(false);
+          return;
+        }
+        setSaved(true);
+        closeTimer.current = setTimeout(() => {
+          closeTimer.current = null;
+          onOpenChange(false);
+          announce(t("form.updated"));
+        }, SAVED_CLOSE_MS);
+      },
+    });
 
   const set = <K extends keyof ApiKeyFormValues>(field: K, value: ApiKeyFormValues[K]) => {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -212,7 +224,7 @@ function useKeyForm(
     if (mutation.isPending || saved) return;
     const parsed = parseApiKeyForm(values);
     if (!parsed.ok) reject(parsed);
-    else mutation.mutate(parsed.value);
+    else send(parsed.value);
   };
 
   return {
@@ -227,7 +239,7 @@ function useKeyForm(
     saved,
     error: mutation.isError ? mutation.error : null,
     reject,
-    submit: (data) => mutation.mutate(data),
+    submit: send,
     onSubmit,
   };
 }

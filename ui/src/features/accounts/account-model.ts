@@ -480,9 +480,11 @@ type TrialExpiry = { kind: "expired" } | { kind: "today" } | { kind: "days"; day
 /** Label for a trial expiry: none for 0 or more than 7 days away. */
 export function trialExpiry(trialExpiresAt: number, nowMs: number): TrialExpiry | null {
   if (!trialExpiresAt) return null;
-  const days = Math.ceil((trialExpiresAt * 1000 - nowMs) / DAY_MS);
-  if (days < 0) return { kind: "expired" };
-  if (days === 0) return { kind: "today" };
+  const left = trialExpiresAt * 1000 - nowMs;
+  //! Today is the day ahead: rounded up, the day past the expiry came out as 0 and read "today".
+  if (left < 0) return { kind: "expired" };
+  if (left < DAY_MS) return { kind: "today" };
+  const days = Math.ceil(left / DAY_MS);
   if (days <= 7) return { kind: "days", days };
   return null;
 }
@@ -545,7 +547,11 @@ export { isValidProxyUrl } from "@/features/settings/lib/proxy-url";
 // Credentials JSON (contains secrets: never log)
 // ---------------------------------------------------------------------------
 
-/** The credentials a client needs for one account, by auth type (old copyAccountJSON). */
+/**
+ * The credentials a client needs for one account, by auth type (old copyAccountJSON). Builder ID,
+ * IdC and social sign-ins keep their provider and region: the token refresh goes to the region's
+ * OIDC host, and the credentials import otherwise falls back to us-east-1 and BuilderId/Google.
+ */
 export function buildCopyJson(account: AccountFull): Record<string, unknown> {
   if (account.authMethod === "api_key") {
     return {
@@ -570,16 +576,39 @@ export function buildCopyJson(account: AccountFull): Record<string, unknown> {
       scopes,
     };
   }
-  return { clientId, clientSecret, accessToken, refreshToken };
+  const { provider, region } = account;
+  return { clientId, clientSecret, accessToken, refreshToken, provider, region };
 }
 
-/** Copy JSON of the export dialog: API keys keep their region, others the client and tokens. */
+/**
+ * Copy JSON of the export dialog, item by item as buildCopyJson copies one account: API keys keep
+ * their region, Microsoft sign-ins what their refresh needs, others the client, tokens, provider
+ * and region.
+ */
 export function buildExportCopy(data: ExportData): Record<string, unknown>[] {
   return (data.accounts ?? []).map((account) => {
-    const { clientId, clientSecret, accessToken, refreshToken, authMethod, region } =
+    const credentials =
       account.credentials ?? ({} as ExportData["accounts"][number]["credentials"]);
+    const { clientId, clientSecret, accessToken, refreshToken, authMethod, region } = credentials;
     if (authMethod === "api_key") return { kiroApiKey: accessToken, region, authMethod };
-    return { clientId, clientSecret, accessToken, refreshToken };
+    if (authMethod === "external_idp") {
+      const { provider, tokenEndpoint, issuerUrl, scopes } = credentials;
+      const { userId, profileArn } = account;
+      return {
+        clientId,
+        accessToken,
+        refreshToken,
+        authMethod,
+        provider,
+        userId,
+        profileArn,
+        tokenEndpoint,
+        issuerUrl,
+        scopes,
+      };
+    }
+    const { provider } = credentials;
+    return { clientId, clientSecret, accessToken, refreshToken, provider, region };
   });
 }
 

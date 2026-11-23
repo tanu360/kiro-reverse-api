@@ -83,6 +83,8 @@ export function MicrosoftFlow(): JSX.Element {
     } catch (error) {
       if (!sessions.isCurrent(generation)) return;
       if (await relogin.resolveMismatch(error, setFailure)) {
+        // Closed or finished meanwhile: the sessions may already be a new login's.
+        if (!sessions.isCurrent(generation)) return;
         // The server finished this login; a new attempt starts from the first step.
         sessions.cancelMicrosoft();
         setStage("idle");

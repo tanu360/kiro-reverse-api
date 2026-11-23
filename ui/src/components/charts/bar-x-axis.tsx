@@ -93,7 +93,8 @@ const BarXAxisInner = memo(function BarXAxisInner({
   maxLabels = 12,
   container,
 }: BarXAxisProps & { container: HTMLDivElement }) {
-  const { margin, tooltipData, barScale, bandWidth, barXAccessor, data, width } = useChart();
+  const { margin, tooltipData, barScale, bandWidth, barXAccessor, data, dateLabels, width } =
+    useChart();
   const bounds = useMemo<readonly [number, number]>(
     () => [margin.left, Math.max(margin.left, width - margin.right)],
     [margin.left, margin.right, width],
@@ -110,9 +111,9 @@ const BarXAxisInner = memo(function BarXAxisInner({
       return [];
     }
 
-    const allLabels = data.map((d) => {
-      const label = barXAccessor(d);
-      const bandX = barScale(label) ?? 0;
+    const allLabels = data.map((d, index) => {
+      const label = dateLabels[index] ?? barXAccessor(d);
+      const bandX = barScale(barXAccessor(d)) ?? 0;
       // Center the label under the bar group
       const x = bandX + bandWidth / 2 + margin.left;
       return { label, x };
@@ -136,7 +137,16 @@ const BarXAxisInner = memo(function BarXAxisInner({
         : Math.ceil(allLabels.length / Math.max(1, resolvedMaxLabels));
     const step = Math.max(countStep, fitStep);
     return step <= 1 ? allLabels : allLabels.filter((_, i) => i % step === 0);
-  }, [barScale, bandWidth, barXAccessor, data, margin.left, showAllLabels, resolvedMaxLabels]);
+  }, [
+    barScale,
+    bandWidth,
+    barXAccessor,
+    data,
+    dateLabels,
+    margin.left,
+    showAllLabels,
+    resolvedMaxLabels,
+  ]);
 
   const isHovering = tooltipData !== null;
   const crosshairX = tooltipData ? tooltipData.x + margin.left : null;

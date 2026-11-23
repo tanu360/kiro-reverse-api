@@ -93,10 +93,12 @@ export function OverviewPage(): JSX.Element {
     setRefreshing(true);
     try {
       // A failure shows where it happened: the totals banner above the cards, or the card whose
-      // part failed (its own line with Try again).
+      // part failed (its own line with Try again). The account list feeds the Accounts KPI,
+      // Needs attention and the busiest accounts; no event follows its per-request counters.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.status }),
         queryClient.invalidateQueries({ queryKey: queryKeys.observe.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.accounts.list() }),
       ]);
     } finally {
       setRefreshing(false);

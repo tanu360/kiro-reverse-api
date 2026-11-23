@@ -34,7 +34,7 @@ function defaultArn(result: AccountProfilesResponse): string {
  */
 export function ProfileSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
-  const supported = supportsKiroProfiles(account) || account.profileArnPinned;
+  const supported = supportsKiroProfiles(account);
   const invalidate = useInvalidateAccounts();
   const [selectedArn, setSelectedArn] = useState("");
   const loadRef = useRef<HTMLButtonElement | null>(null);
@@ -93,9 +93,10 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
       }
       description={supported ? t("detail.profileHint") : t("detail.profileUnsupported")}
       footer={
-        choices ? (
+        // Return to automatic needs no list: a pin stays undoable when discovery fails or is empty.
+        account.profileArnPinned || choices ? (
           <div className="ms-auto flex flex-wrap items-center gap-2">
-            {choices.pinned ? (
+            {account.profileArnPinned ? (
               <Button
                 // The pressed button stays enabled while it spins, so it keeps focus.
                 disabled={pin.isPending && pin.variables !== ""}
@@ -108,16 +109,18 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
                 {t("detail.profileUnpin")}
               </Button>
             ) : null}
-            <Button
-              disabled={(pin.isPending && pin.variables === "") || !selectedArn}
-              loading={pin.isPending && pin.variables !== ""}
-              loadingText={t("detail.profileSaving")}
-              onClick={() => pin.mutate(selectedArn)}
-              ref={pinRef}
-              size="sm"
-            >
-              {t("detail.profileUse")}
-            </Button>
+            {choices ? (
+              <Button
+                disabled={(pin.isPending && pin.variables === "") || !selectedArn}
+                loading={pin.isPending && pin.variables !== ""}
+                loadingText={t("detail.profileSaving")}
+                onClick={() => pin.mutate(selectedArn)}
+                ref={pinRef}
+                size="sm"
+              >
+                {t("detail.profileUse")}
+              </Button>
+            ) : null}
           </div>
         ) : undefined
       }
@@ -197,7 +200,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
               ))}
             </RadioGroup>
           ) : null}
-          {result && pin.isError ? (
+          {pin.isError ? (
             <ActionError
               className="mt-4"
               error={pin.error}

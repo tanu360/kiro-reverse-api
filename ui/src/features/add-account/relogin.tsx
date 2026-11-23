@@ -36,7 +36,8 @@ interface ReloginFlow {
    * replace the identity, then applies the waiting login (and finishes the dialog) or discards
    * it. A sign-in that is another stored account (409 relogin_other_account) only says so, through
    * `fail`, as does a failed apply. True when it handled the error, so the flow shows nothing
-   * else.
+   * else. An apply that answers after the dialog closed or moved on is dropped, like any late
+   * response; the caller checks the session generation again before touching shared sessions.
    */
   resolveMismatch: (error: unknown, fail: (failure: FlowFailure) => void) => Promise<boolean>;
 }
@@ -46,7 +47,7 @@ export function useReloginFlow(): ReloginFlow {
   const { t } = useT("add-account");
   const display = useDisplayEmail();
   const confirm = useConfirm();
-  const { relogin, finishAdd, setBusy } = useFlow();
+  const { relogin, finishAdd, setBusy, sessions } = useFlow();
 
   const finish = useCallback(
     (res: FinishedLogin, note?: string) => {
@@ -93,6 +94,7 @@ export function useReloginFlow(): ReloginFlow {
       }
       const mismatch = reloginMismatch(error);
       if (!mismatch) return false;
+      const generation = sessions.generation;
       // Busy keeps the dialog open under the confirm: no outside press or Escape closes it.
       setBusy(true);
       try {
@@ -114,16 +116,17 @@ export function useReloginFlow(): ReloginFlow {
         }
         try {
           const res = await confirmRelogin(relogin.id, mismatch.pendingId);
-          finish(res);
+          // Cancel still closes while the apply runs; a dialog opened since must not finish.
+          if (sessions.isCurrent(generation)) finish(res);
         } catch (caught) {
-          fail({ error: caught });
+          if (sessions.isCurrent(generation)) fail({ error: caught });
         }
         return true;
       } finally {
         setBusy(false);
       }
     },
-    [confirm, display, finish, relogin, setBusy, t],
+    [confirm, display, finish, relogin, sessions, setBusy, t],
   );
 
   return {

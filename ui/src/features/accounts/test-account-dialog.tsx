@@ -62,8 +62,8 @@ interface LogLine {
 type ModelRun =
   | { kind: "queued" }
   | { kind: "running"; started: number }
-  | { kind: "ok"; seconds: string; result: TestAccountResponse }
-  | { kind: "err"; seconds: string; reason: string };
+  | { kind: "ok"; seconds: number; result: TestAccountResponse }
+  | { kind: "err"; seconds: number; reason: string };
 
 type DetailTab = "response" | "steps";
 
@@ -488,12 +488,16 @@ export function TestAccountDialog({
     const startedAt = Date.now();
     setRun(model, { kind: "running", started: startedAt });
     append(model, "info", t("testLog.start", { email, model, proxy }), model);
-    const seconds = () => formatDecimal((Date.now() - startedAt) / 1000, 1);
+    const seconds = () => (Date.now() - startedAt) / 1000;
     try {
       const result = await testAccount(account.id, { model });
       const took = seconds();
       setRun(model, { kind: "ok", seconds: took, result });
-      append(model, "ok", t("testLog.success", { email, seconds: took, reply: result.reply }));
+      append(
+        model,
+        "ok",
+        t("testLog.success", { email, seconds: formatDecimal(took, 1), reply: result.reply }),
+      );
       append(
         model,
         "info",
@@ -510,7 +514,7 @@ export function TestAccountDialog({
       const took = seconds();
       const reason = maskText(errorMessage(error, t));
       setRun(model, { kind: "err", seconds: took, reason });
-      append(model, "err", t("testLog.failed", { email, seconds: took, reason }));
+      append(model, "err", t("testLog.failed", { email, seconds: formatDecimal(took, 1), reason }));
     }
   };
 
@@ -548,7 +552,7 @@ export function TestAccountDialog({
   const failed = outcomes.filter((item) => item.kind === "err").length;
   const pending = outcomes.filter((item) => item.kind === "queued" || item.kind === "running");
   const credits = succeeded.reduce((total, item) => total + item.result.credits, 0);
-  const times = succeeded.map((item) => Number(item.seconds)).sort((a, b) => a - b);
+  const times = succeeded.map((item) => item.seconds).sort((a, b) => a - b);
   const median = times.length > 0 ? times[Math.floor((times.length - 1) / 2)] : null;
 
   const status = cached.isPending
@@ -771,7 +775,7 @@ export function TestAccountDialog({
                               started={item.started}
                             />
                           ) : item?.kind === "ok" || item?.kind === "err" ? (
-                            t("test.seconds", { seconds: item.seconds })
+                            t("test.seconds", { seconds: formatDecimal(item.seconds, 1) })
                           ) : (
                             <span className="text-muted-foreground">{EMPTY}</span>
                           )}

@@ -36,6 +36,8 @@ export interface UpdateStatus {
   errorCode?: string;
   /** The underlying error, GitHub's status or file, or the old program's path on a rollback. */
   errorDetail?: string;
+  /** After a later download failed: the release an earlier one put in place, which a restart runs. */
+  installed?: string;
 }
 
 const UPDATE_STATES: readonly UpdateState[] = [
@@ -81,6 +83,7 @@ export function normalizeUpdateStatus(
     error: optionalString(res.error),
     errorCode: optionalString(res.errorCode),
     errorDetail: optionalString(res.errorDetail),
+    installed: optionalString(res.installed),
   };
 }
 
@@ -140,6 +143,19 @@ export async function startUpdate(version: string): Promise<UpdateStatus> {
 /** POST /update/restart: the server answers, then restarts on the release it has in place. */
 export async function restartForUpdate(): Promise<UpdateStatus> {
   return normalizeUpdateStatus(await apiRequest("/update/restart", { method: "POST" }));
+}
+
+/**
+ * Restarts the server on the release in place and resolves once it answers on it. That release
+ * is the one the server says it restarts into, not always `target`: after a later download failed,
+ * the earlier one still in place runs. Rejects like waitForVersion.
+ */
+export async function restartAndWait(
+  target: string,
+  options?: Parameters<typeof waitForVersion>[1],
+): Promise<void> {
+  const status = await restartForUpdate();
+  await waitForVersion(status.version ?? target, options);
 }
 
 /** How long the restart may take before the page says the server did not come back. */

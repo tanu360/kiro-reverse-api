@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { mapCredential } from "@/features/add-account/lib/credentials-mapping";
 import type { AccountFull, ExportData, ModelInfo } from "@/lib/api/types";
 import { type TParams, translate } from "@/lib/i18n";
 import { makeAccount, makeAccountFull, makeModelInfo } from "@/lib/mocks/fixtures";
@@ -268,6 +269,9 @@ describe("trialExpiry", () => {
   it("labels expired, today, days left and far-off expiries", () => {
     expect(trialExpiry(0, nowMs)).toBeNull();
     expect(trialExpiry(NOW_SEC - DAY, nowMs)).toEqual({ kind: "expired" });
+    // Under a day past the expiry is expired too; under a day ahead is today.
+    expect(trialExpiry(NOW_SEC - 3600, nowMs)).toEqual({ kind: "expired" });
+    expect(trialExpiry(NOW_SEC + 5 * 3600, nowMs)).toEqual({ kind: "today" });
     expect(trialExpiry(NOW_SEC, nowMs)).toEqual({ kind: "today" });
     expect(trialExpiry(NOW_SEC + 3 * DAY, nowMs)).toEqual({ kind: "days", days: 3 });
     expect(trialExpiry(NOW_SEC + 7 * DAY, nowMs)).toEqual({ kind: "days", days: 7 });
@@ -419,18 +423,48 @@ describe("buildCopyJson", () => {
     expect(Object.keys(value)).not.toContain("clientSecret");
   });
 
-  it("returns client and token fields for every other account", () => {
-    expect(buildCopyJson(full({ authMethod: "idc" }))).toEqual({
+  it("returns client, token, provider and region fields for every other account", () => {
+    expect(
+      buildCopyJson(full({ authMethod: "idc", provider: "Enterprise", region: "eu-west-1" })),
+    ).toEqual({
       clientId: "cid",
       clientSecret: "secret",
       accessToken: "access",
       refreshToken: "refresh",
+      provider: "Enterprise",
+      region: "eu-west-1",
+    });
+  });
+
+  it("copies an IdC sign-in outside us-east-1 so the import keeps its region", () => {
+    const item = JSON.parse(
+      JSON.stringify(
+        buildCopyJson(full({ authMethod: "idc", provider: "Enterprise", region: "eu-west-1" })),
+      ),
+    );
+    expect(mapCredential(item)).toMatchObject({
+      kind: "request",
+      payload: { authMethod: "idc", provider: "Enterprise", region: "eu-west-1" },
+    });
+  });
+
+  it("copies a GitHub social sign-in so the import keeps its provider", () => {
+    const item = JSON.parse(
+      JSON.stringify(
+        buildCopyJson(
+          full({ authMethod: "social", provider: "Github", clientId: "", clientSecret: "" }),
+        ),
+      ),
+    );
+    expect(mapCredential(item)).toMatchObject({
+      kind: "request",
+      payload: { authMethod: "social", provider: "Github" },
     });
   });
 });
 
 describe("buildExportCopy", () => {
-  it("keeps only the credentials a client needs", () => {
+  it("keeps only the credentials a client needs, with the region an IdC refresh goes to", () => {
     const credentials = {
       csrfToken: "",
       expiresAt: 0,
@@ -448,13 +482,81 @@ describe("buildExportCopy", () => {
         {
           credentials: { ...credentials, authMethod: "api_key", accessToken: "ksk_1", region: "r" },
         },
-        { credentials: { ...credentials, authMethod: "IdC", region: "us-east-1" } },
+        {
+          credentials: {
+            ...credentials,
+            authMethod: "IdC",
+            provider: "Enterprise",
+            region: "eu-west-1",
+          },
+        },
+        {
+          userId: "uid",
+          profileArn: "arn:profile",
+          credentials: {
+            ...credentials,
+            clientSecret: undefined,
+            authMethod: "external_idp",
+            provider: "AzureAD",
+            tokenEndpoint: "https://login.microsoftonline.com/t/oauth2/v2.0/token",
+            issuerUrl: "https://login.microsoftonline.com/t/v2.0",
+            scopes: "openid offline_access",
+          },
+        },
       ],
     } as unknown as ExportData;
     expect(buildExportCopy(data)).toEqual([
       { kiroApiKey: "ksk_1", region: "r", authMethod: "api_key" },
-      { clientId: "cid", clientSecret: "secret", accessToken: "access", refreshToken: "refresh" },
+      {
+        clientId: "cid",
+        clientSecret: "secret",
+        accessToken: "access",
+        refreshToken: "refresh",
+        provider: "Enterprise",
+        region: "eu-west-1",
+      },
+      {
+        clientId: "cid",
+        accessToken: "access",
+        refreshToken: "refresh",
+        authMethod: "external_idp",
+        provider: "AzureAD",
+        userId: "uid",
+        profileArn: "arn:profile",
+        tokenEndpoint: "https://login.microsoftonline.com/t/oauth2/v2.0/token",
+        issuerUrl: "https://login.microsoftonline.com/t/v2.0",
+        scopes: "openid offline_access",
+      },
     ]);
+  });
+
+  it("copies a Microsoft sign-in so the credentials import maps it back to Microsoft", () => {
+    const data = {
+      version: "2.1.0",
+      exportedAt: 0,
+      groups: [],
+      tags: [],
+      accounts: [
+        {
+          userId: "uid",
+          credentials: {
+            csrfToken: "",
+            expiresAt: 0,
+            clientId: "cid",
+            accessToken: "access",
+            refreshToken: "refresh",
+            authMethod: "external_idp",
+            provider: "AzureAD",
+            tokenEndpoint: "https://login.microsoftonline.com/t/oauth2/v2.0/token",
+          },
+        },
+      ],
+    } as unknown as ExportData;
+    const [item] = JSON.parse(JSON.stringify(buildExportCopy(data)));
+    expect(mapCredential(item)).toMatchObject({
+      kind: "request",
+      payload: { authMethod: "external_idp", refreshToken: "refresh", clientId: "cid" },
+    });
   });
 });
 

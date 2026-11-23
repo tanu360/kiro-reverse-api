@@ -455,8 +455,9 @@ export function SettingsSection({
 }
 
 /**
- * Skeleton while the section's query loads, an error with Retry when it fails ("Could not load
- * {section} settings"), both under the section's heading. A section built on the shared GET
+ * Skeleton while the section's query loads, an error with Retry when its first load fails ("Could
+ * not load {section} settings"), both under the section's heading. A refetch that fails keeps the
+ * copy already shown, and the unsaved edits made on it. A section built on the shared GET
  * /settings query (`shared`) shows no error of its own: the page shows one for all of them, and
  * the section leaves only a hidden anchor (the nav then goes to the page error).
  */
@@ -485,10 +486,8 @@ export function SectionQuery<T>({
       </SettingsGroup>
     );
   }
-  if (query.isError && shared) {
-    return <div hidden id={id} />;
-  }
-  if (query.isError) {
+  if (query.data === undefined) {
+    if (shared) return <div hidden id={id} />;
     return (
       <SettingsGroup id={id} title={title}>
         <ErrorState

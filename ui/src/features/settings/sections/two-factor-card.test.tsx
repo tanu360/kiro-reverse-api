@@ -46,6 +46,9 @@ describe("TwoFactorCard", () => {
     expect(
       await screen.findByText("10 unused codes left. Each code signs in once without the app."),
     ).toBeInTheDocument();
+    // Turn on is gone with the dialog: focus goes to Turn off, which took its place.
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Turn off" })).toHaveFocus());
   });
 
   it("retries a setup that failed to start, and leaves the code field unfocused", async () => {
@@ -86,7 +89,9 @@ describe("TwoFactorCard", () => {
     await user.type(within(dialog).getByLabelText("Admin password"), "12345678");
     await user.click(within(dialog).getByRole("button", { name: "Turn off" }));
     await waitFor(() => expect(mockDb.twoFactor.enabled).toBe(false));
-    expect(await screen.findByRole("button", { name: "Turn on" })).toBeInTheDocument();
+    // Turn off is gone with the dialog: focus goes to Turn on, which took its place.
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Turn on" })).toHaveFocus());
   });
 
   it("says why setup is off while ADMIN_RESET_2FA is set", async () => {

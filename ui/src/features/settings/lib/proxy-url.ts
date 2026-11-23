@@ -93,6 +93,32 @@ export function parseProxyUrl(url: string): ProxyModel {
 }
 
 /**
+ * The form once the Host field reads `value`. A full proxy URL (a scheme and a host) fills the
+ * fields it carries: scheme, host and port, and the username and password when it has them.
+ * Fields it leaves out keep what the form had, so a URL typed one key at a time never clears
+ * the port or credentials typed before it, and a bare "socks5://" stays as typed until its host
+ * follows. Anything else is the host as typed.
+ */
+export function applyHostInput(current: ProxyModel, value: string): ProxyModel {
+  if (value.includes("://")) {
+    const parsed = parseProxyUrl(value);
+    if (parsed.type !== "none" && parsed.host !== "") {
+      const credentials = parsed.username !== "" || parsed.password !== "";
+      return {
+        ...current,
+        type: parsed.type,
+        scheme: parsed.scheme,
+        host: parsed.host,
+        port: parsed.port || current.port,
+        username: credentials ? parsed.username : current.username,
+        password: credentials ? parsed.password : current.password,
+      };
+    }
+  }
+  return { ...current, host: value };
+}
+
+/**
  * Joins the form back into a URL: `scheme://[user[:pass]@]host:port`, credentials encoded,
  * IPv6 hosts bracketed. A password without a username is dropped. Direct gives ''.
  */

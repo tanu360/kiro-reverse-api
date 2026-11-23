@@ -55,6 +55,24 @@ function Harness({
   );
 }
 
+/** The credentials re-login dialog with a Reopen button outside it. */
+function Reopenable({ account }: { account: Account }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} type="button">
+        Reopen
+      </button>
+      <AddAccountDialog
+        initialMethod="credentials"
+        onOpenChange={setOpen}
+        open={open}
+        relogin={account}
+      />
+    </>
+  );
+}
+
 async function expectClosed(): Promise<void> {
   await waitFor(() =>
     expect(document.querySelector('[data-slot="dialog-popup"]')).not.toBeInTheDocument(),
@@ -246,6 +264,42 @@ describe("AddAccountDialog in re-login mode", () => {
     await expectAnnounced("someone.else@northwind-labs.dev is signed in again.");
   });
 
+  it("drops a replace that answers after Cancel, leaving a reopened dialog open", async () => {
+    let answer: () => void = () => {};
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    let applies = 0;
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/relogin/confirm"), async () => {
+        applies += 1;
+        await answered;
+      }),
+    );
+    const { user } = renderWithProviders(<Reopenable account={accountBy("Enterprise")} />);
+    await submitCredentials(user, OTHER_USER);
+    const ask = await screen.findByRole("alertdialog", {
+      name: "Switch this account to another user?",
+    });
+    await user.click(within(ask).getByRole("button", { name: "Switch user" }));
+    await waitFor(() => expect(applies).toBe(1));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+
+    // Cancel still closes while the apply runs; the dialog opens again before it answers.
+    const footer = document.querySelector<HTMLElement>('[data-slot="dialog-footer"]');
+    if (!footer) throw new Error("no dialog footer");
+    await user.click(within(footer).getByRole("button", { name: "Cancel" }));
+    await expectClosed();
+    await user.click(screen.getByRole("button", { name: "Reopen" }));
+    const dialog = await screen.findByRole("dialog", { name: "Sign in again" });
+    answer();
+
+    // The late answer does not close the new dialog.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(dialog).not.toHaveAttribute("data-closed");
+    expect(dialog).toHaveAttribute("data-open");
+  });
+
   it("names the stored account a sign-in belongs to, masked, and asks nothing", async () => {
     mockServer.use(
       http.post(apiUrl("/auth/credentials"), () =>
@@ -337,6 +391,59 @@ describe("Builder ID re-login", () => {
     await expectClosed();
     expect(mockDb.accounts).toHaveLength(before);
     await expectAnnounced(`${account.email} is signed in again.`);
+  });
+
+  it("keeps the first step busy while a mismatch is confirmed and applied", async () => {
+    const starts = logRequests("/auth/builderid/start");
+    let answer: () => void = () => {};
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    mockServer.use(
+      http.post(apiUrl("/auth/builderid/poll"), () =>
+        HttpResponse.json(
+          {
+            success: false,
+            error: "the new sign-in belongs to a different user than this account",
+            code: "relogin_identity_mismatch",
+            pendingId: "pending-1",
+            accountId: "x",
+            currentEmail: "",
+            incomingEmail: "someone.else@northwind-labs.dev",
+            expiresIn: 600,
+          },
+          { status: 409 },
+        ),
+      ),
+      http.post(apiUrl("/accounts/:id/relogin/confirm"), async () => {
+        await answered;
+        return HttpResponse.json({ error: "Re-login not found or expired" }, { status: 404 });
+      }),
+    );
+    renderWithProviders(<Harness account={accountBy("BuilderId")} />);
+
+    await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
+    expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
+    for (let step = 0; step < 50 && !screen.queryByRole("alertdialog"); step++) {
+      await act(() => vi.advanceTimersByTimeAsync(200));
+    }
+    const ask = await screen.findByRole("alertdialog", {
+      name: "Switch this account to another user?",
+    });
+    await user.click(within(ask).getByRole("button", { name: "Switch user" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+
+    // Back on the first step, but no second login can start while the apply runs.
+    const submit = screen.getByRole("button", { name: "Start sign-in" });
+    expect(submit).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("textbox", { name: "Region" })).toBeDisabled();
+    await user.click(submit);
+    expect(starts.count).toBe(1);
+
+    answer();
+    await expectFlowError("Re-login not found or expired");
+    expect(screen.getByRole("button", { name: "Start sign-in" })).not.toHaveAttribute("aria-busy");
+    expect(screen.getByRole("textbox", { name: "Region" })).toBeEnabled();
   });
 
   it("stops at the start when the account is gone", async () => {

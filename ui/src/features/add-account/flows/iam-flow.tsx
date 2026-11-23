@@ -96,6 +96,8 @@ export function IamFlow(): JSX.Element {
     } catch (error) {
       if (!sessions.isCurrent(generation)) return;
       if (await relogin.resolveMismatch(error, setFailure)) {
+        // Closed or finished meanwhile: the sessions may already be a new login's.
+        if (!sessions.isCurrent(generation)) return;
         // The server used up the session; a new attempt starts from the first step.
         sessions.iamSession = "";
         setAuthorizeUrl("");

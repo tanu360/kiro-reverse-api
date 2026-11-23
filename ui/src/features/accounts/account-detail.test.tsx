@@ -271,6 +271,45 @@ describe("AccountDetailSheet", () => {
     );
   });
 
+  it("returns a pinned account to automatic when its profiles cannot load", async () => {
+    const account = accountBy((a) => a.profileArnPinned && supportsKiroProfiles(a));
+    mockServer.use(
+      http.get(apiUrl("/accounts/:id/profiles"), () => jsonError(502, "discovery down")),
+    );
+    const pins = capture("post", "/accounts/:id/profile");
+    const { sheet, user } = await openSheet(account);
+    const profile = section(sheet, "Kiro profile");
+    await user.click(within(profile).getByRole("button", { name: "Load Kiro profiles" }));
+    expect(await within(profile).findByRole("alert")).toHaveTextContent("discovery down");
+    expect(
+      within(profile).queryByRole("button", { name: "Use selected profile" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(profile).getByRole("button", { name: "Return to automatic" }));
+    await waitFor(() => expect(pins).toEqual([{ profileArn: "" }]));
+    expect(
+      await screen.findByText("The profile is chosen automatically again."),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(within(profile).getByText("Automatic")).toBeInTheDocument());
+    expect(
+      within(profile).queryByRole("button", { name: "Return to automatic" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a pinned profile undoable on a sign-in without profiles, with loading off", async () => {
+    const account = noProfiles();
+    account.profileArnPinned = true;
+    const { sheet } = await openSheet(account);
+    const profile = section(sheet, "Kiro profile");
+    expect(within(profile).getByRole("button", { name: "Load Kiro profiles" })).toBeDisabled();
+    expect(
+      within(profile).getByText(
+        "Kiro profiles exist only for Enterprise (IAM Identity Center) and Microsoft SSO accounts.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(profile).getByRole("button", { name: "Return to automatic" })).toBeEnabled();
+  });
+
   it("drops a failed pin's notice on another choice or a new list", async () => {
     mockServer.use(
       http.post(apiUrl("/accounts/:id/profile"), () =>

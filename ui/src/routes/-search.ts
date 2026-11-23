@@ -1,6 +1,8 @@
 // Search-param schemas for the file routes. The "-" prefix keeps this file out of the route
 // tree. Features import the types from here; this module must not import route files.
 
+import { defaultParseSearch } from "@tanstack/react-router";
+
 /** The Overview traffic range; `all` is every logged request, by day, week, month or year. */
 export type OverviewRange = "1h" | "6h" | "24h" | "all";
 /** range undefined = '1h' */
@@ -196,8 +198,12 @@ export function redirectTarget(redirect: string | undefined): {
   const to = queryStart === -1 ? withoutHash : withoutHash.slice(0, queryStart);
   const search: Record<string, string> = {};
   if (queryStart !== -1) {
-    for (const [key, value] of new URLSearchParams(withoutHash.slice(queryStart + 1))) {
-      search[key] = value;
+    // The query is the router's own, which JSON-encodes a text that reads as a number
+    // (`?search=%22500%22`): its parser reads that back as "500", where URLSearchParams would
+    // keep the quotes. Every value goes on as text, which the routes' validators all accept.
+    const parsed = defaultParseSearch(withoutHash.slice(queryStart));
+    for (const [key, value] of Object.entries(parsed)) {
+      search[key] = typeof value === "string" ? value : JSON.stringify(value);
     }
   }
   return { to: to || "/", search };

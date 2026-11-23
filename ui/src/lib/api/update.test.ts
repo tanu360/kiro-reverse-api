@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { HttpResponse, http } from "msw";
+import { afterEach, describe, expect, it } from "vitest";
+import { clearSession, setSession } from "@/lib/auth/session";
 import { type TFunction, translate } from "@/lib/i18n";
-import { normalizeUpdateStatus, updateErrorText, updateMoving } from "./update";
+import { apiUrl } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
+import { normalizeUpdateStatus, restartAndWait, updateErrorText, updateMoving } from "./update";
 
 describe("normalizeUpdateStatus", () => {
   it("keeps the fields of a download under way", () => {
@@ -95,5 +99,27 @@ describe("updateErrorText", () => {
     );
     expect(updateErrorText({ error: "Old server." }, ja)).toBe("Old server.");
     expect(updateErrorText({}, ja)).toBeUndefined();
+  });
+});
+
+describe("restartAndWait", () => {
+  afterEach(() => clearSession("signout"));
+
+  it("waits for the release the server restarts into, not the newer one that failed", async () => {
+    setSession({ token: "t", expiresAt: Date.now() + 3_600_000, remember: false }, "signin");
+    mockServer.use(
+      http.post(apiUrl("/update/restart"), () =>
+        HttpResponse.json(
+          { state: "restarting", supported: true, version: "2.1.5" },
+          { status: 202 },
+        ),
+      ),
+      http.get(apiUrl("/version"), () => HttpResponse.json({ version: "v2.1.5" })),
+    );
+    await expect(restartAndWait("2.2.0", { timeoutMs: 500, pollMs: 10 })).resolves.toBeUndefined();
+  });
+
+  it("keeps the installed release a failed status names", () => {
+    expect(normalizeUpdateStatus({ state: "error", installed: "2.1.5" }).installed).toBe("2.1.5");
   });
 });

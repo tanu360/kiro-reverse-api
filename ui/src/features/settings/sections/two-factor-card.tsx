@@ -8,7 +8,16 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type JSX, useId, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type JSX,
+  type RefObject,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Code } from "@/components/shared/code";
 import { CopyButton } from "@/components/shared/copy-button";
 import { ErrorState } from "@/components/shared/error-state";
@@ -73,11 +82,19 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [session, setSession] = useState(0);
+  // Turning it on or off swaps the sign-in row's button for the other one: a closing dialog
+  // hands focus to the one now shown, not to the gone one (which would drop it to the page).
+  const signInRef = useRef<HTMLButtonElement>(null);
   const open = (kind: "setup" | "disable" | "codes") => {
     setSession((value) => value + 1);
     setDialog({ kind, session: session + 1 });
   };
   const close = () => setDialog(null);
+  // The disable dialog closes once the card reads Off, after the render that brings Turn on, so
+  // the dialog hands focus to it.
+  useEffect(() => {
+    if (dialog?.kind === "disable" && !status.enabled) setDialog(null);
+  }, [dialog, status.enabled]);
   const refresh = (next?: TwoFactorStatus) => {
     if (next) queryClient.setQueryData(queryKeys.settings.twoFactor(), next);
     void queryClient.invalidateQueries({ queryKey: queryKeys.settings.twoFactor() });
@@ -102,7 +119,7 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
         <>
           <SettingsRow
             control={
-              <Button onClick={() => open("disable")} size="sm" variant="danger">
+              <Button onClick={() => open("disable")} ref={signInRef} size="sm" variant="danger">
                 {t("twoFactor.turnOff")}
               </Button>
             }
@@ -143,6 +160,7 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
             <Button
               disabled={status.resetByEnv}
               onClick={() => open("setup")}
+              ref={signInRef}
               size="sm"
               variant="secondary"
             >
@@ -170,15 +188,17 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
         open={dialog !== null}
       >
         {dialog?.kind === "setup" ? (
-          <SetupDialog key={dialog.session} onDone={(next) => refresh(next)} />
+          <SetupDialog
+            finalFocus={signInRef}
+            key={dialog.session}
+            onDone={(next) => refresh(next)}
+          />
         ) : null}
         {dialog?.kind === "disable" ? (
           <DisableDialog
+            finalFocus={signInRef}
             key={dialog.session}
-            onDone={(next) => {
-              refresh(next);
-              close();
-            }}
+            onDone={(next) => refresh(next)}
           />
         ) : null}
         {dialog?.kind === "codes" ? (
@@ -279,7 +299,13 @@ function RecoveryCodes({ codes }: { codes: string[] }): JSX.Element {
  * Turning it on: the QR code and the secret, then a code from the app to confirm, then the
  * recovery codes, shown once.
  */
-function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }): JSX.Element {
+function SetupDialog({
+  finalFocus,
+  onDone,
+}: {
+  finalFocus: RefObject<HTMLButtonElement | null>;
+  onDone: (status: TwoFactorStatus) => void;
+}): JSX.Element {
   const { t } = useT("settings");
   const codeId = useId();
   const [code, setCode] = useState("");
@@ -314,7 +340,7 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
 
   if (codes) {
     return (
-      <DialogPopup className="sm:max-w-lg">
+      <DialogPopup className="sm:max-w-lg" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{t("twoFactor.codesTitle")}</DialogTitle>
           <DialogDescription>{t("twoFactor.codesHint")}</DialogDescription>
@@ -330,7 +356,7 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
   }
 
   return (
-    <DialogPopup className="sm:max-w-lg">
+    <DialogPopup className="sm:max-w-lg" finalFocus={finalFocus}>
       <form className="contents" noValidate onSubmit={submit}>
         <DialogHeader>
           {/* The sheet headers' tile: the shield in a soft purple square beside the title. */}
@@ -449,7 +475,13 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
 }
 
 /** Turning it off: a current code, or the password when the phone is not at hand. */
-function DisableDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }): JSX.Element {
+function DisableDialog({
+  finalFocus,
+  onDone,
+}: {
+  finalFocus: RefObject<HTMLButtonElement | null>;
+  onDone: (status: TwoFactorStatus) => void;
+}): JSX.Element {
   const { t } = useT("settings");
   const codeId = useId();
   const passwordId = useId();
@@ -460,7 +492,7 @@ function DisableDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }
   const disable = useMutation({
     mutationFn: (proof: TwoFactorProof) => disableTwoFactor(proof),
     onSuccess: (status) => {
-      // The dialog closes on the card's pill reading Off.
+      // The dialog closes on the card's pill reading Off (the panel closes it).
       announce(t("twoFactor.disabled"));
       onDone(status);
     },
@@ -481,7 +513,7 @@ function DisableDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }
     disable.mutate(withPassword ? { password } : { code });
   };
   return (
-    <DialogPopup className="sm:max-w-md">
+    <DialogPopup className="sm:max-w-md" finalFocus={finalFocus}>
       <form className="contents" noValidate onSubmit={submit}>
         <DialogHeader>
           <DialogTitle>{t("twoFactor.disableTitle")}</DialogTitle>

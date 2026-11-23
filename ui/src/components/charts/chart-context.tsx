@@ -213,7 +213,10 @@ interface ChartContextValue extends ChartHoverContextValue {
   barScale?: ScaleBand<string>;
   /** Width of each bar band */
   bandWidth?: number;
-  /** X accessor for bar charts (returns string instead of Date) */
+  /**
+   * A bar's key in `barScale`: its label, with the occurrence appended when an earlier bar has the
+   * same label. Show `dateLabels[index]`, not this.
+   */
   barXAccessor?: (d: Record<string, unknown>) => string;
   /** Bar chart orientation */
   orientation?: "vertical" | "horizontal";

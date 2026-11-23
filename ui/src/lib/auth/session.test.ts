@@ -73,6 +73,50 @@ describe("session storage", () => {
   });
 });
 
+describe("the session in another tab", () => {
+  function storageEvent(newValue: string | null): void {
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: TOKEN_KEY, newValue, storageArea: localStorage }),
+    );
+  }
+
+  it("ends this tab's session when another tab signs out", () => {
+    setSession({ token: "shared", expiresAt: Date.now() + HOUR_MS, remember: true });
+    const calls = record();
+    // The other tab removes the shared token; this tab only hears the storage event.
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_EXP_KEY);
+    storageEvent(null);
+    expect(calls).toEqual([[null, "signout"]]);
+  });
+
+  it("takes up the token another tab signed in with", () => {
+    const calls = record();
+    localStorage.setItem(TOKEN_KEY, "other");
+    localStorage.setItem(TOKEN_EXP_KEY, String(Date.now() + HOUR_MS));
+    storageEvent("other");
+    expect(calls.map(([session, reason]) => [session?.token, reason])).toEqual([
+      ["other", "signin"],
+    ]);
+  });
+
+  it("ignores another tab's change while this tab keeps its own session-only token", () => {
+    setSession({ token: "mine", expiresAt: Date.now() + HOUR_MS, remember: false });
+    const calls = record();
+    localStorage.setItem(TOKEN_KEY, "other");
+    storageEvent("other");
+    expect(calls).toEqual([]);
+    expect(getSession()?.token).toBe("mine");
+  });
+
+  it("says nothing when the stored session did not change", () => {
+    clearSession("signout");
+    const calls = record();
+    storageEvent(null);
+    expect(calls).toEqual([]);
+  });
+});
+
 describe("signIn", () => {
   it("throws ApiError 401 for a wrong password and stores nothing", async () => {
     const error = await signIn("wrong-password", true).catch((e: unknown) => e);

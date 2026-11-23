@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyHostInput,
   buildProxyUrl,
   isValidProxyPort,
   isValidProxyUrl,
+  type ProxyModel,
   parseProxyUrl,
   proxyHostProblem,
 } from "./proxy-url";
@@ -48,6 +50,50 @@ describe("parseProxyUrl", () => {
 
   it("keeps credentials that are not valid percent-encoding as typed", () => {
     expect(parseProxyUrl("socks5://a%zz:b@h:1").username).toBe("a%zz");
+  });
+});
+
+describe("applyHostInput", () => {
+  const filled: ProxyModel = {
+    type: "socks5",
+    scheme: "socks5",
+    host: "",
+    port: "1080",
+    username: "alice",
+    password: "pw",
+  };
+
+  it("keeps the port and credentials while a URL is typed one key at a time", () => {
+    let model = filled;
+    for (const key of "http://proxy.local") model = applyHostInput(model, `${model.host}${key}`);
+    // A bare "http://" stays as typed; the host after it switches the type and keeps the rest.
+    expect(model).toEqual({
+      type: "http",
+      scheme: "http",
+      host: "proxy.local",
+      port: "1080",
+      username: "alice",
+      password: "pw",
+    });
+  });
+
+  it("leaves a bare scheme in the field as typed", () => {
+    expect(applyHostInput(filled, "socks5://")).toEqual({ ...filled, host: "socks5://" });
+  });
+
+  it("fills every field a pasted full URL carries", () => {
+    expect(applyHostInput(filled, "socks5h://bob:s3cret@10.0.0.1:9050")).toEqual({
+      type: "socks5",
+      scheme: "socks5h",
+      host: "10.0.0.1",
+      port: "9050",
+      username: "bob",
+      password: "s3cret",
+    });
+  });
+
+  it("takes anything else as the host", () => {
+    expect(applyHostInput(filled, "proxy.local")).toEqual({ ...filled, host: "proxy.local" });
   });
 });
 

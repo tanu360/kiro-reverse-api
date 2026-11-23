@@ -34,9 +34,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  applyHostInput,
   PROXY_HOST_PROBLEM_KEYS,
   type ProxyModel,
-  parseProxyUrl,
   schemeForType,
 } from "@/features/settings/lib/proxy-url";
 import { announce } from "@/lib/announce";
@@ -137,17 +137,8 @@ export function ProxyEditor({
     },
   });
 
-  /** A pasted full proxy URL fills every field; anything else is the host as typed. */
-  const onHostChange = (value: string) => {
-    if (value.includes("://")) {
-      const parsed = parseProxyUrl(value);
-      if (parsed.type !== "none") {
-        update(parsed);
-        return;
-      }
-    }
-    update({ ...model.proxy, host: value });
-  };
+  /** A full proxy URL fills the fields it carries; anything else is the host as typed. */
+  const onHostChange = (value: string) => update(applyHostInput(model.proxy, value));
 
   const kind = kindOf(model.proxy);
   const kindHint = KINDS.find((item) => item.value === kind)?.hint ?? "settings:proxySocks5Hint";

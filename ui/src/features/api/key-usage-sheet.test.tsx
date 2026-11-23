@@ -204,6 +204,50 @@ describe("ApiKeyUsageSheet", () => {
     expect(within(legend(sheet)).getAllByText("0")).toHaveLength(2);
   });
 
+  it("says a measure with nothing to chart is empty, for a key whose requests all failed", async () => {
+    const failedOnly = totals({ requests: 2, failed: 2, inTokens: 40 });
+    mockServer.use(
+      http.get(apiUrl("/api-keys/usage"), () =>
+        HttpResponse.json({
+          ...response(),
+          totals: failedOnly,
+          keys: [
+            {
+              id: "a",
+              kind: "key",
+              name: "alpha",
+              keyMasked: "sk-alp****0001",
+              totals: failedOnly,
+              series: [EMPTY_TOTALS, failedOnly],
+            },
+          ],
+        }),
+      ),
+    );
+    const { user } = renderWithProviders(
+      <ApiKeyUsageSheet
+        entryRef="key:a"
+        identity={{ kind: "key", name: "alpha", keyMasked: "sk-alp****0001" }}
+        onOpenChange={() => {}}
+        open
+      />,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "alpha" });
+    expect(await within(legend(sheet)).findByText("Failed")).toBeInTheDocument();
+    const before = within(sheet).queryAllByText("No usage in this range").length;
+
+    await user.click(within(sheet).getByRole("radio", { name: "Credits" }));
+    // The two failed requests cost nothing: the chart says so instead of drawing zero bars.
+    await waitFor(() =>
+      expect(within(sheet).queryAllByText("No usage in this range")).toHaveLength(before + 1),
+    );
+
+    await user.click(within(sheet).getByRole("radio", { name: "Requests" }));
+    await waitFor(() =>
+      expect(within(sheet).queryAllByText("No usage in this range")).toHaveLength(before),
+    );
+  });
+
   it("names the no-key group and fetches nothing while closed", async () => {
     let calls = 0;
     mockServer.use(
@@ -317,5 +361,41 @@ describe("ApiKeyUsageSheet", () => {
     // A configured key also shows its state, account binding and limits.
     expect(await within(sheet).findByText("Key details")).toBeInTheDocument();
     expect(within(sheet).getByText("Accounts it can use")).toBeInTheDocument();
+  });
+
+  it("names the tags of a key bound by tags only, not every account", async () => {
+    serveUsage();
+    mockServer.use(
+      http.get(apiUrl("/api-keys"), () =>
+        HttpResponse.json({
+          apiKeys: [
+            {
+              id: "tagged",
+              name: "tagged key",
+              keyMasked: "sk-tag****0003",
+              enabled: true,
+              createdAt: 1_790_000_000,
+              tokensUsed: 0,
+              creditsUsed: 0,
+              requestsCount: 0,
+              accountIds: [],
+              accountTags: ["eu", "batch"],
+            },
+          ],
+        }),
+      ),
+    );
+    renderWithProviders(
+      <ApiKeyUsageSheet
+        entryRef="key:tagged"
+        identity={{ kind: "key", name: "tagged key", keyMasked: "sk-tag****0003" }}
+        onOpenChange={() => {}}
+        open
+      />,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "tagged key" });
+    expect(await within(sheet).findByText("Key details")).toBeInTheDocument();
+    expect(within(sheet).getByText("Every account with these tags: eu, batch")).toBeInTheDocument();
+    expect(within(sheet).queryByText("Every account")).toBeNull();
   });
 });

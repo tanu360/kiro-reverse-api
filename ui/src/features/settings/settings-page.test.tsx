@@ -806,6 +806,8 @@ describe("SettingsPage", () => {
     );
     await user.click(await screen.findByRole("menuitem", { name: "Delete rule" }));
     expect(within(card).getAllByRole("listitem")).toHaveLength(1);
+    // The deleted rule's menu button is gone: focus goes on to Add rule, not to the page.
+    expect(within(card).getByRole("button", { name: "Add rule" })).toHaveFocus();
 
     // The fixture has the built-ins off and its rule on: mixed, so the checkbox reads mixed.
     const all = within(card).getByRole("checkbox", { name: "All filters and rules" });
@@ -870,6 +872,37 @@ describe("SettingsPage", () => {
       "aria-disabled",
       "true",
     );
+  });
+
+  it("keeps the cards and their unsaved edits when a refetch fails", async () => {
+    const { user, queryClient } = await renderPage();
+    const thinking = section(SECTION_ID.thinking);
+    const suffix = within(thinking).getByLabelText("Trigger suffix");
+    await user.clear(suffix);
+    await user.type(suffix, "-local");
+    const autoContinue = screen.getByRole("switch", {
+      name: "Continue answers cut off by the output limit",
+    });
+    await user.click(autoContinue);
+
+    mockServer.use(
+      http.get(apiUrl("/thinking"), () => HttpResponse.json({ error: "down" }, { status: 500 })),
+      http.get(apiUrl("/settings"), () => HttpResponse.json({ error: "down" }, { status: 500 })),
+    );
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.all });
+    });
+
+    // The page's one error says the refetch failed; the cards and the edits stay.
+    expect(await screen.findByText("Could not load settings")).toBeInTheDocument();
+    expect(within(section(SECTION_ID.thinking)).getByLabelText("Trigger suffix")).toHaveValue(
+      "-local",
+    );
+    expect(
+      screen.getByRole("switch", { name: "Continue answers cut off by the output limit" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(section(SECTION_ID.autoContinue)).toBeVisible();
+    expect(screen.queryByText("Could not load this section")).not.toBeInTheDocument();
   });
 
   it("lets a clean card take a refetched server copy", async () => {

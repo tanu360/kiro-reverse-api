@@ -11,7 +11,6 @@ import { AnimatePresence, m, type Variants } from "motion/react";
 import { memo, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
-import { numberFormat } from "@/lib/format";
 import {
   useChartPortalContainer,
   useChartStable,
@@ -19,7 +18,7 @@ import {
   useYScale,
 } from "./chart-context";
 import { normalizeYAxisId } from "./y-axis-scales";
-import { resolveYAxisTickCount, Y_AXIS_DEFAULT_TICK_COUNT } from "./y-axis-ticks";
+import { resolveYAxisTickCount, tickLabels, Y_AXIS_DEFAULT_TICK_COUNT } from "./y-axis-ticks";
 
 /** Vertical drift (px) of labels fading in / out on a y-domain change. */
 const Y_AXIS_LABEL_SHIFT_PX = 8;
@@ -106,23 +105,6 @@ interface YAxisProps {
   formatLargeNumbers?: boolean;
   /** Custom label formatter. Overrides `formatLargeNumbers`. */
   formatValue?: (value: number) => string;
-}
-
-function formatLabel(
-  value: number,
-  formatLargeNumbers: boolean,
-  formatValue?: (value: number) => string,
-): string {
-  if (formatValue) {
-    return formatValue(value);
-  }
-  if (formatLargeNumbers && Math.abs(value) >= 1000) {
-    return numberFormat(undefined, {
-      notation: "compact",
-      maximumFractionDigits: 1,
-    }).format(value);
-  }
-  return numberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 }
 
 /** Inclusive data range of a reference band, for axis label highlighting. */
@@ -218,12 +200,13 @@ const YAxisInner = memo(function YAxisInner({
   );
 
   const ticks = useMemo(() => {
-    return tickValues.map((value) => {
+    const labels = tickLabels(tickValues, formatLargeNumbers, formatValue);
+    return tickValues.map((value, index) => {
       const y = (yScale(value) ?? 0) + margin.top;
       return {
         value,
         y,
-        label: formatLabel(value, formatLargeNumbers, formatValue),
+        label: labels[index],
         labelColor: resolveTickLabelColor(y - margin.top, axisId, yScale, referenceAreas),
       };
     });

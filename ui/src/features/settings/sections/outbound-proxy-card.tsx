@@ -44,6 +44,7 @@ import type { ProxyConfig } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { digitsOnly } from "@/lib/input-filters";
 import {
+  applyHostInput,
   buildProxyUrl,
   isValidProxyPort,
   PROXY_HOST_PROBLEM_KEYS,
@@ -296,17 +297,8 @@ function ProxyEditor({
     setModel(next);
   };
 
-  /** A pasted full proxy URL fills every field; anything else is the host as typed. */
-  const onHostChange = (value: string) => {
-    if (value.includes("://")) {
-      const parsed = parseProxyUrl(value);
-      if (parsed.type !== "none") {
-        update(parsed);
-        return;
-      }
-    }
-    update({ ...model, host: value });
-  };
+  /** A full proxy URL fills the fields it carries; anything else is the host as typed. */
+  const onHostChange = (value: string) => update(applyHostInput(model, value));
 
   const kind = kindOf(model);
   const kindHint = KINDS.find((item) => item.value === kind)?.hint ?? "proxySocks5Hint";

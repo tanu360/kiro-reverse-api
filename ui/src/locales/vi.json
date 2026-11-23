@@ -155,6 +155,7 @@
   "shell.update.restartConfirmTitle": "Khởi động lại trên bản {latest} ngay?",
   "shell.update.failedTitle": "Cập nhật chưa hoàn tất",
   "shell.update.retry": "Thử lại",
+  "shell.update.restartInstalled": "Khởi động lại với {version} đã cài sẵn",
   "shell.update.manual": "Cập nhật thủ công",
   "shell.update.automatic": "Cập nhật tự động",
   "shell.update.readyAnnouncement": "Kiro Proxy {latest} đã sẵn sàng để cài đặt.",

@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Account } from "@/lib/api/types";
 import { mockDb } from "@/lib/mocks/db";
 import { makeTestResult } from "@/lib/mocks/fixtures";
@@ -235,6 +235,31 @@ describe("TestAccountDialog", () => {
     expect(panel).toHaveTextContent('"stopReason": "end_turn"');
     expect(panel).not.toHaveTextContent('"success"');
     expect(within(panel).getByRole("button", { name: "Copy response" })).toBeInTheDocument();
+  });
+
+  it("sums the median time in a comma-decimal language", async () => {
+    // Each test takes 1.5 s on the page's clock.
+    const realNow = Date.now.bind(Date);
+    let offset = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realNow() + offset);
+    mockServer.use(
+      http.post(apiUrl("/accounts/:id/test"), async ({ request }) => {
+        const { model } = (await request.json()) as { model: string };
+        offset += 1500;
+        return HttpResponse.json(makeTestResult(model));
+      }),
+    );
+    const view = renderWithProviders(
+      <TestAccountDialog account={dana()} onOpenChange={() => {}} open />,
+      { lang: "vi" },
+    );
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText(/^Đã cache 6 model/);
+    await view.user.click(within(dialog).getByRole("button", { name: "Kiểm tra 1" }));
+
+    await waitFor(() => expect(within(dialog).getByText("1 OK")).toBeInTheDocument());
+    expect(row(dialog, "claude-sonnet-4.6")).toHaveTextContent(/1,\d giây/);
+    expect(within(dialog).getByText(/^trung vị 1,\d giây$/)).toBeInTheDocument();
   });
 
   it("tests every picked model in one go, from the picker's own button", async () => {

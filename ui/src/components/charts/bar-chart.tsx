@@ -15,6 +15,7 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import { DEFAULT_ANIMATION_EASING } from "./animation";
+import { bandKeys } from "./band-keys";
 import type { BarProps } from "./bar";
 import { topSquareCenterY } from "./bar-squares-layout";
 import {
@@ -244,12 +245,26 @@ const ChartCore = memo(function ChartCore({
     [xDataKey],
   );
 
+  // Labels on screen (axis ticks, tooltip title), by index; also feed the ticker animation.
+  const dateLabels = useMemo(() => data.map((d) => categoryAccessor(d)), [data, categoryAccessor]);
+
+  //! The band scale keys bars apart: two can share a label (the hour that repeats when clocks go
+  //! back), and keyed on the label the second drew over the first.
+  const categoryKeys = useMemo(() => {
+    const keys = bandKeys(dateLabels);
+    return new Map(data.map((d, index) => [d, keys[index]]));
+  }, [data, dateLabels]);
+  const categoryKey = useCallback(
+    (d: Record<string, unknown>): string => categoryKeys.get(d) ?? categoryAccessor(d),
+    [categoryKeys, categoryAccessor],
+  );
+
   // Category scale (band) - for the categorical axis
   const categoryScale = useMemo(() => {
-    const domain = data.map((d) => categoryAccessor(d));
+    const domain = data.map((d) => categoryKey(d));
     const range: [number, number] = isHorizontal ? [0, innerHeight] : [0, innerWidth];
     return scaleBand<string>().domain(domain).range(range).padding(barGap);
-  }, [innerWidth, innerHeight, data, categoryAccessor, barGap, isHorizontal]);
+  }, [innerWidth, innerHeight, data, categoryKey, barGap, isHorizontal]);
 
   // Band width for bars - use prop if provided, otherwise use scale's bandwidth
   const bandWidth = barWidthProp ?? categoryScale.bandwidth();
@@ -319,9 +334,6 @@ const ChartCore = memo(function ChartCore({
     return isHorizontal ? innerHeight / data.length : innerWidth / data.length;
   }, [innerWidth, innerHeight, data.length, isHorizontal]);
 
-  // Pre-compute labels for ticker animation
-  const dateLabels = useMemo(() => data.map((d) => categoryAccessor(d)), [data, categoryAccessor]);
-
   // Create a fake time scale for compatibility with ChartContext
   const fakeTimeScale = useMemo(() => {
     const now = Date.now();
@@ -386,7 +398,7 @@ const ChartCore = memo(function ChartCore({
       // Calculate positions for each bar
       const yPositions: Record<string, number> = {};
       const xPositions: Record<string, number> = {};
-      const barPos = categoryScale(categoryAccessor(d)) ?? 0;
+      const barPos = categoryScale(categoryKey(d)) ?? 0;
 
       if (isHorizontal) {
         // Horizontal bars: dots at end of bar (x = value), centered vertically in band
@@ -490,7 +502,7 @@ const ChartCore = memo(function ChartCore({
       valueScale,
       data,
       lines,
-      categoryAccessor,
+      categoryKey,
       bandWidth,
       isHorizontal,
       stacked,
@@ -629,7 +641,7 @@ const ChartCore = memo(function ChartCore({
     barScale: categoryScale,
     bandWidth,
     hoveredBarIndex,
-    barXAccessor: categoryAccessor,
+    barXAccessor: categoryKey,
     orientation,
     stacked,
     stackOffsets,

@@ -155,6 +155,7 @@
   "shell.update.restartConfirmTitle": "现在以 {latest} 重启？",
   "shell.update.failedTitle": "更新未完成",
   "shell.update.retry": "重试",
+  "shell.update.restartInstalled": "重启到已就绪的 {version}",
   "shell.update.manual": "改为手动更新",
   "shell.update.automatic": "自动更新",
   "shell.update.readyAnnouncement": "Kiro Proxy {latest} 已可以安装。",

@@ -1,3 +1,4 @@
+import { defaultStringifySearch } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 import {
   redirectTarget,
@@ -125,6 +126,20 @@ describe("redirectTarget", () => {
     expect(redirectTarget("/requests?page=2&status=failed")).toEqual({
       to: "/requests",
       search: { page: "2", status: "failed" },
+    });
+  });
+
+  it("reads the router's own query back, quotes and all", () => {
+    // The Requests search "500": the router writes a text that reads as a number in quotes.
+    const redirect = `/requests${defaultStringifySearch({ search: "500", page: 2 })}`;
+    expect(redirect).toBe("/requests?search=%22500%22&page=2");
+    expect(redirectTarget(redirect)).toEqual({
+      to: "/requests",
+      search: { search: "500", page: "2" },
+    });
+    expect(validateRequestsSearch(redirectTarget(redirect).search)).toMatchObject({
+      search: "500",
+      page: 2,
     });
   });
 

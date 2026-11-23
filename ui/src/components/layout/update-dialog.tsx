@@ -489,7 +489,7 @@ function SelfUpdateCard({
             {t("shell.update.restarting")}
           </p>
           <p className="text-pretty text-muted-foreground text-sm leading-relaxed">
-            {t("shell.update.restartingNote", { latest })}
+            {t("shell.update.restartingNote", { latest: update.status?.installed ?? latest })}
           </p>
         </div>
       );
@@ -505,6 +505,14 @@ function SelfUpdateCard({
               {update.error ?? t("shell.update.failedTitle")}
             </AlertDescription>
           </Alert>
+          {/* A later download failed, but the release an earlier one put in place still runs on
+              a restart. */}
+          {update.status?.installed ? (
+            <Button className="w-full" onClick={update.restart}>
+              <HugeiconsIcon aria-hidden="true" icon={ReloadIcon} />
+              {t("shell.update.restartInstalled", { version: update.status.installed })}
+            </Button>
+          ) : null}
           <Button className="w-full" onClick={update.start} variant="outline">
             <HugeiconsIcon aria-hidden="true" icon={Download04Icon} />
             {t("shell.update.retry")}

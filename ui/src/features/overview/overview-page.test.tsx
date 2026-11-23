@@ -524,6 +524,24 @@ describe("OverviewPage", () => {
     );
   });
 
+  it("reloads the account list on Refresh, so the busiest accounts show new requests", async () => {
+    // Per-request counters publish no accounts_changed event: Refresh is what brings them in.
+    let listCalls = 0;
+    mockServer.use(
+      http.get(apiUrl("/accounts"), () => {
+        listCalls += 1;
+        return HttpResponse.json(mockDb.accounts);
+      }),
+    );
+    const { user } = await renderApp("/");
+    const card = await screen.findByRole("region", { name: "Accounts" });
+    await within(card).findByRole("table", { name: "Accounts" });
+    await waitFor(() => expect(listCalls).toBeGreaterThan(0));
+    const before = listCalls;
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(listCalls).toBeGreaterThan(before));
+  });
+
   it("keeps tags out of the top accounts rows", async () => {
     const first = topAccounts(mockDb.accounts)[0];
     first.tags = ["overview-tag"];
