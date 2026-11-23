@@ -560,6 +560,10 @@ func (h *Handler) statusPayload(includeAdmin bool) map[string]interface{} {
 
 	accounts := config.GetAccounts()
 	accountCreditsUsed, accountCreditsLimit := accountCreditTotals(accounts)
+	accountCreditsProxy, err := proxyCycleCredits(accounts, observeNow())
+	if err != nil {
+		logger.Warnf("[Stats] Failed to query this cycle's proxy credits: %v", err)
+	}
 	payload := map[string]interface{}{
 		"status":              "ok",
 		"version":             config.Version,
@@ -567,6 +571,7 @@ func (h *Handler) statusPayload(includeAdmin bool) map[string]interface{} {
 		"available":           h.pool.AvailableCount(),
 		"accountCreditsUsed":  accountCreditsUsed,
 		"accountCreditsLimit": accountCreditsLimit,
+		"accountCreditsProxy": accountCreditsProxy,
 		"totalRequests":       requestStats.TotalRequests,
 		"successRequests":     requestStats.SuccessRequests,
 		"failedRequests":      requestStats.FailedRequests,

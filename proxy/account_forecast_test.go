@@ -98,3 +98,83 @@ func TestAccountForecastEndpointReadsTheRequestLog(t *testing.T) {
 		t.Fatalf("fc-b = %+v", b)
 	}
 }
+
+func TestCycleStart(t *testing.T) {
+	now := time.Date(2030, 3, 15, 12, 0, 0, 0, time.Local)
+	for _, c := range []struct {
+		name string
+		acc  config.Account
+		want time.Time
+	}{
+		{"exact reset moment", config.Account{NextResetAt: time.Date(2030, 3, 27, 9, 30, 0, 0, time.Local).Unix(), NextResetDate: "2030-03-27"}, time.Date(2030, 2, 27, 9, 30, 0, 0, time.Local)},
+		{"reset day", config.Account{NextResetDate: "2030-04-01"}, time.Date(2030, 3, 1, 0, 0, 0, 0, time.Local)},
+		{"never refreshed", config.Account{}, time.Date(2030, 3, 1, 0, 0, 0, 0, time.Local)},
+	} {
+		if got := cycleStart(c.acc, now); got != c.want.Unix() {
+			t.Errorf("%s: cycleStart = %v, want %v", c.name, time.Unix(got, 0), c.want)
+		}
+	}
+}
+
+func TestStatusProxyCreditsCountOnlyTheCurrentCycle(t *testing.T) {
+	h := newKeyAccessHandler(t, nil, "cy-a", "cy-b")
+	now := time.Now().Unix()
+	reset := now + 10*daySeconds
+	start := time.Unix(reset, 0).AddDate(0, -1, 0).Unix()
+	// Kiro counts 100 credits this cycle for cy-a and 5 for cy-b, whose cycle
+	// started five days before cy-a's.
+	for id, info := range map[string]config.AccountInfo{
+		"cy-a": {UsageCurrent: 100, UsageLimit: 1000, NextResetAt: reset},
+		"cy-b": {UsageCurrent: 5, UsageLimit: 1000, NextResetAt: reset - 5*daySeconds},
+	} {
+		if err := config.UpdateAccountInfo(id, info); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	logRequest := func(account string, ts int64, credits float64) {
+		t.Helper()
+		if _, err := d.Exec(`INSERT INTO requests (ts, account_id, credits, success) VALUES (?, ?, ?, 1)`, ts, account, credits); err != nil {
+			t.Fatal(err)
+		}
+	}
+	logPrunedDay := func(account string, day int64, credits float64) {
+		t.Helper()
+		if _, err := d.Exec(`INSERT INTO request_rollup_daily (day, account_id, request_count, credits, success) VALUES (?, ?, 1, ?, 1)`, day, account, credits); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// cy-a this cycle: a logged request and a day log retention pruned.
+	logRequest("cy-a", now-2*daySeconds, 20)
+	logPrunedDay("cy-a", floorDiv(start, daySeconds)+2, 7)
+	// cy-a last cycle: never counted.
+	logRequest("cy-a", start-1, 500)
+	logPrunedDay("cy-a", floorDiv(start, daySeconds)-1, 900)
+	// cy-b logged more than Kiro counts for it: its share stops at its 5.
+	logRequest("cy-b", now-3600, 30)
+
+	proxyCredits := func() float64 {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		h.apiGetStatus(rec, httptest.NewRequest(http.MethodGet, "/admin/api/status", nil))
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		v, _ := body["accountCreditsProxy"].(float64)
+		return v
+	}
+	if got := proxyCredits(); math.Abs(got-(27+5)) > 1e-9 {
+		t.Fatalf("accountCreditsProxy = %v, want 27 + 5", got)
+	}
+	// Rows logged after the sums are cached count the same way, a request that
+	// began last cycle included.
+	logRequest("cy-a", now-60, 3)
+	logRequest("cy-a", start-60, 400)
+	if got := proxyCredits(); math.Abs(got-(30+5)) > 1e-9 {
+		t.Fatalf("accountCreditsProxy after new rows = %v, want 30 + 5", got)
+	}
+}

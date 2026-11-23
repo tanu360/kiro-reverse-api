@@ -505,7 +505,7 @@ func TestApiMergeDuplicateAccountsMovesRollups(t *testing.T) {
 	if err := d.QueryRow(`SELECT SUM(error_count) FROM error_rollup_daily WHERE account_id = 'keep'`).Scan(&errs); err != nil || errs != 5 {
 		t.Fatalf("merged daily errors = %d (%v), want 5", errs, err)
 	}
-	spent, err := loadAccountSpend(0)
+	spent, _, err := loadAccountSpend(map[string]int64{"keep": 0})
 	if err != nil {
 		t.Fatal(err)
 	}

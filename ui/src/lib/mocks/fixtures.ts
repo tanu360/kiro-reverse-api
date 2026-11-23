@@ -1215,6 +1215,22 @@ function isExhausted(account: Account): boolean {
   return account.usageLimit > 0 && account.usageCurrent >= account.usageLimit;
 }
 
+/**
+ * When the account's billing cycle began, as cycleStart in proxy/account_forecast.go: a calendar
+ * month before its reset, or the start of this month when it has none.
+ */
+function cycleStart(account: Account): number {
+  let reset: Date;
+  if (account.nextResetAt) reset = new Date(account.nextResetAt * 1000);
+  else if (account.nextResetDate) reset = new Date(`${account.nextResetDate}T00:00:00`);
+  else {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000;
+  }
+  reset.setMonth(reset.getMonth() - 1);
+  return Math.floor(reset.getTime() / 1000);
+}
+
 /** GET /status from the mock database, with the Go definitions of each count. */
 export function buildStatus(db: MockDb): StatusResponse {
   const now = nowUnix();
@@ -1237,9 +1253,15 @@ export function buildStatus(db: MockDb): StatusResponse {
   let successInTokens = 0;
   let successOutTokens = 0;
   let successCredits = 0;
+  const starts = new Map(db.accounts.map((a) => [a.id, cycleStart(a)]));
+  const cycleCredits = new Map<string, number>();
   for (const r of db.requests) {
     totalTokens += r.totalTokens;
     totalCredits += r.credits;
+    const start = starts.get(r.accountId);
+    if (start !== undefined && r.ts >= start) {
+      cycleCredits.set(r.accountId, (cycleCredits.get(r.accountId) ?? 0) + r.credits);
+    }
     if (!r.success) continue;
     successRequests += 1;
     successTokens += r.totalTokens;
@@ -1257,6 +1279,13 @@ export function buildStatus(db: MockDb): StatusResponse {
       4,
     ),
     accountCreditsLimit: db.accounts.reduce((sum, a) => sum + a.usageLimit, 0),
+    accountCreditsProxy: round(
+      db.accounts.reduce(
+        (sum, a) => sum + Math.min(cycleCredits.get(a.id) ?? 0, a.usageCurrent),
+        0,
+      ),
+      4,
+    ),
     totalRequests: db.requests.length,
     successRequests,
     failedRequests: db.requests.length - successRequests,

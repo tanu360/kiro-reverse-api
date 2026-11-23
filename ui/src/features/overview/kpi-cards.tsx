@@ -419,8 +419,8 @@ export function KpiCards(): JSX.Element {
   // 2. Plan credits: proxy and outside-proxy use against the summed plan limits.
   const used = s?.accountCreditsUsed ?? 0;
   const limit = s?.accountCreditsLimit ?? 0;
-  const proxy = Math.min(s?.totalCredits ?? 0, used);
-  const outside = Math.max(0, used - (s?.totalCredits ?? 0));
+  const proxy = s?.accountCreditsProxy ?? 0;
+  const outside = Math.max(0, used - proxy);
   const remaining = Math.max(0, limit - used);
   const creditParts: Part[] = [
     {

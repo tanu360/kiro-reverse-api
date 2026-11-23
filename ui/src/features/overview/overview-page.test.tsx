@@ -66,6 +66,29 @@ describe("OverviewPage", () => {
     expect(await kpiCard("Failed")).toBeInTheDocument();
   });
 
+  it("splits the plan credits by the proxy's credits this cycle, not all time", async () => {
+    mockServer.use(
+      http.get(apiUrl("/status"), () =>
+        HttpResponse.json({
+          ...buildStatus(mockDb),
+          accountCreditsUsed: 100,
+          accountCreditsLimit: 1000,
+          accountCreditsProxy: 30,
+          totalCredits: 5000,
+        }),
+      ),
+    );
+    await renderApp("/");
+    const credits = await kpiCard("Plan credits");
+    expect(await within(credits).findByText(formatPercent(100, 1000, "en"))).toBeInTheDocument();
+    const legendValue = (label: string) =>
+      within(credits).getByText(label, { selector: "dt" }).closest("div")?.querySelector("dd")
+        ?.textContent;
+    expect(legendValue("Proxy")).toBe("30");
+    expect(legendValue("Outside")).toBe("70");
+    expect(legendValue("Left")).toBe("900");
+  });
+
   it("links every KPI card to the page behind its number", async () => {
     await renderApp("/");
     const row = await screen.findByRole("region", { name: "Key figures" });

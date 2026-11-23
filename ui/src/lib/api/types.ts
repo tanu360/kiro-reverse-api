@@ -249,6 +249,8 @@ interface StatsResponse {
   available: number;
   accountCreditsUsed: number;
   accountCreditsLimit: number;
+  /** The proxy's credits in each account's current billing cycle, each capped at its usageCurrent, summed. */
+  accountCreditsProxy: number;
   totalRequests: number;
   successRequests: number;
   failedRequests: number;
