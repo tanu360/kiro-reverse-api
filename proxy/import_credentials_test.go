@@ -122,9 +122,15 @@ func stubImportNetwork(t *testing.T) <-chan string {
 	auth.SetOIDCTokenURLForTest(func(string) string { return refresh.URL })
 	t.Cleanup(func() { auth.SetOIDCTokenURLForTest(oldOIDC) })
 
-	modelCalls := make(chan string, 4)
+	//! The stub is the package's one REST client, so a background refresh another test started can
+	//! land here too. The send never blocks on a full buffer, and waitForModelRefresh skips calls
+	//! it is not waiting for.
+	modelCalls := make(chan string, 64)
 	stubRestTransport(t, func(req *http.Request) (*http.Response, error) {
-		modelCalls <- req.Header.Get("Authorization")
+		select {
+		case modelCalls <- req.Header.Get("Authorization"):
+		default:
+		}
 		return nil, fmt.Errorf("network disabled in test")
 	})
 	return modelCalls
@@ -137,15 +143,33 @@ func importCredentials(h *Handler, body string) *httptest.ResponseRecorder {
 	return rec
 }
 
+// waitForModelRefresh waits for a REST call that carries wantAuth. Calls with another
+// Authorization are a refresh some earlier test left running, and are skipped.
 func waitForModelRefresh(t *testing.T, calls <-chan string, wantAuth string) {
 	t.Helper()
-	select {
-	case got := <-calls:
-		if got != wantAuth {
-			t.Fatalf("model refresh Authorization = %q, want %q", got, wantAuth)
+	deadline := time.After(5 * time.Second)
+	var others []string
+	for {
+		select {
+		case got := <-calls:
+			if got == wantAuth {
+				return
+			}
+			others = append(others, got)
+		case <-deadline:
+			t.Fatalf("expected a background model refresh with Authorization %q; saw only %q", wantAuth, others)
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("expected the background model refresh to run")
+	}
+}
+
+// drainModelCalls drops the calls received so far, so the next wait sees only later ones.
+func drainModelCalls(calls <-chan string) {
+	for {
+		select {
+		case <-calls:
+		default:
+			return
+		}
 	}
 }
 

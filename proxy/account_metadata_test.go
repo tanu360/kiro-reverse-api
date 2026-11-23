@@ -241,6 +241,8 @@ func TestExportImportRoundTripKeepsNotesAndTags(t *testing.T) {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
+	// The first import's refresh may have made more than the one call waited for above.
+	drainModelCalls(modelCalls)
 	rec = serveRegionTestAdmin(h, http.MethodPost, "/admin/api/auth/credentials", string(payload))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("re-import: %d %s", rec.Code, rec.Body.String())
