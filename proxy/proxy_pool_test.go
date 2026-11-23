@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	neturl "net/url"
@@ -28,17 +27,6 @@ func newPoolTestAdmin(t *testing.T) *Handler {
 	t.Cleanup(proxypool.Default().ResetForTest)
 	t.Cleanup(dropPoolClients)
 	return h
-}
-
-func poolClosedPort(t *testing.T) string {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := ln.Addr().String()
-	ln.Close()
-	return addr
 }
 
 // poolFakeProxy answers every proxied plain-HTTP request itself, as the upstream would.
