@@ -1,5 +1,5 @@
 {
-  "version": "4.1.7",
-  "changelog": "📐 Empty cards line up. A card with nothing to show now centres its message however tall the row makes it, so Needs attention, Traffic by account, Model mix and the user panel's Usage by model no longer leave it stuck under the header. Every usage card explains what will show up, and a Failed card with nothing failed looks like the others.",
+  "version": "4.1.8",
+  "changelog": "🧭 A cleaner sidebar. One row per page and no more arrows that did nothing: Requests, Accounts and Settings keep their views in the page's tabs. The sidebar is now a white panel with an outlined Add account button, uppercase section labels and a bolder selected row.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
