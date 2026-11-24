@@ -1,5 +1,5 @@
 {
-  "version": "4.1.5",
-  "changelog": "🛠️ A round of fixes from a full review. Streamed tool calls no longer count twice in output tokens, an explicit thinking budget is no longer dropped when an effort is set, and tool parameters named required or encrypted survive. An error streak can no longer cut a quota cooldown to a minute, and merging duplicate accounts keeps every counter and its history. A backup restore ends two-factor sign-ins in progress and re-checks alerts, Reset statistics also clears stored prompts, and unauthenticated requests can no longer grow /metrics. The Plan credits card now counts this billing cycle, an update that failed after another was installed can still restart into that one, and LISTEN_HOST accepts an IPv6 address.",
+  "version": "4.1.6",
+  "changelog": "🧭 A tidier sidebar. Requests, Accounts and Settings now show their views only while that page is open, so the menu stays short and the tree follows you from page to page.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
