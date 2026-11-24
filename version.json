@@ -1,5 +1,5 @@
 {
-  "version": "4.1.8",
-  "changelog": "🧭 A cleaner sidebar. One row per page and no more arrows that did nothing: Requests, Accounts and Settings keep their views in the page's tabs. The sidebar is now a white panel with an outlined Add account button, uppercase section labels and a bolder selected row.",
+  "version": "4.1.9",
+  "changelog": "🧭 The sidebar is back to its usual look, minus the arrows that did nothing. A page's views (Needs attention, Server and the rest) now sit visibly under their page: smaller, quieter rows, with the page above them as their heading.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
