@@ -2,34 +2,32 @@ import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderApp } from "@/test/render";
 
-/** The Settings row of the sidebar: the link that owns the sub-page tree. */
-function settingsRow(): HTMLElement {
+/** A page's row in the sidebar: the link that owns its tree of views or sub-pages. */
+function treeRow(name: string): HTMLElement {
   const row = screen
-    .getAllByRole("link", { name: "Settings" })
+    .getAllByRole("link", { name })
     .find((link) => link.hasAttribute("aria-expanded"));
-  if (!row) throw new Error("no Settings row in the sidebar");
+  if (!row) throw new Error(`no ${name} row in the sidebar`);
   return row;
 }
 
 describe("sidebar tree", () => {
-  it("folds and unfolds Settings from any of its pages, staying on that page", async () => {
-    const { user, router } = await renderApp("/settings/server");
+  it("unfolds only the open page's tree", async () => {
+    await renderApp("/settings/server");
     await screen.findByRole("tab", { name: "Server", selected: true });
-    expect(settingsRow()).toHaveAttribute("aria-expanded", "true");
-
-    await user.click(settingsRow());
-    await waitFor(() => expect(settingsRow()).toHaveAttribute("aria-expanded", "false"));
-    expect(router.state.location.pathname).toBe("/settings/server");
-
-    await user.click(settingsRow());
-    await waitFor(() => expect(settingsRow()).toHaveAttribute("aria-expanded", "true"));
-    expect(router.state.location.pathname).toBe("/settings/server");
+    expect(treeRow("Settings")).toHaveAttribute("aria-expanded", "true");
+    expect(treeRow("Requests")).toHaveAttribute("aria-expanded", "false");
+    expect(treeRow("Accounts")).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("goes to Settings from another page", async () => {
-    const { user, router } = await renderApp("/api");
-    await user.click(settingsRow());
+  it("moves the unfolded tree to the page it goes to", async () => {
+    const { user, router } = await renderApp("/accounts");
+    await waitFor(() => expect(treeRow("Accounts")).toHaveAttribute("aria-expanded", "true"));
+    expect(treeRow("Settings")).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(treeRow("Settings"));
     await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
-    expect(settingsRow()).toHaveAttribute("aria-expanded", "true");
+    expect(treeRow("Settings")).toHaveAttribute("aria-expanded", "true");
+    expect(treeRow("Accounts")).toHaveAttribute("aria-expanded", "false");
   });
 });

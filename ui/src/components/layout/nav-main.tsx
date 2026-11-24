@@ -1,6 +1,6 @@
 import { PlusIcon } from "@hugeicons/core-free-icons";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { type JSX, type MouseEvent, useState } from "react";
+import type { JSX } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Collapsible, CollapsiblePanel } from "@/components/ui/collapsible";
 import {
@@ -17,22 +17,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useT } from "@/lib/i18n";
-import { readStorage, writeStorage } from "@/lib/storage";
-import { activeNavItem, activeNavView, NAV_GROUPS, NAV_ITEMS, type NavItem } from "./nav-items";
-
-// Pages whose views the admin folded away; every tree starts open so rows never jump.
-const COLLAPSED_KEY = "kiro_sidebar_collapsed_views";
-
-function readCollapsed(): Set<string> {
-  const raw = readStorage(COLLAPSED_KEY);
-  return new Set(raw ? raw.split(",").filter(Boolean) : []);
-}
+import { activeNavItem, activeNavView, NAV_GROUPS, NAV_ITEMS } from "./nav-items";
 
 /**
  * Port of Studio Admin nav-main: an "Add account" action, then the grouped pages. A page with
  * filtered views (Requests, Accounts) or sub-pages (Settings) carries them as a tree under its
- * row. The row opens the tree on the way to its page, and folds or unfolds it once already
- * there; the chevron only shows which. The page row is selected only when none of its views is.
+ * row, unfolded only while that page is open; the chevron shows which. The page row is selected
+ * only when none of its views is.
  */
 export function NavMain(): JSX.Element {
   const { t } = useT();
@@ -42,19 +33,11 @@ export function NavMain(): JSX.Element {
     select: (s) => (s.location.search as { status?: unknown }).status,
   });
   const active = activeNavItem(pathname);
-  const [collapsed, setCollapsed] = useState(readCollapsed);
   // The icon rail hides the trees, so there the page row stays selected on any of its views.
   const rail = state === "collapsed" && !isMobile;
   // The mobile sheet closes once a page is picked.
   const closeOnMobile = () => {
     if (isMobile) setOpenMobile(false);
-  };
-  const setOpen = (id: NavItem["id"], open: boolean) => {
-    const next = new Set(collapsed);
-    if (open) next.delete(id);
-    else next.add(id);
-    setCollapsed(next);
-    writeStorage(COLLAPSED_KEY, next.size ? [...next].join(",") : null);
   };
 
   return (
@@ -89,27 +72,13 @@ export function NavMain(): JSX.Element {
                 const label = t(item.labelKey);
                 const onPage = active?.id === item.id;
                 const view = onPage ? activeNavView(item, status, pathname) : undefined;
-                const open = !collapsed.has(item.id);
-                // Sub-pages (Settings) leave no plain page: /settings is its first sub-page.
-                const subPages = item.views?.some((sub) => !("status" in sub)) ?? false;
-                const onRowClick = (event: MouseEvent) => {
-                  // Already on the plain page, or on any of the sub-pages: the click folds or
-                  // unfolds its tree, and the mobile sheet stays open to show it. On a sub-page
-                  // it stays there instead of going to the first one. The rail has no tree to
-                  // fold.
-                  if (item.views && onPage && (!view || subPages) && !rail) {
-                    if (subPages) event.preventDefault();
-                    setOpen(item.id, !open);
-                    return;
-                  }
-                  if (item.views && !open) setOpen(item.id, true);
-                  closeOnMobile();
-                };
+                // Only the open page's tree unfolds.
+                const open = onPage;
                 const button = (
                   <SidebarMenuButton
                     aria-expanded={item.views && !rail ? open : undefined}
                     isActive={onPage && (rail || !view)}
-                    onClick={onRowClick}
+                    onClick={closeOnMobile}
                     render={<Link to={item.to} />}
                     tooltip={label}
                   >
