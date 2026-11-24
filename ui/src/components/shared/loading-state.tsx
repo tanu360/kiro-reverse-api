@@ -1,22 +1,6 @@
 import type { JSX } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import { useT } from "@/lib/i18n";
 import { placeholderKeys } from "@/lib/utils";
-
-export function LoadingState({ label }: { label?: string }): JSX.Element {
-  const { t } = useT();
-  const text = label ?? t("state.loading");
-  return (
-    <div
-      aria-live="polite"
-      className="flex items-center justify-center gap-2 px-6 py-12 text-muted-foreground text-sm"
-    >
-      <Spinner aria-hidden="true" className="size-4" />
-      <span>{text}</span>
-    </div>
-  );
-}
 
 export function TableSkeleton({
   rows = 5,
