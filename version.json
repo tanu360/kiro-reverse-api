@@ -1,5 +1,5 @@
 {
-  "version": "4.1.6",
-  "changelog": "🧭 A tidier sidebar. Requests, Accounts and Settings now show their views only while that page is open, so the menu stays short and the tree follows you from page to page.",
+  "version": "4.1.7",
+  "changelog": "📐 Empty cards line up. A card with nothing to show now centres its message however tall the row makes it, so Needs attention, Traffic by account, Model mix and the user panel's Usage by model no longer leave it stuck under the header. Every usage card explains what will show up, and a Failed card with nothing failed looks like the others.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
