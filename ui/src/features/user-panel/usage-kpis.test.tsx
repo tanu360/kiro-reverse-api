@@ -171,7 +171,10 @@ describe("usage cards", () => {
     renderCards(key({ lastUsedAt: 0 }), usage(totals(), totals()));
     expect(screen.getAllByText("No requests yet")).toHaveLength(3);
     expect(within(card("Failed")).getByText("Nothing failed")).toBeInTheDocument();
-    expect(screen.getAllByText("No traffic")).toHaveLength(3);
+    // Every card's trend, Failed included, is the same empty track saying so.
+    expect(screen.getAllByText("No traffic")).toHaveLength(4);
+    expect(card("Failed").querySelector('[data-slot="kpi-trend-empty"]')).not.toBeNull();
+    expect(card("Failed").querySelector('[data-slot="kpi-pills"]')).toBeNull();
     expect(within(card("Failed")).getByText("0 succeeded")).toBeInTheDocument();
     expect(within(card("Failed")).queryByText(/success$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\d failed$/)).not.toBeInTheDocument();
@@ -188,6 +191,8 @@ describe("usage cards", () => {
     renderCards(key(), usage(totals({ requests: 3, failed: 3 }), totals({ requests: 1 })));
     expect(card("Credits").querySelector('[data-slot="kpi-trend-empty"]')).not.toBeNull();
     expect(screen.queryByText("No traffic")).not.toBeInTheDocument();
+    // Failures draw their pills.
+    expect(card("Failed").querySelector('[data-slot="kpi-pills"]')).not.toBeNull();
     expect(within(card("Failed")).getByText("0.0% success")).toBeInTheDocument();
   });
 

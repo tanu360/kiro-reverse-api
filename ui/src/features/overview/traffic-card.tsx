@@ -246,7 +246,8 @@ export function TrafficCard(): JSX.Element {
     }
   } else {
     body = (
-      <div className="flex flex-col gap-3">
+      // relative: the empty notice centres on the whole body, legend and axis included.
+      <div className="relative flex flex-col gap-3">
         {query.isError && !totalsFailed ? (
           <ErrorState
             compact
@@ -262,7 +263,7 @@ export function TrafficCard(): JSX.Element {
           })}
         </p>
         {legend}
-        <div className="relative">
+        <div>
           {/* Empty, the bare axes recede, so the notice over them is what reads. */}
           <div aria-hidden="true" className={cn(empty && "opacity-40")}>
             <Suspense fallback={placeholder}>

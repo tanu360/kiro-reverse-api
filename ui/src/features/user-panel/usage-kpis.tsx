@@ -356,6 +356,7 @@ export function UsageKpis({
           // A week's seven pills stay as thin as a day's 24, spread over the card.
           <FailurePills
             className="justify-between *:max-w-3"
+            emptyLabel={idle ? t("kpi.noTraffic") : undefined}
             values={pillValues(series.map((point) => point.failed))}
           />
         ) : (

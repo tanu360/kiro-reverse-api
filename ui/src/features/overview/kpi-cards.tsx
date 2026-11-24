@@ -138,15 +138,22 @@ export function Delta({
   );
 }
 
-/** Pills over the last hour, tallest for the bucket with the most failures; the newest is solid. */
+/**
+ * Pills over the last hour, tallest for the bucket with the most failures; the newest is solid.
+ * Nothing failed draws the empty grey track the other cards' trends draw, `emptyLabel` over it.
+ */
 export function FailurePills({
   values,
   className,
+  emptyLabel,
 }: {
   values: readonly number[];
   /** Layout only. */
   className?: string;
+  /** Over the empty track when nothing failed (the key holder's "No traffic"). */
+  emptyLabel?: ReactNode;
 }): JSX.Element {
+  if (values.every((value) => value === 0)) return <KpiTrendFloor label={emptyLabel} />;
   const peak = Math.max(0, ...values);
   return (
     <div

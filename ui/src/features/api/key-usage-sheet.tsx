@@ -315,10 +315,11 @@ export function UsageChartCard({
   } else {
     // One tree for loading and loaded: the legend stays put while a range loads.
     body = (
-      <div className="flex flex-col gap-3">
+      // relative: the empty notice centres on the whole body, legend and axis included.
+      <div className="relative flex flex-col gap-3">
         {data && isError ? errorState : null}
         {legend}
-        <div className="relative">
+        <div>
           {/* Empty, the bare axis recedes, so the notice over it is what reads. */}
           <div aria-hidden="true" className={cn(showEmpty && "opacity-40")}>
             {loading ? (
@@ -342,6 +343,7 @@ export function UsageChartCard({
           {showEmpty ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <EmptyState
+                description={t("usage.emptyBody")}
                 icon={ChartLineData02Icon}
                 title={t("usage.emptyTitle")}
                 variant="compact"

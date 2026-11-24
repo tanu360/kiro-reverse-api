@@ -141,7 +141,10 @@ function useWrappedActions(): {
 
   return { ref, wrapped };
 }
-const PANEL_CLASS = "min-w-0 flex-1 p-4";
+// An empty or error state fills the panel and centres in it, also when a taller card beside it
+// stretches this one.
+const PANEL_CLASS =
+  "min-w-0 flex-1 p-4 [&:has(>[data-slot=empty])]:flex [&:has(>[data-slot=empty])]:flex-col [&:has(>[data-slot=error-state])]:flex [&:has(>[data-slot=error-state])]:flex-col";
 const FOOTER_CLASS =
   "flex flex-wrap items-center justify-between gap-3 p-4 text-meta text-muted-foreground";
 

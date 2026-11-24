@@ -303,25 +303,25 @@ export function NeedsAttention(): JSX.Element {
     );
   } else if (query.isError && !query.data) {
     body = (
-      <div className="p-4">
+      <CardPanel>
         <ErrorState
           compact
           error={query.error}
           onRetry={() => void query.refetch()}
           title={t("errors.accounts")}
         />
-      </div>
+      </CardPanel>
     );
   } else if (rows.length === 0) {
     body = (
-      <div className="px-4 py-6">
+      <CardPanel className="py-6">
         <EmptyState
           description={t("attention.emptyBody")}
           icon={CheckmarkCircle02Icon}
           title={t("attention.empty")}
           variant="compact"
         />
-      </div>
+      </CardPanel>
     );
   } else {
     const retry = failure?.retry;

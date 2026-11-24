@@ -173,7 +173,14 @@ export function UsageBreakdownCard({
   } else if (loading || !items) {
     body = <ModelMixSkeleton besideFrom="xl" />;
   } else if (total === 0) {
-    body = <EmptyState icon={icon} title={t("usage.emptyTitle")} variant="compact" />;
+    body = (
+      <EmptyState
+        description={t("usage.emptyBody")}
+        icon={icon}
+        title={t("usage.emptyTitle")}
+        variant="compact"
+      />
+    );
   } else {
     slim = true;
     body = (
