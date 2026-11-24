@@ -10,9 +10,9 @@ import type { IconSvgElement } from "@hugeicons/react";
 import type { AccountStatusFilter, RequestsSearch } from "@/routes/-search";
 
 /**
- * A view of a page that the header trail names (Accounts › Needs attention): the page with one
- * `status` filter, or one of its sub-pages (Settings › Server), matched by path. The labels are
- * the page's own tab labels (`ns:key`), so the trail and the page tabs always agree.
+ * A view under a page in the sidebar: the page with one `status` filter, or one of its sub-pages
+ * (Settings › Server), matched by path. The labels are the page's own tab labels (`ns:key`), so
+ * the sidebar and the page tabs always agree.
  */
 export type NavView =
   | { id: string; labelKey: string; to: "/accounts"; status: AccountStatusFilter }
@@ -30,7 +30,7 @@ export interface NavItem {
   icon: IconSvgElement;
   labelKey: string;
   group: "monitor" | "manage";
-  /** Filtered views and sub-pages of the page, as the header trail names them. */
+  /** Filtered views listed under the page, as the sidebar tree shows them. */
   views?: readonly NavView[];
 }
 

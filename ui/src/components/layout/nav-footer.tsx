@@ -67,9 +67,8 @@ function UpdateNotice(): JSX.Element | null {
   const failure = self?.phase === "error" ? self.error : undefined;
   return (
     <>
-      {/* A faint grey panel, so the card reads as its own block on the white sidebar. */}
       <Card
-        className="bg-sidebar-row-hover group-data-[collapsible=icon]:hidden"
+        className="group-data-[collapsible=icon]:hidden"
         data-slot="sidebar-update-card"
         size="sm"
       >
