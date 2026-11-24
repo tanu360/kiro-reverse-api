@@ -1,33 +1,27 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderApp } from "@/test/render";
 
-/** A page's row in the sidebar: the link that owns its tree of views or sub-pages. */
-function treeRow(name: string): HTMLElement {
-  const row = screen
-    .getAllByRole("link", { name })
-    .find((link) => link.hasAttribute("aria-expanded"));
-  if (!row) throw new Error(`no ${name} row in the sidebar`);
-  return row;
+/** A page's row in the sidebar. */
+function navRow(name: string): HTMLElement {
+  const nav = screen.getByRole("navigation", { name: "Main navigation" });
+  return within(nav).getByRole("link", { name });
 }
 
-describe("sidebar tree", () => {
-  it("unfolds only the open page's tree", async () => {
+describe("sidebar", () => {
+  it("keeps the page row selected on its sub-pages, which it does not list", async () => {
     await renderApp("/settings/server");
     await screen.findByRole("tab", { name: "Server", selected: true });
-    expect(treeRow("Settings")).toHaveAttribute("aria-expanded", "true");
-    expect(treeRow("Requests")).toHaveAttribute("aria-expanded", "false");
-    expect(treeRow("Accounts")).toHaveAttribute("aria-expanded", "false");
+    expect(navRow("Settings")).toHaveAttribute("data-active", "true");
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    expect(within(nav).queryByRole("link", { name: "Server" })).toBeNull();
   });
 
-  it("moves the unfolded tree to the page it goes to", async () => {
-    const { user, router } = await renderApp("/accounts");
-    await waitFor(() => expect(treeRow("Accounts")).toHaveAttribute("aria-expanded", "true"));
-    expect(treeRow("Settings")).toHaveAttribute("aria-expanded", "false");
-
-    await user.click(treeRow("Settings"));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
-    expect(treeRow("Settings")).toHaveAttribute("aria-expanded", "true");
-    expect(treeRow("Accounts")).toHaveAttribute("aria-expanded", "false");
+  it("keeps the page row selected on a filtered view, which it does not list", async () => {
+    await renderApp("/accounts?status=attention");
+    expect(navRow("Accounts")).toHaveAttribute("data-active", "true");
+    expect(navRow("Requests")).toHaveAttribute("data-active", "false");
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    expect(within(nav).queryByRole("link", { name: "Needs attention" })).toBeNull();
   });
 });

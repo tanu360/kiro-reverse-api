@@ -28,8 +28,7 @@ import { cn } from "@/lib/utils";
 /**
  * The sign-in button finish, on the purple main action only: the faint film grain (index.css
  * grain-overlay at 0.1) under the label, a 1 px white inner highlight along the top edge (a
- * black one while pressed), no drop shadow, and the icon at 80 %. Also worn by the sidebar's
- * Add account row (sidebar.tsx, variant "primary").
+ * black one while pressed), no drop shadow, and the icon at 80 %.
  */
 export const PRIMARY_FINISH: string =
   "grain-overlay [--grain-overlay-opacity:0.1] not-disabled:not-aria-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [&_svg:not([class*='opacity-'])]:opacity-80";

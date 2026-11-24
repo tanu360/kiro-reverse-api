@@ -2,11 +2,11 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { ArrowRight01Icon, PanelLeftIcon } from "@hugeicons/core-free-icons";
+import { PanelLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
-import { Button, PRIMARY_FINISH } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useUiT } from "@/components/ui/messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -40,7 +40,7 @@ const SIDEBAR_KEYBOARD_SHORTCUT: string = "b";
 // Kiro patch: row states, geometry and icon colour follow t3code's sidebar
 // (apps/web/src/components/ui/sidebar.tsx), reading the --sidebar-row-* tokens.
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full cursor-pointer items-center gap-(--sidebar-control-gap) overflow-hidden text-left outline-hidden transition-[width,height,padding] duration-200 ease-in-out hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-has-data-[sidebar=menu-chevron]/menu-item:pe-8 aria-disabled:pointer-events-none aria-disabled:opacity-64 data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[state=open]:hover:bg-sidebar-row-hover data-[state=open]:hover:text-sidebar-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-(--sidebar-content-inset)! [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-(--sidebar-icon-color) hover:[&>svg]:text-sidebar-foreground active:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
+  "peer/menu-button flex w-full cursor-pointer items-center gap-(--sidebar-control-gap) overflow-hidden text-left outline-hidden transition-[width,height,padding] duration-200 ease-in-out hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 group-has-data-[sidebar=menu-action]/menu-item:pe-8 aria-disabled:pointer-events-none aria-disabled:opacity-64 data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground data-[state=open]:hover:bg-sidebar-row-hover data-[state=open]:hover:text-sidebar-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-(--sidebar-content-inset)! [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-(--sidebar-icon-color) hover:[&>svg]:text-sidebar-foreground active:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
   {
     defaultVariants: {
       size: "default",
@@ -55,22 +55,18 @@ const sidebarMenuButtonVariants = cva(
         sm: "h-7 rounded-lg px-(--sidebar-row-content-inset) py-2 text-xs",
       },
       variant: {
-        // Kiro patch: labels in the sidebar text colour (80%), not the muted grey, so the
+        // Kiro patch: labels in the sidebar text colour (90%), not the muted grey, so the
         // list reads at a glance; icons keep the quieter --sidebar-icon-color.
-        default: "font-medium text-sidebar-foreground/80",
+        default: "font-medium text-sidebar-foreground/90",
         // Kiro patch: a row whose page or section is destructive (Settings' danger zone): red
         // label and icon, a red tint on hover and while selected.
         destructive:
           "font-medium text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground active:bg-error-surface active:text-destructive-foreground data-[active=true]:bg-error-surface data-[active=true]:text-destructive-foreground data-[active=true]:hover:bg-error-surface data-[active=true]:active:bg-error-surface [&>svg]:text-destructive-foreground hover:[&>svg]:text-destructive-foreground active:[&>svg]:text-destructive-foreground data-[active=true]:[&>svg]:text-destructive-foreground",
-        outline: "bg-sidebar-control-surface ring-1 ring-sidebar-border",
-        // Kiro patch: the sidebar's main action in the sign-in button's look: solid purple, a
-        // white centred label and icon, the grain and top highlight, a slight press. The inset
-        // focus ring is drawn in the text colour (dark in light, white in dark): the default ring
-        // is the purple of the fill.
-        primary: cn(
-          PRIMARY_FINISH,
-          "relative justify-center bg-primary font-medium [--color-ring:var(--foreground)] text-primary-foreground transition-[width,height,padding,scale] hover:bg-primary-hover hover:text-primary-foreground active:scale-[0.98] active:bg-primary-hover active:text-primary-foreground [&>svg]:text-primary-foreground hover:[&>svg]:text-primary-foreground active:[&>svg]:text-primary-foreground",
-        ),
+        // Kiro patch: the sidebar's main action as a raised outlined row: the card fill, a
+        // hairline inset ring and a soft drop shadow, label and icon in the text colour,
+        // a faint tint on hover and a slight press.
+        outline:
+          "bg-card font-medium text-sidebar-foreground shadow-xs inset-ring inset-ring-sidebar-border transition-[width,height,padding,scale] hover:bg-sidebar-row-hover active:scale-[0.98] [&>svg]:text-sidebar-foreground",
       },
     },
   },
@@ -519,114 +515,4 @@ export function SidebarMenuButton({
       <TooltipPopup align="center" hidden={tooltipOff} side="right" {...tooltip} />
     </Tooltip>
   );
-}
-
-/**
- * Kiro patch: a chevron at the end of a row that has a sub-menu. It only shows whether the
- * sub-menu is open (right when closed, down when open); the row itself opens and closes it, so
- * the chevron takes no pointer events and has no hover state of its own. Render it after the
- * SidebarMenuButton, which then keeps room for it.
- */
-export function SidebarMenuChevron({
-  open,
-  className,
-  ...props
-}: React.ComponentProps<"span"> & { open: boolean }): React.ReactElement {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "pointer-events-none absolute inset-e-(--sidebar-row-content-inset) flex size-4 items-center justify-center text-(--sidebar-icon-color) peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground",
-        "peer-data-[size=sm]/menu-button:top-1.5",
-        "peer-data-[size=default]/menu-button:top-2.5 max-lg:peer-data-[size=default]/menu-button:top-3",
-        "peer-data-[size=lg]/menu-button:top-4",
-        "group-data-[collapsible=icon]:hidden",
-        className,
-      )}
-      data-open={open}
-      data-sidebar="menu-chevron"
-      data-slot="sidebar-menu-chevron"
-      {...props}
-    >
-      <HugeiconsIcon
-        className={cn("size-4 transition-transform duration-200 ease-out", open && "rotate-90")}
-        icon={ArrowRight01Icon}
-      />
-    </span>
-  );
-}
-
-export function SidebarMenuSub({
-  className,
-  ...props
-}: React.ComponentProps<"ul">): React.ReactElement {
-  return (
-    <ul
-      className={cn(
-        // Kiro patch: a tree as in the reference sidebars. The line runs down the centre of
-        // the parent row's icon and stops at the last row's node dot.
-        "relative ms-[calc(var(--sidebar-row-content-inset)+0.5rem)] flex min-w-0 flex-col gap-0.5 ps-3.5 pt-0.5",
-        "before:pointer-events-none before:absolute before:inset-s-0 before:top-0 before:bottom-4 before:w-px before:-translate-x-1/2 before:bg-sidebar-muted-foreground/25 max-lg:before:bottom-5",
-        "group-data-[collapsible=icon]:hidden",
-        className,
-      )}
-      data-sidebar="menu-sub"
-      data-slot="sidebar-menu-sub"
-      {...props}
-    />
-  );
-}
-
-export function SidebarMenuSubItem({
-  className,
-  ...props
-}: React.ComponentProps<"li">): React.ReactElement {
-  return (
-    <li
-      className={cn(
-        "group/menu-sub-item relative",
-        // Kiro patch: the node dot on the tree line, ringed in the sidebar colour so the line
-        // breaks around it; in the label colour on the selected row.
-        "before:pointer-events-none before:absolute before:-inset-s-3.5 before:top-1/2 before:z-10 before:size-1.5 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-muted-foreground/45 before:ring-2 before:ring-sidebar before:transition-colors hover:before:bg-sidebar-muted-foreground has-data-[active=true]:before:bg-sidebar-foreground",
-        className,
-      )}
-      data-sidebar="menu-sub-item"
-      data-slot="sidebar-menu-sub-item"
-      {...props}
-    />
-  );
-}
-
-export function SidebarMenuSubButton({
-  size = "md",
-  isActive = false,
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"a"> & {
-  size?: "sm" | "md";
-  isActive?: boolean;
-}): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      // Kiro patch: same row language as SidebarMenuButton (radius, inset, label colour), one
-      // step shorter: 32 px, 40 px in the sheet.
-      "flex h-8 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-(--sidebar-row-content-inset) font-medium text-sidebar-foreground/80 outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:opacity-64 max-lg:h-10 [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
-      "data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:text-sidebar-foreground",
-      size === "sm" && "text-xs",
-      size === "md" && "text-sm",
-      "group-data-[collapsible=icon]:hidden",
-      className,
-    ),
-    "data-active": isActive,
-    "data-sidebar": "menu-sub-button",
-    "data-size": size,
-    "data-slot": "sidebar-menu-sub-button",
-  };
-
-  return useRender({
-    defaultTagName: "a",
-    props: mergeProps<"a">(defaultProps, props),
-    render,
-  });
 }

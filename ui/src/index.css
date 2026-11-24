@@ -121,8 +121,8 @@
   --sidebar-border: var(--border);
   /* Sidebar row tints over --sidebar (mixed in the `:root, [data-app-sidebar]` block below). */
   --sidebar-row-hover-mix: 3%;
-  --sidebar-row-selected-mix: 7%;
-  --sidebar-row-active-mix: 9%;
+  --sidebar-row-selected-mix: 5%;
+  --sidebar-row-active-mix: 7%;
   /* Inline code (the inline-code utility): a see-through chip that reads on the page and cards. */
   --code-background: color-mix(in oklab, var(--foreground) 6%, transparent);
   --code-foreground: var(--foreground);
@@ -180,10 +180,12 @@
 }
 
 /*
- * The navigation (desktop sidebar and mobile sheet) shares the app palette. In dark it sits on
- * the page colour rather than the card, so the sidebar reads as part of the chrome.
+ * The navigation (desktop sidebar and mobile sheet) shares the app palette. In light it is a
+ * white panel (the card colour) beside the grey page; in dark it sits on the page colour rather
+ * than the card, so the sidebar reads as part of the chrome.
  */
 [data-app-sidebar] {
+  --sidebar: var(--card);
   @variant dark {
     --card: var(--background);
     --sidebar: var(--card);
@@ -200,12 +202,8 @@
 [data-app-sidebar] {
   --contrast-foreground: var(--foreground);
   --contrast-muted-foreground: var(--muted-foreground);
-  --contrast-sidebar-muted-foreground: var(--sidebar-muted-foreground);
-  --sidebar-icon-color: color-mix(
-    in srgb,
-    var(--contrast-sidebar-muted-foreground) 85%,
-    var(--sidebar)
-  );
+  /* A step under the label colour, so the glyphs read as firmly as the labels beside them. */
+  --sidebar-icon-color: color-mix(in srgb, var(--sidebar-foreground) 65%, var(--sidebar));
   --sidebar-row-hover: color-mix(
     in srgb,
     var(--sidebar),

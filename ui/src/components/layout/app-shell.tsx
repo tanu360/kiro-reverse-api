@@ -10,7 +10,7 @@ import { SiteHeader } from "./site-header";
 import { UpdateCheckProvider } from "./update-check";
 
 // 232 px sidebar: the narrowest that keeps the English footer (version, status, GitHub) on one
-// line; every nav row, the longest tree row "Needs attention" included, fits with room to spare.
+// line; every nav row fits with room to spare.
 const SIDEBAR_STYLE = { "--sidebar-width": "calc(var(--spacing) * 58)" } as CSSProperties;
 
 const PAGE_FADE_CLASS = "pointer-events-none sticky z-15 h-4 shrink-0 from-background md:h-6";
