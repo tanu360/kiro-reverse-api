@@ -359,11 +359,10 @@ func TestBuildKiroResponsesRequest(t *testing.T) {
 		"thinking":      map[string]interface{}{"type": "adaptive", "display": "summarized", "budget_tokens": 4000},
 	}
 	toolResults := []KiroToolResult{{ToolUseID: "call_1", Content: []KiroResultContent{{Text: "line 1"}, {Text: "line 2"}}, Status: "success"}}
-	thinking := thinkingOpenTag + "plan it" + thinkingCloseTag
 	state.History = []KiroHistoryMessage{
 		{UserInputMessage: &KiroUserInputMessage{Content: "SYSTEM RULES\n\nhello", ModelID: "claude-sonnet-4.5", Origin: "AI_EDITOR"}},
 		{AssistantResponseMessage: &KiroAssistantResponseMessage{
-			Content:   thinking + "\n\nLet me look.",
+			Content:   "Let me look.",
 			ToolUses:  []KiroToolUse{{ToolUseID: "call_1", Name: "read_file", Input: map[string]interface{}{"path": "a.go"}}},
 			Reasoning: []KiroReasoningBlock{{Text: "plan it", Signature: "sig-1"}, {RedactedContent: "enc=="}},
 		}},
@@ -405,7 +404,7 @@ func TestBuildKiroResponsesRequest(t *testing.T) {
 		"tools": [{"type": "function", "name": "read_file", "description": "Read a file", "parameters": {"type": "object"}}],
 		"input": [
 			{"role": "user", "content": "SYSTEM RULES\n\nhello"},
-			{"type": "reasoning", "summary": [], "encrypted_content": "{\"reasoningText\":{\"signature\":\"sig-1\",\"text\":\"plan it\"}}"},
+			{"type": "reasoning", "summary": [], "encrypted_content": "{\"reasoningText\":{\"text\":\"plan it\",\"signature\":\"sig-1\"}}"},
 			{"type": "reasoning", "summary": [], "encrypted_content": "{\"redactedContent\":\"enc==\"}"},
 			{"role": "assistant", "content": "Let me look."},
 			{"type": "function_call", "call_id": "call_1", "name": "read_file", "arguments": "{\"path\":\"a.go\"}"},
@@ -428,17 +427,6 @@ func TestBuildKiroResponsesRequest(t *testing.T) {
 		t.Fatalf("request body:\n%s\nwant:\n%s", gotPretty, wantPretty)
 	}
 
-	//! Without signed reasoning the thinking stays text, as generateAssistantResponse gets it.
-	stripped := buildKiroResponsesRequestWithoutReasoning(payload)
-	if replaysReasoning(stripped) {
-		t.Fatal("stripped request still replays reasoning")
-	}
-	if stripped.Input[1]["content"] != thinking+"\n\nLet me look." {
-		t.Fatalf("stripped assistant item = %v", stripped.Input[1])
-	}
-	if len(payload.ConversationState.History[1].AssistantResponseMessage.Reasoning) != 2 {
-		t.Fatal("stripping must not change the caller's payload")
-	}
 }
 
 func TestBuildKiroResponsesRequestKeepsUserTextBesideToolResults(t *testing.T) {
@@ -663,7 +651,7 @@ func TestCallKiroResponsesRetriesWithoutRejectedReasoning(t *testing.T) {
 		legacyAns: func() *http.Response { t.Fatal("generateAssistantResponse must not be called"); return nil },
 		respAns: func(n int) *http.Response {
 			if n == 1 {
-				return httpAnswer(400, "application/json", `{"error":{"message":"Invalid signature in thinking block","type":"invalid_request"}}`)
+				return httpAnswer(400, "application/json", signatureRejectedBody)
 			}
 			return httpAnswer(200, "text/event-stream", recordedResponsesText)
 		},
@@ -674,7 +662,7 @@ func TestCallKiroResponsesRetriesWithoutRejectedReasoning(t *testing.T) {
 	payload.ConversationState.History = []KiroHistoryMessage{
 		{UserInputMessage: &KiroUserInputMessage{Content: "hi"}},
 		{AssistantResponseMessage: &KiroAssistantResponseMessage{
-			Content:   thinkingOpenTag + "t" + thinkingCloseTag + "\n\nhello",
+			Content:   "hello",
 			Reasoning: []KiroReasoningBlock{{Text: "t", Signature: "foreign"}},
 		}},
 	}
@@ -686,8 +674,39 @@ func TestCallKiroResponsesRetriesWithoutRejectedReasoning(t *testing.T) {
 		t.Fatalf("bodies:\n%s\n%s", upstream.bodies[0], upstream.bodies[1])
 	}
 	var retried kiroResponsesRequest
-	if err := json.Unmarshal(upstream.bodies[1], &retried); err != nil || retried.Input[1]["content"] != thinkingOpenTag+"t"+thinkingCloseTag+"\n\nhello" {
+	if err := json.Unmarshal(upstream.bodies[1], &retried); err != nil || retried.Input[1]["content"] != "hello" {
 		t.Fatalf("bodies:\n%s\n%s", upstream.bodies[0], upstream.bodies[1])
+	}
+	//! Account failover sends the caller's payload again: it keeps its reasoning.
+	if len(payload.ConversationState.History[1].AssistantResponseMessage.Reasoning) != 1 {
+		t.Fatal("the retry stripped the caller's payload")
+	}
+}
+
+func TestCallKiroResponsesOtherBadRequestKeepsReasoning(t *testing.T) {
+	newStubChatAPIFlag(t)
+	account := flagTestAccount(t, "reasoning-other-400")
+	if err := config.UpdateChatAPI("responses"); err != nil {
+		t.Fatalf("set mode: %v", err)
+	}
+	upstream := &chatAPITestUpstream{
+		legacyAns: func() *http.Response { t.Fatal("generateAssistantResponse must not be called"); return nil },
+		respAns: func(int) *http.Response {
+			return httpAnswer(400, "application/json", `{"error":{"message":"Improperly formed request.","type":"invalid_request"}}`)
+		},
+	}
+	upstream.install(t)
+
+	payload := testKiroPayload()
+	payload.ConversationState.History = []KiroHistoryMessage{
+		{UserInputMessage: &KiroUserInputMessage{Content: "hi"}},
+		{AssistantResponseMessage: &KiroAssistantResponseMessage{Content: "hello", Reasoning: []KiroReasoningBlock{{Text: "t", Signature: "s"}}}},
+	}
+	if err := CallKiroAPIContext(context.Background(), account, payload, &KiroStreamCallback{}); !isUpstreamBadRequest(err) {
+		t.Fatalf("err = %v, want the 400", err)
+	}
+	if len(upstream.bodies) != 1 {
+		t.Fatalf("CreateResponse calls = %d, want 1: only a rejected signature is retried without reasoning", len(upstream.bodies))
 	}
 }
 

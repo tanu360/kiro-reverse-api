@@ -337,7 +337,7 @@ Claude 兼容请求如果带有顶层 `thinking` 配置，也会自动启用：
 
 OpenAI `reasoning_effort` 与 Claude `output_config.effort` 同样可用：`low`、`medium`、`high` 或 `xhigh` 会开启思考，并传递给支持强度等级的模型；`minimal` 则关闭思考。
 
-在 `/v1/messages` 中使用默认的思考块输出格式时，思考块会携带 Kiro 返回的 `signature`（流式输出时为 `signature_delta`），`redacted_thinking` 块原样透传。Kiro 并不总会返回这两者。开启思考时，客户端回传的思考块会以文本形式重放给 Kiro，哪些轮次保留思考遵循 Anthropic 的规则；其中的签名与 `redacted_thinking` 块会被丢弃。
+在 `/v1/messages` 中使用默认的思考块输出格式时，思考块会携带 Kiro 返回的 `signature`（流式输出时为 `signature_delta`），`redacted_thinking` 块原样透传。Kiro 并不总会返回这两者。开启思考时，客户端回传的思考块会作为推理内容（而不是文本）发回 Kiro，哪些轮次保留思考遵循 Anthropic 的规则：对话中如果以文本形式出现之前的推理，Claude 5 模型会拒绝回答。思考块只有带签名时才会发回，没有签名的会被丢弃。Kiro 较新的聊天 API（CreateResponse）接收所有带签名的思考块和 `redacted_thinking` 块；较旧的 API 只在一条消息仅有一个推理块时才接收它。如果 Kiro 拒绝这些推理内容，请求会去掉它们后再发送一次。
 
 输出格式可在管理面板「**设置 → Thinking**」中配置。
 

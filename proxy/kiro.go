@@ -262,9 +262,24 @@ type KiroAssistantResponseMessage struct {
 	Content  string        `json:"content"`
 	ToolUses []KiroToolUse `json:"toolUses,omitempty"`
 	// Reasoning holds the signed thinking and redacted_thinking blocks a client sent back, in
-	// order. generateAssistantResponse has no field for them (Content carries the thinking as
-	// <thinking> text); CreateResponse takes them as reasoning items.
+	// order. CreateResponse takes them all as reasoning items; generateAssistantResponse takes
+	// one, as reasoningContent (MarshalJSON). Content never carries thinking.
 	Reasoning []KiroReasoningBlock `json:"-"`
+}
+
+// MarshalJSON writes the message as generateAssistantResponse takes it. Its reasoningContent
+// holds a single block, so it is sent only for a message that replays exactly one: half of a
+// turn's reasoning is not sent. CreateResponse builds its request from Reasoning instead.
+func (m KiroAssistantResponseMessage) MarshalJSON() ([]byte, error) {
+	type wire KiroAssistantResponseMessage
+	out := struct {
+		wire
+		ReasoningContent *kiroReasoningContent `json:"reasoningContent,omitempty"`
+	}{wire: wire(m)}
+	if len(m.Reasoning) == 1 {
+		out.ReasoningContent = m.Reasoning[0].wire()
+	}
+	return json.Marshal(out)
 }
 
 // KiroReasoningBlock is one block of earlier reasoning: thinking text with its signature, or
@@ -273,6 +288,26 @@ type KiroReasoningBlock struct {
 	Text            string
 	Signature       string
 	RedactedContent string
+}
+
+// kiroReasoningContent is a reasoning block as Kiro takes it back, in the shape of Bedrock's
+// ReasoningContentBlock: generateAssistantResponse's reasoningContent, and the
+// encrypted_content of a CreateResponse reasoning item.
+type kiroReasoningContent struct {
+	ReasoningText   *kiroReasoningText `json:"reasoningText,omitempty"`
+	RedactedContent string             `json:"redactedContent,omitempty"`
+}
+
+type kiroReasoningText struct {
+	Text      string `json:"text"`
+	Signature string `json:"signature"`
+}
+
+func (b KiroReasoningBlock) wire() *kiroReasoningContent {
+	if b.RedactedContent != "" {
+		return &kiroReasoningContent{RedactedContent: b.RedactedContent}
+	}
+	return &kiroReasoningContent{ReasoningText: &kiroReasoningText{Text: b.Text, Signature: b.Signature}}
 }
 
 type KiroToolUse struct {
@@ -435,6 +470,22 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 		return callKiroResponsesAPI(ctx, account, payload, callback)
 	}
 
+	err := callKiroLegacyAPI(ctx, account, payload, callback)
+	if !isReasoningRejection(err) || !legacyReplaysReasoning(payload) {
+		return err
+	}
+	//! A signature Kiro does not accept (from another backend or account, say) would fail every
+	//! later turn of the conversation. Kiro checks it before answering, so nothing repeats.
+	logger.Warnf("[ThinkingHistory] Kiro rejected the replayed reasoning (%v); retrying without it", err)
+	traceEndpointFallback(ctx, account, "", err)
+	return callKiroLegacyAPI(ctx, account, withoutReplayedReasoning(payload), callback)
+}
+
+// callKiroLegacyAPI sends the payload to generateAssistantResponse, endpoint by endpoint, and
+// feeds its events to callback. A 429 that shows Kiro moved the account to CreateResponse
+// sends the request there instead.
+func callKiroLegacyAPI(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
+	isAPIKey := config.IsAPIKeyAccount(account)
 	endpoints := endpointsForAccount(account)
 
 	//! Requests run under streamCtx: it ends with ctx, but a stream the output limiter cut stays
@@ -537,7 +588,8 @@ endpointLoop:
 					logger.Warnf("[KiroAPI] Endpoint %s rejected request: %v", ep.Name, lastErr)
 					//! An input over the context window is too long for every endpoint, so asking the
 					//! others only made the client wait for the same answer (5-6 s for all three, live).
-					if isContextOverflowError(clientErr) {
+					//! A rejected reasoning signature is rejected by every endpoint too.
+					if isContextOverflowError(clientErr) || isReasoningRejection(clientErr) {
 						return clientErr
 					}
 					continue endpointLoop

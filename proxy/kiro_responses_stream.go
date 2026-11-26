@@ -254,13 +254,7 @@ func (a *responsesSSEAdapter) finishCall(item map[string]interface{}) {
 // or {"redactedContent": "..."}, as a JSON string in encrypted_content.
 func (a *responsesSSEAdapter) reasoningDone(item map[string]interface{}) {
 	raw, _ := item["encrypted_content"].(string)
-	var envelope struct {
-		ReasoningText *struct {
-			Text      string `json:"text"`
-			Signature string `json:"signature"`
-		} `json:"reasoningText"`
-		RedactedContent string `json:"redactedContent"`
-	}
+	var envelope kiroReasoningContent
 	if raw == "" || json.Unmarshal([]byte(raw), &envelope) != nil {
 		return
 	}

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"kiro-proxy/config"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -100,15 +101,15 @@ func TestContextOverflowIsNotRetriedWithoutReasoning(t *testing.T) {
 		{UserInputMessage: &KiroUserInputMessage{Content: "think", ModelID: "claude-sonnet-4.5", Origin: "AI_EDITOR"}},
 		{AssistantResponseMessage: &KiroAssistantResponseMessage{Content: "done", Reasoning: []KiroReasoningBlock{{Text: "hmm", Signature: "sig"}}}},
 	}
-	if !replaysReasoning(buildKiroResponsesRequest(payload)) {
-		t.Fatal("the payload replays no reasoning")
+	if err := config.UpdateChatAPI("responses"); err != nil {
+		t.Fatalf("set mode: %v", err)
 	}
 
-	err := callKiroResponsesAPI(context.Background(), account, payload, &KiroStreamCallback{})
+	err := CallKiroAPIContext(context.Background(), account, payload, &KiroStreamCallback{})
 	if !isContextOverflowError(err) {
 		t.Fatalf("err = %v, want the context overflow", err)
 	}
-	if len(upstream.responses) != 1 {
-		t.Fatalf("CreateResponse calls = %d, want 1", len(upstream.responses))
+	if len(upstream.responses) != 1 || !strings.Contains(string(upstream.bodies[0]), `"type":"reasoning"`) {
+		t.Fatalf("CreateResponse calls = %d, want 1 that replays the reasoning", len(upstream.responses))
 	}
 }

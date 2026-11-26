@@ -337,7 +337,7 @@ Requisições compatíveis com o Claude que incluem uma configuração `thinking
 
 O `reasoning_effort` da OpenAI e o `output_config.effort` do Claude também funcionam: `low`, `medium`, `high` ou `xhigh` ativa o raciocínio e é repassado aos modelos que aceitam níveis de esforço, e `minimal` o desativa.
 
-Em `/v1/messages`, com a saída padrão em blocos de raciocínio, um bloco de raciocínio traz a `signature` que o Kiro envia (`signature_delta` no streaming), e blocos `redacted_thinking` passam direto. O Kiro nem sempre envia um ou outro. Com o raciocínio ligado, blocos de raciocínio que o cliente devolve são reenviados ao Kiro como texto, seguindo as regras da Anthropic sobre quais turnos os mantêm; as assinaturas e os blocos `redacted_thinking` deles são descartados.
+Em `/v1/messages`, com a saída padrão em blocos de raciocínio, um bloco de raciocínio traz a `signature` que o Kiro envia (`signature_delta` no streaming), e blocos `redacted_thinking` passam direto. O Kiro nem sempre envia um ou outro. Com o raciocínio ligado, blocos de raciocínio que o cliente devolve vão ao Kiro como raciocínio, nunca como texto, seguindo as regras da Anthropic sobre quais turnos os mantêm: os modelos Claude 5 se recusam a responder quando um raciocínio anterior aparece como texto na conversa. Um bloco de raciocínio só volta com a sua assinatura; um bloco sem assinatura é descartado. A API de chat mais nova do Kiro (CreateResponse) recebe todos os blocos assinados e os blocos `redacted_thinking`. A mais antiga só recebe o raciocínio de uma mensagem quando ela tem um único bloco. Se o Kiro rejeitar o raciocínio, a requisição é enviada mais uma vez sem ele.
 
 O formato de saída é configurado em **Configurações → Raciocínio** no painel de administração.
 

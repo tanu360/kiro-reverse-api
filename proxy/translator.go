@@ -254,7 +254,7 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 			}
 		case "assistant":
 			keepThinking := thinkingReplay.next()
-			content, toolUses := extractClaudeAssistantHistory(msg.Content, keepThinking)
+			content, toolUses := extractClaudeAssistantContent(msg.Content)
 			history = append(history, KiroHistoryMessage{
 				AssistantResponseMessage: &KiroAssistantResponseMessage{
 					Content:   content,
@@ -1732,7 +1732,7 @@ func historyEntryByteSize(entry KiroHistoryMessage) int {
 	if err != nil {
 		return 0
 	}
-	return len(raw) + 1 - inlineMediaBytes(entry.UserInputMessage)
+	return len(raw) + 1 - inlineMediaBytes(entry.UserInputMessage) + reasoningOutsideJSONBytes(entry.AssistantResponseMessage)
 }
 
 func dropLeadingAssistant(tail []KiroHistoryMessage) []KiroHistoryMessage {
@@ -1751,7 +1751,7 @@ func payloadByteSize(payload *KiroPayload) int {
 	}
 	size := len(raw) - inlineMediaBytes(&payload.ConversationState.CurrentMessage.UserInputMessage)
 	for _, entry := range payload.ConversationState.History {
-		size -= inlineMediaBytes(entry.UserInputMessage)
+		size += reasoningOutsideJSONBytes(entry.AssistantResponseMessage) - inlineMediaBytes(entry.UserInputMessage)
 	}
 	return size
 }

@@ -213,29 +213,16 @@ func withoutTextBlock(text, block string) string {
 // its tool calls with their arguments as a JSON string.
 func responsesAssistantItems(msg *KiroAssistantResponseMessage) []map[string]interface{} {
 	var items []map[string]interface{}
-	content := msg.Content
 	for _, block := range msg.Reasoning {
-		envelope := map[string]interface{}{}
-		switch {
-		case block.RedactedContent != "":
-			envelope["redactedContent"] = block.RedactedContent
-		case block.Signature != "":
-			envelope["reasoningText"] = map[string]string{"text": block.Text, "signature": block.Signature}
-			//! The thinking went to generateAssistantResponse as <thinking> text in the content;
-			//! here it travels as reasoning, so it must not appear twice.
-			content = removeThinkingSegment(content, block.Text)
-		default:
-			continue
-		}
-		encoded, _ := json.Marshal(envelope)
+		encoded, _ := json.Marshal(block.wire())
 		items = append(items, map[string]interface{}{
 			"type":              "reasoning",
 			"summary":           []interface{}{},
 			"encrypted_content": string(encoded),
 		})
 	}
-	if strings.TrimSpace(content) != "" {
-		items = append(items, map[string]interface{}{"role": "assistant", "content": content})
+	if strings.TrimSpace(msg.Content) != "" {
+		items = append(items, map[string]interface{}{"role": "assistant", "content": msg.Content})
 	}
 	for _, tu := range msg.ToolUses {
 		input := tu.Input
@@ -251,16 +238,4 @@ func responsesAssistantItems(msg *KiroAssistantResponseMessage) []map[string]int
 		})
 	}
 	return items
-}
-
-// removeThinkingSegment takes one <thinking>text</thinking> segment, and the blank line that
-// joined it to the next, out of assistant content.
-func removeThinkingSegment(content, text string) string {
-	segment := thinkingOpenTag + text + thinkingCloseTag
-	idx := strings.Index(content, segment)
-	if idx < 0 {
-		return content
-	}
-	rest := strings.TrimPrefix(content[idx+len(segment):], "\n\n")
-	return content[:idx] + rest
 }

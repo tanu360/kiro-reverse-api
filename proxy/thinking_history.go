@@ -1,17 +1,17 @@
 package proxy
 
 import (
-	"kiro-proxy/logger"
-	"kiro-proxy/textfmt"
+	"errors"
+	"net/http"
 	"strconv"
 	"strings"
 )
 
-//! Kiro history has no reasoning field: assistantResponseMessage.reasoningContent is
-//! rejected with "400 Improperly formed request". Thinking a client sends back is replayed
-//! as <thinking>…</thinking> segments in the assistant content, in block order, which is
-//! the same shape thinking-mode models write inline. redacted_thinking blocks are encrypted
-//! and signatures only mean something to Anthropic, so both are dropped.
+//! Thinking a client sends back reaches Kiro only as reasoning, never as text: Claude 5
+//! models answer stop_reason "refusal" to a history whose assistant content holds earlier
+//! reasoning as <thinking> text. Signed thinking and redacted_thinking blocks travel as
+//! KiroAssistantResponseMessage.Reasoning (generateAssistantResponse's reasoningContent, or
+//! CreateResponse reasoning items); thinking without a signature cannot, so it is dropped.
 
 // claudeThinkingReplay decides, assistant message by assistant message, whether the
 // thinking blocks a client sent back are replayed into Kiro history.
@@ -24,8 +24,7 @@ type claudeThinkingReplay struct {
 
 // newClaudeThinkingReplay follows Anthropic's thinking caching rules. The current turn's
 // tool loop always keeps its thinking. Thinking from finished turns is kept only by models
-// that keep prior thinking in context. With thinking off nothing is replayed, so the model
-// is not taught to write <thinking> tags into a plain answer.
+// that keep prior thinking in context. With thinking off nothing is replayed.
 func newClaudeThinkingReplay(messages []ClaudeMessage, modelID string, thinking bool) *claudeThinkingReplay {
 	replay := &claudeThinkingReplay{enabled: thinking}
 	if thinking && !modelKeepsPriorThinking(modelID) {
@@ -138,57 +137,9 @@ func leadingVersion(version string) (int, int, bool) {
 	return major, minor, true
 }
 
-// extractClaudeAssistantHistory converts one assistant message for Kiro history. Content
-// without thinking blocks, or whose thinking is not kept, converts exactly as before.
-func extractClaudeAssistantHistory(content interface{}, keepThinking bool) (string, []KiroToolUse) {
-	blocks, ok := content.([]interface{})
-	if !ok {
-		return extractClaudeAssistantContent(content)
-	}
-	thinkingBlocks, redactedBlocks := countClaudeThinkingBlocks(blocks)
-	if redactedBlocks > 0 {
-		logger.Debugf("[ThinkingHistory] Dropping %s: Kiro cannot replay encrypted reasoning",
-			textfmt.Count(redactedBlocks, "redacted_thinking block", "redacted_thinking blocks"))
-	}
-	if thinkingBlocks == 0 || !keepThinking {
-		return extractClaudeAssistantContent(content)
-	}
-
-	var segments []string
-	var toolUses []KiroToolUse
-	var run []interface{}
-	flush := func() {
-		if len(run) == 0 {
-			return
-		}
-		text, tools := extractClaudeAssistantContent(run)
-		if text != "" {
-			segments = append(segments, text)
-		}
-		toolUses = append(toolUses, tools...)
-		run = nil
-	}
-	for _, item := range blocks {
-		block, _ := item.(map[string]interface{})
-		switch block["type"] {
-		case "thinking":
-			flush()
-			if text, _ := block["thinking"].(string); text != "" {
-				segments = append(segments, thinkingOpenTag+text+thinkingCloseTag)
-			}
-		case "redacted_thinking":
-			flush()
-		default:
-			run = append(run, item)
-		}
-	}
-	flush()
-	return strings.Join(segments, "\n\n"), toolUses
-}
-
 // claudeAssistantReasoning collects the signed thinking and redacted_thinking blocks of an
-// assistant message that keeps its thinking, in order. Only CreateResponse can replay them;
-// a thinking block without a signature stays <thinking> text in the content.
+// assistant message that keeps its thinking, in order. A thinking block without a signature,
+// or with no text (display "omitted"), cannot be replayed and is left out.
 func claudeAssistantReasoning(content interface{}, keepThinking bool) []KiroReasoningBlock {
 	blocks, ok := content.([]interface{})
 	if !ok || !keepThinking {
@@ -213,15 +164,50 @@ func claudeAssistantReasoning(content interface{}, keepThinking bool) []KiroReas
 	return out
 }
 
-func countClaudeThinkingBlocks(blocks []interface{}) (thinking, redacted int) {
-	for _, item := range blocks {
-		block, _ := item.(map[string]interface{})
-		switch block["type"] {
-		case "thinking":
-			thinking++
-		case "redacted_thinking":
-			redacted++
+// withoutReplayedReasoning is the payload without the reasoning its history replays. The
+// history is copied, so the caller's payload, which account failover sends again, keeps it.
+func withoutReplayedReasoning(payload *KiroPayload) *KiroPayload {
+	stripped := *payload
+	stripped.ConversationState.History = make([]KiroHistoryMessage, len(payload.ConversationState.History))
+	for i, entry := range payload.ConversationState.History {
+		if a := entry.AssistantResponseMessage; a != nil && len(a.Reasoning) > 0 {
+			copied := *a
+			copied.Reasoning = nil
+			entry.AssistantResponseMessage = &copied
+		}
+		stripped.ConversationState.History[i] = entry
+	}
+	return &stripped
+}
+
+// isReasoningRejection reports Kiro's 400 for replayed reasoning it does not accept. Both
+// chat APIs answer it the same way (recorded live): reason THINKING_SIGNATURE_INVALID,
+// "messages.N.content.0: Invalid `signature` in `thinking` block".
+func isReasoningRejection(err error) bool {
+	var client *upstreamClientError
+	return errors.As(err, &client) && client.status == http.StatusBadRequest && strings.Contains(client.message, "THINKING_SIGNATURE_INVALID")
+}
+
+// legacyReplaysReasoning reports whether the payload's generateAssistantResponse body carries
+// reasoning: a history assistant message with exactly one block (MarshalJSON).
+func legacyReplaysReasoning(payload *KiroPayload) bool {
+	for _, entry := range payload.ConversationState.History {
+		if a := entry.AssistantResponseMessage; a != nil && len(a.Reasoning) == 1 {
+			return true
 		}
 	}
-	return thinking, redacted
+	return false
+}
+
+// reasoningOutsideJSONBytes counts the replayed reasoning that a message's JSON leaves out:
+// generateAssistantResponse carries a single block, CreateResponse carries every one.
+func reasoningOutsideJSONBytes(a *KiroAssistantResponseMessage) int {
+	if a == nil || len(a.Reasoning) < 2 {
+		return 0
+	}
+	n := 0
+	for _, b := range a.Reasoning {
+		n += len(b.Text) + len(b.Signature) + len(b.RedactedContent)
+	}
+	return n
 }

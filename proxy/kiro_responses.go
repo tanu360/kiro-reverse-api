@@ -65,19 +65,19 @@ func applyKiroResponsesHeaders(req *http.Request, account *config.Account, profi
 }
 
 // callKiroResponsesAPI sends the payload to CreateResponse and feeds its events to callback,
-// the way callKiroAPIContextOnce does for generateAssistantResponse. A stream that fails
-// before any output is tried once more.
+// the way callKiroLegacyAPI does for generateAssistantResponse. A stream that fails before
+// any output is tried once more.
 func callKiroResponsesAPI(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	request := buildKiroResponsesRequest(payload)
 	err := sendKiroResponses(ctx, account, payload.ProfileArn, request, callback)
-	//! Reasoning sent as text instead is no shorter, so an input over the context window is final.
-	if !isUpstreamBadRequest(err) || isContextOverflowError(err) || !replaysReasoning(request) {
+	if !isReasoningRejection(err) || !replaysReasoning(request) {
 		return err
 	}
 	//! Signed thinking from the client is replayed as reasoning items; a signature Kiro does
 	//! not accept (from another backend, say) would fail every turn of the conversation.
 	logger.Warnf("[KiroResponses] Kiro rejected the replayed reasoning (%v); retrying without it", err)
-	return sendKiroResponses(ctx, account, payload.ProfileArn, buildKiroResponsesRequestWithoutReasoning(payload), callback)
+	traceEndpointFallback(ctx, account, kiroResponsesEndpointName, err)
+	return sendKiroResponses(ctx, account, payload.ProfileArn, buildKiroResponsesRequest(withoutReplayedReasoning(payload)), callback)
 }
 
 // replaysReasoning reports whether the request replayed reasoning items.
@@ -90,22 +90,6 @@ func replaysReasoning(request *kiroResponsesRequest) bool {
 	return false
 }
 
-// buildKiroResponsesRequestWithoutReasoning is the request with earlier thinking as text, as
-// generateAssistantResponse gets it.
-func buildKiroResponsesRequestWithoutReasoning(payload *KiroPayload) *kiroResponsesRequest {
-	stripped := *payload
-	stripped.ConversationState.History = make([]KiroHistoryMessage, len(payload.ConversationState.History))
-	for i, entry := range payload.ConversationState.History {
-		if a := entry.AssistantResponseMessage; a != nil && len(a.Reasoning) > 0 {
-			copied := *a
-			copied.Reasoning = nil
-			entry.AssistantResponseMessage = &copied
-		}
-		stripped.ConversationState.History[i] = entry
-	}
-	return buildKiroResponsesRequest(&stripped)
-}
-
 func sendKiroResponses(ctx context.Context, account *config.Account, profileArn string, request *kiroResponsesRequest, callback *KiroStreamCallback) error {
 	body, err := json.Marshal(request)
 	if err != nil {
@@ -114,7 +98,7 @@ func sendKiroResponses(ctx context.Context, account *config.Account, profileArn 
 	logKiroResponsesBodyDebug(body)
 	endpointURL := kiroResponsesURL(account, profileArn)
 
-	//! As in callKiroAPIContextOnce: a stream the output limiter cut stays open for drainCutStream.
+	//! As in callKiroLegacyAPI: a stream the output limiter cut stays open for drainCutStream.
 	streamCtx, endStream := upstreamStreamContext(ctx)
 	defer func() {
 		if endStream != nil {

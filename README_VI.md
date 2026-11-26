@@ -337,7 +337,7 @@ Các yêu cầu tương thích Claude có cấu hình `thinking` ở cấp cao n
 
 `reasoning_effort` của OpenAI và `output_config.effort` của Claude cũng dùng được: `low`, `medium`, `high` hoặc `xhigh` bật thinking và được chuyển tới các model hỗ trợ mức effort, còn `minimal` tắt thinking.
 
-Trên `/v1/messages`, với định dạng đầu ra mặc định là khối thinking, khối thinking mang `signature` do Kiro gửi (`signature_delta` khi stream), và các khối `redacted_thinking` được chuyển tiếp nguyên vẹn. Không phải lúc nào Kiro cũng gửi hai thứ này. Khi bật thinking, các khối thinking mà client gửi lại được phát lại cho Kiro dưới dạng văn bản, theo quy tắc của Anthropic về những lượt được giữ thinking; chữ ký và các khối `redacted_thinking` của chúng bị bỏ đi.
+Trên `/v1/messages`, với định dạng đầu ra mặc định là khối thinking, khối thinking mang `signature` do Kiro gửi (`signature_delta` khi stream), và các khối `redacted_thinking` được chuyển tiếp nguyên vẹn. Không phải lúc nào Kiro cũng gửi hai thứ này. Khi bật thinking, các khối thinking mà client gửi lại được gửi cho Kiro dưới dạng reasoning, không bao giờ dưới dạng văn bản, theo quy tắc của Anthropic về những lượt được giữ thinking: các mô hình Claude 5 từ chối trả lời khi reasoning trước đó xuất hiện dưới dạng văn bản trong cuộc hội thoại. Một khối thinking chỉ được gửi lại khi có chữ ký; khối không có chữ ký bị bỏ đi. API chat mới hơn của Kiro (CreateResponse) nhận mọi khối có chữ ký và khối `redacted_thinking`. API cũ hơn chỉ nhận reasoning của một tin nhắn khi tin nhắn đó chỉ có một khối. Nếu Kiro từ chối reasoning, yêu cầu được gửi lại một lần nữa mà không có nó.
 
 Định dạng đầu ra được cấu hình tại **Cài đặt → Thinking** trong trang quản trị.
 

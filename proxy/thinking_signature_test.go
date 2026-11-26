@@ -411,12 +411,14 @@ func assertNoReasoningLeak(t *testing.T, payload *KiroPayload, secrets ...string
 func TestClaudeToKiroReplaysCurrentTurnThinking(t *testing.T) {
 	var calls atomic.Int32
 	var second KiroPayload
+	var secondRaw []byte
 	h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if calls.Add(1) == 1 {
 			writeFrames(w, signedReasoningFrames(t, answerFrame(t, "Checking."), weatherToolFrame(t))...)
 			return
 		}
 		raw, _ := io.ReadAll(r.Body)
+		secondRaw = raw
 		if err := json.Unmarshal(raw, &second); err != nil {
 			t.Errorf("decode upstream payload: %v", err)
 		}
@@ -442,13 +444,20 @@ func TestClaudeToKiroReplaysCurrentTurnThinking(t *testing.T) {
 	if len(assistants) != 1 {
 		t.Fatalf("history assistants = %#v", assistants)
 	}
-	if got := assistants[0].Content; got != "<thinking>plan it</thinking>\n\nChecking." {
-		t.Fatalf("replayed assistant content = %q", got)
+	//! Signed thinking and a redacted block are two blocks: generateAssistantResponse's single
+	//! reasoningContent carries neither, and the content carries no thinking.
+	if got := assistants[0].Content; got != "Checking." {
+		t.Fatalf("replayed assistant content = %q, want no thinking in it", got)
 	}
 	if len(assistants[0].ToolUses) != 1 || assistants[0].ToolUses[0].ToolUseID != "call_weather" {
 		t.Fatalf("replayed tool uses = %#v", assistants[0].ToolUses)
 	}
-	assertNoReasoningLeak(t, &second, fixtureSignature, fixtureRedacted)
+	//! Decoding into KiroPayload drops reasoningContent, so the body is checked as sent.
+	for _, leak := range []string{"reasoningContent", fixtureSignature, fixtureRedacted, "plan it", "\\u003cthinking\\u003e"} {
+		if strings.Contains(string(secondRaw), leak) {
+			t.Fatalf("upstream body carries %q: %s", leak, secondRaw)
+		}
+	}
 }
 
 func finishedTurnRequest(model string) *ClaudeRequest {
@@ -483,10 +492,12 @@ func TestClaudeToKiroDropsFinishedTurnThinkingForOlderModels(t *testing.T) {
 		if assistants[0].Content != "first done" {
 			t.Fatalf("%s: finished turn content = %q, want its thinking dropped", model, assistants[0].Content)
 		}
-		if assistants[1].Content != "<thinking>CURRENT_PLAN</thinking>" || len(assistants[1].ToolUses) != 1 {
-			t.Fatalf("%s: current tool loop = %#v, want its thinking replayed", model, assistants[1])
+		if assistants[1].Content != "" || len(assistants[1].ToolUses) != 1 {
+			t.Fatalf("%s: current tool loop = %#v, want no thinking in its content", model, assistants[1])
 		}
-		assertNoReasoningLeak(t, payload, "sig-old", "sig-cur", "OLD_PLAN")
+		assertLegacyReasoningText(t, payload, 0, "", "")
+		assertLegacyReasoningText(t, payload, 1, "CURRENT_PLAN", "sig-cur")
+		assertNoThinkingText(t, payload, "OLD_PLAN", "sig-old")
 	}
 }
 
@@ -494,31 +505,40 @@ func TestClaudeToKiroKeepsPriorThinkingForNewerModels(t *testing.T) {
 	for _, model := range []string{"claude-opus-4.6", "claude-sonnet-5"} {
 		payload := ClaudeToKiro(finishedTurnRequest(model), true)
 		assistants := claudeHistoryAssistants(payload)
-		if len(assistants) != 2 || assistants[0].Content != "<thinking>OLD_PLAN</thinking>\n\nfirst done" {
+		if len(assistants) != 2 || assistants[0].Content != "first done" || assistants[1].Content != "" {
 			t.Fatalf("%s: history assistants = %#v", model, assistants)
 		}
-		if assistants[1].Content != "<thinking>CURRENT_PLAN</thinking>" {
-			t.Fatalf("%s: current tool loop = %#v", model, assistants[1])
-		}
-		assertNoReasoningLeak(t, payload, "sig-old", "sig-cur")
+		assertLegacyReasoningText(t, payload, 0, "OLD_PLAN", "sig-old")
+		assertLegacyReasoningText(t, payload, 1, "CURRENT_PLAN", "sig-cur")
+		assertNoThinkingText(t, payload)
 	}
 }
 
-func TestClaudeToKiroReplaysInterleavedThinkingInBlockOrder(t *testing.T) {
-	content, tools := extractClaudeAssistantHistory([]interface{}{
+func TestClaudeToKiroInterleavedThinkingSkipsLegacyField(t *testing.T) {
+	req := finishedTurnRequest("claude-sonnet-5")
+	req.Messages[3].Content = []interface{}{
 		map[string]interface{}{"type": "thinking", "thinking": "T1", "signature": "s1"},
 		map[string]interface{}{"type": "text", "text": "X"},
-		map[string]interface{}{"type": "tool_use", "id": "a", "name": "get_weather", "input": map[string]interface{}{}},
 		map[string]interface{}{"type": "thinking", "thinking": "T2", "signature": "s2"},
 		map[string]interface{}{"type": "text", "text": "Y"},
 		map[string]interface{}{"type": "thinking", "thinking": ""},
-	}, true)
-	if content != "<thinking>T1</thinking>\n\nX\n\n<thinking>T2</thinking>\n\nY" || len(tools) != 1 {
-		t.Fatalf("content=%q tools=%#v", content, tools)
+		map[string]interface{}{"type": "tool_use", "id": "call_weather", "name": "get_weather", "input": map[string]interface{}{}},
 	}
+	payload := ClaudeToKiro(req, true)
+	assistants := claudeHistoryAssistants(payload)
+	if len(assistants) != 2 || assistants[1].Content != "XY" || len(assistants[1].ToolUses) != 1 {
+		t.Fatalf("history assistants = %#v", assistants)
+	}
+	//! CreateResponse takes every signed block; generateAssistantResponse has room for one, and
+	//! half of a turn's reasoning is not sent there.
+	if got := assistants[1].Reasoning; len(got) != 2 || got[0].Text != "T1" || got[1].Text != "T2" {
+		t.Fatalf("reasoning = %#v", got)
+	}
+	assertLegacyReasoningText(t, payload, 1, "", "")
+	assertNoThinkingText(t, payload)
 }
 
-func TestClaudeToKiroDropsRedactedThinkingHistory(t *testing.T) {
+func TestClaudeToKiroReplaysRedactedThinkingNatively(t *testing.T) {
 	req := &ClaudeRequest{
 		Model: "claude-sonnet-4.5",
 		Tools: weatherTools(),
@@ -551,10 +571,13 @@ func TestClaudeToKiroDropsRedactedThinkingHistory(t *testing.T) {
 	if assistants[0].Content != "" || len(assistants[0].ToolUses) != 1 {
 		t.Fatalf("redacted-only assistant = %#v, want empty content and its tool use", assistants[0])
 	}
-	if assistants[1].Content != "<thinking>plan</thinking>\n\nsunny it is" || len(assistants[1].ToolUses) != 1 {
+	if assistants[1].Content != "sunny it is" || len(assistants[1].ToolUses) != 1 {
 		t.Fatalf("assistant = %#v", assistants[1])
 	}
-	assertNoReasoningLeak(t, payload, "REDACTED_SECRET")
+	assertLegacyRedacted(t, payload, 0, "REDACTED_SECRET")
+	//! The unsigned "plan" cannot be replayed; the redacted block beside it still can.
+	assertLegacyRedacted(t, payload, 1, "REDACTED_SECRET_2")
+	assertNoThinkingText(t, payload)
 }
 
 func TestClaudeToKiroThinkingOffMatchesLegacy(t *testing.T) {

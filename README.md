@@ -337,7 +337,7 @@ Claude-compatible requests that include a top-level `thinking` config also enabl
 
 OpenAI `reasoning_effort` and Claude `output_config.effort` work too: `low`, `medium`, `high`, or `xhigh` turns thinking on and is passed to models that support effort levels, and `minimal` turns it off.
 
-On `/v1/messages` with the default thinking-block output, a thinking block carries the `signature` Kiro sends (`signature_delta` when streaming), and `redacted_thinking` blocks pass through. Kiro does not always send either. With thinking on, thinking blocks a client sends back are replayed to Kiro as text, following Anthropic's rules on which turns keep them; their signatures and redacted blocks are dropped.
+On `/v1/messages` with the default thinking-block output, a thinking block carries the `signature` Kiro sends (`signature_delta` when streaming), and `redacted_thinking` blocks pass through. Kiro does not always send either. With thinking on, thinking blocks a client sends back go to Kiro as reasoning, never as text, following Anthropic's rules on which turns keep them: Claude 5 models refuse to answer when earlier reasoning appears as text in the conversation. A thinking block goes back only with its signature; one without a signature is dropped. Kiro's newer chat API (CreateResponse) takes every signed and `redacted_thinking` block. The older one takes a message's reasoning only when the message has a single block. If Kiro rejects the reasoning, the request is sent once more without it.
 
 Output format is configured in **Settings → Thinking** in the admin panel.
 
