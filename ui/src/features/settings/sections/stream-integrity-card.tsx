@@ -1,9 +1,6 @@
-import { Alert02Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { SwitchField } from "@/components/shared/settings-rows";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RowNote, SwitchField } from "@/components/shared/settings-rows";
 import { endpointQuery, settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -46,21 +43,15 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
             />
           ) : null
         }
+        notes={
+          <>
+            <RowNote tone="warning">{t("lenientStreamIntegrityRisk")}</RowNote>
+            {chatOnResponses ? <RowNote>{t("lenientStreamIntegrityResponses")}</RowNote> : null}
+          </>
+        }
         onCheckedChange={lenientStreamIntegrity.onCheckedChange}
         title={t("lenientStreamIntegrity")}
-      >
-        {/* The risk as a small warning notice under the description, as wide as its text. */}
-        <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="warning">
-          <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-          <AlertDescription>{t("lenientStreamIntegrityRisk")}</AlertDescription>
-        </Alert>
-        {chatOnResponses ? (
-          <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="info">
-            <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
-            <AlertDescription>{t("lenientStreamIntegrityResponses")}</AlertDescription>
-          </Alert>
-        ) : null}
-      </SwitchField>
+      />
     </SettingsSection>
   );
 }

@@ -1,6 +1,5 @@
 import {
   Alert02Icon,
-  InformationCircleIcon,
   Key01Icon,
   LockPasswordIcon,
   SecurityCheckIcon,
@@ -22,7 +21,7 @@ import { Code } from "@/components/shared/code";
 import { CopyButton } from "@/components/shared/copy-button";
 import { ErrorState } from "@/components/shared/error-state";
 import { PasswordInput } from "@/components/shared/password-input";
-import { SettingsRow } from "@/components/shared/settings-rows";
+import { RowNote, SettingsRow } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,7 +56,7 @@ import { formatDateTime } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { digitsOnly } from "@/lib/input-filters";
 import { SECTION_ID } from "./sections";
-import { Hint, SectionQuery, SettingsGroup } from "./settings-section";
+import { EnvBadge, Hint, SectionQuery, SettingsGroup } from "./settings-section";
 import { parseQrSvg, StyledQr } from "./styled-qr";
 
 /** Settings card for admin two-factor sign-in with an authenticator app. */
@@ -144,15 +143,13 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
             }
             controlWidth="auto"
             description={t("twoFactor.codesLeft", { count: status.recoveryCodesLeft })}
+            notes={
+              status.recoveryCodesLeft <= 2 ? (
+                <RowNote tone="warning">{t("twoFactor.codesLow")}</RowNote>
+              ) : null
+            }
             title={t("twoFactor.recoveryTitle")}
-          >
-            {status.recoveryCodesLeft <= 2 ? (
-              <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="warning">
-                <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-                <AlertDescription>{t("twoFactor.codesLow")}</AlertDescription>
-              </Alert>
-            ) : null}
-          </SettingsRow>
+          />
         </>
       ) : (
         <SettingsRow
@@ -169,16 +166,19 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
             </Button>
           }
           controlWidth="auto"
-          description={<Hint more={lockout}>{t("twoFactor.offHint")}</Hint>}
+          description={
+            <Hint more={lockout}>
+              {status.resetByEnv
+                ? t("common:text.joinSentences", {
+                    first: t("twoFactor.offHint"),
+                    second: t("twoFactor.resetByEnv"),
+                  })
+                : t("twoFactor.offHint")}
+            </Hint>
+          }
+          status={status.resetByEnv ? <EnvBadge name="ADMIN_RESET_2FA" /> : undefined}
           title={t("twoFactor.signIn")}
-        >
-          {status.resetByEnv ? (
-            <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="info">
-              <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
-              <AlertDescription>{t("twoFactor.resetByEnv")}</AlertDescription>
-            </Alert>
-          ) : null}
-        </SettingsRow>
+        />
       )}
 
       <Dialog

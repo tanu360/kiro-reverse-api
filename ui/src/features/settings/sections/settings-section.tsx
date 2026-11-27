@@ -1,4 +1,9 @@
-import { Alert02Icon, CheckIcon, FloppyDiskIcon } from "@hugeicons/core-free-icons";
+import {
+  Alert02Icon,
+  CheckIcon,
+  FloppyDiskIcon,
+  InformationCircleIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type UseQueryResult, useMutation } from "@tanstack/react-query";
 import {
@@ -25,6 +30,7 @@ import {
   SaveFooter as SharedSaveFooter,
 } from "@/components/shared/settings-rows";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -272,6 +278,20 @@ export function DialogSaveButton({
  * A hint of at most two sentences, with the rest behind the "Learn more" (InfoHint's
  * link look) at its end.
  */
+/**
+ * After a row title (SettingsRow `status`): an environment variable sets this value again at each
+ * start. The row's description says what that means, so the row keeps the control's height.
+ */
+export function EnvBadge({ name }: { name: string }): JSX.Element {
+  const { t } = useT("settings");
+  return (
+    <Badge size="sm" tone="info" variant="soft">
+      <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
+      {t("envBadge", { name })}
+    </Badge>
+  );
+}
+
 export function Hint({ children, more }: { children: ReactNode; more?: ReactNode }): JSX.Element {
   const { t } = useT("settings");
   if (!more) return <>{children}</>;

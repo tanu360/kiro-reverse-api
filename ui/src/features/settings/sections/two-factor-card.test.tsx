@@ -97,7 +97,10 @@ describe("TwoFactorCard", () => {
   it("says why setup is off while ADMIN_RESET_2FA is set", async () => {
     mockDb.twoFactor.resetByEnv = true;
     renderWithProviders(<TwoFactorCard />);
-    expect(await screen.findByText(/ADMIN_RESET_2FA is set on the server/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/ADMIN_RESET_2FA turns it off at each start/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Set by ADMIN_RESET_2FA")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Turn on" })).toBeDisabled();
   });
 });

@@ -1,5 +1,4 @@
 import {
-  Alert02Icon,
   Delete02Icon,
   PencilEdit01Icon,
   PlusSignIcon,
@@ -14,12 +13,12 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { InfoHint } from "@/components/shared/info-hint";
 import { RelativeTime } from "@/components/shared/relative-time";
 import {
+  RowNote,
   SETTINGS_ROW_X,
   SettingsEmptyRow,
   SettingsRow,
   SwitchField,
 } from "@/components/shared/settings-rows";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
@@ -544,16 +543,16 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
         // One settings save at a time: a change made while one is saving would be dropped.
         disabled={(empty && !on) || settings.isPending}
         onCheckedChange={(checked) => saveSettings({ mode: checked ? "on" : "off" })}
+        notes={
+          on && empty ? (
+            <RowNote role="status" tone="warning">
+              {t("card.emptyOnWarning")}
+            </RowNote>
+          ) : null
+        }
         switchRef={modeRef}
         title={t("card.modeTitle")}
-      >
-        {on && empty ? (
-          <Alert role="status" size="sm" variant="warning">
-            <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-            <AlertDescription>{t("card.emptyOnWarning")}</AlertDescription>
-          </Alert>
-        ) : null}
-      </SwitchField>
+      />
       <SwitchField
         checked={fallback}
         description={poolInUse ? t("card.fallbackHint") : t("card.fallbackUnused")}

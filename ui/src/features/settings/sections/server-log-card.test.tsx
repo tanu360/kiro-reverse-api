@@ -10,7 +10,8 @@ import { ServerLogCard } from "./server-log-card";
 
 const ROW = "Log level";
 const DEBUG_WARNING = /Debug also writes request contents/;
-const ENV_NOTE = /LOG_LEVEL environment variable is set/;
+const ENV_NOTE = /LOG_LEVEL sets the level again at each start\./;
+const ENV_BADGE = "Set by LOG_LEVEL";
 
 let posted: Array<Promise<unknown>> = [];
 
@@ -55,6 +56,7 @@ describe("ServerLogCard", () => {
     expect(within(card).getByRole("combobox", { name: ROW })).toHaveTextContent("Info (default)");
     expect(within(card).queryByText(DEBUG_WARNING)).not.toBeInTheDocument();
     expect(within(card).queryByText(ENV_NOTE)).not.toBeInTheDocument();
+    expect(within(card).queryByText(ENV_BADGE)).not.toBeInTheDocument();
   });
 
   it("saves Debug as it is picked and warns what debug writes", async () => {
@@ -96,6 +98,7 @@ describe("ServerLogCard", () => {
     mockDb.settings.logLevelFromEnv = true;
     const { card } = await renderCard();
     expect(within(card).getByText(ENV_NOTE)).toBeInTheDocument();
+    expect(within(card).getByText(ENV_BADGE)).toBeInTheDocument();
     // The hint no longer promises the change outlives a restart.
     expect(within(card).queryByText(/kept after a restart/)).not.toBeInTheDocument();
   });

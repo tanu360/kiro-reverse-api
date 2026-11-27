@@ -1,11 +1,10 @@
-import { CheckIcon, InformationCircleIcon, LockPasswordIcon } from "@hugeicons/core-free-icons";
+import { CheckIcon, LockPasswordIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, useId, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { PasswordInput } from "@/components/shared/password-input";
 import { SaveFooter, SettingsRow, SubmitButton } from "@/components/shared/settings-rows";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSavedFlash } from "@/hooks/use-saved-flash";
 import { announce } from "@/lib/announce";
 import { settingsQuery, updateSettings } from "@/lib/api/settings";
@@ -13,7 +12,7 @@ import { reauthenticate } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { useReportDirty } from "../lib/unsaved";
 import { SECTION_ID } from "./sections";
-import { FieldControl, FooterSaveError, SettingsSection } from "./settings-section";
+import { EnvBadge, FieldControl, FooterSaveError, SettingsSection } from "./settings-section";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -147,18 +146,20 @@ export function AdminPasswordCard(): JSX.Element {
             />
           </FieldControl>
         }
-        description={t("newPasswordHint")}
+        description={
+          fromEnv
+            ? t("common:text.joinSentences", {
+                first: t("newPasswordHint"),
+                second: t("adminPasswordEnvNote"),
+              })
+            : t("newPasswordHint")
+        }
         htmlFor={inputId}
+        status={fromEnv ? <EnvBadge name="ADMIN_PASSWORD" /> : undefined}
         title={t("newPassword")}
       >
         {/* Lets password managers file the new password under the admin account. */}
         <input autoComplete="username" hidden name="username" readOnly value="admin" />
-        {fromEnv ? (
-          <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="info">
-            <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
-            <AlertDescription>{t("adminPasswordEnvNote")}</AlertDescription>
-          </Alert>
-        ) : null}
       </SettingsRow>
     </SettingsSection>
   );

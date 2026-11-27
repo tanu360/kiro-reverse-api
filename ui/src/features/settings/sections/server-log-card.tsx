@@ -1,9 +1,6 @@
-import { Alert02Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { SettingsRow } from "@/components/shared/settings-rows";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RowNote, SettingsRow } from "@/components/shared/settings-rows";
 import {
   Select,
   SelectItem,
@@ -16,7 +13,7 @@ import type { LogLevel, Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useInstantValue } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { Hint, RowActionError, SectionQuery, SettingsSection } from "./settings-section";
+import { EnvBadge, Hint, RowActionError, SectionQuery, SettingsSection } from "./settings-section";
 
 /** Most detail first, as the server ranks them. */
 const LOG_LEVELS: readonly LogLevel[] = ["debug", "info", "warn", "error"];
@@ -79,8 +76,18 @@ function ServerLogForm({ settings }: { settings: Settings }): JSX.Element {
         description={
           // LOG_LEVEL picks the level again at each start: a change is not kept then.
           <Hint more={t("serverLog.more")}>
-            {t(settings.logLevelFromEnv ? "serverLog.hintEnv" : "serverLog.hint")}
+            {settings.logLevelFromEnv
+              ? t("common:text.joinSentences", {
+                  first: t("serverLog.hintEnv"),
+                  second: t("serverLog.envNote"),
+                })
+              : t("serverLog.hint")}
           </Hint>
+        }
+        notes={
+          level.value === "debug" ? (
+            <RowNote tone="warning">{t("serverLog.debugWarning")}</RowNote>
+          ) : null
         }
         notice={
           level.failure ? (
@@ -91,22 +98,9 @@ function ServerLogForm({ settings }: { settings: Settings }): JSX.Element {
             />
           ) : null
         }
+        status={settings.logLevelFromEnv ? <EnvBadge name="LOG_LEVEL" /> : undefined}
         title={t("serverLog.level")}
-      >
-        {/* Notices under the description, each as wide as its text. */}
-        {level.value === "debug" ? (
-          <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="warning">
-            <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-            <AlertDescription>{t("serverLog.debugWarning")}</AlertDescription>
-          </Alert>
-        ) : null}
-        {settings.logLevelFromEnv ? (
-          <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="info">
-            <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
-            <AlertDescription>{t("serverLog.envNote")}</AlertDescription>
-          </Alert>
-        ) : null}
-      </SettingsRow>
+      />
     </SettingsSection>
   );
 }

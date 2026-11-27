@@ -1,10 +1,15 @@
-import { Alert02Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { RelativeTime } from "@/components/shared/relative-time";
-import { ROW_DESCRIPTION, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
-import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import {
+  ROW_DESCRIPTION,
+  RowNote,
+  SettingsRow,
+  SwitchField,
+} from "@/components/shared/settings-rows";
+import { AlertAction } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError } from "@/components/ui/field";
 import {
@@ -320,26 +325,31 @@ function HealStatusRow({
           />
         ) : null
       }
+      notes={
+        halted ? (
+          <RowNote
+            action={
+              <AlertAction>
+                <Button
+                  loading={resume.isPending}
+                  onClick={() => resume.mutate()}
+                  ref={resumeRef}
+                  size="xs"
+                  variant="tone"
+                >
+                  <HugeiconsIcon icon={PlayIcon} aria-hidden="true" />
+                  {t("selfHeal.resume")}
+                </Button>
+              </AlertAction>
+            }
+            role="status"
+            tone="warning"
+          >
+            {t("selfHeal.halted")}
+          </RowNote>
+        ) : null
+      }
       title={t("selfHeal.status")}
-    >
-      {halted ? (
-        <Alert role="status" variant="warning">
-          <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-          <AlertDescription>{t("selfHeal.halted")}</AlertDescription>
-          <AlertAction>
-            <Button
-              loading={resume.isPending}
-              onClick={() => resume.mutate()}
-              ref={resumeRef}
-              size="sm"
-              variant="tone"
-            >
-              <HugeiconsIcon icon={PlayIcon} aria-hidden="true" />
-              {t("selfHeal.resume")}
-            </Button>
-          </AlertAction>
-        </Alert>
-      ) : null}
-    </SettingsRow>
+    />
   );
 }

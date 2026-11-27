@@ -1,4 +1,9 @@
-import { CheckIcon, FloppyDiskIcon } from "@hugeicons/core-free-icons";
+import {
+  Alert02Icon,
+  CheckIcon,
+  FloppyDiskIcon,
+  InformationCircleIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
   cloneElement,
@@ -11,6 +16,7 @@ import {
   useId,
 } from "react";
 import { StatusDot } from "@/components/shared/status-dot";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { HeadingIdContext, useHeadingId } from "@/components/ui/heading-context";
 import { Label } from "@/components/ui/label";
@@ -26,6 +32,12 @@ export const ROW_DESCRIPTION = "max-w-2xl text-pretty text-muted-foreground text
 
 /** A row's inline padding (the card's), for a row element that is not a SettingsRow. */
 export const SETTINGS_ROW_X = "min-w-0 px-4";
+
+/**
+ * A row's notes (RowNote strips), stacked. On a card's last row they take the card's rounded
+ * bottom corners, as the card does not clip its children.
+ */
+const NOTES = "flex min-w-0 flex-col overflow-hidden group-last/settings-row:rounded-b-xl";
 
 type ControlWidth = "field" | "number" | "actions" | "value" | "block" | "auto";
 
@@ -108,16 +120,50 @@ function joinIds(...ids: Array<string | undefined>): string | undefined {
 type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string; "aria-label"?: string };
 
 /**
+ * A long note of a row (SettingsRow `notes`): a tinted strip along the row's bottom edge, the
+ * card's full width, so the row's text keeps the height of the control beside it. `action` is a
+ * button at the strip's end (AlertAction).
+ */
+export function RowNote({
+  tone = "info",
+  role = "note",
+  action,
+  children,
+}: {
+  tone?: "info" | "warning";
+  role?: "note" | "status";
+  action?: ReactNode;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <Alert
+      className="rounded-none border-x-0 border-b-0 px-4"
+      data-slot="row-note"
+      role={role}
+      size="sm"
+      variant={tone}
+    >
+      <HugeiconsIcon
+        icon={tone === "warning" ? Alert02Icon : InformationCircleIcon}
+        aria-hidden="true"
+      />
+      <AlertDescription>{children}</AlertDescription>
+      {action}
+    </Alert>
+  );
+}
+
+/**
  * One settings row: the title (with an optional `status` after it) and its description on the
  * left, the control at the end. The title and description ids are put on the control as
  * aria-labelledby and aria-describedby, so a control without a visible label of its own is
- * named and described by the row. `children` go under the description (a current value, a
- * field's error). `notice` (a failed action with Try again) goes last, across the whole row under
- * the text and the control. `controlWidth` sizes the control slot: a text field or select
+ * named and described by the row. `children` (a current value, a field's error) go on a line
+ * of their own under the text and the control, so the control stays level with the title and
+ * description. `notice` (a failed action with Try again) goes after them, across the whole row.
+ * `notes` (RowNote: a long warning or a note) are strips along the row's bottom edge. `controlWidth` sizes the control slot: a text field or select
  * (`field`), a number field or a select of short options (`number`), a group of buttons at their
  * own width (`actions`), a value to copy at its own width (`value`), or the control's own width
- * (`auto`: a switch or a button, beside the text and centred on it at every width, while
- * `children` such as a warning notice take the row's full width under the description). A Button
+ * (`auto`: a switch or a button, beside the text and centred on it at every width). A Button
  * control keeps its own name (its label, "Add rule"): the row title is not put on it, only the
  * description. `labelControl` overrides that either way.
  */
@@ -133,6 +179,7 @@ export function SettingsRow({
   compact = false,
   children,
   notice,
+  notes,
   className,
 }: {
   title: ReactNode;
@@ -154,9 +201,12 @@ export function SettingsRow({
    * the text from a narrower row up (COMPACT_CONTROL_WIDTH).
    */
   compact?: boolean;
+  /** Notes and field errors: under the text and the control, at the row's full width. */
   children?: ReactNode;
-  /** A failed action of the row: last, at the row's full width (both columns). */
+  /** A failed action of the row: at the row's full width (both columns). */
   notice?: ReactNode;
+  /** Long notes (RowNote): strips along the row's bottom edge, the card's full width. */
+  notes?: ReactNode;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
@@ -202,7 +252,7 @@ export function SettingsRow({
       <HeadingIdContext.Provider value={titleId}>
         <div
           className={cn(
-            "@container/settings-row grid gap-x-8 py-4",
+            "@container/settings-row group/settings-row grid gap-x-8 py-4",
             slot ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1",
             SETTINGS_ROW_X,
             className,
@@ -220,6 +270,9 @@ export function SettingsRow({
           {notice ? (
             <div className="col-span-full flex min-w-0 flex-col gap-2 pt-2">{notice}</div>
           ) : null}
+          {notes ? (
+            <div className={cn("col-span-full -mx-4 mt-4 -mb-4", NOTES)}>{notes}</div>
+          ) : null}
         </div>
       </HeadingIdContext.Provider>
     );
@@ -229,7 +282,7 @@ export function SettingsRow({
     <HeadingIdContext.Provider value={titleId}>
       <div
         className={cn(
-          "@container/settings-row flex flex-wrap items-center justify-between gap-y-3",
+          "@container/settings-row group/settings-row flex flex-wrap items-center justify-between gap-y-3",
           compact ? "gap-x-6 py-3" : "gap-x-8 py-4",
           SETTINGS_ROW_X,
           className,
@@ -244,12 +297,26 @@ export function SettingsRow({
         >
           {titleRow}
           {hint}
-          {children}
         </div>
         {slot}
+        {/*
+         * A line of its own under the text and the control, 4 px down like the description, so
+         * a tall note does not push the control off the title it sits beside.
+         */}
+        {children ? (
+          <div className="-mt-2 flex min-w-0 basis-full flex-col gap-1">{children}</div>
+        ) : null}
         {/* A line of its own under the text and the control: the row's gap less 4 px, 8 px. */}
         {notice ? (
           <div className="-mt-1 flex min-w-0 basis-full flex-col gap-2">{notice}</div>
+        ) : null}
+        {/* Out to the card's edges: as wide as the row and its inline padding (2rem). */}
+        {notes ? (
+          <div
+            className={cn("-mx-4 basis-[calc(100%+2rem)]", compact ? "-mb-3" : "mt-1 -mb-4", NOTES)}
+          >
+            {notes}
+          </div>
         ) : null}
       </div>
     </HeadingIdContext.Provider>
@@ -289,6 +356,7 @@ export function SwitchField({
   switchRef,
   children,
   notice,
+  notes,
   className,
 }: {
   checked: boolean;
@@ -299,8 +367,10 @@ export function SwitchField({
   disabled?: boolean;
   switchRef?: Ref<HTMLElement>;
   children?: ReactNode;
-  /** A failed action of the row: last, at the row's full width (SettingsRow `notice`). */
+  /** A failed action of the row: at the row's full width (SettingsRow `notice`). */
   notice?: ReactNode;
+  /** Long notes (RowNote): strips along the row's bottom edge (SettingsRow `notes`). */
+  notes?: ReactNode;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
@@ -320,6 +390,7 @@ export function SwitchField({
       controlWidth="auto"
       description={description}
       htmlFor={switchId}
+      notes={notes}
       notice={notice}
       status={status}
       title={title}

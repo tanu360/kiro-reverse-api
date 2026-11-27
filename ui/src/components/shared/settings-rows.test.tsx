@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Button } from "@/components/ui/button";
 import { renderWithProviders } from "@/test/render";
-import { SettingsRow } from "./settings-rows";
+import { RowNote, SettingsRow } from "./settings-rows";
 
 describe("SettingsRow", () => {
   it("names a field control by the row title and describes it by the row description", () => {
@@ -58,6 +58,46 @@ describe("SettingsRow", () => {
       expect(slot?.parentElement).toHaveAttribute("data-slot", "settings-row");
       expect(slot).not.toContainElement(screen.getByText("Current value"));
       expect(slot).toHaveClass(controlWidth === "auto" ? "col-span-full" : "basis-full");
+    },
+  );
+
+  it("keeps a field level with the title and description: children go under the control", () => {
+    renderWithProviders(
+      <SettingsRow control={<input />} description="Where requests go" title="Upstream">
+        <p>Current value</p>
+      </SettingsRow>,
+    );
+    const value = screen.getByText("Current value");
+    expect(
+      screen.getByRole("textbox").compareDocumentPosition(value) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByText("Where requests go").parentElement).not.toContainElement(value);
+  });
+
+  it.each(["field", "auto"] as const)(
+    "puts a %s row's notes last, as strips out to the card's edges",
+    (controlWidth) => {
+      renderWithProviders(
+        <SettingsRow
+          control={<input />}
+          controlWidth={controlWidth}
+          description="Where requests go"
+          notes={<RowNote tone="warning">Debug writes prompts to the log</RowNote>}
+          notice={<p>Could not save</p>}
+          title="Upstream"
+        />,
+      );
+      const note = screen.getByRole("note");
+      expect(note).toHaveAttribute("data-slot", "row-note");
+      expect(note).toHaveTextContent("Debug writes prompts to the log");
+      for (const before of [screen.getByText("Could not save"), screen.getByRole("textbox")]) {
+        expect(
+          before.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      }
+      const strip = note.parentElement;
+      expect(strip?.parentElement).toHaveAttribute("data-slot", "settings-row");
+      expect(strip).toHaveClass("-mx-4");
     },
   );
 });
