@@ -757,7 +757,7 @@ func extractClaudeAssistantContent(content interface{}) (string, []KiroToolUse) 
 	var toolUses []KiroToolUse
 
 	if s, ok := content.(string); ok {
-		return s, nil
+		return stripReplayedInlineThinking(s), nil
 	}
 
 	if blocks, ok := content.([]interface{}); ok {
@@ -771,7 +771,7 @@ func extractClaudeAssistantContent(content interface{}) (string, []KiroToolUse) 
 			switch blockType {
 			case "text":
 				if t, ok := block["text"].(string); ok {
-					text += t
+					text += stripReplayedInlineThinking(t)
 				}
 			case "tool_use":
 				id, _ := block["id"].(string)
@@ -1173,6 +1173,9 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		}
 	}
 
+	//! The prompt filters (Settings > System prompt filter) clean every API's system prompt, as
+	//! buildClaudeSystemPrompt does for /v1/messages.
+	systemPrompt = applyPromptFilters(systemPrompt)
 	if thinking {
 		systemPrompt = ThinkingModePrompt + "\n\n" + systemPrompt
 	}
@@ -1209,7 +1212,7 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 			}
 
 		case "assistant":
-			content := extractOpenAIMessageText(msg.Content)
+			content := extractOpenAIAssistantText(msg.Content)
 
 			var toolUses []KiroToolUse
 			for _, tc := range msg.ToolCalls {
@@ -1409,6 +1412,38 @@ func extractOpenAIUserContent(content interface{}) (string, []KiroImage) {
 	}
 
 	return text, images
+}
+
+// extractOpenAIAssistantText is an assistant message's answer text for Kiro history: its text
+// parts without reasoning parts or inline thinking (thinking_history.go), and nothing else. An
+// assistant turn with no text (only reasoning, or only tool calls) has empty content, never
+// the parts as JSON.
+func extractOpenAIAssistantText(content interface{}) string {
+	switch v := content.(type) {
+	case string:
+		return stripReplayedInlineThinking(v)
+	case map[string]interface{}:
+		if _, typed := v["type"]; !typed {
+			if nested, ok := v["content"]; ok {
+				return extractOpenAIAssistantText(nested)
+			}
+		}
+		return extractOpenAIAssistantText([]interface{}{v})
+	case []interface{}:
+		var b strings.Builder
+		for _, item := range v {
+			switch part := item.(type) {
+			case string:
+				b.WriteString(part)
+			case map[string]interface{}:
+				if t, ok := extractOpenAITextPart(part); ok {
+					b.WriteString(t)
+				}
+			}
+		}
+		return stripReplayedInlineThinking(b.String())
+	}
+	return ""
 }
 
 func extractOpenAIMessageText(content interface{}) string {
@@ -1936,6 +1971,9 @@ func isSyntheticConversationAnchor(anchor string) bool {
 
 func extractOpenAITextPart(part map[string]interface{}) (string, bool) {
 	partType, _ := part["type"].(string)
+	if isReasoningPartType(partType) {
+		return "", false
+	}
 	switch partType {
 	case "text", "input_text", "output_text":
 		if t, ok := part["text"].(string); ok {

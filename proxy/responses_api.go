@@ -234,7 +234,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits,
-				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens), upstreamStopReason)
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(ctx, payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
@@ -257,6 +257,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				upstreamStopReason = inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload))
 			}
 			applyResponsesStopReason(response, upstreamStopReason)
+			storedMessages = withoutEmptyRefusalAnswer(response, storedMessages, upstreamStopReason, finalContent, toolUses)
 			if prepared.Store {
 				if err := saveResponseState(responseStateFromObject(response, storedMessages)); err != nil {
 					logger.Warnf("[Responses] Failed to persist response %s: %v", responseIDFromObject(response), err)
@@ -726,7 +727,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits,
-				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens), upstreamStopReason)
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(ctx, payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
@@ -747,7 +748,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			}
 			finishReasoning()
 			finishMessage()
-			if !messageAdded && len(toolUses) == 0 {
+			if !messageAdded && len(toolUses) == 0 && !emptyRefusal(upstreamStopReason, finalContent, toolUses) {
 				reserveOutputItem(nextOutputIndex, buildResponsesMessageOutputItem(messageItemID, finalContent))
 				nextOutputIndex++
 			}
@@ -757,6 +758,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				upstreamStopReason = inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload))
 			}
 			terminalEvent := applyResponsesStopReason(response, upstreamStopReason)
+			storedMessages = withoutEmptyRefusalAnswer(response, storedMessages, upstreamStopReason, finalContent, toolUses)
 			sendResponsesSSE(w, flusher, terminalEvent, map[string]interface{}{
 				"type":     terminalEvent,
 				"response": response,
@@ -847,6 +849,33 @@ func buildResponsesBaseObject(id string, createdAt int64, status string, prepare
 		response["metadata"] = prepared.Metadata
 	}
 	return response
+}
+
+// emptyRefusal reports a refused turn with no words and no tool call: its answer is nothing.
+func emptyRefusal(stopReason, content string, toolUses []KiroToolUse) bool {
+	return content == "" && len(toolUses) == 0 && mapClaudeStopReason(stopReason, 0) == "refusal"
+}
+
+// withoutEmptyRefusalAnswer drops what an empty refusal would otherwise carry: the output's
+// message item with no text (a completed message the model never wrote) and the empty assistant
+// message a stored response would replay on previous_response_id. A refusal in words keeps both.
+func withoutEmptyRefusalAnswer(response map[string]interface{}, stored []OpenAIMessage, stopReason, content string, toolUses []KiroToolUse) []OpenAIMessage {
+	if !emptyRefusal(stopReason, content, toolUses) {
+		return stored
+	}
+	if output, ok := response["output"].([]map[string]interface{}); ok {
+		kept := make([]map[string]interface{}, 0, len(output))
+		for _, item := range output {
+			if item["type"] != "message" {
+				kept = append(kept, item)
+			}
+		}
+		response["output"] = kept
+	}
+	if n := len(stored); n > 0 && stored[n-1].Role == "assistant" {
+		stored = stored[:n-1]
+	}
+	return stored
 }
 
 func buildResponsesOutput(content, reasoning string, toolUses []KiroToolUse) []map[string]interface{} {

@@ -368,6 +368,10 @@ func responseInputItemToMessages(item interface{}, field string) ([]OpenAIMessag
 	switch itemType {
 	case "additional_tools":
 		return nil, nil
+	case "reasoning":
+		//! Reasoning reaches Kiro only as signed reasoning, never as text (thinking_history.go);
+		//! a Responses reasoning item has no Kiro signature, so it is dropped even with a role.
+		return nil, nil
 	case "agent_message":
 		var parts []string
 		if content, ok := obj["content"].([]interface{}); ok {

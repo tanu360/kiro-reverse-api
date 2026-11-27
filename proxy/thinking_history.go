@@ -12,6 +12,52 @@ import (
 //! reasoning as <thinking> text. Signed thinking and redacted_thinking blocks travel as
 //! KiroAssistantResponseMessage.Reasoning (generateAssistantResponse's reasoningContent, or
 //! CreateResponse reasoning items); thinking without a signature cannot, so it is dropped.
+//! That holds for reasoning inside an assistant message's text too: the <think> or
+//! <thinking> block this proxy puts at the head of an answer (the "think" and "thinking"
+//! output formats) comes back verbatim from clients that replay content, and reasoning
+//! content parts (OpenAI reasoning, summary_text, thinking) are not answer text.
+
+// isReasoningPartType reports whether an OpenAI or Responses content part carries reasoning
+// rather than answer text.
+func isReasoningPartType(partType string) bool {
+	switch partType {
+	case "reasoning", "reasoning_text", "summary_text", "thinking", "redacted_thinking":
+		return true
+	}
+	return false
+}
+
+// stripReplayedInlineThinking takes the reasoning out of replayed assistant text: the
+// <thinking> or <think> blocks at its head, where this proxy and Kiro put them. A block that
+// never closes was cut off mid-thought, so all of it is reasoning. A tag later in the text is
+// the answer quoting it and stays.
+func stripReplayedInlineThinking(text string) string {
+	rest := text
+	stripped := false
+	for {
+		trimmed := strings.TrimLeft(rest, " \t\r\n")
+		open, close := "", ""
+		switch {
+		case strings.HasPrefix(trimmed, "<thinking>"):
+			open, close = "<thinking>", "</thinking>"
+		case strings.HasPrefix(trimmed, "<think>"):
+			open, close = "<think>", "</think>"
+		}
+		if open == "" {
+			break
+		}
+		stripped = true
+		end := strings.Index(trimmed[len(open):], close)
+		if end == -1 {
+			return ""
+		}
+		rest = trimmed[len(open)+end+len(close):]
+	}
+	if !stripped {
+		return text
+	}
+	return strings.TrimLeft(rest, " \t\r\n")
+}
 
 // claudeThinkingReplay decides, assistant message by assistant message, whether the
 // thinking blocks a client sent back are replayed into Kiro history.
@@ -178,6 +224,39 @@ func withoutReplayedReasoning(payload *KiroPayload) *KiroPayload {
 		stripped.ConversationState.History[i] = entry
 	}
 	return &stripped
+}
+
+// hasMultiBlockReasoning reports whether an assistant message replays more than one reasoning
+// block (interleaved thinking).
+func hasMultiBlockReasoning(payload *KiroPayload) bool {
+	for _, entry := range payload.ConversationState.History {
+		if a := entry.AssistantResponseMessage; a != nil && len(a.Reasoning) > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// withoutMultiBlockReasoning is a copy of the payload whose assistant messages with more than
+// one reasoning block replay none; single blocks stay. The caller's payload is left as it was.
+func withoutMultiBlockReasoning(payload *KiroPayload) *KiroPayload {
+	trimmed := *payload
+	trimmed.ConversationState.History = make([]KiroHistoryMessage, len(payload.ConversationState.History))
+	for i, entry := range payload.ConversationState.History {
+		if a := entry.AssistantResponseMessage; a != nil && len(a.Reasoning) > 1 {
+			copied := *a
+			copied.Reasoning = nil
+			entry.AssistantResponseMessage = &copied
+		}
+		trimmed.ConversationState.History[i] = entry
+	}
+	return &trimmed
+}
+
+// isRequestBodyRejection reports Kiro's 400 REQUEST_BODY_INVALID ("Improperly formed request.").
+func isRequestBodyRejection(err error) bool {
+	var client *upstreamClientError
+	return errors.As(err, &client) && client.status == http.StatusBadRequest && strings.Contains(client.message, "REQUEST_BODY_INVALID")
 }
 
 // isReasoningRejection reports Kiro's 400 for replayed reasoning it does not accept. Both

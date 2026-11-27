@@ -1,6 +1,9 @@
 package proxy
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 //! Kiro's reasoningContentEvent is flat: {"text"?, "signature"?, "redactedContent"?}, the same
 //! shape as Bedrock's ReasoningContentBlockDelta. The signature usually comes as its own event
@@ -79,6 +82,25 @@ func applyClaudeThinkingExtras(blocks []ClaudeContentBlock, signature string, re
 		result = append(result, ClaudeContentBlock{Type: "redacted_thinking", Data: data})
 	}
 	return append(result, blocks[insertAt:]...)
+}
+
+// splitSignedThinking gives each thinking block Kiro signed its own signature. Interleaved
+// thinking (reasoning, a tool call, more reasoning) arrives as several signed blocks; merged
+// into one block under the last signature, it failed Kiro's check when a client replayed it,
+// and the retry without reasoning dropped all of it. It applies only when the response's
+// first block is exactly those blocks' reasoning, merged.
+func splitSignedThinking(blocks []ClaudeContentBlock, signed []ClaudeContentBlock) []ClaudeContentBlock {
+	if len(signed) < 2 || len(blocks) == 0 || blocks[0].Type != "thinking" {
+		return blocks
+	}
+	var merged strings.Builder
+	for _, block := range signed {
+		merged.WriteString(block.Thinking)
+	}
+	if strings.TrimSpace(merged.String()) != strings.TrimSpace(blocks[0].Thinking) {
+		return blocks
+	}
+	return append(append([]ClaudeContentBlock(nil), signed...), blocks[1:]...)
 }
 
 // MarshalJSON writes the fields the Messages API always sends for a block type even when they

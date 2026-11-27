@@ -40,6 +40,9 @@ type responsesSSEAdapter struct {
 	textStreamed map[string]bool
 	// reasoningStreamed is whether the reasoning item in progress sent its text as deltas.
 	reasoningStreamed bool
+	// refused is whether the answer held a refusal part: the model declined, so the turn ends
+	// with a refusal stop reason rather than END_TURN.
+	refused bool
 }
 
 // responsesSSESource reads a CreateResponse event stream as generateAssistantResponse events.
@@ -121,11 +124,13 @@ func (a *responsesSSEAdapter) event(event map[string]interface{}) error {
 			a.emit("assistantResponseEvent", map[string]interface{}{"content": text})
 		}
 	case "response.refusal.delta":
+		a.refused = true
 		if delta, _ := event["delta"].(string); delta != "" {
 			a.textStreamed[responsesPartKey(event)] = true
 			a.emit("assistantResponseEvent", map[string]interface{}{"content": delta})
 		}
 	case "response.refusal.done":
+		a.refused = true
 		if refusal, _ := event["refusal"].(string); refusal != "" && !a.textStreamed[responsesPartKey(event)] {
 			a.emit("assistantResponseEvent", map[string]interface{}{"content": refusal})
 		}
@@ -292,6 +297,9 @@ func (a *responsesSSEAdapter) completed(eventType string, event map[string]inter
 		} else if reason != "" {
 			stopReason = strings.ToUpper(reason)
 		}
+	}
+	if a.refused && stopReason == "END_TURN" {
+		stopReason = "REFUSAL"
 	}
 	metadata := map[string]interface{}{"stopReason": stopReason}
 	usage, _ := response["usage"].(map[string]interface{})

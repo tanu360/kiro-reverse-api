@@ -360,12 +360,18 @@ func TestFlattenStructuredToolHistoryMatchesNarratedMode(t *testing.T) {
 		msgs := openAIToolLoop(3, "exec_command")
 		return &OpenAIRequest{Model: "claude-opus-4.8", Messages: msgs[:len(msgs)-1], Tools: []OpenAITool{testOpenAIFunctionTool("exec_command")}}
 	}
-	structured := OpenAIToKiro(req(), false)
-	if !flattenStructuredToolHistory(structured) {
+	original := OpenAIToKiro(req(), false)
+	before, _ := json.Marshal(original.ConversationState.History)
+	structured := flattenedToolHistory(original)
+	if structured == nil {
 		t.Fatal("expected structured history to be flattened")
 	}
-	if flattenStructuredToolHistory(structured) {
+	if flattenedToolHistory(structured) != nil {
 		t.Fatal("a flattened payload has nothing left to flatten")
+	}
+	//! Account failover and the other endpoints still need the structured history.
+	if after, _ := json.Marshal(original.ConversationState.History); string(after) != string(before) {
+		t.Fatalf("flattening changed the caller's payload:\n%s\nwant\n%s", after, before)
 	}
 	if err := config.UpdateStructuredToolHistory(false); err != nil {
 		t.Fatal(err)

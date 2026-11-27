@@ -187,14 +187,31 @@ func payloadHasStructuredToolHistory(payload *KiroPayload) bool {
 	return false
 }
 
-// flattenStructuredToolHistory rewrites the payload's history the way narrated
-// mode builds it. It reports whether there was anything to flatten.
-func flattenStructuredToolHistory(payload *KiroPayload) bool {
+// flattenedToolHistory is a copy of the payload whose history is rewritten the way narrated
+// mode builds it, or nil when there is nothing to flatten. The history entries' messages and
+// their tool context are copied too (sanitizeKiroHistory writes through them), so the caller's
+// payload keeps its structured history for account failover and the other endpoints.
+func flattenedToolHistory(payload *KiroPayload) *KiroPayload {
 	if !payloadHasStructuredToolHistory(payload) {
-		return false
+		return nil
 	}
 	ids := currentPayloadToolResultIDs(payload)
-	history := payload.ConversationState.History
+	history := make([]KiroHistoryMessage, len(payload.ConversationState.History))
+	for i, entry := range payload.ConversationState.History {
+		if entry.UserInputMessage != nil {
+			user := *entry.UserInputMessage
+			if user.UserInputMessageContext != nil {
+				context := *user.UserInputMessageContext
+				user.UserInputMessageContext = &context
+			}
+			entry.UserInputMessage = &user
+		}
+		if entry.AssistantResponseMessage != nil {
+			assistant := *entry.AssistantResponseMessage
+			entry.AssistantResponseMessage = &assistant
+		}
+		history[i] = entry
+	}
 	for i := range history {
 		a := history[i].AssistantResponseMessage
 		if a == nil || len(a.ToolUses) == 0 {
@@ -207,25 +224,30 @@ func flattenStructuredToolHistory(payload *KiroPayload) bool {
 				uses[j].Name = clientName
 			}
 		}
-		copied := *a
-		copied.ToolUses = uses
-		history[i].AssistantResponseMessage = &copied
+		a.ToolUses = uses
 	}
-	payload.ConversationState.History = sanitizeKiroHistory(history, ids)
-	return true
+	flat := *payload
+	flat.ConversationState.History = sanitizeKiroHistory(history, ids)
+	return &flat
 }
 
 // callWithToolHistoryFallback retries once with narrated history when upstream
 // answers 400 to a payload that carried structured tool history. A 400 happens
 // before any stream output, so the retry cannot duplicate text.
-func callWithToolHistoryFallback(payload *KiroPayload, call func() error) error {
-	err := call()
-	//! Narrating the tool history does not shorten an input over the context window.
-	if !isUpstreamBadRequest(err) || isContextOverflowError(err) || !flattenStructuredToolHistory(payload) {
+func callWithToolHistoryFallback(payload *KiroPayload, call func(*KiroPayload) error) error {
+	err := call(payload)
+	//! Narrating the tool history does not shorten an input over the context window, and a 400
+	//! about the model (another account may serve it) or the replayed reasoning is not about
+	//! tool history.
+	if !isUpstreamBadRequest(err) || isContextOverflowError(err) || isModelRefusal(err) || isReasoningRejection(err) {
+		return err
+	}
+	flat := flattenedToolHistory(payload)
+	if flat == nil {
 		return err
 	}
 	logger.Warnf("[ToolHistory] Kiro rejected structured tool history (%v); retrying with narrated tool history", err)
-	retryErr := call()
+	retryErr := call(flat)
 	if retryErr != nil && !isStreamIntegrityError(retryErr) {
 		//! Only a narrated retry that reached a 200 stream proves tool history was the cause;
 		//! a 4xx, 429, 5xx, network error or cancellation says nothing about it.

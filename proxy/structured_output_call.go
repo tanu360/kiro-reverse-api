@@ -181,8 +181,13 @@ func (a *structuredAttempt) flush() {
 	a.splitter.Flush(a.recordAnswer, a.recordThinking)
 }
 
-// canRetry rules out answers a retry cannot fix: one cut at the output cap would be cut again.
+// canRetry rules out answers a retry cannot fix: one cut at the output cap would be cut again,
+// and a refusal (the model declined the prompt) would be paid for again and, answered in prose,
+// lose its stop reason.
 func (a *structuredAttempt) canRetry(payload *KiroPayload) bool {
+	if mapClaudeStopReason(a.stopReason, 0) == "refusal" {
+		return false
+	}
 	return !isOutputCapStopReason(inferMaxTokensStop(a.stopReason, a.outputTokens, requestedMaxTokens(payload)))
 }
 

@@ -1568,7 +1568,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
-				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
+				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens), upstreamStopReason)
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
@@ -1722,11 +1722,16 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			var thinkingSignature string
 			var redactedThinking []string
 			var stopSequence *string
+			// signedThinking holds each thinking block Kiro signed, in order; openThinking is the
+			// reasoning since the last signature.
+			var signedThinking []ClaudeContentBlock
+			var openThinking string
 
 			callback := &KiroStreamCallback{
 				OnText: func(text string, isThinking bool) {
 					if isThinking {
 						thinkingContent += text
+						openThinking += text
 					} else {
 						content += text
 					}
@@ -1752,9 +1757,14 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				OnCacheUsage: func(read, write int) {
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
-				//! All reasoning merges into one thinking block, so it carries the last signature.
-				OnThinkingSignature: func(signature string) { thinkingSignature = signature },
-				OnRedactedThinking:  func(data string) { redactedThinking = append(redactedThinking, data) },
+				//! All reasoning merges into one thinking block, so it carries the last signature;
+				//! splitSignedThinking splits it back when Kiro signed several blocks.
+				OnThinkingSignature: func(signature string) {
+					thinkingSignature = signature
+					signedThinking = append(signedThinking, ClaudeContentBlock{Type: "thinking", Thinking: openThinking, Signature: signature})
+					openThinking = ""
+				},
+				OnRedactedThinking: func(data string) { redactedThinking = append(redactedThinking, data) },
 			}
 			dropDisabledClaudeThinkingExtras(callback, thinking, thinkingOpts.Format)
 
@@ -1793,7 +1803,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
-				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
+				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens), upstreamStopReason)
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
@@ -1819,6 +1829,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 
 			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
 			resp.Content = applyClaudeThinkingExtras(resp.Content, thinkingSignature, redactedThinking)
+			resp.Content = splitSignedThinking(resp.Content, signedThinking)
 			resp.StopReason = mapClaudeStopReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
 			resp.StopSequence = claudeStopSequence(resp.StopReason, stopSequence)
 			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
@@ -2404,7 +2415,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
-				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens), upstreamStopReason)
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
@@ -2567,7 +2578,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
-				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens), upstreamStopReason)
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)

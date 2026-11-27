@@ -416,8 +416,8 @@ func getSortedEndpoints(preferred string) []kiroEndpoint {
 
 func CallKiroAPIContext(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	noteResponseAccount(ctx, account)
-	return callWithToolHistoryFallback(payload, func() error {
-		return callKiroAPIContextOnce(ctx, account, payload, callback)
+	return callWithToolHistoryFallback(payload, func(p *KiroPayload) error {
+		return callKiroAPIContextOnce(ctx, account, p, callback)
 	})
 }
 
@@ -972,6 +972,12 @@ func upstreamEventStreamError(messageType string, headers map[string]string, eve
 		detail = kind
 	case detail == "":
 		detail = messageType
+	}
+	//! A ValidationException is about the request, not the account or the moment: every account
+	//! and endpoint answers it the same, so it is a 400 (no retry, no account error), and an
+	//! input over the context window reads as one (isContextOverflowError).
+	if strings.EqualFold(kind, "ValidationException") {
+		return &upstreamClientError{status: http.StatusBadRequest, message: detail}
 	}
 	return fmt.Errorf("%w: %s", errKiroEventStreamUpstream, detail)
 }

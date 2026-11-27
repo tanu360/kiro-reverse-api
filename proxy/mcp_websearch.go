@@ -552,8 +552,11 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 			finish()
 			return nil
 		}
-		next = buildWebSearchFollowupPayload(next, searches, results, said.String())
-		hooks.countRound(searchRoundUsage(roundIn, roundOut, contextUsage, said.String(), reasoning.String(), searches, next))
+		//! generateAssistantResponse streams thinking inline as <thinking> text; the follow-up
+		//! replays only the answer, since Claude 5 refuses reasoning as history text.
+		answer, inlineThinking := splitInlineThinking(said.String())
+		next = buildWebSearchFollowupPayload(next, searches, results, answer)
+		hooks.countRound(searchRoundUsage(roundIn, roundOut, contextUsage, answer, reasoning.String()+inlineThinking, searches, next))
 		if callback.onFollowupPayload != nil {
 			callback.onFollowupPayload(next)
 		}

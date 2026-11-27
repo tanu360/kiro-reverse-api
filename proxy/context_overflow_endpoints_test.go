@@ -44,7 +44,7 @@ func TestContextOverflowEndsAtTheFirstEndpoint(t *testing.T) {
 		mu.Unlock()
 		http.Error(w, contextOverflowBody, http.StatusBadRequest)
 	})
-	if !flattenStructuredToolHistory(payloadWithToolHistory()) {
+	if flattenedToolHistory(payloadWithToolHistory()) == nil {
 		t.Fatal("the payload has no tool history to narrate")
 	}
 

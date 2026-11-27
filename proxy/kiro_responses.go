@@ -70,6 +70,17 @@ func applyKiroResponsesHeaders(req *http.Request, account *config.Account, profi
 func callKiroResponsesAPI(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	request := buildKiroResponsesRequest(payload)
 	err := sendKiroResponses(ctx, account, payload.ProfileArn, request, callback)
+	if isRequestBodyRejection(err) && hasMultiBlockReasoning(payload) {
+		//! Sonnet answers REQUEST_BODY_INVALID to an assistant message with more than one
+		//! reasoning item (interleaved thinking; recorded live), where Opus takes them. Those
+		//! messages lose their reasoning, as generateAssistantResponse replays only a message's
+		//! single block; the others keep theirs.
+		logger.Warnf("[KiroResponses] Kiro rejected a message with several reasoning blocks (%v); retrying with one block per message at most", err)
+		traceEndpointFallback(ctx, account, kiroResponsesEndpointName, err)
+		payload = withoutMultiBlockReasoning(payload)
+		request = buildKiroResponsesRequest(payload)
+		err = sendKiroResponses(ctx, account, payload.ProfileArn, request, callback)
+	}
 	if !isReasoningRejection(err) || !replaysReasoning(request) {
 		return err
 	}
