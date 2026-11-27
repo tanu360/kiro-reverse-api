@@ -1,5 +1,5 @@
 {
-  "version": "4.1.9",
-  "changelog": "🧭 The sidebar is back to its usual look, minus the arrows that did nothing. A page's views (Needs attention, Server and the rest) now sit visibly under their page: smaller, quieter rows, with the page above them as their heading.",
+  "version": "4.2.0",
+  "changelog": "🧭 Every page now shows how settings depend on each other: a control another setting makes do nothing stays visible, turns off and says why, and notes appear where one setting overrides another. Kiro's newer chat API is marked New, and replayed thinking now goes to Kiro as reasoning, so clients no longer see \"Provider blocked the response\".",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
