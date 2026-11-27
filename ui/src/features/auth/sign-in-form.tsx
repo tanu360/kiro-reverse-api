@@ -229,7 +229,8 @@ export function SignInForm({
           {pending ? null : <AnimatedIcon icon={LogInIcon} aria-hidden="true" />}
           {t("verify")}
         </Button>
-        <div className="-mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        {/* The labels, not the invisible boxes, line up with the form's edges. */}
+        <div className="-mx-2.5 -mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:-mx-3">
           <Button
             onClick={() => {
               setRecovery((current) => !current);

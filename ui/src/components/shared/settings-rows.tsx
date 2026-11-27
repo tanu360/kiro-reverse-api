@@ -6,6 +6,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
+  Children,
   cloneElement,
   isValidElement,
   type JSX,
@@ -37,7 +38,7 @@ export const SETTINGS_ROW_X = "min-w-0 px-4";
  * A row's notes (RowNote strips), stacked. On a card's last row they take the card's rounded
  * bottom corners, as the card does not clip its children.
  */
-const NOTES = "flex min-w-0 flex-col overflow-hidden group-last/settings-row:rounded-b-xl";
+const NOTES = "flex min-w-0 flex-col overflow-hidden group-last/settings-row:rounded-b-xl-inner";
 
 type ControlWidth = "field" | "number" | "actions" | "value" | "block" | "auto";
 
@@ -244,6 +245,8 @@ export function SettingsRow({
   ) : null;
   const width = (compact && COMPACT_CONTROL_WIDTH[controlWidth]) || CONTROL_WIDTH[controlWidth];
   const slot = wired ? <div className={width}>{wired}</div> : null;
+  // Children that all render nothing (conditions that came out null) leave no empty line.
+  const hasChildren = Children.toArray(children).length > 0;
 
   if (controlWidth === "auto") {
     // Two columns: the title and description beside the control, which sits centred on them;
@@ -252,7 +255,8 @@ export function SettingsRow({
       <HeadingIdContext.Provider value={titleId}>
         <div
           className={cn(
-            "@container/settings-row group/settings-row grid gap-x-8 py-4",
+            "@container/settings-row group/settings-row grid",
+            compact ? "gap-x-6 py-3" : "gap-x-8 py-4",
             slot ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1",
             SETTINGS_ROW_X,
             className,
@@ -264,14 +268,18 @@ export function SettingsRow({
             {hint}
           </div>
           {slot}
-          {children ? (
+          {hasChildren ? (
             <div className="col-span-full flex min-w-0 flex-col gap-1 pt-1">{children}</div>
           ) : null}
           {notice ? (
             <div className="col-span-full flex min-w-0 flex-col gap-2 pt-2">{notice}</div>
           ) : null}
           {notes ? (
-            <div className={cn("col-span-full -mx-4 mt-4 -mb-4", NOTES)}>{notes}</div>
+            <div
+              className={cn("col-span-full -mx-4", compact ? "mt-3 -mb-3" : "mt-4 -mb-4", NOTES)}
+            >
+              {notes}
+            </div>
           ) : null}
         </div>
       </HeadingIdContext.Provider>
@@ -303,7 +311,7 @@ export function SettingsRow({
          * A line of its own under the text and the control, 4 px down like the description, so
          * a tall note does not push the control off the title it sits beside.
          */}
-        {children ? (
+        {hasChildren ? (
           <div className="-mt-2 flex min-w-0 basis-full flex-col gap-1">{children}</div>
         ) : null}
         {/* A line of its own under the text and the control: the row's gap less 4 px, 8 px. */}

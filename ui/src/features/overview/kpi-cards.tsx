@@ -298,9 +298,10 @@ export function KpiCard({
             className="flex min-w-0 flex-1 items-center justify-between gap-2 p-4 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline"
           >
             <span className="min-w-0 truncate">{footer.linkLabel}</span>
+            {/* Pulled 2 px to the end: the arrow sits well inside its box. */}
             <HugeiconsIcon
               aria-hidden="true"
-              className="size-4 shrink-0"
+              className="-me-0.5 size-4 shrink-0"
               icon={ArrowUpRight01Icon}
             />
           </Link>

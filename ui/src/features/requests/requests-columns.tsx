@@ -292,7 +292,15 @@ export function RequestCard({
   const cache = record.inTokens > 0;
   return (
     <ListCard
-      action={details && record.requestId ? <RequestIdCopy record={record} /> : undefined}
+      action={
+        details && record.requestId ? (
+          // The copy button is icon-xs (a 6 px icon inset at every width): give back what the
+          // card's pull for an icon button (8 / 10 / 12 px) takes beyond that.
+          <span className="me-0.5 sm:me-1 sm:pointer-coarse:me-1.5">
+            <RequestIdCopy record={record} />
+          </span>
+        ) : undefined
+      }
       leading={<StatusNode record={record} />}
       onOpen={onOpen}
       openDescription={onOpen ? summary(record) : undefined}

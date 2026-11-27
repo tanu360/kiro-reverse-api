@@ -56,7 +56,7 @@ import { formatDateTime } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { digitsOnly } from "@/lib/input-filters";
 import { SECTION_ID } from "./sections";
-import { EnvBadge, Hint, SectionQuery, SettingsGroup } from "./settings-section";
+import { EnvBadge, Hint, RowAction, SectionQuery, SettingsGroup } from "./settings-section";
 import { parseQrSvg, StyledQr } from "./styled-qr";
 
 /** Settings card for admin two-factor sign-in with an authenticator app. */
@@ -118,11 +118,13 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
         <>
           <SettingsRow
             control={
-              <Button onClick={() => open("disable")} ref={signInRef} size="sm" variant="danger">
-                {t("twoFactor.turnOff")}
-              </Button>
+              <RowAction>
+                <Button onClick={() => open("disable")} ref={signInRef} size="sm" variant="danger">
+                  {t("twoFactor.turnOff")}
+                </Button>
+              </RowAction>
             }
-            controlWidth="auto"
+            controlWidth="actions"
             description={
               <Hint more={lockout}>
                 {status.enabledAt
@@ -136,12 +138,14 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
           />
           <SettingsRow
             control={
-              <Button onClick={() => open("codes")} size="sm" variant="secondary">
-                <HugeiconsIcon icon={Key01Icon} aria-hidden="true" />
-                {t("twoFactor.newCodes")}
-              </Button>
+              <RowAction>
+                <Button onClick={() => open("codes")} size="sm" variant="secondary">
+                  <HugeiconsIcon icon={Key01Icon} aria-hidden="true" />
+                  {t("twoFactor.newCodes")}
+                </Button>
+              </RowAction>
             }
-            controlWidth="auto"
+            controlWidth="actions"
             description={t("twoFactor.codesLeft", { count: status.recoveryCodesLeft })}
             notes={
               status.recoveryCodesLeft <= 2 ? (
@@ -154,18 +158,20 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
       ) : (
         <SettingsRow
           control={
-            <Button
-              disabled={status.resetByEnv}
-              onClick={() => open("setup")}
-              ref={signInRef}
-              size="sm"
-              variant="secondary"
-            >
-              <HugeiconsIcon icon={SecurityCheckIcon} aria-hidden="true" />
-              {t("twoFactor.turnOn")}
-            </Button>
+            <RowAction>
+              <Button
+                disabled={status.resetByEnv}
+                onClick={() => open("setup")}
+                ref={signInRef}
+                size="sm"
+                variant="secondary"
+              >
+                <HugeiconsIcon icon={SecurityCheckIcon} aria-hidden="true" />
+                {t("twoFactor.turnOn")}
+              </Button>
+            </RowAction>
           }
-          controlWidth="auto"
+          controlWidth="actions"
           description={
             <Hint more={lockout}>
               {status.resetByEnv
@@ -548,7 +554,8 @@ function DisableDialog({
             />
           )}
           <Button
-            className="self-start"
+            // The label (or its icon), not the invisible box, lines up with the fields above.
+            className="-ms-2.5 self-start has-[>svg]:-ms-2 sm:-ms-3 sm:has-[>svg]:-ms-2.5"
             onClick={() => {
               setWithPassword((current) => !current);
               setError(null);

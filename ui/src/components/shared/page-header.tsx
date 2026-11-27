@@ -2,6 +2,7 @@ import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CompactOnPhone } from "@/components/ui/compact-actions";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -137,7 +138,8 @@ export function PageHeaderLayout({
           data-wrapped={wrapped ? "" : undefined}
           ref={actionsRef}
         >
-          {actions}
+          {/* On a phone icon buttons, as every header's actions there. */}
+          <CompactOnPhone>{actions}</CompactOnPhone>
         </div>
       ) : null}
     </div>

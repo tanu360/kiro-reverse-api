@@ -170,7 +170,6 @@
   "metadata.tagLimit": "Already has {max} tags",
   "models.refreshAll": "Refresh models",
   "models.refreshAllNone": "No account is in rotation, so there is nothing to refresh.",
-  "models.refreshShort": "Models",
   "models.confirmRefreshAll": "Refresh models for all enabled accounts?",
   "models.refreshing": "Refreshing models…",
   "models.refreshAllDone": "Models refreshed. {count} available.",

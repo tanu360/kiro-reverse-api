@@ -195,8 +195,9 @@ export function AccountPicks({
         <fieldset className="flex min-w-0 flex-col gap-1.5">
           <legend className="mb-1.5 text-muted-foreground text-xs">{t("form.accountTags")}</legend>
           {/* One row that scrolls sideways, its ends fading while more tags are past them. */}
-          <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
-            <div className="flex w-max gap-x-4">
+          {/* The 4 px bleed (-m-1 with p-1 inside) keeps the checkboxes' focus outline unclipped. */}
+          <ScrollArea className="-m-1 h-auto" clampContentMinWidth={false} scrollFade>
+            <div className="flex w-max gap-x-4 p-1">
               {tagRows.map((option) => {
                 const id = `${baseId}-tag-${tagKey(option.tag)}`;
                 const checked = pickedTags.has(tagKey(option.tag));

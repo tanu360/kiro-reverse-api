@@ -3,6 +3,7 @@ import type { IconSvgElement } from "@hugeicons/react";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
+import { useCompactActions } from "@/components/ui/compact-actions";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { announce } from "@/lib/announce";
 import { copyText } from "@/lib/clipboard";
@@ -80,7 +81,9 @@ export function CopyButton({
     }, COPIED_MS);
   };
 
-  const iconOnly = !showLabel;
+  // A labelled copy button keeps only its icon where actions show compact (a phone's headers).
+  const compact = useCompactActions();
+  const iconOnly = !showLabel || compact;
   const Icon = copied ? CheckIcon : failed ? AlertCircleIcon : icon;
   const said = copied ? t("copy.copied") : failed ? t("copy.failed") : label;
   const button = (
@@ -90,8 +93,8 @@ export function CopyButton({
       data-copied={copied ? "" : undefined}
       data-copy-failed={failed ? "" : undefined}
       onClick={onClick}
-      size={iconOnly ? (size === "sm" ? "icon" : size) : "sm"}
-      variant={variant ?? (iconOnly ? "ghost" : "secondary")}
+      size={showLabel ? (iconOnly ? "icon-sm" : "sm") : size === "sm" ? "icon" : size}
+      variant={variant ?? (showLabel ? "secondary" : "ghost")}
     >
       <AnimatedIcon
         icon={Icon}

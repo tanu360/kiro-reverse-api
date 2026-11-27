@@ -6,6 +6,7 @@ import { ThemeSwitch } from "@/components/layout/theme-switch";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { AppIcon } from "@/components/shared/app-icon";
 import { Button } from "@/components/ui/button";
+import { CompactOnPhone } from "@/components/ui/compact-actions";
 import { Separator } from "@/components/ui/separator";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -51,15 +52,22 @@ export function UserShell({
             <AppIcon className="size-5 max-w-none shrink-0 rounded-sm" size={20} />
             <span className="truncate font-semibold text-base">{t("shell.appName")}</span>
           </Link>
-          {/* The last button's label sits on the page's right edge, as the admin header's glyph. */}
-          <div className="-me-2.5 flex shrink-0 items-center gap-0.5 sm:gap-1">
+          {/*
+            The last button's icon (a phone) or label sits on the page's right edge, as the admin
+            header's glyph: pulled by its icon inset (8 px) or end padding (12 px). Default size,
+            as tall as the icon buttons.
+          */}
+          <div className="-me-2 flex shrink-0 items-center gap-0.5 sm:-me-3 sm:gap-1">
             <LanguageSwitch />
             <ThemeSwitch variant="menu" />
             <Separator className="mx-1 h-4 self-center" orientation="vertical" />
-            <Button loading={signingOut} onClick={onSignOut} size="sm" variant="ghost">
-              <AnimatedIcon icon={LogOutIcon} aria-hidden="true" />
-              {t("shell.signOut")}
-            </Button>
+            {/* On a phone an icon button, as the switches beside it. */}
+            <CompactOnPhone>
+              <Button loading={signingOut} onClick={onSignOut} variant="ghost">
+                <AnimatedIcon icon={LogOutIcon} aria-hidden="true" />
+                {t("shell.signOut")}
+              </Button>
+            </CompactOnPhone>
           </div>
         </div>
       </header>

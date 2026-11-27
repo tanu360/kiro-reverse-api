@@ -2,6 +2,7 @@
 
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 import type React from "react";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { DIALOG_POPUP_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { useOpenAfterMount } from "@/hooks/use-open-after-mount";
@@ -56,19 +57,21 @@ export function AlertDialogPopup({
 }): React.ReactElement {
   return (
     <AlertDialogPortal {...portalProps}>
-      {/* forceRender: nested in a dialog or sheet, it still dims its parent (dialog.tsx). */}
-      <AlertDialogBackdrop forceRender />
-      <AlertDialogViewport>
-        <AlertDialogPrimitive.Popup
-          className={cn(DIALOG_POPUP_CLASS, "max-w-lg", className)}
-          data-slot="alert-dialog-popup"
-          onKeyDown={(event) => {
-            onKeyDown?.(event);
-            wrapTabFocus(event);
-          }}
-          {...props}
-        />
-      </AlertDialogViewport>
+      <KeepLabels>
+        {/* forceRender: nested in a dialog or sheet, it still dims its parent (dialog.tsx). */}
+        <AlertDialogBackdrop forceRender />
+        <AlertDialogViewport>
+          <AlertDialogPrimitive.Popup
+            className={cn(DIALOG_POPUP_CLASS, "max-w-lg", className)}
+            data-slot="alert-dialog-popup"
+            onKeyDown={(event) => {
+              onKeyDown?.(event);
+              wrapTabFocus(event);
+            }}
+            {...props}
+          />
+        </AlertDialogViewport>
+      </KeepLabels>
     </AlertDialogPortal>
   );
 }

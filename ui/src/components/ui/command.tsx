@@ -6,6 +6,7 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
 import { AutocompleteCollection } from "@/components/ui/autocomplete";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 
@@ -63,21 +64,23 @@ export function CommandDialogPopup({
 }): React.ReactElement {
   return (
     <CommandDialogPortal {...portalProps}>
-      <CommandDialogBackdrop />
-      <CommandDialogViewport>
-        <CommandDialogPrimitive.Popup
-          className={cn(
-            "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-2xl outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
-            "transition-[opacity,translate,scale] duration-220 data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 data-ending-style:scale-96 data-starting-style:scale-96 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-140 data-ending-style:ease-in",
-            OPEN_EASE,
-            className,
-          )}
-          data-slot="command-dialog-popup"
-          {...props}
-        >
-          {children}
-        </CommandDialogPrimitive.Popup>
-      </CommandDialogViewport>
+      <KeepLabels>
+        <CommandDialogBackdrop />
+        <CommandDialogViewport>
+          <CommandDialogPrimitive.Popup
+            className={cn(
+              "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-2xl outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
+              "transition-[opacity,translate,scale] duration-220 data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 data-ending-style:scale-96 data-starting-style:scale-96 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-140 data-ending-style:ease-in",
+              OPEN_EASE,
+              className,
+            )}
+            data-slot="command-dialog-popup"
+            {...props}
+          >
+            {children}
+          </CommandDialogPrimitive.Popup>
+        </CommandDialogViewport>
+      </KeepLabels>
     </CommandDialogPortal>
   );
 }

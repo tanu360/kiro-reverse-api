@@ -2,6 +2,7 @@
 
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import type * as React from "react";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { withMarqueeText } from "@/components/ui/marquee-text";
 import {
   CheckedDot,
@@ -64,33 +65,35 @@ export function MenuPopup({
 }): React.ReactElement {
   return (
     <MenuPortal {...portalProps}>
-      <MenuPrimitive.Positioner
-        align={align}
-        alignOffset={alignOffset}
-        anchor={anchor}
-        // z-70: above dialogs and sheets (z-50), as every anchored popup.
-        className="z-70"
-        collisionPadding={collisionPadding}
-        data-slot="menu-positioner"
-        side={side}
-        sideOffset={sideOffset}
-      >
-        <MenuPrimitive.Popup
-          className={cn(
-            // Kiro: the one popup sheet (index.css popup-surface) instead of t3code's dropdown glass.
-            "popup-surface popup-width relative flex origin-(--transform-origin) outline-none transition-[opacity,scale] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
-            className,
-          )}
-          data-slot="menu-popup"
-          {...props}
+      <KeepLabels>
+        <MenuPrimitive.Positioner
+          align={align}
+          alignOffset={alignOffset}
+          anchor={anchor}
+          // z-70: above dialogs and sheets (z-50), as every anchored popup.
+          className="z-70"
+          collisionPadding={collisionPadding}
+          data-slot="menu-positioner"
+          side={side}
+          sideOffset={sideOffset}
         >
-          {/* At most 22rem tall (a part row shows there is more), 90dvh on a short screen, fading at an
+          <MenuPrimitive.Popup
+            className={cn(
+              // Kiro: the one popup sheet (index.css popup-surface) instead of t3code's dropdown glass.
+              "popup-surface popup-width relative flex origin-(--transform-origin) outline-none transition-[opacity,scale] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+              className,
+            )}
+            data-slot="menu-popup"
+            {...props}
+          >
+            {/* At most 22rem tall (a part row shows there is more), 90dvh on a short screen, fading at an
               edge it can still scroll past; a label wider than the popup (index.css popup-width) slides when its row is highlighted. */}
-          <div className="scroll-fade-y max-h-[min(var(--available-height),22rem,90dvh)] w-full overflow-y-auto p-1">
-            {children}
-          </div>
-        </MenuPrimitive.Popup>
-      </MenuPrimitive.Positioner>
+            <div className="scroll-fade-y max-h-[min(var(--available-height),22rem,90dvh)] w-full overflow-y-auto p-1">
+              {children}
+            </div>
+          </MenuPrimitive.Popup>
+        </MenuPrimitive.Positioner>
+      </KeepLabels>
     </MenuPortal>
   );
 }

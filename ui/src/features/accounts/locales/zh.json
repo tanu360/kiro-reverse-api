@@ -151,7 +151,6 @@
   "metadata.tagLimit": "已有 {max} 个标签",
   "models.refreshAll": "刷新模型",
   "models.refreshAllNone": "没有轮换中的账号，因此没有可刷新的内容。",
-  "models.refreshShort": "模型",
   "models.confirmRefreshAll": "为所有已启用账号刷新模型？",
   "models.refreshing": "正在刷新模型…",
   "models.refreshAllDone": "模型已刷新，共 {count} 个可用。",

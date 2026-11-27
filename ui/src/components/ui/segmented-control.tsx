@@ -30,7 +30,7 @@ export const segmentedControlItemSizeClassNames: Record<SegmentedControlSize, st
 };
 
 export const segmentedControlItemLayoutClassName =
-  "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4 icon-slot [&_svg]:-mx-0.5";
+  "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4 icon-slot [&_svg]:-mx-px";
 
 /**
  * The sign-in theme toggle is the segmented control: a faintly tinted rounded rectangle in the

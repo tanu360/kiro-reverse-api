@@ -2,7 +2,7 @@ import { ArrowDown02Icon, ArrowUp02Icon, ChevronDownIcon } from "@hugeicons/core
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type JSX, type ReactNode, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { BUTTON_END_ICON, Button } from "@/components/ui/button";
 import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
 import {
   Menu,
@@ -123,7 +123,7 @@ export function FilterTrigger({
         {after}
         <HugeiconsIcon
           aria-hidden="true"
-          className={selectTriggerIconClassName}
+          className={cn(selectTriggerIconClassName, BUTTON_END_ICON)}
           icon={ChevronDownIcon}
         />
       </MenuTrigger>

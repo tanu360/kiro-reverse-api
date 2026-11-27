@@ -24,8 +24,9 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
-import { Button } from "@/components/ui/button";
+import { BUTTON_END_ICON, Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -271,21 +272,25 @@ function ViewAllLink({ focusRef }: { focusRef: RefObject<HTMLElement | null> }):
   const { t } = useT("overview");
   const { t: tc } = useT();
   return (
-    <Button
-      // The visible "View all" stays the name (label in name); the longer line is read after it.
-      aria-description={t("attention.viewAll")}
-      // The arrow, not the invisible box, lines up with the card's content edge (its 8 px inset).
-      className="-me-2"
-      ref={(element) => {
-        focusRef.current = element;
-      }}
-      render={<Link search={{ status: "attention" }} to="/accounts" />}
-      size="sm"
-      variant="ghost"
-    >
-      {tc("actions.viewAll")}
-      <HugeiconsIcon icon={ArrowUpRight01Icon} aria-hidden="true" />
-    </Button>
+    // A link: it keeps its label in a compact header (a lone arrow says nothing).
+    <KeepLabels>
+      <Button
+        // The visible "View all" stays the name (label in name); the longer line is read after it.
+        aria-description={t("attention.viewAll")}
+        // The arrow, not the invisible box, lines up with the card's content edge: the sm button's
+        // end inset less the arrow's 3 px pull, plus the empty margin inside the arrow's box.
+        className="-me-2 sm:-me-2.5"
+        ref={(element) => {
+          focusRef.current = element;
+        }}
+        render={<Link search={{ status: "attention" }} to="/accounts" />}
+        size="sm"
+        variant="ghost"
+      >
+        {tc("actions.viewAll")}
+        <HugeiconsIcon icon={ArrowUpRight01Icon} aria-hidden="true" className={BUTTON_END_ICON} />
+      </Button>
+    </KeepLabels>
   );
 }
 

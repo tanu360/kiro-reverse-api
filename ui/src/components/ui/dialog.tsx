@@ -7,6 +7,7 @@ import { XIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
 import { Button } from "@/components/ui/button";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useOpenAfterMount } from "@/hooks/use-open-after-mount";
@@ -101,11 +102,11 @@ export const DIALOG_POPUP_CLASS =
 
 /**
  * The close X of a dialog, sheet or drawer: centred on the 24 px title line under the 16 px top
- * padding, its glyph on the 16 px content edge (the 36 px button 10 px down and 6 px in; 40 px on
- * a coarse pointer, 8 and 4).
+ * padding, its glyph on the 16 px content edge (the 32 px phone button 12 px down and 8 px in;
+ * 36 px from sm up, 10 and 6; 40 px on a coarse pointer, 8 and 4).
  */
 export const OVERLAY_CLOSE_CLASS =
-  "absolute inset-e-1.5 top-2.5 z-1 sm:pointer-coarse:inset-e-1 sm:pointer-coarse:top-2";
+  "absolute inset-e-2 top-3 z-1 sm:inset-e-1.5 sm:top-2.5 sm:pointer-coarse:inset-e-1 sm:pointer-coarse:top-2";
 
 export function DialogPopup({
   className,
@@ -128,43 +129,45 @@ export function DialogPopup({
   const { t } = useT();
   return (
     <DialogPortal {...portalProps}>
-      {/*
+      <KeepLabels>
+        {/*
         forceRender: a dialog opened from inside another dialog or a sheet (Base UI nesting) draws
         its own backdrop too, so the parent dims behind it instead of staying at full brightness.
       */}
-      <DialogBackdrop forceRender />
-      <DialogViewport anchor={anchor}>
-        <DialogPrimitive.Popup
-          className={cn(
-            DIALOG_POPUP_CLASS,
-            DIALOG_SIZE_CLASS[size],
-            // A `top` dialog on phones fills its 90dvh row (the grid stretches it); the footer
-            // keeps to the bottom edge when a step is short.
-            anchor === "top" && "max-sm:*:data-[slot=dialog-footer]:mt-auto",
-            className,
-          )}
-          data-size={size}
-          data-slot="dialog-popup"
-          onKeyDown={(event) => {
-            onKeyDown?.(event);
-            wrapTabFocus(event);
-          }}
-          {...props}
-        >
-          {children}
-          {showCloseButton && (
-            <DialogPrimitive.Close
-              aria-label={t("actions.close")}
-              className={OVERLAY_CLOSE_CLASS}
-              data-slot="dialog-dismiss"
-              render={<Button size="icon" variant="ghost" />}
-              {...closeProps}
-            >
-              <HugeiconsIcon icon={XIcon} />
-            </DialogPrimitive.Close>
-          )}
-        </DialogPrimitive.Popup>
-      </DialogViewport>
+        <DialogBackdrop forceRender />
+        <DialogViewport anchor={anchor}>
+          <DialogPrimitive.Popup
+            className={cn(
+              DIALOG_POPUP_CLASS,
+              DIALOG_SIZE_CLASS[size],
+              // A `top` dialog on phones fills its 90dvh row (the grid stretches it); the footer
+              // keeps to the bottom edge when a step is short.
+              anchor === "top" && "max-sm:*:data-[slot=dialog-footer]:mt-auto",
+              className,
+            )}
+            data-size={size}
+            data-slot="dialog-popup"
+            onKeyDown={(event) => {
+              onKeyDown?.(event);
+              wrapTabFocus(event);
+            }}
+            {...props}
+          >
+            {children}
+            {showCloseButton && (
+              <DialogPrimitive.Close
+                aria-label={t("actions.close")}
+                className={OVERLAY_CLOSE_CLASS}
+                data-slot="dialog-dismiss"
+                render={<Button size="icon" variant="ghost" />}
+                {...closeProps}
+              >
+                <HugeiconsIcon icon={XIcon} />
+              </DialogPrimitive.Close>
+            )}
+          </DialogPrimitive.Popup>
+        </DialogViewport>
+      </KeepLabels>
     </DialogPortal>
   );
 }

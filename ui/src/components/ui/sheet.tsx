@@ -7,6 +7,7 @@ import { XIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
 import { Button } from "@/components/ui/button";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { OVERLAY_CLOSE_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -82,46 +83,48 @@ export function SheetPopup({
   const { t } = useT();
   return (
     <SheetPortal {...portalProps}>
-      <SheetBackdrop />
-      <SheetViewport side={side} variant={variant}>
-        <SheetPrimitive.Popup
-          className={cn(
-            // The frosted modal surface (index.css dialog-glass), as dialogs and drawers.
-            "dialog-glass relative flex max-h-full min-h-0 w-full min-w-0 flex-col text-popover-foreground outline-none transition-[opacity,translate] duration-200 ease-in-out will-change-transform data-ending-style:opacity-0 data-starting-style:opacity-0",
-            side === "bottom" &&
-              "row-start-2 rounded-t-2xl border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
-            side === "top" &&
-              "border-b max-sm:row-start-2 data-ending-style:-translate-y-8 data-starting-style:-translate-y-8",
-            side === "left" &&
-              "w-[calc(100%-(--spacing(12)))] max-w-md border-e data-ending-style:-translate-x-8 data-starting-style:-translate-x-8",
-            side === "right" &&
-              "col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s data-ending-style:translate-x-8 data-starting-style:translate-x-8",
-            variant === "inset" &&
-              "sm:rounded-2xl sm:border sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
-            "max-sm:rounded-2xl max-sm:border max-sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
-            className,
-          )}
-          data-slot="sheet-popup"
-          onKeyDown={(event) => {
-            onKeyDown?.(event);
-            wrapTabFocus(event);
-          }}
-          {...props}
-        >
-          {children}
-          {showCloseButton && (
-            <SheetPrimitive.Close
-              aria-label={t("actions.close")}
-              className={OVERLAY_CLOSE_CLASS}
-              data-slot="sheet-dismiss"
-              render={<Button size="icon" variant="ghost" />}
-              {...closeProps}
-            >
-              <HugeiconsIcon icon={XIcon} />
-            </SheetPrimitive.Close>
-          )}
-        </SheetPrimitive.Popup>
-      </SheetViewport>
+      <KeepLabels>
+        <SheetBackdrop />
+        <SheetViewport side={side} variant={variant}>
+          <SheetPrimitive.Popup
+            className={cn(
+              // The frosted modal surface (index.css dialog-glass), as dialogs and drawers.
+              "dialog-glass relative flex max-h-full min-h-0 w-full min-w-0 flex-col text-popover-foreground outline-none transition-[opacity,translate] duration-200 ease-in-out will-change-transform data-ending-style:opacity-0 data-starting-style:opacity-0",
+              side === "bottom" &&
+                "row-start-2 rounded-t-2xl border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
+              side === "top" &&
+                "border-b max-sm:row-start-2 data-ending-style:-translate-y-8 data-starting-style:-translate-y-8",
+              side === "left" &&
+                "w-[calc(100%-(--spacing(12)))] max-w-md border-e data-ending-style:-translate-x-8 data-starting-style:-translate-x-8",
+              side === "right" &&
+                "col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s data-ending-style:translate-x-8 data-starting-style:translate-x-8",
+              variant === "inset" &&
+                "sm:rounded-2xl sm:border sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
+              "max-sm:rounded-2xl max-sm:border max-sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
+              className,
+            )}
+            data-slot="sheet-popup"
+            onKeyDown={(event) => {
+              onKeyDown?.(event);
+              wrapTabFocus(event);
+            }}
+            {...props}
+          >
+            {children}
+            {showCloseButton && (
+              <SheetPrimitive.Close
+                aria-label={t("actions.close")}
+                className={OVERLAY_CLOSE_CLASS}
+                data-slot="sheet-dismiss"
+                render={<Button size="icon" variant="ghost" />}
+                {...closeProps}
+              >
+                <HugeiconsIcon icon={XIcon} />
+              </SheetPrimitive.Close>
+            )}
+          </SheetPrimitive.Popup>
+        </SheetViewport>
+      </KeepLabels>
     </SheetPortal>
   );
 }

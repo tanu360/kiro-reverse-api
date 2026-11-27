@@ -10,7 +10,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactElement, type Ref, useRef } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, ICON_BUTTON_PULL } from "@/components/ui/button";
+import { CompactOnPhone } from "@/components/ui/compact-actions";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -331,52 +332,57 @@ export function AccountSheetActions({
   const refresh = useRefreshAccount(account.id, () => refreshRef.current, isApiKeyAccount(account));
   const manage = useManageActions();
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <Button onClick={onTest} size="sm" variant="secondary">
-        <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
-        {t("actions.test")}
-      </Button>
-      <Button
-        loading={refresh.isPending}
-        onClick={() => refresh.mutate()}
-        ref={refreshRef}
-        size="sm"
-        variant="secondary"
-      >
-        <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-        {t(refreshLabel)}
-      </Button>
-      <div className="ms-auto flex items-center gap-2">
-        <span aria-hidden="true" className="text-muted-foreground max-sm:hidden">
-          {t("columns.enabled")}
-        </span>
-        <EnabledSwitch account={account} />
-        <Menu>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <MenuTrigger
-                  render={
-                    <Button
-                      aria-busy={manage.busy || undefined}
-                      aria-label={t("actions.more")}
-                      ref={manage.triggerRef}
-                      size="icon-sm"
-                      variant="quiet"
-                    />
-                  }
-                />
-              }
-            >
-              <MenuTriggerIcon busy={manage.busy} copied={manage.copied} />
-            </TooltipTrigger>
-            <TooltipPopup>{manage.copied ? tc("copy.copied") : t("actions.more")}</TooltipPopup>
-          </Tooltip>
-          <MenuPopup align="end">
-            <ManageMenuItems account={account} manage={manage} />
-          </MenuPopup>
-        </Menu>
+    // On a phone icon buttons, as every header's actions there.
+    <CompactOnPhone>
+      <div className={cn("flex flex-wrap items-center gap-2", className)}>
+        <Button onClick={onTest} size="sm" variant="secondary">
+          <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
+          {t("actions.test")}
+        </Button>
+        <Button
+          loading={refresh.isPending}
+          onClick={() => refresh.mutate()}
+          ref={refreshRef}
+          size="sm"
+          variant="secondary"
+        >
+          <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
+          {t(refreshLabel)}
+        </Button>
+        <div className="ms-auto flex items-center gap-2">
+          <span aria-hidden="true" className="text-muted-foreground max-sm:hidden">
+            {t("columns.enabled")}
+          </span>
+          <EnabledSwitch account={account} />
+          <Menu>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <MenuTrigger
+                    render={
+                      <Button
+                        aria-busy={manage.busy || undefined}
+                        aria-label={t("actions.more")}
+                        // Its dots, not its box, on the content edge: under the close X.
+                        className={ICON_BUTTON_PULL["icon-sm"].end}
+                        ref={manage.triggerRef}
+                        size="icon-sm"
+                        variant="quiet"
+                      />
+                    }
+                  />
+                }
+              >
+                <MenuTriggerIcon busy={manage.busy} copied={manage.copied} />
+              </TooltipTrigger>
+              <TooltipPopup>{manage.copied ? tc("copy.copied") : t("actions.more")}</TooltipPopup>
+            </Tooltip>
+            <MenuPopup align="end">
+              <ManageMenuItems account={account} manage={manage} />
+            </MenuPopup>
+          </Menu>
+        </div>
       </div>
-    </div>
+    </CompactOnPhone>
   );
 }

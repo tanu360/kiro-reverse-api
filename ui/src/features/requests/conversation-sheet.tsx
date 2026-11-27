@@ -106,6 +106,8 @@ export function ConversationSheet({
           </Alert>
         ) : null}
         <SectionCard
+          // Clips the current turn's tint on the last row to the card's rounded corners.
+          className="overflow-hidden"
           icon={ArrowDataTransferHorizontalIcon}
           slim
           title={t("conversation.turnsTitle")}

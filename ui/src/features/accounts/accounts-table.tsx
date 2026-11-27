@@ -6,10 +6,12 @@ import {
   type DataTableSort,
 } from "@/components/shared/data-table";
 import { ListCard, ListCardSkeleton } from "@/components/shared/list-card";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { ACCOUNT_SORTS, type AccountSort } from "@/routes/-search";
 import { AccountActivityLine, LiveStatusPill } from "./account-activity";
 import {
@@ -270,7 +272,6 @@ function AccountCard({
           />
         </span>
       }
-      badge={hasAuthIcon(account) ? <AuthIcon account={account} /> : undefined}
       leading={
         <Checkbox
           aria-label={t("selectAccount", { email: name.text })}
@@ -292,7 +293,17 @@ function AccountCard({
       onOpen={() => onDetails(account)}
       openLabel={t("openDetails", { email: name.text })}
       selected={ctx.selected}
-      title={<span className={name.mono ? "font-mono text-meta" : undefined}>{name.text}</span>}
+      title={
+        // The sign-in mark stays beside the name, which truncates first (as on Overview); as a
+        // badge it dropped to a line of its own under a long email. pe-0.5: the AWS mark draws
+        // 2 px past its box, which the title's truncation clipped.
+        <span className="flex min-w-0 items-center gap-2 pe-0.5">
+          <TruncatedText className={cn(name.mono && "font-mono text-meta")}>
+            {name.text}
+          </TruncatedText>
+          {hasAuthIcon(account) ? <AuthIcon account={account} /> : null}
+        </span>
+      }
       variant="row"
     >
       {/* The tags wrap on the card's own line, so a long tag keeps its text. */}

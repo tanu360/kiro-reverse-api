@@ -42,6 +42,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CompactOnPhone } from "@/components/ui/compact-actions";
 import { scopedShortcuts } from "@/hooks/use-key-shortcut";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { RequestRecord } from "@/lib/api/types";
@@ -421,32 +422,34 @@ const RequestDetailHeader = memo(function RequestDetailHeader({
           header keeps no room; there the buttons keep their own widths and each line of them
           is centred.
         */
-        <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0 max-sm:justify-center">
-          {canOpenAccount ? (
-            <Button onClick={onOpenAccount} size="sm" variant="secondary">
-              <HugeiconsIcon aria-hidden="true" icon={UserCircleIcon} />
-              {t("detail.openAccount")}
-            </Button>
-          ) : null}
-          {history && record.conversationId ? (
-            <Button onClick={onOpenConversation} size="sm" variant="secondary">
-              <HugeiconsIcon aria-hidden="true" icon={BubbleChatIcon} />
-              {t("detail.openConversation")}
-            </Button>
-          ) : null}
-          {history && record.hasBody && record.id !== undefined ? (
-            <Button onClick={onOpenReplay} size="sm" variant="secondary">
-              <HugeiconsIcon aria-hidden="true" icon={PlayIcon} />
-              {t("detail.replay")}
-            </Button>
-          ) : null}
-          <CopyButton
-            className="ms-auto max-sm:ms-0"
-            label={t("detail.copyJson")}
-            showLabel
-            value={() => Promise.resolve(recordJson(record, maskText))}
-          />
-        </div>
+        <CompactOnPhone>
+          <div className="flex flex-wrap items-center gap-2 -me-8 max-sm:me-0 max-sm:justify-center">
+            {canOpenAccount ? (
+              <Button onClick={onOpenAccount} size="sm" variant="secondary">
+                <HugeiconsIcon aria-hidden="true" icon={UserCircleIcon} />
+                {t("detail.openAccount")}
+              </Button>
+            ) : null}
+            {history && record.conversationId ? (
+              <Button onClick={onOpenConversation} size="sm" variant="secondary">
+                <HugeiconsIcon aria-hidden="true" icon={BubbleChatIcon} />
+                {t("detail.openConversation")}
+              </Button>
+            ) : null}
+            {history && record.hasBody && record.id !== undefined ? (
+              <Button onClick={onOpenReplay} size="sm" variant="secondary">
+                <HugeiconsIcon aria-hidden="true" icon={PlayIcon} />
+                {t("detail.replay")}
+              </Button>
+            ) : null}
+            <CopyButton
+              className="ms-auto max-sm:ms-0"
+              label={t("detail.copyJson")}
+              showLabel
+              value={() => Promise.resolve(recordJson(record, maskText))}
+            />
+          </div>
+        </CompactOnPhone>
       ) : null}
     </ResponsiveSheetHeader>
   );

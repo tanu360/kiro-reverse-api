@@ -10,7 +10,7 @@ import { ListCard, ListCardSkeleton } from "@/components/shared/list-card";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
-import { Button } from "@/components/ui/button";
+import { BUTTON_END_ICON, Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
 import { LiveStatusPill } from "@/features/accounts/account-activity";
 import {
@@ -202,8 +202,9 @@ function FooterLink({ focusRef }: { focusRef: RefObject<HTMLElement | null> }): 
   const { t } = useT("overview");
   return (
     <Button
-      // The arrow, not the invisible box, lines up with the card's content edge (its 8 px inset).
-      className="-me-2"
+      // The arrow, not the invisible box, lines up with the card's content edge: the sm button's
+      // end inset less the arrow's 3 px pull, plus the empty margin inside the arrow's box.
+      className="-me-2 sm:-me-2.5"
       ref={(element) => {
         focusRef.current = element;
       }}
@@ -212,7 +213,7 @@ function FooterLink({ focusRef }: { focusRef: RefObject<HTMLElement | null> }): 
       variant="ghost"
     >
       {t("topAccounts.viewAll")}
-      <HugeiconsIcon icon={ArrowUpRight01Icon} aria-hidden="true" />
+      <HugeiconsIcon icon={ArrowUpRight01Icon} aria-hidden="true" className={BUTTON_END_ICON} />
     </Button>
   );
 }

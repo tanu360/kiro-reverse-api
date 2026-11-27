@@ -705,7 +705,7 @@ describe("AccountsPage layout", () => {
     expect(within(dialog).getByText("1 selected")).toBeInTheDocument();
   });
 
-  it("shows a short Refresh models label on phones and Export in the tab row", async () => {
+  it("shows the header actions as icons on phones and Export in the tab row", async () => {
     mockViewport(390);
     await renderCards();
     const main = screen.getByRole("main");
@@ -715,7 +715,9 @@ describe("AccountsPage layout", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label") ?? button.textContent);
     expect(names).toEqual(["Refresh models", "Add account"]);
-    expect(within(header).getByText("Models")).toHaveClass("sm:hidden");
+    //! On a phone every header action is an icon; its label stays its name.
+    expect(within(header).getByText("Refresh models")).toHaveClass("sr-only");
+    expect(within(header).getByText("Add account")).toHaveClass("sr-only");
     // The cards have no headers to click; the Sort by select stands in.
     expect(within(main).getByRole("button", { name: "Sort by: Default" })).toBeInTheDocument();
     expect(within(main).getByRole("button", { name: "Export" })).toBeInTheDocument();

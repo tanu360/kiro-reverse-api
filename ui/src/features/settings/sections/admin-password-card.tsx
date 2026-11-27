@@ -128,6 +128,8 @@ export function AdminPasswordCard(): JSX.Element {
       onSubmit={() => void onSubmit()}
       title={t("adminPassword")}
     >
+      {/* Lets password managers file the new password under the admin account. */}
+      <input autoComplete="username" hidden name="username" readOnly value="admin" />
       <SettingsRow
         control={
           <FieldControl error={error}>
@@ -157,10 +159,7 @@ export function AdminPasswordCard(): JSX.Element {
         htmlFor={inputId}
         status={fromEnv ? <EnvBadge name="ADMIN_PASSWORD" /> : undefined}
         title={t("newPassword")}
-      >
-        {/* Lets password managers file the new password under the admin account. */}
-        <input autoComplete="username" hidden name="username" readOnly value="admin" />
-      </SettingsRow>
+      />
     </SettingsSection>
   );
 }

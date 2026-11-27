@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * note).
  */
 const alertVariants = cva(
-  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-lg border border-(--notice-line) bg-(--badge-bg) px-3 text-(--badge-fg) has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--alert-icon)_1fr_auto] has-[>svg]:grid-cols-[var(--alert-icon)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] sm:has-data-[slot=alert-action]:items-center [&>svg]:size-(--alert-icon) [&>svg]:text-(--badge-disc)",
+  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-lg border border-(--notice-line) bg-(--badge-bg) px-3 text-(--badge-fg) sm:has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--alert-icon)_1fr_auto] has-[>svg]:grid-cols-[var(--alert-icon)_1fr] sm:has-data-[slot=alert-action]:grid-cols-[1fr_auto] sm:has-data-[slot=alert-action]:items-center [&>svg]:size-(--alert-icon) [&>svg]:text-(--badge-disc)",
   {
     defaultVariants: {
       size: "default",
@@ -90,7 +90,7 @@ export function AlertAction({
   return (
     <div
       className={cn(
-        "flex gap-1 max-sm:col-start-2 max-sm:mt-2 sm:row-start-1 sm:[[data-slot=alert-title]~&]:row-end-3 sm:self-center sm:[[data-slot=alert-description]~&]:col-start-2 sm:[[data-slot=alert-title]~&]:col-start-2 sm:[svg~&]:col-start-2 sm:[svg~[data-slot=alert-description]~&]:col-start-3 sm:[svg~[data-slot=alert-title]~&]:col-start-3",
+        "flex gap-1 max-sm:mt-2 max-sm:[svg~&]:col-start-2 sm:row-start-1 sm:[[data-slot=alert-title]~&]:row-end-3 sm:self-center sm:[[data-slot=alert-description]~&]:col-start-2 sm:[[data-slot=alert-title]~&]:col-start-2 sm:[svg~&]:col-start-2 sm:[svg~[data-slot=alert-description]~&]:col-start-3 sm:[svg~[data-slot=alert-title]~&]:col-start-3",
         className,
       )}
       data-slot="alert-action"

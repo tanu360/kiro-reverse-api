@@ -470,19 +470,21 @@ export function BackupsPage(): JSX.Element {
       <ScheduleCard />
 
       <SectionCard
+        // Clips the last row's hover tint to the card's rounded corners (as the API keys card).
+        className="overflow-hidden"
         actions={
-          // The page's primary action at the page's button size, as Add account.
-          <Button loading={create.isPending} onClick={startCreate} ref={createRef}>
-            <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-            {t("create")}
-          </Button>
-        }
-        cornerAction={
-          <RefreshButton
-            fetching={list.isFetching && !list.isPending}
-            onRefresh={() => void invalidate()}
-            variant="icon"
-          />
+          <>
+            <RefreshButton
+              fetching={list.isFetching && !list.isPending}
+              onRefresh={() => void invalidate()}
+              variant="icon"
+            />
+            {/* The page's primary action at the page's button size, as Add account. */}
+            <Button loading={create.isPending} onClick={startCreate} ref={createRef}>
+              <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+              {t("create")}
+            </Button>
+          </>
         }
         description={t("list.description")}
         icon={ArchiveIcon}

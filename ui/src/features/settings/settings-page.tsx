@@ -526,8 +526,8 @@ function SectionNav({
       className="sticky top-12 z-30 -mx-4 bg-background pt-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-background md:-mx-6"
     >
       <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
-        {/* The top 4px of padding sits inside the scroller, so a chip's focus ring is not clipped. */}
-        <div className="flex w-max gap-2 px-4 pt-1 md:px-6" ref={listRef}>
+        {/* 4 px above and below sit inside the scroller, so a chip's focus ring is not clipped. */}
+        <div className="flex w-max gap-2 px-4 py-1 md:px-6" ref={listRef}>
           {groups.map(({ group, labelId, entries }) => (
             <div className="flex shrink-0" key={group}>
               <p className="sr-only" id={labelId}>

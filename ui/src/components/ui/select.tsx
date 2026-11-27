@@ -5,6 +5,7 @@ import { ChevronDownIcon, ChevronUpIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { withMarqueeText } from "@/components/ui/marquee-text";
 import {
   CheckedDot,
@@ -53,7 +54,8 @@ export const selectTriggerVariants = cva(
   },
 );
 
-export const selectTriggerIconClassName = "-me-0.5 size-4 shrink-0";
+/** The trigger's chevron, pulled 3 px to the end: its glyph sits well inside its box. */
+export const selectTriggerIconClassName = "-me-0.75 size-4 shrink-0";
 
 export function SelectTrigger({
   className,
@@ -122,58 +124,60 @@ export function SelectPopup({
 }): React.ReactElement {
   return (
     <SelectPrimitive.Portal {...portalProps}>
-      <SelectPrimitive.Positioner
-        align={align}
-        alignItemWithTrigger={alignItemWithTrigger}
-        alignOffset={alignOffset}
-        anchor={anchor}
-        // z-70: above dialogs and sheets (z-50), as every anchored popup.
-        className="z-70 select-none"
-        collisionPadding={collisionPadding}
-        data-slot="select-positioner"
-        side={side}
-        sideOffset={sideOffset}
-      >
-        <SelectPrimitive.Popup
-          className="origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0"
-          data-slot="select-popup"
-          {...props}
+      <KeepLabels>
+        <SelectPrimitive.Positioner
+          align={align}
+          alignItemWithTrigger={alignItemWithTrigger}
+          alignOffset={alignOffset}
+          anchor={anchor}
+          // z-70: above dialogs and sheets (z-50), as every anchored popup.
+          className="z-70 select-none"
+          collisionPadding={collisionPadding}
+          data-slot="select-positioner"
+          side={side}
+          sideOffset={sideOffset}
         >
-          <SelectPrimitive.ScrollUpArrow
-            className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-popup"
-            data-slot="select-scroll-up-arrow"
+          <SelectPrimitive.Popup
+            className="origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0"
+            data-slot="select-popup"
+            {...props}
           >
-            <HugeiconsIcon icon={ChevronUpIcon} className="relative size-4" />
-          </SelectPrimitive.ScrollUpArrow>
-          {/* The one popup sheet (index.css popup-surface), the same as menus. */}
-          {/* At least as wide as the trigger, growing to fit its longest option up to
+            <SelectPrimitive.ScrollUpArrow
+              className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-popup"
+              data-slot="select-scroll-up-arrow"
+            >
+              <HugeiconsIcon icon={ChevronUpIcon} className="relative size-4" />
+            </SelectPrimitive.ScrollUpArrow>
+            {/* The one popup sheet (index.css popup-surface), the same as menus. */}
+            {/* At least as wide as the trigger, growing to fit its longest option up to
               max(trigger, 14rem) (index.css popup-width-field, or popup-width with fit="content"),
               and at most 22rem tall, fading at an edge it can still scroll past; a label still too
               long slides when its row is highlighted. */}
-          <div
-            className={cn(
-              "popup-surface relative h-full",
-              fit === "field" ? "popup-width-field" : "popup-width",
-            )}
-          >
-            <SelectPrimitive.List
+            <div
               className={cn(
-                "scroll-fade-y max-h-[min(var(--available-height),22rem,90dvh)] overflow-y-auto p-1",
-                className,
+                "popup-surface relative h-full",
+                fit === "field" ? "popup-width-field" : "popup-width",
               )}
-              data-slot="select-list"
             >
-              {children}
-            </SelectPrimitive.List>
-          </div>
-          <SelectPrimitive.ScrollDownArrow
-            className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-popup"
-            data-slot="select-scroll-down-arrow"
-          >
-            <HugeiconsIcon icon={ChevronDownIcon} className="relative size-4" />
-          </SelectPrimitive.ScrollDownArrow>
-        </SelectPrimitive.Popup>
-      </SelectPrimitive.Positioner>
+              <SelectPrimitive.List
+                className={cn(
+                  "scroll-fade-y max-h-[min(var(--available-height),22rem,90dvh)] overflow-y-auto p-1",
+                  className,
+                )}
+                data-slot="select-list"
+              >
+                {children}
+              </SelectPrimitive.List>
+            </div>
+            <SelectPrimitive.ScrollDownArrow
+              className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-popup"
+              data-slot="select-scroll-down-arrow"
+            >
+              <HugeiconsIcon icon={ChevronDownIcon} className="relative size-4" />
+            </SelectPrimitive.ScrollDownArrow>
+          </SelectPrimitive.Popup>
+        </SelectPrimitive.Positioner>
+      </KeepLabels>
     </SelectPrimitive.Portal>
   );
 }

@@ -2,6 +2,7 @@
 
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import type React from "react";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { cn } from "@/lib/utils";
 
 export const Popover: typeof PopoverPrimitive.Root = PopoverPrimitive.Root;
@@ -49,44 +50,46 @@ export function PopoverPopup({
 }): React.ReactElement {
   return (
     <PopoverPrimitive.Portal {...portalProps}>
-      <PopoverPrimitive.Positioner
-        align={align}
-        alignOffset={alignOffset}
-        anchor={anchor}
-        // At most 90 % of the viewport wide and, on phones, its viewport (below) 90 % tall. z-70:
-        // above dialogs and sheets (z-50), as every anchored popup.
-        className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-[min(var(--available-width),90vw)] transition-[top,left,right,bottom,transform] data-instant:transition-none"
-        collisionPadding={collisionPadding}
-        data-slot="popover-positioner"
-        side={side}
-        sideOffset={sideOffset}
-      >
-        <PopoverPrimitive.Popup
-          className={cn(
-            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-popover-foreground outline-none transition-[width,height,scale,opacity] duration-100 has-data-[slot=calendar]:rounded-xl data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
-            // A tooltip-style popover is drawn as the tooltip (tooltip.tsx); any other is the one
-            // popup sheet (index.css popup-surface), as menus and selects.
-            tooltipStyle ? "popup-surface w-fit text-pretty text-xs" : "popup-surface text-sm",
-            className,
-          )}
-          data-slot="popover-popup"
-          {...props}
+      <KeepLabels>
+        <PopoverPrimitive.Positioner
+          align={align}
+          alignOffset={alignOffset}
+          anchor={anchor}
+          // At most 90 % of the viewport wide and, on phones, its viewport (below) 90 % tall. z-70:
+          // above dialogs and sheets (z-50), as every anchored popup.
+          className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-[min(var(--available-width),90vw)] transition-[top,left,right,bottom,transform] data-instant:transition-none"
+          collisionPadding={collisionPadding}
+          data-slot="popover-positioner"
+          side={side}
+          sideOffset={sideOffset}
         >
-          <PopoverPrimitive.Viewport
+          <PopoverPrimitive.Popup
             className={cn(
-              "relative size-full max-h-(--available-height) overflow-clip max-sm:max-h-[min(var(--available-height),90dvh)] px-(--viewport-inline-padding) has-data-[slot=calendar]:p-2 data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity",
-              tooltipStyle
-                ? "py-1 [--viewport-inline-padding:--spacing(2)]"
-                : flush
-                  ? "[--viewport-inline-padding:0px]"
-                  : "not-data-transitioning:overflow-y-auto py-4 [--viewport-inline-padding:--spacing(4)]",
+              "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-popover-foreground outline-none transition-[width,height,scale,opacity] duration-100 has-data-[slot=calendar]:rounded-xl data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+              // A tooltip-style popover is drawn as the tooltip (tooltip.tsx); any other is the one
+              // popup sheet (index.css popup-surface), as menus and selects.
+              tooltipStyle ? "popup-surface w-fit text-pretty text-xs" : "popup-surface text-sm",
+              className,
             )}
-            data-slot="popover-viewport"
+            data-slot="popover-popup"
+            {...props}
           >
-            {children}
-          </PopoverPrimitive.Viewport>
-        </PopoverPrimitive.Popup>
-      </PopoverPrimitive.Positioner>
+            <PopoverPrimitive.Viewport
+              className={cn(
+                "relative size-full max-h-(--available-height) overflow-clip max-sm:max-h-[min(var(--available-height),90dvh)] px-(--viewport-inline-padding) has-data-[slot=calendar]:p-2 data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity",
+                tooltipStyle
+                  ? "py-1 [--viewport-inline-padding:--spacing(2)]"
+                  : flush
+                    ? "[--viewport-inline-padding:0px]"
+                    : "not-data-transitioning:overflow-y-auto py-4 [--viewport-inline-padding:--spacing(4)]",
+              )}
+              data-slot="popover-viewport"
+            >
+              {children}
+            </PopoverPrimitive.Viewport>
+          </PopoverPrimitive.Popup>
+        </PopoverPrimitive.Positioner>
+      </KeepLabels>
     </PopoverPrimitive.Portal>
   );
 }

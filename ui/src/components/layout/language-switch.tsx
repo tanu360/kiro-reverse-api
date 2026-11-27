@@ -114,7 +114,8 @@ function LanguageSelect({ className }: { className?: string }): JSX.Element {
             )}
           </SelectPrimitive.Value>
           <SelectPrimitive.Icon className="flex">
-            <AnimatedIcon icon={ChevronDownIcon} aria-hidden="true" className="size-4" />
+            {/* Pulled 2 px to the end: the chevron sits well inside its box (as in SelectTrigger). */}
+            <AnimatedIcon icon={ChevronDownIcon} aria-hidden="true" className="-me-0.5 size-4" />
           </SelectPrimitive.Icon>
         </TooltipTrigger>
         <TooltipPopup>{triggerLabel}</TooltipPopup>

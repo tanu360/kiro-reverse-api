@@ -3,9 +3,8 @@ import { type JSX, type ReactNode, useCallback, useMemo, useState } from "react"
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
+import { SegmentedPicker } from "@/components/shared/segmented-picker";
 import { TruncatedText } from "@/components/shared/truncated-text";
-import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
-import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
   MIX_FOOTER,
   type MixItem,
@@ -35,10 +34,6 @@ const HOLDER_SWITCH: SwitchOptions = [
   ["models", "user-panel:clients.byModel"],
   ["clients", "user-panel:clients.byClient"],
 ];
-
-function isBreakdownKind(value: unknown): value is BreakdownKind {
-  return value === "models" || value === "accounts" || value === "clients";
-}
 
 /**
  * A client row's caller as the Requests table reads it off a request: the id is a coding tool's
@@ -217,24 +212,12 @@ export function UsageBreakdownCard({
     <SectionCard
       actions={
         options ? (
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("usage.breakdown")}
-                onValueChange={(next) => {
-                  if (isBreakdownKind(next)) setKind(next);
-                }}
-                value={kind}
-              />
-            }
-            size="sm"
-          >
-            {options.map(([value, label]) => (
-              <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-                {t(label)}
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
+          <SegmentedPicker
+            items={options.map(([value, label]) => ({ value, label: t(label) }))}
+            label={t("usage.breakdown")}
+            onValueChange={setKind}
+            value={kind}
+          />
         ) : undefined
       }
       description={t("usage.byRequests")}

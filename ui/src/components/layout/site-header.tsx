@@ -8,10 +8,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { ICON_BUTTON_PULL } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { CommandMenuProvider, CommandMenuTrigger } from "./command-menu";
 import { LanguageSwitch } from "./language-switch";
 import { activeNavItem, activeNavView, type NavItem, type NavView } from "./nav-items";
@@ -55,7 +57,7 @@ export function SiteHeader(): JSX.Element {
         <div className="mx-auto grid w-full min-w-0 max-w-screen-2xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 sm:grid-cols-[minmax(max-content,1fr)_minmax(0,20rem)_minmax(max-content,1fr)] md:px-6">
           <div className="flex min-w-0 items-center gap-2">
             {/* The glyph's inset sits on this box, so the dot can be placed from the button's centre. */}
-            <span className="-ms-2 pointer-coarse:-ms-2.5 relative flex shrink-0">
+            <span className={cn("relative flex shrink-0", ICON_BUTTON_PULL.icon.start)}>
               <Tooltip>
                 <TooltipTrigger render={<SidebarTrigger aria-label={toggleLabel} />} />
                 <TooltipPopup>{toggleLabel}</TooltipPopup>
@@ -77,7 +79,12 @@ export function SiteHeader(): JSX.Element {
           <div className="hidden min-w-0 justify-center sm:flex">
             <CommandMenuTrigger />
           </div>
-          <div className="-me-2 flex shrink-0 items-center justify-end gap-0.5 pointer-coarse:-me-2.5 sm:gap-1">
+          <div
+            className={cn(
+              "flex shrink-0 items-center justify-end gap-0.5 sm:gap-1",
+              ICON_BUTTON_PULL.icon.end,
+            )}
+          >
             <CommandMenuTrigger className="sm:hidden" variant="icon" />
             <PrivacyToggle />
             {/*

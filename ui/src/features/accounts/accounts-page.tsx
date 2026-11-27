@@ -23,7 +23,7 @@ import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
-import { Button } from "@/components/ui/button";
+import { Button, ICON_BUTTON_PULL } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddAccountDialog } from "@/features/add-account/add-account-dialog";
@@ -386,6 +386,8 @@ export function AccountsPage(): JSX.Element {
             render={
               <Button
                 aria-label={t("actions.export")}
+                // The icon, not the invisible box, lines up with the card's content edge.
+                className={ICON_BUTTON_PULL["icon-sm"].end}
                 disabled={pending}
                 onClick={() => onExport()}
                 size="icon-sm"
@@ -456,23 +458,17 @@ export function AccountsPage(): JSX.Element {
             noAccounts ? undefined : (
               <>
                 <RefreshModelsReason show={nothingToRefresh}>
+                  {/* On a phone the icon alone, as every header action there (PageHeader). */}
                   <Button
-                    aria-label={t("models.refreshAll")}
                     disabled={nothingToRefresh}
                     loading={refreshingAll}
-                    loadingText={
-                      <>
-                        <span className="sm:hidden">{t("models.refreshShort")}</span>
-                        <span className="max-sm:hidden">{t("models.refreshing")}</span>
-                      </>
-                    }
+                    loadingText={t("models.refreshing")}
                     onClick={() => void onRefreshAllModels()}
                     ref={refreshAllRef}
                     variant="secondary"
                   >
                     <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-                    <span className="sm:hidden">{t("models.refreshShort")}</span>
-                    <span className="max-sm:hidden">{t("models.refreshAll")}</span>
+                    {t("models.refreshAll")}
                   </Button>
                 </RefreshModelsReason>
                 <Button onClick={() => setAddOpen(true)}>

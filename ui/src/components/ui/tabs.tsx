@@ -101,8 +101,9 @@ export function TabsTab({
         "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inner data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64",
         segmentedControlItemLayoutClassName,
         segmentedControlItemSizeClassNames[resolvedSize],
-        // Phones: a little less side padding, so three or four tabs fit at 360 px.
-        "max-sm:px-2.5",
+        // Phones: a little less side padding on a default tab, so three or four fit at 360 px
+        // (an sm tab is already narrower, an icon tab square).
+        resolvedSize === "default" && "max-sm:px-2.5",
         // A count badge in a tab (coss p-tabs-10) goes muted while its tab is not the active one.
         "not-data-active:**:data-[slot=badge]:text-muted-foreground",
         className,

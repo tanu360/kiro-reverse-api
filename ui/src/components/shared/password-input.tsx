@@ -77,10 +77,10 @@ export function PasswordInput({
             render={
               <Button
                 aria-label={label}
-                // The lg field is 40 px on a fine pointer from sm up: 2 px more end inset puts the
-                // 28 px eye 6 px from the top, bottom and end, so its focus ring clears the
-                // field's border. Elsewhere the addon's own inset is already even.
-                className={size === "lg" ? "sm:pointer-fine:me-0.5" : undefined}
+                // The lg field is 40 px on a phone, where the eye is 28 px: 2 px more end inset
+                // puts it 6 px from the top, bottom and end, so its focus ring clears the field's
+                // border. From sm up the eye grows with the field and the inset is already even.
+                className={size === "lg" ? "max-sm:me-0.5" : undefined}
                 onClick={() => setVisible((shown) => !shown)}
                 size="icon-sm"
                 variant="quiet"

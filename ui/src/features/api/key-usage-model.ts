@@ -10,13 +10,6 @@ export type UsageMetric = "requests" | "tokens" | "credits";
 /** The measures the usage sheet's chart switches between. */
 export const SHEET_METRICS: readonly UsageMetric[] = ["requests", "tokens", "credits"];
 
-export function isUsageMetric(
-  value: unknown,
-  allowed: readonly UsageMetric[],
-): value is UsageMetric {
-  return typeof value === "string" && (allowed as readonly string[]).includes(value);
-}
-
 export const EMPTY_TOTALS: ApiKeyUsageTotals = {
   requests: 0,
   succeeded: 0,

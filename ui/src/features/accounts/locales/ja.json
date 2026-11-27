@@ -151,7 +151,6 @@
   "metadata.tagLimit": "タグがすでに {max} 個あります",
   "models.refreshAll": "モデルを更新",
   "models.refreshAllNone": "ローテーション中のアカウントがないため、更新するものはありません。",
-  "models.refreshShort": "モデル",
   "models.confirmRefreshAll": "有効なすべてのアカウントのモデルを更新しますか？",
   "models.refreshing": "モデルを更新中…",
   "models.refreshAllDone": "モデルを更新しました。{count} 個が利用可能です。",

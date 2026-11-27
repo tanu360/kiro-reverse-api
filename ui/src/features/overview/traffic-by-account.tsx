@@ -6,8 +6,7 @@ import { DisplayEmail } from "@/components/shared/display-email";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
-import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
-import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
+import { SegmentedPicker } from "@/components/shared/segmented-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { accountsQuery } from "@/lib/api/accounts";
 import { heatmapQuery } from "@/lib/api/observe";
@@ -27,10 +26,6 @@ const ROW_PLACEHOLDERS = placeholderKeys("row", TOP_ACCOUNTS + 1);
 
 type Metric = "requests" | "credits";
 const METRICS: readonly Metric[] = ["requests", "credits"];
-
-function isMetric(value: unknown): value is Metric {
-  return typeof value === "string" && (METRICS as readonly string[]).includes(value);
-}
 
 interface Totals {
   requests: number;
@@ -308,25 +303,12 @@ export function TrafficByAccount(): JSX.Element {
   return (
     <SectionCard
       actions={
-        // A radio group: one tab stop, the arrow keys switch the measure.
-        <SegmentedControl
-          render={
-            <RadioGroupPrimitive
-              aria-label={t("heatmap.metric")}
-              onValueChange={(next) => {
-                if (isMetric(next)) setMetric(next);
-              }}
-              value={metric}
-            />
-          }
-          size="sm"
-        >
-          {METRICS.map((item) => (
-            <SegmentedControlItem key={item} render={<RadioPrimitive.Root value={item} />}>
-              {t(`modelMix.${item}`)}
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
+        <SegmentedPicker
+          items={METRICS.map((item) => ({ value: item, label: t(`modelMix.${item}`) }))}
+          label={t("heatmap.metric")}
+          onValueChange={setMetric}
+          value={metric}
+        />
       }
       description={
         view && view.rest > 0

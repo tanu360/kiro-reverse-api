@@ -37,7 +37,7 @@ import { ModelLogo } from "@/components/shared/model-logo";
 import { SETTINGS_ROW_X, SettingsEmptyRow } from "@/components/shared/settings-rows";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, ICON_BUTTON_PULL } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -514,7 +514,13 @@ const MappingRowItem = memo(function MappingRowItem({
     >
       {filtering ? (
         // The grip's footprint (icon-sm), so the columns keep their place while filtered.
-        <span aria-hidden="true" className="size-7 sm:size-8 sm:pointer-coarse:size-9" />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "size-7 sm:size-8 sm:pointer-coarse:size-9",
+            ICON_BUTTON_PULL["icon-sm"].start,
+          )}
+        />
       ) : (
         <Tooltip>
           <TooltipTrigger
@@ -522,7 +528,11 @@ const MappingRowItem = memo(function MappingRowItem({
               <Button
                 aria-description={t("modelMappings.rowLabel", { n })}
                 aria-label={t("modelMappings.drag")}
-                className="cursor-grab touch-none active:cursor-grabbing"
+                // The grip, not its invisible box, on the row's start edge.
+                className={cn(
+                  "cursor-grab touch-none active:cursor-grabbing",
+                  ICON_BUTTON_PULL["icon-sm"].start,
+                )}
                 ref={setActivatorNodeRef}
                 size="icon-sm"
                 variant="quiet"
@@ -570,6 +580,7 @@ const MappingRowItem = memo(function MappingRowItem({
           render={
             <Button
               aria-label={t("modelMappings.rowActions", { n })}
+              className={ICON_BUTTON_PULL["icon-sm"].end}
               ref={menuRef}
               size="icon-sm"
               variant="quiet"

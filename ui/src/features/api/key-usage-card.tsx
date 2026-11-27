@@ -13,11 +13,10 @@ import { ErrorState } from "@/components/shared/error-state";
 import { ListCard } from "@/components/shared/list-card";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
+import { SegmentedPicker } from "@/components/shared/segmented-picker";
 import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Badge } from "@/components/ui/badge";
 import { CardPanel } from "@/components/ui/card";
-import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
-import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
   API_KEY_USAGE_RANGES,
   type ApiKeyUsageRange,
@@ -51,10 +50,6 @@ const SORT_COLUMNS: readonly SortColumn[] = ["requests", "failed", "credits", "t
 const DEFAULT_SORT: DataTableSort = { id: "requests", desc: true };
 /** Rows per page, as the API keys table. */
 const PAGE_SIZE = 10;
-
-function isRange(value: unknown): value is ApiKeyUsageRange {
-  return typeof value === "string" && (API_KEY_USAGE_RANGES as readonly string[]).includes(value);
-}
 
 function isSortColumn(value: string): value is SortColumn {
   return (SORT_COLUMNS as readonly string[]).includes(value);
@@ -416,28 +411,15 @@ export function KeyUsageCard(): JSX.Element {
   return (
     <SectionCard
       actions={
-        // A radio group: one tab stop, the arrow keys move the range.
-        <SegmentedControl
-          render={
-            <RadioGroupPrimitive
-              aria-label={t("usage.range")}
-              onValueChange={(next) => {
-                if (isRange(next)) {
-                  setRange(next);
-                  setPage(1);
-                }
-              }}
-              value={range}
-            />
-          }
-          size="sm"
-        >
-          {API_KEY_USAGE_RANGES.map((value) => (
-            <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-              {t(`usage.range.${value}`)}
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
+        <SegmentedPicker
+          items={API_KEY_USAGE_RANGES.map((value) => ({ value, label: t(`usage.range.${value}`) }))}
+          label={t("usage.range")}
+          onValueChange={(next) => {
+            setRange(next);
+            setPage(1);
+          }}
+          value={range}
+        />
       }
       // Clips the last row's hover tint to the card's rounded corners.
       className="overflow-hidden"

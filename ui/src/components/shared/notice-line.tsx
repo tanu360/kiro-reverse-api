@@ -1,7 +1,7 @@
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { ComponentProps, JSX, ReactNode } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, ICON_BUTTON_PULL } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -12,8 +12,12 @@ import { cn } from "@/lib/utils";
  * and on a phone they stay beside the text instead of dropping under it.
  */
 
-/** On the Alert. */
-const NOTICE_LINE_CLASS = "sm:has-data-[slot=alert-action]:py-2";
+/**
+ * On the Alert. A phone keeps the actions' column too (an Alert drops it there, putting its
+ * actions under the text).
+ */
+const NOTICE_LINE_CLASS =
+  "max-sm:has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--alert-icon)_1fr_auto] sm:has-data-[slot=alert-action]:py-2";
 
 /** On its AlertAction. */
 const NOTICE_ACTIONS_CLASS =
@@ -38,7 +42,12 @@ export function NoticeLine({
     <Alert className={cn(NOTICE_LINE_CLASS, className)} {...props}>
       <HugeiconsIcon icon={icon} aria-hidden="true" />
       <AlertDescription className="wrap-break-word">{children}</AlertDescription>
-      {actions ? <AlertAction className={NOTICE_ACTIONS_CLASS}>{actions}</AlertAction> : null}
+      {actions ? (
+        // The last action's glyph, not its invisible box, on the notice's 12 px content edge.
+        <AlertAction className={cn(NOTICE_ACTIONS_CLASS, ICON_BUTTON_PULL["icon-sm"].end)}>
+          {actions}
+        </AlertAction>
+      ) : null}
     </Alert>
   );
 }

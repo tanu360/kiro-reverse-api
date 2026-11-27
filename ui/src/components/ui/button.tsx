@@ -4,6 +4,8 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
+import { Children, isValidElement } from "react";
+import { useCompactActions } from "@/components/ui/compact-actions";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +36,31 @@ import { cn } from "@/lib/utils";
 export const PRIMARY_FINISH: string =
   "grain-overlay [--grain-overlay-opacity:0.1] not-disabled:not-aria-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [&_svg:not([class*='opacity-'])]:opacity-80";
 
+/**
+ * A trailing icon whose glyph sits well inside its box (a chevron or an up-right arrow leaves
+ * about 4 px empty on each side): a -3 px end margin in place of every icon's -1 px, so it sits
+ * as far from the edge as the label does from the other.
+ */
+export const BUTTON_END_ICON = "-me-0.75!";
+
+/**
+ * A quiet icon button at a content edge, pulled out by its own icon inset, so its glyph, not its
+ * invisible box, lines up with the edge: icon 8 / 10 / 12 px, icon-sm 6 / 8 / 10 px (a phone, sm
+ * and up, a coarse pointer from sm up; the sizes below).
+ */
+export const ICON_BUTTON_PULL = {
+  icon: {
+    start: "-ms-2 sm:-ms-2.5 sm:pointer-coarse:-ms-3",
+    end: "-me-2 sm:-me-2.5 sm:pointer-coarse:-me-3",
+  },
+  "icon-sm": {
+    start: "-ms-1.5 sm:-ms-2 sm:pointer-coarse:-ms-2.5",
+    end: "-me-1.5 sm:-me-2 sm:pointer-coarse:-me-2.5",
+  },
+} as const;
+
 export const buttonVariants = cva(
-  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-sm transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:not-aria-busy:opacity-64 aria-busy:cursor-progress [&_svg:not([class*='text-'])]:text-(--control-icon-color) [&_svg:not([class*='size-'])]:size-4 icon-slot [&_svg]:-mx-0.5 [&>[data-slot=button-loading-indicator]+svg]:hidden",
+  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-sm transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:not-aria-busy:opacity-64 aria-busy:cursor-progress [&_svg:not([class*='text-'])]:text-(--control-icon-color) [&_svg:not([class*='size-'])]:size-4 icon-slot [&_svg]:-mx-px [&>[data-slot=button-loading-indicator]~svg]:hidden",
   {
     defaultVariants: {
       size: "default",
@@ -51,8 +76,10 @@ export const buttonVariants = cva(
        *   default  36 (40) px, 14 px text     page-header actions and dialog footers
        *   lg       44 / 40 / 44 px, 16 / 14 px   the sign-in button beside the sign-in field
        *            (phone / sm and up / coarse pointer)
-       * A text button pads 16 px, 12 px beside an icon (sm: 12 / 10 px; xs: 8 px). Icons are
-       * 16 px (xs: 12 px). Icon buttons are square: icon-xs 24, icon-sm 32 (36), icon 36 (40),
+       * A text button pads 16 px, 12 px with an icon (sm: 12 / 10 px; xs: 8 px), the same on
+       * both sides, so a leading or a trailing icon sits as far from its edge as the label does
+       * from the other: the icon's 1 px pull-in (-mx-px) takes back about the empty margin
+       * Hugeicons draw inside their box. Icons are 16 px (xs: 12 px). Icon buttons are square: icon-xs 24, icon-sm 32 (36), icon 36 (40),
        * icon-lg 40 (44). A coarse pointer grows the control itself, and every size keeps the
        * 44 px ::after hit area, so no call site sizes for touch.
        */
@@ -69,9 +96,9 @@ export const buttonVariants = cva(
         // The sign-in button keeps the larger text (16 px on phones, 14 px from sm up).
         lg: "h-10 px-[calc(--spacing(3.5)-1px)] text-control sm:pointer-coarse:h-11",
         // On a phone the 28 px sm button is shadcn Nova's sm, label and all: 12.8 px text, a
-        // 14 px icon with no pull-in margin, a 4 px gap, 10 px sides and 6 px beside a leading
-        // icon. From sm up: 14 / 16 and the -2 px icon margin, as before.
-        sm: "h-7 gap-1 px-2.5 text-button-sm has-[>svg:first-child]:ps-1.5 [&_svg]:mx-0 [&_svg:not([class*='size-'])]:size-3.5 sm:h-8 sm:[&_svg]:-mx-0.5 sm:gap-1.5 sm:px-[calc(--spacing(3)-1px)] sm:text-sm sm:has-[>svg]:px-[calc(--spacing(2.5)-1px)] sm:[&_svg:not([class*='size-'])]:size-4 sm:pointer-coarse:h-9",
+        // 14 px icon, a 4 px gap (5 less the icon's 1 px pull-in), 10 px sides and 8 px on both
+        // sides with an icon. From sm up: 14 / 16.
+        sm: "h-7 gap-1.25 px-2.5 text-button-sm has-[>svg]:px-2 [&_svg:not([class*='size-'])]:size-3.5 sm:h-8 sm:gap-1.5 sm:px-[calc(--spacing(3)-1px)] sm:text-sm sm:has-[>svg]:px-[calc(--spacing(2.5)-1px)] sm:[&_svg:not([class*='size-'])]:size-4 sm:pointer-coarse:h-9",
         xs: "h-6 gap-1 px-[calc(--spacing(2)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3",
       },
       // Hover is the guarded `hover:` variant (only where the pointer can hover), never a bare
@@ -173,6 +200,56 @@ function preventWhileLoading(event: React.MouseEvent<HTMLButtonElement>): void {
   event.preventDefault();
 }
 
+/** The icon button of each text size, for a button shown compact. */
+const COMPACT_SIZE = {
+  default: "icon",
+  lg: "icon-lg",
+  sm: "icon-sm",
+  xs: "icon-xs",
+} as const satisfies Partial<Record<NonNullable<ButtonProps["size"]>, ButtonProps["size"]>>;
+
+/**
+ * In a card header too narrow for the actions' labels (CompactActionsContext), a button with an
+ * icon and a text label shows only the icon at the icon size of its text size; the label stays,
+ * visually hidden, as its accessible name. Text-only and icon-only buttons stay as they are.
+ */
+function useCompactContent(
+  children: React.ReactNode,
+  size: ButtonProps["size"],
+  variant: ButtonProps["variant"],
+): { children: React.ReactNode; size: ButtonProps["size"]; compacted: boolean } {
+  const compact = useCompactActions();
+  const textSize = (size ?? "default") as keyof typeof COMPACT_SIZE;
+  if (
+    !compact ||
+    variant === "link-inline" ||
+    variant === "link-action" ||
+    !(textSize in COMPACT_SIZE)
+  ) {
+    return { children, size, compacted: false };
+  }
+  const parts = Children.toArray(children);
+  const isText = (part: React.ReactNode): part is string | number =>
+    typeof part === "string" || typeof part === "number";
+  if (!parts.some(isText) || !parts.some((part) => isValidElement(part))) {
+    return { children, size, compacted: false };
+  }
+  return {
+    children: parts.map((part, index) =>
+      isText(part) ? (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one fixed children list
+        <span className="sr-only" key={`label-${index}`}>
+          {part}
+        </span>
+      ) : (
+        part
+      ),
+    ),
+    size: COMPACT_SIZE[textSize],
+    compacted: true,
+  };
+}
+
 export function Button({
   className,
   variant,
@@ -188,21 +265,28 @@ export function Button({
   const typeValue: React.ButtonHTMLAttributes<HTMLButtonElement>["type"] = render
     ? undefined
     : "button";
+  const shown = useCompactContent(children, size, variant);
 
   const defaultProps = {
     children: loading ? (
       <>
         <Spinner aria-hidden="true" data-slot="button-loading-indicator" />
-        {loadingText ?? children}
+        {loadingText === undefined ? (
+          shown.children
+        ) : shown.compacted ? (
+          <span className="sr-only">{loadingText}</span>
+        ) : (
+          loadingText
+        )}
       </>
     ) : (
-      children
+      shown.children
     ),
     // An inline link or text action takes the surrounding text's size, so it drops the scale.
     className: cn(
       buttonVariants({
         className,
-        size: variant === "link-inline" || variant === "link-action" ? null : size,
+        size: variant === "link-inline" || variant === "link-action" ? null : shown.size,
         variant,
       }),
     ),

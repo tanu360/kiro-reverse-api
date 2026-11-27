@@ -2,7 +2,7 @@ import type { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactNode, RefObject } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, ICON_BUTTON_PULL } from "@/components/ui/button";
 import {
   Dialog,
   type DialogAnchor,
@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 interface ResponsiveDialogProps {
   open: boolean;
@@ -80,7 +81,7 @@ function TitleRow({
       <span className="flex h-lh shrink-0 items-center text-subtitle">
         <Button
           aria-label={backLabel}
-          className="-ms-2 shrink-0"
+          className={cn("shrink-0", ICON_BUTTON_PULL.icon.start)}
           onClick={onBack}
           size="icon"
           variant="ghost"

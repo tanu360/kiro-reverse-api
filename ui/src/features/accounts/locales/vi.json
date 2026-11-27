@@ -151,7 +151,6 @@
   "metadata.tagLimit": "Đã có {max} thẻ",
   "models.refreshAll": "Làm mới model",
   "models.refreshAllNone": "Không có tài khoản nào đang trong vòng xoay, nên không có gì để làm mới.",
-  "models.refreshShort": "Model",
   "models.confirmRefreshAll": "Làm mới model cho mọi tài khoản đang bật?",
   "models.refreshing": "Đang làm mới model…",
   "models.refreshAllDone": "Đã làm mới model. Có {count} model khả dụng.",

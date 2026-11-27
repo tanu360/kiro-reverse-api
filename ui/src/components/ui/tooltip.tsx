@@ -2,6 +2,7 @@
 
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import type React from "react";
+import { KeepLabels } from "@/components/ui/compact-actions";
 import { cn } from "@/lib/utils";
 
 export const TooltipProvider: typeof TooltipPrimitive.Provider = TooltipPrimitive.Provider;
@@ -33,33 +34,35 @@ export function TooltipPopup({
 }): React.ReactElement {
   return (
     <TooltipPrimitive.Portal {...portalProps}>
-      <TooltipPrimitive.Positioner
-        align={align}
-        anchor={anchor}
-        // z-70: above dialogs and sheets (z-50), as every anchored popup.
-        className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
-        collisionPadding={collisionPadding}
-        data-slot="tooltip-positioner"
-        side={side}
-        sideOffset={sideOffset}
-      >
-        <TooltipPrimitive.Popup
-          className={cn(
-            // The one floating sheet (index.css popup-surface), as menus, selects and popovers.
-            "popup-surface relative flex h-(--popup-height,auto) w-(--popup-width,auto) max-w-[min(--spacing(80),90vw)] origin-(--transform-origin) wrap-anywhere text-pretty whitespace-normal text-xs leading-snug transition-[width,height,scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
-            className,
-          )}
-          data-slot="tooltip-popup"
-          {...props}
+      <KeepLabels>
+        <TooltipPrimitive.Positioner
+          align={align}
+          anchor={anchor}
+          // z-70: above dialogs and sheets (z-50), as every anchored popup.
+          className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
+          collisionPadding={collisionPadding}
+          data-slot="tooltip-positioner"
+          side={side}
+          sideOffset={sideOffset}
         >
-          <TooltipPrimitive.Viewport
-            className="relative size-full overflow-clip px-(--viewport-inline-padding) py-1 [--viewport-inline-padding:--spacing(2)] data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:truncate **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity"
-            data-slot="tooltip-viewport"
+          <TooltipPrimitive.Popup
+            className={cn(
+              // The one floating sheet (index.css popup-surface), as menus, selects and popovers.
+              "popup-surface relative flex h-(--popup-height,auto) w-(--popup-width,auto) max-w-[min(--spacing(80),90vw)] origin-(--transform-origin) wrap-anywhere text-pretty whitespace-normal text-xs leading-snug transition-[width,height,scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
+              className,
+            )}
+            data-slot="tooltip-popup"
+            {...props}
           >
-            {children}
-          </TooltipPrimitive.Viewport>
-        </TooltipPrimitive.Popup>
-      </TooltipPrimitive.Positioner>
+            <TooltipPrimitive.Viewport
+              className="relative size-full overflow-clip px-(--viewport-inline-padding) py-1 [--viewport-inline-padding:--spacing(2)] data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:truncate **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity"
+              data-slot="tooltip-viewport"
+            >
+              {children}
+            </TooltipPrimitive.Viewport>
+          </TooltipPrimitive.Popup>
+        </TooltipPrimitive.Positioner>
+      </KeepLabels>
     </TooltipPrimitive.Portal>
   );
 }

@@ -1122,6 +1122,8 @@
   /* lg one hairline in: the inner edge of a 1 px border round an lg shape (a ::before inside it). */
   --radius-lg-inner: calc(var(--radius) - 1px);
   --radius-xl: calc(var(--radius) + 4px);
+  /* xl one hairline in: the inner edge of a card's 1 px border, for a child that fills a corner. */
+  --radius-xl-inner: calc(var(--radius) + 3px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
 

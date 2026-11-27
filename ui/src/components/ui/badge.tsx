@@ -35,13 +35,15 @@ export const badgeVariants = cva(
     },
     variants: {
       size: {
-        // min-w-5 keeps a one-digit count round.
-        sm: "h-5 min-w-5 justify-center px-1.5 text-xs has-[>svg:first-child]:ps-1 has-[>[data-slot=badge-dot]:first-child]:ps-1.5 [&_svg:not([class*='size-'])]:size-3",
-        // The disc nearly fills the pill (a 2 px inset), as in the reference; line icons stay a
-        // step smaller so they sit with the 12 px label instead of shouting over it.
+        // min-w-5 keeps a one-digit count round. An icon, a dot or a label alone: the same
+        // padding on both sides, so the icon sits as far from its edge as the label does from
+        // the other (on every size).
+        sm: "h-5 min-w-5 justify-center px-1.5 text-xs [&_svg:not([class*='size-'])]:size-3",
+        // The disc nearly fills the pill's height (a 2 px inset), as in the reference; line icons
+        // stay a step smaller so they sit with the 12 px label instead of shouting over it.
         default:
-          "h-6 px-2.5 text-xs has-[>svg:first-child]:ps-1 has-[>[data-slot=badge-dot]:first-child]:ps-2 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='size-'])[data-badge-icon=line]]:size-3.5 has-[>svg[data-badge-icon=line]:first-child]:ps-2",
-        lg: "h-7 gap-1.5 px-2.5 text-sm has-[>svg:first-child]:ps-1.5 has-[>[data-slot=badge-dot]:first-child]:ps-2.5 [&_svg:not([class*='size-'])]:size-4",
+          "h-6 px-2.5 text-xs has-[>svg]:px-2 has-[>[data-slot=badge-dot]]:px-2 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='size-'])[data-badge-icon=line]]:size-3.5",
+        lg: "h-7 gap-1.5 px-2.5 text-sm has-[>svg]:px-2 [&_svg:not([class*='size-'])]:size-4",
       },
       // Every tone reads its colours from the --pill-* tokens and the status ramps (index.css),
       // which already switch for the dark theme. A solid fill is the tone's text colour (4.5:1 on
@@ -70,7 +72,7 @@ export const badgeVariants = cva(
         // No fill and no side padding: the tone's dot (or line icon) before a muted label, so a
         // calm status ("Succeeded") lines up with the text around it. Use with `dot`.
         quiet:
-          "gap-1.5 bg-transparent px-0 text-muted-foreground has-[>svg:first-child]:ps-0 has-[>svg[data-badge-icon=line]:first-child]:ps-0 has-[>[data-slot=badge-dot]:first-child]:ps-0 [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] [button&,a&]:hover:text-foreground",
+          "gap-1.5 bg-transparent px-0 text-muted-foreground has-[>svg]:px-0 has-[>[data-slot=badge-dot]]:px-0 [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] [button&,a&]:hover:text-foreground",
         outline:
           // The field fill and hairline (index.css --field-*), as the outline button.
           "border-field-border bg-field text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] [button&,a&]:hover:bg-field-hover",

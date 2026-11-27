@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useCompactActions } from "@/components/ui/compact-actions";
 import {
   Dialog,
   DialogClose,
@@ -205,15 +206,13 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
   return (
     <SettingsSection
       actions={
-        <Label variant="option">
-          <Checkbox
-            aria-describedby={allId}
-            checked={total > 0 && on === total}
-            indeterminate={on > 0 && on < total}
-            onCheckedChange={(checked) => setAll(checked)}
-          />
-          {t("promptFilter.all")}
-        </Label>
+        <AllToggle
+          describedBy={allId}
+          label={t("promptFilter.all")}
+          off={on === 0}
+          on={total > 0 && on === total}
+          onChange={setAll}
+        />
       }
       badge={
         // Green when every filter is on; plain otherwise (all off is a valid choice, not an error).
@@ -584,5 +583,36 @@ function RuleEditor({
         </DialogFooter>
       </form>
     </DialogPopup>
+  );
+}
+
+/**
+ * The header's switch for every filter and rule at once. Where the header is too narrow for its
+ * label beside the title (CompactActionsContext), only the box shows; the label stays its name.
+ */
+function AllToggle({
+  label,
+  on,
+  off,
+  describedBy,
+  onChange,
+}: {
+  label: string;
+  on: boolean;
+  off: boolean;
+  describedBy: string;
+  onChange: (checked: boolean) => void;
+}): JSX.Element {
+  const compact = useCompactActions();
+  return (
+    <Label variant="option">
+      <Checkbox
+        aria-describedby={describedBy}
+        checked={on}
+        indeterminate={!on && !off}
+        onCheckedChange={(checked) => onChange(checked)}
+      />
+      <span className={compact ? "sr-only" : undefined}>{label}</span>
+    </Label>
   );
 }

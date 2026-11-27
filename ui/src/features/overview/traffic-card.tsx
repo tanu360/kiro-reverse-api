@@ -16,8 +16,7 @@ import { BarChartSkeleton } from "@/components/shared/chart-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
-import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
-import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
+import { SegmentedPicker } from "@/components/shared/segmented-picker";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { heatmapQuery, trafficHistoryQuery } from "@/lib/api/observe";
@@ -304,23 +303,12 @@ export function TrafficCard(): JSX.Element {
     <ChartLegendHoverProvider>
       <SectionCard
         actions={
-          // A radio group: one tab stop, the arrow keys move the range.
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("traffic.range")}
-                onValueChange={setRange}
-                value={range}
-              />
-            }
-            size="sm"
-          >
-            {RANGES.map((value) => (
-              <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-                {t(`traffic.range.${value}`)}
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
+          <SegmentedPicker
+            items={RANGES.map((value) => ({ value, label: t(`traffic.range.${value}`) }))}
+            label={t("traffic.range")}
+            onValueChange={setRange}
+            value={range}
+          />
         }
         description={
           allTime

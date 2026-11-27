@@ -28,14 +28,11 @@ export interface SectionCardProps {
   descriptionVariant?: "stacked" | "inline";
   /** After the title, outside the heading: a count, a size or a state badge. */
   meta?: ReactNode;
-  actions?: ReactNode;
   /**
-   * One icon-only action (a Refresh) before `actions`. From sm up the two sit together as one
-   * group, 8 px apart. On a phone it stays in the top right corner, on the title's line (alone
-   * at the start of the wrapped row it read as stray), out of the flow so the description keeps
-   * the full width, and `actions` always take the row under the heading.
+   * Beside the title at every width, 8 px apart; compact (icon buttons, a cycling picker) when
+   * their labels do not fit there (CardAction).
    */
-  cornerAction?: ReactNode;
+  actions?: ReactNode;
   footer?: ReactNode;
   /** Layout classes for the footer (height, alignment). */
   footerClassName?: string;
@@ -61,7 +58,6 @@ export function SectionCard({
   descriptionVariant = "stacked",
   meta,
   actions,
-  cornerAction,
   footer,
   tone = "default",
   slim = false,
@@ -85,19 +81,9 @@ export function SectionCard({
     >
       {/* The title names what the card's controls (Save, Learn more) belong to. */}
       <HeadingIdContext.Provider value={headingId}>
-        <CardHeader
-          className={cornerAction ? "relative" : undefined}
-          icon={icon}
-          iconTone={danger ? "danger" : "default"}
-        >
+        <CardHeader icon={icon} iconTone={danger ? "danger" : "default"}>
           <CardHeading>
-            {/* On a phone the title row ends 8 px short of the corner action. */}
-            <div
-              className={cn(
-                "flex min-h-6 min-w-0 flex-wrap items-center gap-x-2 gap-y-1",
-                cornerAction && "max-sm:pe-7",
-              )}
-            >
+            <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <CardTitle
                 className={cn(danger && "text-destructive-foreground")}
                 id={headingId}
@@ -118,18 +104,7 @@ export function SectionCard({
               <CardDescription variant={descriptionVariant}>{description}</CardDescription>
             ) : null}
           </CardHeading>
-          {cornerAction ? (
-            // Phones: its 32 px box centred on the 24 px title line, at the 16 px edge.
-            <CardAction className="max-sm:absolute max-sm:end-4 max-sm:top-3 max-sm:m-0">
-              {cornerAction}
-            </CardAction>
-          ) : null}
-          {/* Beside the corner action the header's 12 px gap less 4: the 8 px of one group. */}
-          {actions ? (
-            <CardAction className={cornerAction ? "max-sm:basis-full sm:-ms-1" : undefined}>
-              {actions}
-            </CardAction>
-          ) : null}
+          {actions ? <CardAction>{actions}</CardAction> : null}
         </CardHeader>
         {slim ? children : <CardPanel className={panelClassName}>{children}</CardPanel>}
         {footer ? <CardFooter className={footerClassName}>{footer}</CardFooter> : null}

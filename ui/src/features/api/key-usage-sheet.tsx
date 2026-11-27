@@ -23,6 +23,7 @@ import {
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
 import { SectionCard } from "@/components/shared/section-card";
+import { SegmentedPicker } from "@/components/shared/segmented-picker";
 import { StatStrip } from "@/components/shared/stat-strip";
 import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Card } from "@/components/ui/card";
@@ -62,7 +63,6 @@ import { KeyLimitsCard } from "./key-usage-limits";
 import {
   EMPTY_TOTALS,
   findEntry,
-  isUsageMetric,
   SHEET_METRICS,
   seriesBars,
   type UsageMetric,
@@ -364,24 +364,12 @@ export function UsageChartCard({
     <ChartLegendHoverProvider>
       <SectionCard
         actions={
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("usage.metric")}
-                onValueChange={(next) => {
-                  if (isUsageMetric(next, SHEET_METRICS)) setMetric(next);
-                }}
-                value={metric}
-              />
-            }
-            size="sm"
-          >
-            {SHEET_METRICS.map((value) => (
-              <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-                {t(`usage.metric.${value}`)}
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
+          <SegmentedPicker
+            items={SHEET_METRICS.map((value) => ({ value, label: t(`usage.metric.${value}`) }))}
+            label={t("usage.metric")}
+            onValueChange={setMetric}
+            value={metric}
+          />
         }
         className={className}
         description={range === "all" ? t(`usage.per.all.${bucket}`) : t(`usage.per.${range}`)}

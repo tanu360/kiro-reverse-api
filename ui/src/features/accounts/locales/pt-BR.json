@@ -171,7 +171,6 @@
   "metadata.tagLimit": "Já tem {max} tags",
   "models.refreshAll": "Atualizar modelos",
   "models.refreshAllNone": "Nenhuma conta está em rotação, então não há o que atualizar.",
-  "models.refreshShort": "Modelos",
   "models.confirmRefreshAll": "Atualizar modelos de todas as contas habilitadas?",
   "models.refreshing": "Atualizando modelos…",
   "models.refreshAllDone": "Modelos atualizados. {count} disponíveis.",

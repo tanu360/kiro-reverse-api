@@ -1,6 +1,7 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import type { JSX, ReactElement, ReactNode } from "react";
+import { ICON_BUTTON_PULL } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, placeholderKeys } from "@/lib/utils";
@@ -119,7 +120,11 @@ export function ListCard({
           // One title line tall: the icon button centres on the title's line and overflows into
           // the padding instead of making the header taller; its icon, not its box, lines up
           // with the card's content edge.
-          <div className="relative z-1 -me-2.5 flex h-6 shrink-0 items-center">{action}</div>
+          <div
+            className={cn("relative z-1 flex h-6 shrink-0 items-center", ICON_BUTTON_PULL.icon.end)}
+          >
+            {action}
+          </div>
         ) : null}
       </div>
       {meta ? (

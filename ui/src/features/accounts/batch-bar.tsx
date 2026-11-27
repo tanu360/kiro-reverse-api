@@ -239,8 +239,9 @@ export function BatchBar({
     <p
       aria-live="polite"
       className={cn(
-        "whitespace-nowrap px-1.5 text-sm tabular-nums",
-        isMobile ? "min-w-0 flex-1 px-1 font-semibold" : "font-medium",
+        "whitespace-nowrap text-sm tabular-nums",
+        // Desktop: the count sits as far from the bar's start as Delete's label from its end.
+        isMobile ? "min-w-0 flex-1 px-1 font-semibold" : "ps-2.5 pe-1.5 font-medium",
       )}
     >
       {isMobile ? (
