@@ -57,11 +57,17 @@ func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) 
 		t.Fatalf("disable endpoint fallback: %v", err)
 	}
 
+	// The account the pool picks first fails. Which one that is depends on where the shared
+	// pool's rotation cursor stands (it keeps its place across reloads), so it is not fixed here.
 	requestTokens := make([]string, 0, 2)
+	failing := ""
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		requestTokens = append(requestTokens, token)
-		if token == "token-first" {
+		if failing == "" {
+			failing = token
+		}
+		if token == failing {
 			http.Error(w, "temporary upstream failure", http.StatusInternalServerError)
 			return
 		}
@@ -87,6 +93,9 @@ func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) 
 
 	p := accountpool.GetPool()
 	p.Reload()
+	// The shared pool keeps cooldowns from an earlier run of this test (-count).
+	p.ClearCooldown("first")
+	p.ClearCooldown("second")
 	h := &Handler{
 		pool:        p,
 		promptCache: newPromptCacheTracker(defaultPromptCacheTTL),
@@ -109,8 +118,8 @@ func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) 
 	if len(requestTokens) != 4 {
 		t.Fatalf("expected four account attempts, got %v", requestTokens)
 	}
-	if requestTokens[0] != "token-first" || requestTokens[1] != "token-first" || requestTokens[2] != "token-first" || requestTokens[3] != "token-second" {
-		t.Fatalf("expected first account to be excluded before retry, got %v", requestTokens)
+	if requestTokens[1] != failing || requestTokens[2] != failing || requestTokens[3] == failing {
+		t.Fatalf("expected the failing account to be excluded before retry, got %v", requestTokens)
 	}
 
 	var resp ClaudeResponse
