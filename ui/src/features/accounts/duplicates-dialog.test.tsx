@@ -239,6 +239,7 @@ describe("Duplicate accounts", () => {
       enabled: true,
       healthy: false,
       banStatus: "",
+      banReason: "",
       silent: false,
       lastRefresh: 0,
       expiresAt: 0,
@@ -248,7 +249,13 @@ describe("Duplicate accounts", () => {
     };
     expect(unusableStatus({ ...base, healthy: true })).toBeNull();
     expect(unusableStatus({ ...base, banStatus: "BANNED" })).toBe("banned");
-    expect(unusableStatus({ ...base, banStatus: "SUSPENDED" })).toBe("suspended");
+    expect(
+      unusableStatus({
+        ...base,
+        banStatus: "BANNED",
+        banReason: "AWS temporarily suspended - unusual user activity detected",
+      }),
+    ).toBe("suspended");
     expect(unusableStatus({ ...base, banStatus: "DISABLED" })).toBe("disabled");
     expect(unusableStatus({ ...base, enabled: false })).toBe("disabled");
     expect(unusableStatus({ ...base, silent: true })).toBe("disabled");

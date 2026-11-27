@@ -96,6 +96,8 @@ describe("ServerLogCard", () => {
     mockDb.settings.logLevelFromEnv = true;
     const { card } = await renderCard();
     expect(within(card).getByText(ENV_NOTE)).toBeInTheDocument();
+    // The hint no longer promises the change outlives a restart.
+    expect(within(card).queryByText(/kept after a restart/)).not.toBeInTheDocument();
   });
 
   it("reads in Chinese", async () => {

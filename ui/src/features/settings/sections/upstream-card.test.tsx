@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { ChatApi } from "@/lib/api/types";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
@@ -195,5 +196,30 @@ describe("UpstreamCard", () => {
     expect(within(card).queryByRole("alert")).not.toBeInTheDocument();
     expect(within(card).getByRole("button", { name: "Save" })).toHaveFocus();
     expect(within(card).getByLabelText("Sign-in region")).toHaveValue("eu-west-1");
+  });
+});
+
+describe("UpstreamCard and the chat API", () => {
+  async function renderWith(chatApi: ChatApi) {
+    mockDb.endpoint = { ...mockDb.endpoint, chatApi };
+    mockDb.upstream = { apiDomain: "amazonaws", authRegion: "", apiRegion: "eu-central-1" };
+    const { card } = await renderCard();
+    return card;
+  }
+
+  it("names the Kiro IDE endpoint while chat can still use it", async () => {
+    const card = await renderWith("auto");
+    expect(
+      await within(card).findByText(/The Kiro IDE endpoint and web search go to/),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves chat out of the domain while every account uses CreateResponse", async () => {
+    const card = await renderWith("responses");
+    const line = await within(card).findByText(/^Web search goes to/);
+    expect(line).toHaveTextContent(
+      "Web search goes to q.eu-central-1.amazonaws.com. Chat goes to Kiro's newer chat API (CreateResponse) on kiro.dev, whatever this setting says.",
+    );
+    expect(within(card).queryByText(/Kiro IDE endpoint/)).not.toBeInTheDocument();
   });
 });

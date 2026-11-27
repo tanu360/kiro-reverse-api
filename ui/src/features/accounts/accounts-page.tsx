@@ -45,6 +45,7 @@ import {
   describeFailures,
   FILTER_DIMENSIONS,
   filterAccounts,
+  inRotation,
   sortAccounts,
 } from "./account-model";
 import { AccountsTable } from "./accounts-table";
@@ -55,6 +56,7 @@ import { DuplicatesNotice } from "./duplicates-notice";
 import { ExportDialog } from "./export-dialog";
 import { ReloginProvider } from "./relogin-context";
 import { TestAccountDialog } from "./test-account-dialog";
+import { useAllowOverUsage } from "./use-allow-over-usage";
 
 const NO_ACCOUNTS: Account[] = [];
 const PAGE_SIZES = [10, 25, 50, 100];
@@ -116,6 +118,8 @@ export function AccountsPage(): JSX.Element {
 
   const query = useQuery(accountsQuery());
   const accounts = query.data ?? NO_ACCOUNTS;
+  // The models sweep reads only the accounts in rotation (sweepModelsCache, GetEnabledAccounts).
+  const nothingToRefresh = !accounts.some(inRotation);
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   // The export dialog opens on every account (header Export) or on the selection (batch bar).
@@ -203,13 +207,14 @@ export function AccountsPage(): JSX.Element {
   const desc = search.order ? search.order === "desc" : sort ? defaultSortDesc(sort) : false;
   // One clock per fetch, so the token-expiry status does not change between filter and sort.
   const nowSec = useClockAt(query.dataUpdatedAt);
+  const allowOverUsage = useAllowOverUsage();
   const filtered = useMemo(
-    () => filterAccounts(accounts, shownView.filters, nowSec),
-    [accounts, shownView.filters, nowSec],
+    () => filterAccounts(accounts, shownView.filters, nowSec, allowOverUsage),
+    [accounts, shownView.filters, nowSec, allowOverUsage],
   );
   const sorted = useMemo(
-    () => sortAccounts(filtered, sort, desc, nowSec),
-    [filtered, sort, desc, nowSec],
+    () => sortAccounts(filtered, sort, desc, nowSec, allowOverUsage),
+    [filtered, sort, desc, nowSec, allowOverUsage],
   );
   const pageSize = search.pageSize ?? DEFAULT_PAGE_SIZE;
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
@@ -450,23 +455,26 @@ export function AccountsPage(): JSX.Element {
             // carries the one primary Add account, and the header text gets the full width.
             noAccounts ? undefined : (
               <>
-                <Button
-                  aria-label={t("models.refreshAll")}
-                  loading={refreshingAll}
-                  loadingText={
-                    <>
-                      <span className="sm:hidden">{t("models.refreshShort")}</span>
-                      <span className="max-sm:hidden">{t("models.refreshing")}</span>
-                    </>
-                  }
-                  onClick={() => void onRefreshAllModels()}
-                  ref={refreshAllRef}
-                  variant="secondary"
-                >
-                  <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-                  <span className="sm:hidden">{t("models.refreshShort")}</span>
-                  <span className="max-sm:hidden">{t("models.refreshAll")}</span>
-                </Button>
+                <RefreshModelsReason show={nothingToRefresh}>
+                  <Button
+                    aria-label={t("models.refreshAll")}
+                    disabled={nothingToRefresh}
+                    loading={refreshingAll}
+                    loadingText={
+                      <>
+                        <span className="sm:hidden">{t("models.refreshShort")}</span>
+                        <span className="max-sm:hidden">{t("models.refreshing")}</span>
+                      </>
+                    }
+                    onClick={() => void onRefreshAllModels()}
+                    ref={refreshAllRef}
+                    variant="secondary"
+                  >
+                    <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
+                    <span className="sm:hidden">{t("models.refreshShort")}</span>
+                    <span className="max-sm:hidden">{t("models.refreshAll")}</span>
+                  </Button>
+                </RefreshModelsReason>
                 <Button onClick={() => setAddOpen(true)}>
                   <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
                   {t("actions.add")}
@@ -590,5 +598,23 @@ export function AccountsPage(): JSX.Element {
         ) : null}
       </AccountFailureProvider>
     </ReloginProvider>
+  );
+}
+
+/** The reason Refresh models is off, on hover: a disabled button opens no tooltip itself. */
+function RefreshModelsReason({
+  show,
+  children,
+}: {
+  show: boolean;
+  children: JSX.Element;
+}): JSX.Element {
+  const { t } = useT("accounts");
+  if (!show) return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" />}>{children}</TooltipTrigger>
+      <TooltipPopup>{t("models.refreshAllNone")}</TooltipPopup>
+    </Tooltip>
   );
 }

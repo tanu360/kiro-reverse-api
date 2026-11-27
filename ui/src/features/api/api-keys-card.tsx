@@ -21,7 +21,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useCallback, useEffect, useRef, useState } from "react";
+import { type JSX, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { ActionError } from "@/components/shared/action-error";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
@@ -112,6 +112,16 @@ interface KeyFailure {
 /** The key's name, with any e-mail in it masked in privacy mode, as Usage by key shows it. */
 function keyName(apiKey: ApiKey, t: TFunction, mask: (text?: string) => string): string {
   return apiKey.name ? mask(apiKey.name) : t("keys.unnamed");
+}
+
+/** Whether Reset usage would change anything: it zeroes these four (config ResetApiKeyUsage). */
+function hasUsage(apiKey: ApiKey): boolean {
+  return (
+    apiKey.tokensUsed > 0 ||
+    apiKey.creditsUsed > 0 ||
+    apiKey.requestsCount > 0 ||
+    (apiKey.successfulCalls ?? 0) > 0
+  );
 }
 
 /** The full secret is fetched on demand for each copy and never cached. */
@@ -314,17 +324,9 @@ export function ApiKeysCard(): JSX.Element {
     }));
   };
 
-  // Enable and disable never ask (parity), except when disabling locks every client out.
-  const onToggle = async (apiKey: ApiKey) => {
-    if (apiKey.enabled && wouldLockOutClients(list, apiKey.id, requireApiKey)) {
-      const ok = await confirm({
-        title: t("keys.confirmDisableTitle", { name: keyName(apiKey, t, mask) }),
-        description: t("keys.lockoutWarning"),
-        confirmLabel: t("common:actions.disable"),
-        variant: "danger",
-      });
-      if (!ok) return;
-    }
+  // Enable and disable never ask. The last enabled key while keys are required cannot be
+  // disabled or deleted (409 api_key_lockout): its menu does not offer either.
+  const onToggle = (apiKey: ApiKey) => {
     toggle.mutate(apiKey);
   };
 
@@ -342,15 +344,9 @@ export function ApiKeysCard(): JSX.Element {
   };
 
   const onDelete = async (apiKey: ApiKey) => {
-    const lockout = wouldLockOutClients(list, apiKey.id, requireApiKey);
     const ok = await confirm({
       title: t("keys.confirmDeleteTitle", { name: keyName(apiKey, t, mask) }),
-      description: lockout
-        ? t("common:text.joinSentences", {
-            first: t("keys.confirmDeleteBody"),
-            second: t("keys.lockoutWarning"),
-          })
-        : t("keys.confirmDeleteBody"),
+      description: t("keys.confirmDeleteBody"),
       confirmLabel: t("common:actions.delete"),
       variant: "danger",
     });
@@ -371,11 +367,12 @@ export function ApiKeysCard(): JSX.Element {
       apiKey={apiKey}
       busy={busyId === apiKey.id}
       editing={editingId === apiKey.id}
+      lastEnabledKey={wouldLockOutClients(list, apiKey.id, requireApiKey)}
       onDelete={() => void onDelete(apiKey)}
       onEdit={() => openEdit(apiKey)}
       onRegenerate={() => void onRegenerate(apiKey)}
       onReset={() => reset.mutate(apiKey)}
-      onToggle={() => void onToggle(apiKey)}
+      onToggle={() => onToggle(apiKey)}
       onUsage={() =>
         setUsageFor((current) => ({ apiKey, open: true, session: (current?.session ?? 0) + 1 }))
       }
@@ -586,7 +583,15 @@ export function ApiKeysCard(): JSX.Element {
       cornerAction={headerRefresh}
       // Clips the last row's hover tint to the card's rounded corners.
       className="overflow-hidden"
-      description={t("keys.description")}
+      description={
+        // A key sent straight to the proxy, not through the link, is ignored then (proxy/auth.go).
+        settings.data?.requireApiKey === false
+          ? t("common:text.joinSentences", {
+              first: t("keys.description"),
+              second: t("keys.linkOnly"),
+            })
+          : t("keys.description")
+      }
       footer={
         list.length > pageSize ? (
           <DataTablePagination
@@ -1077,6 +1082,7 @@ function KeyActions({
   apiKey,
   busy,
   editing,
+  lastEnabledKey,
   onEdit,
   onToggle,
   onRegenerate,
@@ -1088,6 +1094,8 @@ function KeyActions({
   apiKey: ApiKey;
   busy: boolean;
   editing: boolean;
+  /** The last enabled key while keys are required: the server refuses to disable or delete it. */
+  lastEnabledKey: boolean;
   onEdit: () => void;
   onToggle: () => void;
   onRegenerate: () => void;
@@ -1129,28 +1137,50 @@ function KeyActions({
           <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
           {t("common:actions.edit")}
         </MenuItem>
-        <MenuItem disabled={busy} onClick={onToggle}>
+        <MenuItem disabled={busy || lastEnabledKey} onClick={onToggle}>
           {apiKey.enabled ? (
             <HugeiconsIcon icon={PowerOffIcon} aria-hidden="true" />
           ) : (
             <HugeiconsIcon icon={PowerIcon} aria-hidden="true" />
           )}
-          {apiKey.enabled ? t("common:actions.disable") : t("common:actions.enable")}
+          <MenuItemLabel reason={lastEnabledKey ? t("keys.lastEnabledKey") : undefined}>
+            {apiKey.enabled ? t("common:actions.disable") : t("common:actions.enable")}
+          </MenuItemLabel>
         </MenuItem>
         <MenuItem disabled={busy} onClick={onRegenerate}>
           <HugeiconsIcon icon={ArrowReloadHorizontalIcon} aria-hidden="true" />
           {t("keys.regenerate")}
         </MenuItem>
-        <MenuItem disabled={busy} onClick={onReset}>
+        <MenuItem disabled={busy || !hasUsage(apiKey)} onClick={onReset}>
           <HugeiconsIcon icon={Undo02Icon} aria-hidden="true" />
-          {t("keys.resetUsage")}
+          <MenuItemLabel reason={hasUsage(apiKey) ? undefined : t("keys.nothingToReset")}>
+            {t("keys.resetUsage")}
+          </MenuItemLabel>
         </MenuItem>
         <MenuSeparator />
-        <MenuItem disabled={busy} onClick={onDelete} variant="destructive">
+        <MenuItem disabled={busy || lastEnabledKey} onClick={onDelete} variant="destructive">
           <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-          {t("common:actions.delete")}
+          <MenuItemLabel reason={lastEnabledKey ? t("keys.lastEnabledKey") : undefined}>
+            {t("common:actions.delete")}
+          </MenuItemLabel>
         </MenuItem>
       </MenuPopup>
     </Menu>
+  );
+}
+
+/** A menu item's label, with the reason under it when the item is off. */
+function MenuItemLabel({
+  children,
+  reason,
+}: {
+  children: ReactNode;
+  reason?: string;
+}): JSX.Element {
+  if (!reason) return <>{children}</>;
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span>{children}</span> <span className="text-muted-foreground text-xs">{reason}</span>
+    </span>
   );
 }

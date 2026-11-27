@@ -80,6 +80,20 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
   });
 
+  it("marks the prompt filter On while only Strip boundary markers is on", async () => {
+    mockDb.promptFilter = {
+      ...mockDb.promptFilter,
+      filterClaudeCode: false,
+      filterEnvNoise: false,
+      filterStripBoundaries: true,
+      rules: [],
+    };
+    await renderPage("security");
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    const link = within(nav).getByRole("link", { name: /Prompt filter/ });
+    await waitFor(() => expect(link).toHaveTextContent("On"));
+  });
+
   it("shows a cut section name whole when the keyboard reaches its link, not only on hover", async () => {
     // From xl the nav is the sidebar's rows, where a name can be cut beside its pill.
     vi.spyOn(window, "matchMedia").mockImplementation(
@@ -191,6 +205,10 @@ describe("SettingsPage", () => {
       within(card).getByText(/^Kiro stops a single answer at about 8,192 output/),
     ).toBeVisible();
 
+    // The limit is read, and checked, only while auto-continue is on.
+    await user.click(
+      within(card).getByRole("switch", { name: "Continue answers cut off by the output limit" }),
+    );
     await user.clear(input);
     await user.type(input, "11");
     await user.click(within(card).getByRole("button", { name: "Save" }));

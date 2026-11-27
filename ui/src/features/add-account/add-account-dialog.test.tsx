@@ -586,6 +586,53 @@ describe("Kiro API Key", () => {
     await user.click(await screen.findByRole("button", { name: "Add" }));
     expect(await screen.findByText("Enter at least one Kiro API key.")).toBeInTheDocument();
   });
+
+  it("offers only the regions Kiro serves API keys from, and sends the one chosen", async () => {
+    const imports = logRequests("/auth/credentials");
+    mockRefresh();
+    const { user } = renderWithProviders(<Harness initialMethod="apikey" />);
+    const region = await screen.findByRole("combobox", { name: "Region" });
+    expect(region).toHaveTextContent("us-east-1");
+    await user.click(region);
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual(["us-east-1", "eu-central-1"]);
+    await user.click(screen.getByRole("option", { name: "eu-central-1" }));
+    await user.type(screen.getByRole("textbox", { name: "Kiro API keys" }), "ksk_plain");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await expectClosed();
+    expect(imports.bodies).toEqual([
+      { kiroApiKey: "ksk_plain", authMethod: "api_key", region: "eu-central-1" },
+    ]);
+  });
+
+  it("stops at a key whose |region Kiro does not serve, before calling the server", async () => {
+    const imports = logRequests("/auth/credentials");
+    const { user } = renderWithProviders(<Harness initialMethod="apikey" />);
+    await screen.findByRole("combobox", { name: "Region" });
+    const keys = screen.getByRole("textbox", { name: "Kiro API keys" });
+    await user.type(keys, "ksk_good|eu-central-1{Enter}ksk_bad|US-West-2");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(
+      await screen.findByText(
+        "Kiro API keys work in us-east-1 and eu-central-1 only, not us-west-2.",
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(keys).toHaveFocus());
+    expect(keys).toHaveAttribute("aria-invalid", "true");
+    expect(imports.count).toBe(0);
+  });
+
+  it("stops at a key with a bar and no region, which the server refuses", async () => {
+    const imports = logRequests("/auth/credentials");
+    const { user } = renderWithProviders(<Harness initialMethod="apikey" />);
+    await screen.findByRole("combobox", { name: "Region" });
+    const keys = screen.getByRole("textbox", { name: "Kiro API keys" });
+    await user.type(keys, "ksk_abc|");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByText("Enter a region like us-east-1.")).toBeInTheDocument();
+    expect(keys).toHaveAttribute("aria-invalid", "true");
+    expect(imports.count).toBe(0);
+  });
 });
 
 describe("Credentials JSON", () => {

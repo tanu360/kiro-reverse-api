@@ -1,9 +1,10 @@
 import { Alert02Icon, ArrowRight02Icon, XIcon } from "@hugeicons/core-free-icons";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { type JSX, useState } from "react";
 import { NoticeIconButton, NoticeLine } from "@/components/shared/notice-line";
 import { announce } from "@/lib/announce";
+import { accountHealthQuery } from "@/lib/api/account-health";
 import { queryKeys } from "@/lib/api/query-keys";
 import { useAdminEvent } from "@/lib/events/admin-events";
 import { useT } from "@/lib/i18n";
@@ -16,8 +17,8 @@ const SELF_HEAL_PATH = sectionPagePath(SECTION_ID.selfHeal);
  * content). Every event refetches the self-heal card, the account list and the status counts. A
  * heal that brought accounts back is read out to screen readers (the lists update themselves).
  * When self-heal stops, a one-line warning stays at the top of the page, with a way to the
- * self-heal settings, until it is closed, the pool recovers or an admin resumes. It hides on the
- * settings page with the self-heal card, which says the same with its Resume.
+ * self-heal settings, until it is closed, the pool recovers, an admin resumes or turns self-heal
+ * off. It hides on the settings page with the self-heal card, which says the same with its Resume.
  */
 export function AccountHealNotices(): JSX.Element | null {
   const { t } = useT("settings");
@@ -51,7 +52,10 @@ export function AccountHealNotices(): JSX.Element | null {
     }
   });
 
-  if (!halted || onSelfHealPage) return null;
+  // Only while the line is up: turning self-heal off refetches it (settings.all), and a heal that
+  // is off neither runs nor halts (proxy/account_health.go).
+  const health = useQuery({ ...accountHealthQuery(), enabled: halted });
+  if (!halted || onSelfHealPage || health.data?.enabled === false) return null;
   return (
     <NoticeLine
       actions={

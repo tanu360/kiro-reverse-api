@@ -9,7 +9,7 @@ import { buildStatus } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp } from "@/test/render";
-import { attentionRows } from "./needs-attention";
+import { attentionFix, attentionRows } from "./needs-attention";
 import { topAccounts } from "./top-accounts";
 
 /** One of the four KPI cards, found by its label in the "Key figures" row. */
@@ -28,6 +28,9 @@ function activeCount(): number {
 }
 
 const BANNER = "Could not load the totals and live traffic";
+
+/** The fix button's name for each kind of fix. */
+const FIX_LABEL = { refresh: "Refresh token", relogin: "Sign in again", details: "Details" };
 
 describe("OverviewPage", () => {
   // The first test renders the whole app cold; on a loaded machine that can pass 5 s.
@@ -450,11 +453,9 @@ describe("OverviewPage", () => {
     items.forEach((item, index) => {
       const row = rows[index];
       expect(item).toHaveAttribute("data-status", row.status);
-      // A new token for an expired, missing or suspended one; otherwise the details.
-      const refreshes = ["expired", "noToken", "suspended"].includes(row.status);
       expect(within(item).getAllByRole("button")).toHaveLength(1);
       expect(
-        within(item).getByRole("button", { name: refreshes ? "Refresh token" : "Details" }),
+        within(item).getByRole("button", { name: FIX_LABEL[attentionFix(row)] }),
       ).toBeInTheDocument();
     });
     // The visible text is the name (label in name); the longer line is its description.
@@ -465,7 +466,7 @@ describe("OverviewPage", () => {
 
   it("refreshes the token from a needs-attention row", async () => {
     const rows = attentionRows(mockDb.accounts, Date.now() / 1000);
-    const index = rows.findIndex((row) => ["expired", "noToken", "suspended"].includes(row.status));
+    const index = rows.findIndex((row) => attentionFix(row) === "refresh");
     if (index < 0 || index >= 5) throw new Error("fixture has no refreshable account in view");
     const refreshed: string[] = [];
     mockServer.use(
@@ -483,7 +484,7 @@ describe("OverviewPage", () => {
 
   it("keeps focus in the list when a refreshed account leaves it", async () => {
     const rows = attentionRows(mockDb.accounts, Date.now() / 1000);
-    const index = rows.findIndex((row) => ["expired", "noToken", "suspended"].includes(row.status));
+    const index = rows.findIndex((row) => attentionFix(row) === "refresh");
     if (index < 0 || index >= 5) throw new Error("fixture has no refreshable account in view");
     const fixed = rows[index].account.id;
     let refreshed = false;
@@ -673,6 +674,39 @@ describe("OverviewPage", () => {
     expect(await within(modelMix).findByText("Not loaded")).toBeInTheDocument();
     expect(within(modelMix).queryByRole("alert")).toBeNull();
     expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
+  });
+
+  it("counts the available accounts from the account list only, never the pool's /status count", async () => {
+    // The pool's count leaves out cooling accounts and keeps expired tokens: a different
+    // measure from the bar's health groups, so the figure waits for the list instead.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockServer.use(
+      http.get(apiUrl("/status"), () =>
+        HttpResponse.json({ ...buildStatus(mockDb), available: 987 }),
+      ),
+      http.get(apiUrl("/accounts"), async () => {
+        await gate;
+        return HttpResponse.json(mockDb.accounts);
+      }),
+    );
+    await renderApp("/");
+    const status = buildStatus(mockDb);
+    const credits = await kpiCard("Plan credits");
+    await within(credits).findByText(
+      formatPercent(status.accountCreditsUsed, status.accountCreditsLimit, "en"),
+    );
+    const accounts = await kpiCard("Accounts");
+    expect(within(accounts).queryByText("987")).not.toBeInTheDocument();
+
+    release();
+    expect(
+      await within(accounts).findByText(`/ ${mockDb.accounts.length} available`),
+    ).toBeInTheDocument();
+    expect(within(accounts).getAllByText(String(activeCount())).length).toBeGreaterThan(0);
+    expect(within(accounts).queryByText("987")).not.toBeInTheDocument();
   });
 
   it("keeps the KPI cards loading while the heatmap is pending", async () => {

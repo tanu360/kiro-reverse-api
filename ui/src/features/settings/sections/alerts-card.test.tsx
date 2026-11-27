@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AlertsConfig } from "@/lib/api/alerts";
+import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
@@ -363,6 +364,69 @@ describe("AlertsCard", () => {
       },
     ]);
     await waitFor(() => expect(thresholds).toHaveValue("50, 75, 100"));
+  });
+});
+
+describe("AlertsCard rule fields", () => {
+  it("turns a rule's fields off while the rule is off", async () => {
+    const { user } = await renderCard();
+    const accountThresholds = screen.getByLabelText("Account thresholds (%)");
+    const poolThresholds = screen.getByLabelText("Pool thresholds (%)");
+    const cooldown = screen.getByLabelText("Pool alert cooldown (minutes)");
+    expect(accountThresholds).toBeEnabled();
+
+    await user.click(screen.getByRole("switch", { name: "Account credit usage" }));
+    expect(accountThresholds).toBeDisabled();
+    await user.click(screen.getByRole("switch", { name: "Pool credit usage" }));
+    expect(poolThresholds).toBeDisabled();
+    // The cooldown also spaces the no-account alerts, so it stays while those are on.
+    expect(cooldown).toBeEnabled();
+    await user.click(screen.getByRole("switch", { name: "No account available" }));
+    expect(cooldown).toBeDisabled();
+  });
+
+  it("drops a field's error once its rule is turned off, as the field cannot be fixed then", async () => {
+    const { user } = await renderCard();
+    const thresholds = screen.getByLabelText("Account thresholds (%)");
+    await user.clear(thresholds);
+    await user.type(thresholds, "90, 80");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const error = "Enter 1 to 10 whole percentages from 1 to 100 in ascending order.";
+    expect(await screen.findByText(error)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: "Account credit usage" }));
+    expect(screen.queryByText(error)).not.toBeInTheDocument();
+  });
+
+  it("says no rule sends anything while no channel is on", async () => {
+    const channels = SAVED.channels.map((channel) => ({ ...channel, enabled: false }));
+    mockServer.use(http.get(apiUrl("/alerts"), () => HttpResponse.json({ ...SAVED, channels })));
+    await renderCard();
+    expect(
+      await screen.findByText("No channel is on, so no rule sends anything yet."),
+    ).toBeInTheDocument();
+  });
+
+  it("says usage rules wait for a manual refresh while background usage refresh is off", async () => {
+    mockDb.settings = { ...mockDb.settings, usageRefreshIntervalMinutes: 0 };
+    mockServer.use(http.get(apiUrl("/alerts"), () => HttpResponse.json(SAVED)));
+    await renderCard();
+    expect(
+      await screen.findByText(
+        "Background usage refresh is off, so the credit usage rules see new usage only after an account is refreshed.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No channel is on, so no rule sends anything yet."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("turns the send time off while the daily summary is off", async () => {
+    const { user } = await renderCard();
+    const time = screen.getByRole("combobox", { name: "Send at" });
+    expect(time).toHaveAttribute("data-disabled");
+    await user.click(screen.getByRole("switch", { name: "Daily usage summary" }));
+    expect(time).not.toHaveAttribute("data-disabled");
   });
 });
 

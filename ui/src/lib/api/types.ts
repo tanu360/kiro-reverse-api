@@ -1290,6 +1290,8 @@ export interface Settings {
   logLevel: LogLevel;
   /** read-only: LOG_LEVEL is set, so it picks the level again at each start */
   logLevelFromEnv: boolean;
+  /** read-only: ADMIN_PASSWORD is set, so its password comes back at each start */
+  adminPasswordFromEnv: boolean;
 }
 export interface SettingsPatch {
   requireApiKey?: boolean;

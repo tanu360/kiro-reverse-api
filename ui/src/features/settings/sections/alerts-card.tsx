@@ -67,6 +67,7 @@ import {
   updateAlerts,
 } from "@/lib/api/alerts";
 import { ApiError, isApiError } from "@/lib/api/errors";
+import { settingsQuery } from "@/lib/api/settings";
 import { dateTimeFormat } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
@@ -91,6 +92,7 @@ import {
   parseThresholds,
   type RulesField,
   type RulesForm,
+  rulesFieldInUse,
   rulesForm,
   SECRET_MAX,
   serverChannelProblem,
@@ -100,6 +102,7 @@ import {
   URL_MAX,
   validateChannelDraft,
   withDraft,
+  withSavedUnusedFields,
 } from "./alerts-model";
 import { SECTION_ID } from "./sections";
 import {
@@ -260,10 +263,12 @@ function viewerTimeZone(): string {
 function SummaryTimeSelect({
   id,
   value,
+  disabled,
   onChange,
 }: {
   id: string;
   value: number;
+  disabled: boolean;
   onChange: (utcMinute: number) => void;
 }): JSX.Element {
   const { t, lang } = useT("alerts");
@@ -278,6 +283,7 @@ function SummaryTimeSelect({
   }));
   return (
     <Select
+      disabled={disabled}
       items={items}
       onValueChange={(next) => {
         if (typeof next === "number") onChange(next);
@@ -318,7 +324,9 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   const draft = useDraft<RulesForm>(server);
   const [invalid, setInvalid] = useState<RulesField[]>([]);
   const edit = (patch: Partial<RulesForm>, field?: RulesField) => {
-    if (field) setInvalid((prev) => prev.filter((item) => item !== field));
+    const next = { ...draft.value, ...patch };
+    // A field its rules no longer use is off and cannot be fixed: its error goes with it.
+    setInvalid((prev) => prev.filter((item) => item !== field && rulesFieldInUse(next, item)));
     draft.set((prev) => ({ ...prev, ...patch }));
   };
 
@@ -344,7 +352,8 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   const onSubmit = () => {
     const bad = invalidRulesFields(draft.value);
     setInvalid(bad);
-    if (bad.length === 0) rules.save(draft.value);
+    // A field whose rules are off cannot be fixed (it is off too): an invalid one keeps its saved value.
+    if (bad.length === 0) rules.save(withSavedUnusedFields(draft.value, draft.saved));
   };
 
   // The channel dialog: `session` remounts the form on each open.
@@ -503,6 +512,10 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   });
 
   const enabledCount = config.channels.filter((channel) => channel.enabled).length;
+  const { data: usageRefreshOff } = useQuery({
+    ...settingsQuery(),
+    select: (settings) => settings.usageRefreshIntervalMinutes === 0,
+  });
   const zone = viewerTimeZone();
   const summaryUtc = formatUtcMinute(draft.value.dailySummaryMinute);
   const summaryTimeHint = zone
@@ -615,7 +628,12 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
         </ul>
       )}
 
-      <SettingsRow description={t("rulesHint")} title={t("rulesHeading")} />
+      <SettingsRow description={t("rulesHint")} title={t("rulesHeading")}>
+        {/* proxy/alerts.go evaluate: with no channel on, every rule only re-arms. */}
+        {enabledCount === 0 ? <p className={ROW_DESCRIPTION}>{t("rulesNoChannel")}</p> : null}
+        {/* Credit usage changes only on a usage refresh (proxy/handler.go refreshAllAccounts). */}
+        {usageRefreshOff ? <p className={ROW_DESCRIPTION}>{t("rulesUsageRefreshOff")}</p> : null}
+      </SettingsRow>
       <SwitchField
         checked={draft.value.accountUsage}
         description={t("accountUsageHint")}
@@ -628,6 +646,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
             {/* A text keyboard, not the numeric pad: a phone's pad has no comma or space. */}
             <Input
               autoComplete="off"
+              disabled={!rulesFieldInUse(draft.value, "accountThresholds")}
               id={accountId}
               onChange={(event) =>
                 edit(
@@ -656,6 +675,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
           <FieldControl error={invalidText("poolThresholds")}>
             <Input
               autoComplete="off"
+              disabled={!rulesFieldInUse(draft.value, "poolThresholds")}
               id={poolId}
               onChange={(event) =>
                 edit({ poolThresholds: keepThresholdChars(event.target.value) }, "poolThresholds")
@@ -670,11 +690,28 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
         htmlFor={poolId}
         title={t("poolThresholds")}
       />
+      <SwitchField
+        checked={draft.value.accountBanned}
+        description={t("accountBannedHint")}
+        onCheckedChange={(accountBanned) => edit({ accountBanned })}
+        title={t("accountBanned")}
+      />
+      <SwitchField
+        checked={draft.value.allUnavailable}
+        description={t("allUnavailableHint")}
+        onCheckedChange={(allUnavailable) => edit({ allUnavailable })}
+        title={t("allUnavailable")}
+      />
       {/* One Field round the row, as the auto-continue card: the error sits under the description. */}
-      <Field className="items-stretch" invalid={invalid.includes("poolCooldownMinutes")}>
+      <Field
+        className="items-stretch"
+        disabled={!rulesFieldInUse(draft.value, "poolCooldownMinutes")}
+        invalid={invalid.includes("poolCooldownMinutes")}
+      >
         <SettingsRow
           control={
             <CooldownField
+              disabled={!rulesFieldInUse(draft.value, "poolCooldownMinutes")}
               id={cooldownId}
               onValueChange={(value) => edit({ poolCooldownMinutes: value }, "poolCooldownMinutes")}
               value={draft.value.poolCooldownMinutes}
@@ -691,18 +728,6 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
         </SettingsRow>
       </Field>
       <SwitchField
-        checked={draft.value.accountBanned}
-        description={t("accountBannedHint")}
-        onCheckedChange={(accountBanned) => edit({ accountBanned })}
-        title={t("accountBanned")}
-      />
-      <SwitchField
-        checked={draft.value.allUnavailable}
-        description={t("allUnavailableHint")}
-        onCheckedChange={(allUnavailable) => edit({ allUnavailable })}
-        title={t("allUnavailable")}
-      />
-      <SwitchField
         checked={draft.value.dailySummary}
         description={t("dailySummaryHint")}
         onCheckedChange={(dailySummary) => edit({ dailySummary })}
@@ -711,6 +736,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
       <SettingsRow
         control={
           <SummaryTimeSelect
+            disabled={!draft.value.dailySummary}
             id={summaryTimeId}
             onChange={(dailySummaryMinute) => edit({ dailySummaryMinute })}
             value={draft.value.dailySummaryMinute}
@@ -805,16 +831,19 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
 function CooldownField({
   id,
   value,
+  disabled,
   onValueChange,
   ...aria
 }: AriaProps & {
   id: string;
   value: number | null;
+  disabled: boolean;
   onValueChange: (value: number | null) => void;
 }): JSX.Element {
   return (
     <NumberField
       allowOutOfRange
+      disabled={disabled}
       id={id}
       max={COOLDOWN_MAX}
       min={COOLDOWN_MIN}

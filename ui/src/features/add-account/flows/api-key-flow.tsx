@@ -1,33 +1,86 @@
-import { type FormEvent, type JSX, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { type FormEvent, type JSX, type ReactNode, type Ref, useRef, useState } from "react";
 import { Code } from "@/components/shared/code";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { announce } from "@/lib/announce";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
+import { upstreamQuery } from "@/lib/api/settings";
 import type { AddedAccountRef } from "@/lib/api/types";
+import { formatList } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
-import {
-  FlowError,
-  type FlowFailure,
-  FlowNote,
-  FormField,
-  RegionField,
-  SubmitButton,
-} from "../fields";
+import { FlowError, type FlowFailure, FlowNote, FormField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
-import { parseApiKeyLines } from "../lib/api-key-lines";
-import { parseRegion } from "../lib/region";
+import { keyRegion, parseApiKeyLines } from "../lib/api-key-lines";
 import { reloginRegion } from "../lib/relogin-method";
 import { useReloginFlow } from "../relogin";
 import { batchResultText } from "../result-text";
 
+/**
+ * The regions Kiro serves API keys from, as a select. Until the server's list arrives it holds
+ * only the current value. A re-login keeps the account's own region even when Kiro no longer
+ * serves it; the flow then asks for another before sending a plain key.
+ */
+function ApiKeyRegionField({
+  value,
+  regions,
+  onChange,
+  error,
+  hint,
+  disabled,
+  triggerRef,
+}: {
+  value: string;
+  regions: readonly string[] | undefined;
+  onChange: (value: string) => void;
+  error?: string;
+  hint: ReactNode;
+  disabled: boolean;
+  triggerRef: Ref<HTMLButtonElement>;
+}): JSX.Element {
+  const { t } = useT("add-account");
+  const items = (regions ?? [value]).map((region) => ({ value: region, label: region }));
+  return (
+    <FormField error={error} hint={hint} label={t("region")}>
+      <Select
+        disabled={disabled}
+        items={items}
+        onValueChange={(next) => {
+          if (next) onChange(next);
+        }}
+        value={value}
+      >
+        <SelectTrigger ref={triggerRef}>
+          <SelectValue>{(region: string) => region}</SelectValue>
+        </SelectTrigger>
+        <SelectPopup>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectPopup>
+      </Select>
+    </FormField>
+  );
+}
+
 /** Kiro CLI API keys, one per line, imported one request at a time. */
 export function ApiKeyFlow(): JSX.Element {
-  const { t } = useT("add-account");
+  const { t, lang } = useT("add-account");
   const { sessions, finishAdd } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
+  // config.KiroServiceRegions: the server turns down a key for any other region.
+  const regions = useQuery(upstreamQuery()).data?.apiRegions;
   const [keys, setKeys] = useState("");
   // An API key account's region is its key's, so a pasted key without |region keeps it.
   const [region, setRegion] = useState(() => reloginRegion(relogin.target));
@@ -37,25 +90,36 @@ export function ApiKeyFlow(): JSX.Element {
   useReportBusy(pending);
   const focusAfter = useFocusAfter(pending);
   const keysRef = useRef<HTMLTextAreaElement>(null);
-  const regionRef = useRef<HTMLInputElement>(null);
+  const regionRef = useRef<HTMLButtonElement>(null);
+
+  // Until the list arrives every region passes here; the server still checks it.
+  const unserved = (value: string) =>
+    regions !== undefined && !regions.includes(value)
+      ? t("apikey.regionUnsupported", { regions: formatList(regions, lang), region: value })
+      : undefined;
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
-    // The server checks that the region is one Kiro API keys support.
-    const parsed = parseRegion(region);
-    const requests = parseApiKeyLines(keys, parsed.ok ? parsed.region : "");
+    const requests = parseApiKeyLines(keys, region);
+    const suffixes = requests.map((request) => keyRegion(request.kiroApiKey ?? ""));
+    // A bar with nothing after it names no region: the server refuses it as invalid.
+    const suffixError = (suffix: string) => (suffix ? unserved(suffix) : t("regionInvalid"));
+    const badSuffix = suffixes.find((suffix) => suffix !== null && suffixError(suffix));
     const nextErrors = {
       keys: !requests.length
         ? t("apikey.keyMissing")
         : relogin.target && requests.length > 1
           ? t("relogin.singleOnly")
-          : undefined,
-      region: parsed.ok ? undefined : t("regionInvalid"),
+          : badSuffix !== undefined && badSuffix !== null
+            ? suffixError(badSuffix)
+            : undefined,
+      // Only a key without |region takes the selected one.
+      region: suffixes.includes(null) ? unserved(region) : undefined,
     };
     setErrors(nextErrors);
     setFailure(null);
-    if (nextErrors.keys || !parsed.ok) {
+    if (nextErrors.keys || nextErrors.region) {
       focusAfter(nextErrors.keys ? keysRef : regionRef);
       return;
     }
@@ -136,7 +200,7 @@ export function ApiKeyFlow(): JSX.Element {
           variant="mono"
         />
       </FormField>
-      <RegionField
+      <ApiKeyRegionField
         disabled={pending}
         error={errors.region}
         hint={
@@ -144,8 +208,9 @@ export function ApiKeyFlow(): JSX.Element {
             {t("apikey.regionHint")} <Code>|region</Code>
           </>
         }
-        inputRef={regionRef}
         onChange={setRegion}
+        regions={regions}
+        triggerRef={regionRef}
         value={region}
       />
       <FlowError failure={failure} />

@@ -10,17 +10,16 @@ import {
   ZapIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { IconChip } from "@/components/shared/icon-chip";
 import { SectionCard } from "@/components/shared/section-card";
 import { SETTINGS_ROW_X, SettingsRowTitle } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
-import { settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { CodeText } from "./code-text";
+import { useKeyRequiredHere } from "./use-key-required";
 
 interface Endpoint {
   id: string;
@@ -110,9 +109,10 @@ export function EndpointsCard({
 } = {}): JSX.Element {
   const { t } = useT("api");
   const keyHolder = requireApiKey !== undefined;
-  const settings = useQuery({ ...settingsQuery(), enabled: !keyHolder });
+  // Through the public link the URLs below are the link's, where every call needs a key.
+  const keyRequired = useKeyRequiredHere(!keyHolder);
   const origin = window.location.origin;
-  const required = requireApiKey ?? settings.data?.requireApiKey ?? false;
+  const required = requireApiKey ?? keyRequired ?? false;
   // A key holder reads the same line either way: with keys not required the proxy ignores a key
   // sent to it, and the user panel already says so above this card.
   const authHint = keyHolder

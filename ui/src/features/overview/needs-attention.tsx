@@ -2,6 +2,7 @@ import {
   ArrowUpRight01Icon,
   CheckmarkCircle02Icon,
   Flag02Icon,
+  Login03Icon,
   PanelRightOpenIcon,
   Refresh01Icon,
   UserIcon,
@@ -39,8 +40,17 @@ import {
   AccountFailureNotice,
   AccountFailureProvider,
 } from "@/features/accounts/account-failure";
-import { accountStatus, formatResetDate, statusGroup } from "@/features/accounts/account-model";
+import {
+  accountStatus,
+  BAN_REASON_AUTH_FAILED,
+  formatResetDate,
+  isApiKeyAccount,
+  statusGroup,
+} from "@/features/accounts/account-model";
+import { useOpenRelogin } from "@/features/accounts/relogin-context";
+import { ReloginHost } from "@/features/accounts/relogin-host";
 import { useRefreshAccount } from "@/features/accounts/use-account-actions";
+import { useAllowOverUsage } from "@/features/accounts/use-allow-over-usage";
 import { accountsQuery } from "@/lib/api/accounts";
 import { serverDataText } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
@@ -83,9 +93,13 @@ interface AttentionRow {
  * The accounts that need a look (banned, suspended, no token, out of credits, token expired),
  * worst status first and, within one status, the most recently used first.
  */
-export function attentionRows(accounts: readonly Account[], nowSec: number): AttentionRow[] {
+export function attentionRows(
+  accounts: readonly Account[],
+  nowSec: number,
+  allowOverUsage = false,
+): AttentionRow[] {
   return accounts
-    .map((account) => ({ account, status: accountStatus(account, nowSec) }))
+    .map((account) => ({ account, status: accountStatus(account, nowSec, allowOverUsage) }))
     .filter((row) => statusGroup(row.status) === "attention")
     .sort(
       (a, b) =>
@@ -132,10 +146,41 @@ function AuthChip({ account }: { account: Account }): JSX.Element {
   );
 }
 
+type AttentionFix = "refresh" | "relogin" | "details";
+
 /**
- * The obvious fix: a new token for an expired, missing or suspended one (Kiro checks the account
- * again on refresh), otherwise the details, where the reason and the account's settings are.
+ * The obvious fix. A new token for an expired one, and for a Kiro suspension, since Kiro checks
+ * the account again on refresh. A sign-in for a missing token (nothing to refresh) and for an
+ * auth ban, which the sign-in lifts. Otherwise the details, where the reason and the account's
+ * settings are.
  */
+export function attentionFix({ account, status }: AttentionRow): AttentionFix {
+  switch (status) {
+    case "expired":
+      return "refresh";
+    case "noToken":
+      return "relogin";
+    case "suspended":
+      return "refresh";
+    case "banned":
+      return account.banReason === BAN_REASON_AUTH_FAILED ? "relogin" : "details";
+    default:
+      return "details";
+  }
+}
+
+const FIX_ICONS = {
+  refresh: Refresh01Icon,
+  relogin: Login03Icon,
+  details: PanelRightOpenIcon,
+} as const;
+
+const FIX_LABELS = {
+  refresh: "actions.refreshToken",
+  relogin: "actions.relogin",
+  details: "actions.details",
+} as const;
+
 function FixAction({
   row,
   onDetails,
@@ -149,10 +194,13 @@ function FixAction({
   const { t } = useT("accounts");
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   // A failed refresh is said above the list; its close and Try again come back to this button.
-  const refresh = useRefreshAccount(row.account.id, () => buttonRef.current);
-  const refreshes =
-    row.status === "expired" || row.status === "noToken" || row.status === "suspended";
-  const label = refreshes ? t("actions.refreshToken") : t("actions.details");
+  // A Kiro API key has no token: its refresh reads the usage again (refreshAccountNow).
+  const apiKey = isApiKeyAccount(row.account);
+  const refresh = useRefreshAccount(row.account.id, () => buttonRef.current, apiKey);
+  // The card's ReloginHost opens the dialog.
+  const openRelogin = useOpenRelogin();
+  const fix = attentionFix(row);
+  const label = t(fix === "refresh" && apiKey ? "actions.refreshUsage" : FIX_LABELS[fix]);
   return (
     <Tooltip>
       <TooltipTrigger
@@ -160,10 +208,14 @@ function FixAction({
           <Button
             aria-label={label}
             data-fix=""
-            loading={refreshes && refresh.isPending}
+            loading={fix === "refresh" && refresh.isPending}
             ref={buttonRef}
             onClick={(event) => {
-              if (!refreshes) {
+              if (fix === "relogin") {
+                openRelogin?.(row.account);
+                return;
+              }
+              if (fix === "details") {
                 onDetails(row.account);
                 return;
               }
@@ -175,7 +227,7 @@ function FixAction({
           />
         }
       >
-        <HugeiconsIcon icon={refreshes ? Refresh01Icon : PanelRightOpenIcon} aria-hidden="true" />
+        <HugeiconsIcon icon={FIX_ICONS[fix]} aria-hidden="true" />
       </TooltipTrigger>
       <TooltipPopup>{label}</TooltipPopup>
     </Tooltip>
@@ -249,9 +301,10 @@ export function NeedsAttention(): JSX.Element {
   const [detail, openDetail, closeDetail] = useDialogTarget();
   // One clock per fetch, so a re-render does not move an account between statuses.
   const nowSec = Math.floor((query.dataUpdatedAt || Date.now()) / 1000);
+  const allowOverUsage = useAllowOverUsage();
   const rows = useMemo(
-    () => (query.data ? attentionRows(query.data, nowSec) : []),
-    [query.data, nowSec],
+    () => (query.data ? attentionRows(query.data, nowSec, allowOverUsage) : []),
+    [query.data, nowSec, allowOverUsage],
   );
   const onDetails = useCallback((account: Account) => openDetail(account.id), [openDetail]);
 
@@ -364,28 +417,30 @@ export function NeedsAttention(): JSX.Element {
   }
 
   return (
-    <AccountFailureProvider fallbackFocus={focusViewAll} report={setFailure}>
-      <SectionCard
-        actions={<ViewAllLink focusRef={viewAllRef} />}
-        description={query.data ? t("attention.count", { count: rows.length }) : undefined}
-        descriptionVariant="inline"
-        icon={Flag02Icon}
-        id="overview-attention"
-        slim
-        title={t("attention.title")}
-      >
-        {body}
-      </SectionCard>
-      {detail ? (
-        <AccountDetailSheet
-          accountId={detail.id}
-          key={`detail-${detail.session}`}
-          onOpenChange={(open) => {
-            if (!open) closeDetail();
-          }}
-          open={detail.open}
-        />
-      ) : null}
-    </AccountFailureProvider>
+    <ReloginHost>
+      <AccountFailureProvider fallbackFocus={focusViewAll} report={setFailure}>
+        <SectionCard
+          actions={<ViewAllLink focusRef={viewAllRef} />}
+          description={query.data ? t("attention.count", { count: rows.length }) : undefined}
+          descriptionVariant="inline"
+          icon={Flag02Icon}
+          id="overview-attention"
+          slim
+          title={t("attention.title")}
+        >
+          {body}
+        </SectionCard>
+        {detail ? (
+          <AccountDetailSheet
+            accountId={detail.id}
+            key={`detail-${detail.session}`}
+            onOpenChange={(open) => {
+              if (!open) closeDetail();
+            }}
+            open={detail.open}
+          />
+        ) : null}
+      </AccountFailureProvider>
+    </ReloginHost>
   );
 }

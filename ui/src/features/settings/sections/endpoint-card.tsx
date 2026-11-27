@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { JSX, ReactNode } from "react";
 import { AmazonQLogo, AwsLogo, KiroLogo } from "@/components/shared/brand-logos";
 import { SettingsRow, SwitchField } from "@/components/shared/settings-rows";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectItem,
@@ -63,10 +64,12 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
 function EndpointSelect({
   value,
   onChange,
+  disabled,
   ...aria
 }: AriaProps & {
   value: PreferredEndpoint;
   onChange: (value: PreferredEndpoint) => void;
+  disabled?: boolean;
 }): JSX.Element {
   const { t } = useT("settings");
   const items = (Object.keys(ENDPOINT_LABEL_KEYS) as PreferredEndpoint[]).map((endpoint) => ({
@@ -75,6 +78,7 @@ function EndpointSelect({
   }));
   return (
     <Select
+      disabled={disabled}
       items={items}
       onValueChange={(next) => {
         if (next) onChange(next as PreferredEndpoint);
@@ -100,6 +104,18 @@ function EndpointSelect({
         ))}
       </SelectPopup>
     </Select>
+  );
+}
+
+/** Kiro's newer chat API, marked New while admins are still learning it is there. */
+const NEW_CHAT_API: ChatApi = "responses";
+
+function NewBadge(): JSX.Element {
+  const { t } = useT("settings");
+  return (
+    <Badge className="shrink-0" size="sm" tone="primary">
+      {t("badgeNew")}
+    </Badge>
   );
 }
 
@@ -129,12 +145,30 @@ function ChatApiSelect({
       value={value}
     >
       <SelectTrigger {...aria}>
-        <SelectValue />
+        <SelectValue className="flex min-w-0 items-center gap-2">
+          {(api: ChatApi) => (
+            <>
+              <span className="truncate">{t(CHAT_API_LABEL_KEYS[api])}</span>
+              {api === NEW_CHAT_API ? (
+                <>
+                  {" "}
+                  <NewBadge />
+                </>
+              ) : null}
+            </>
+          )}
+        </SelectValue>
       </SelectTrigger>
       <SelectPopup>
         {items.map((item) => (
           <SelectItem key={item.value} value={item.value}>
             {item.label}
+            {item.value === NEW_CHAT_API ? (
+              <>
+                {" "}
+                <NewBadge />
+              </>
+            ) : null}
           </SelectItem>
         ))}
       </SelectPopup>
@@ -159,6 +193,15 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
     },
   });
 
+  // The endpoints serve only generateAssistantResponse (proxy/kiro.go callKiroLegacyAPI):
+  // CreateResponse has one endpoint of its own, and Automatic already tries all three in turn.
+  // The rows stay, turned off and saying why, and keep their values for when they apply again.
+  const endpointsUnused = draft.value.chatApi === "responses";
+  const fallbackBuiltIn = draft.value.preferredEndpoint === "auto";
+  let fallbackHint = t("endpointFallbackHint");
+  if (endpointsUnused) fallbackHint = t("endpointUnusedResponses");
+  else if (fallbackBuiltIn) fallbackHint = t("endpointFallbackBuiltIn");
+
   return (
     <SettingsSection
       footer={
@@ -176,22 +219,6 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
     >
       <SettingsRow
         control={
-          <EndpointSelect
-            onChange={(preferredEndpoint) => draft.set((prev) => ({ ...prev, preferredEndpoint }))}
-            value={draft.value.preferredEndpoint}
-          />
-        }
-        description={t("endpointHint")}
-        title={t("preferredEndpoint")}
-      />
-      <SwitchField
-        checked={draft.value.endpointFallback}
-        description={t("endpointFallbackHint")}
-        onCheckedChange={(endpointFallback) => draft.set((prev) => ({ ...prev, endpointFallback }))}
-        title={t("endpointFallback")}
-      />
-      <SettingsRow
-        control={
           <ChatApiSelect
             onChange={(chatApi) => draft.set((prev) => ({ ...prev, chatApi }))}
             value={draft.value.chatApi ?? "auto"}
@@ -199,6 +226,24 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
         }
         description={t("chatApiHint")}
         title={t("chatApi")}
+      />
+      <SettingsRow
+        control={
+          <EndpointSelect
+            disabled={endpointsUnused}
+            onChange={(preferredEndpoint) => draft.set((prev) => ({ ...prev, preferredEndpoint }))}
+            value={draft.value.preferredEndpoint}
+          />
+        }
+        description={endpointsUnused ? t("endpointUnusedResponses") : t("endpointHint")}
+        title={t("preferredEndpoint")}
+      />
+      <SwitchField
+        checked={draft.value.endpointFallback}
+        description={fallbackHint}
+        disabled={endpointsUnused || fallbackBuiltIn}
+        onCheckedChange={(endpointFallback) => draft.set((prev) => ({ ...prev, endpointFallback }))}
+        title={t("endpointFallback")}
       />
     </SettingsSection>
   );

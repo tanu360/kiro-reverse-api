@@ -12,6 +12,7 @@ import { type JSX, type ReactNode, useMemo } from "react";
 import { formatDelta } from "@/components/shared/stat-card";
 import { Card, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAllowOverUsage } from "@/features/accounts/use-allow-over-usage";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { accountsQuery } from "@/lib/api/accounts";
 import { heatmapQuery, observeOverviewQuery } from "@/lib/api/observe";
@@ -318,10 +319,14 @@ export function KpiCard({
 type HealthKey = "available" | "attention" | "banned" | "disabled";
 
 /** Accounts per health group: banned and suspended apart from the other problems. */
-function healthCounts(accounts: readonly Account[], nowSec: number): Record<HealthKey, number> {
+function healthCounts(
+  accounts: readonly Account[],
+  nowSec: number,
+  allowOverUsage: boolean,
+): Record<HealthKey, number> {
   const counts: Record<HealthKey, number> = { available: 0, attention: 0, banned: 0, disabled: 0 };
   for (const account of accounts) {
-    const status = accountStatus(account, nowSec);
+    const status = accountStatus(account, nowSec, allowOverUsage);
     if (status === "active") counts.available += 1;
     else if (status === "disabled") counts.disabled += 1;
     else if (status === "banned" || status === "suspended") counts.banned += 1;
@@ -366,9 +371,10 @@ export function KpiCards(): JSX.Element {
   const cells = heatmap.data?.global.cells;
   const nowUnix = heatmap.data?.nowUnix;
 
+  const allowOverUsage = useAllowOverUsage();
   const health = useMemo(
-    () => (accounts.data ? healthCounts(accounts.data, Date.now() / 1000) : null),
-    [accounts.data],
+    () => (accounts.data ? healthCounts(accounts.data, Date.now() / 1000, allowOverUsage) : null),
+    [accounts.data, allowOverUsage],
   );
   const hour = useMemo(() => {
     if (!cells || nowUnix === undefined) return null;
@@ -387,9 +393,10 @@ export function KpiCards(): JSX.Element {
   const statusLoading = !s && !status.isError;
   const hourLoading = !hour && !heatmap.isError;
 
-  // 1. Accounts: the list's health groups, or /status totals until the list arrives.
-  const total = accounts.data?.length ?? s?.accounts;
-  const available = health?.available ?? s?.available;
+  // 1. Accounts: the list's health groups. Not /status `available`: the pool's count leaves out
+  // cooling accounts and keeps expired tokens, so it would disagree with the bar under it.
+  const total = accounts.data?.length;
+  const available = health?.available;
   const healthParts: Part[] = health
     ? [
         {
@@ -476,7 +483,7 @@ export function KpiCards(): JSX.Element {
         label={t("kpi.accounts")}
         link={{ to: "/accounts", search: { status: "attention" } }}
         linkLabel={t("kpi.reviewAttention")}
-        loading={statusLoading && !accounts.data}
+        loading={accounts.isPending}
         period={t("kpi.now")}
         sub={s ? bannedToday(s.todayBanned, t) : null}
         suffix={
@@ -489,8 +496,6 @@ export function KpiCards(): JSX.Element {
               <SegmentBar parts={healthParts} />
               <PartLegend parts={healthParts} />
             </>
-          ) : accounts.isPending ? (
-            <Skeleton aria-hidden="true" className="mt-3.5 h-13 w-full" />
           ) : null
         }
       />

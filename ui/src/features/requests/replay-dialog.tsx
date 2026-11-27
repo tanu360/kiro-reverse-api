@@ -19,7 +19,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { inRotation } from "@/features/accounts/account-model";
 import { accountsQuery, getAccountModelsCached } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { type ReplayResult, replayRequest, requestBodyQuery } from "@/lib/api/requests";
@@ -68,8 +69,24 @@ function ReplayForm({ id, record }: { id: number; record: RequestRecord }): JSX.
   const modelId = useId();
   const accounts = useQuery(accountsQuery());
   const body = useQuery(requestBodyQuery(id));
-  const [accountId, setAccountId] = useState(record.accountId);
+  const [picked, setPicked] = useState(record.accountId);
   const [model, setModel] = useState(record.model);
+
+  // Only an account in rotation can answer: the replay goes through the pool, which holds no
+  // other (proxy/request_replay.go, config.GetEnabledAccounts), so a request whose account is now
+  // off, silenced, held or removed starts with none picked, and says why.
+  const choices = (accounts.data ?? []).filter(inRotation);
+  const accountId = choices.some((account) => account.id === picked) ? picked : "";
+  let accountNote: string | undefined;
+  if (accounts.data && choices.length === 0) accountNote = t("replay.noAccounts");
+  else if (accounts.data && accountId === "" && picked === record.accountId) {
+    const original = accounts.data.some((account) => account.id === record.accountId);
+    accountNote = original ? t("replay.accountDisabled") : t("replay.accountRemoved");
+  }
+  // The server reads the kept body again; until it has loaded here, whether there is one to
+  // replay is not known.
+  const ready = accountId !== "" && model.trim() !== "" && body.data !== undefined;
+
   const models = useQuery({
     queryKey: queryKeys.accounts.modelsCached(accountId),
     queryFn: () => getAccountModelsCached(accountId),
@@ -82,14 +99,13 @@ function ReplayForm({ id, record }: { id: number; record: RequestRecord }): JSX.
     },
   });
 
-  const choices = (accounts.data ?? []).filter((account) => account.enabled);
   const accountItems = choices.map((account) => ({
     value: account.id,
     label: mask(account.email || account.nickname || account.id),
   }));
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!run.isPending && accountId && model.trim()) run.mutate();
+    if (!run.isPending && ready) run.mutate();
   };
 
   return (
@@ -110,12 +126,12 @@ function ReplayForm({ id, record }: { id: number; record: RequestRecord }): JSX.
               <Select
                 items={accountItems}
                 onValueChange={(next) => {
-                  if (typeof next === "string") setAccountId(next);
+                  if (typeof next === "string") setPicked(next);
                 }}
-                value={accountId}
+                value={accountId || null}
               >
                 <SelectTrigger aria-labelledby={accountLabel}>
-                  <SelectValue />
+                  <SelectValue placeholder={t("replay.chooseAccount")} />
                 </SelectTrigger>
                 <SelectPopup>
                   {accountItems.map((item) => (
@@ -125,6 +141,7 @@ function ReplayForm({ id, record }: { id: number; record: RequestRecord }): JSX.
                   ))}
                 </SelectPopup>
               </Select>
+              {accountNote ? <FieldDescription>{accountNote}</FieldDescription> : null}
             </Field>
             <Field className="min-w-0 items-stretch">
               <FieldLabel htmlFor={modelId}>{t("model")}</FieldLabel>
@@ -175,7 +192,7 @@ function ReplayForm({ id, record }: { id: number; record: RequestRecord }): JSX.
         <DialogFooter>
           <DialogClose render={<Button variant="ghost" />}>{t("common:actions.close")}</DialogClose>
           <Button
-            disabled={!accountId || !model.trim() || body.isError}
+            disabled={!ready}
             loading={run.isPending}
             loadingText={t("replay.running")}
             type="submit"

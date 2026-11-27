@@ -580,3 +580,20 @@ func TestAuthFailureOnAdminDisabledAccountStaysAdminDisabled(t *testing.T) {
 		t.Fatalf("plan = %v ok %v, want in-use and proxy-banned only", banned, ok)
 	}
 }
+
+// Turning a silenced account on puts it back in rotation, the same as the batch Enable: the
+// pool leaves out every silent account (config.GetEnabledAccounts), so an Enabled one that
+// stayed silent read as on while no request reached it.
+func TestEnablingSilencedAccountClearsSilent(t *testing.T) {
+	p := setupHealTest(t, config.Account{ID: "quiet", Email: "q@example.com", AccessToken: "t", Silent: true, SilentReason: "manual", SilentTime: 1})
+	h := &Handler{pool: p}
+	rec := httptest.NewRecorder()
+	h.apiUpdateAccount(rec, httptest.NewRequest(http.MethodPut, "/admin/api/accounts/quiet", strings.NewReader(`{"enabled":true}`)), "quiet")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enable: %d %s", rec.Code, rec.Body.String())
+	}
+	got := storedHealAccount(t, "quiet")
+	if !got.Enabled || got.Silent || got.SilentReason != "" || got.SilentTime != 0 {
+		t.Fatalf("account = %+v, want enabled and no longer silent", got)
+	}
+}

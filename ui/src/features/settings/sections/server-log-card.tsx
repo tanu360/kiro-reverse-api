@@ -76,7 +76,12 @@ function ServerLogForm({ settings }: { settings: Settings }): JSX.Element {
     <SettingsSection id={SECTION_ID.serverLog} title={t("serverLog.title")}>
       <SettingsRow
         control={<LevelSelect onChange={level.onChange} value={level.value} />}
-        description={<Hint more={t("serverLog.more")}>{t("serverLog.hint")}</Hint>}
+        description={
+          // LOG_LEVEL picks the level again at each start: a change is not kept then.
+          <Hint more={t("serverLog.more")}>
+            {t(settings.logLevelFromEnv ? "serverLog.hintEnv" : "serverLog.hint")}
+          </Hint>
+        }
         notice={
           level.failure ? (
             <RowActionError

@@ -25,13 +25,18 @@ import {
   type UserRequestSort,
   userRequestsQuery,
 } from "@/lib/api/user-panel";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** The Requests page's smallest page: the card stays short on a page of cards. */
 const DEFAULT_PAGE_SIZE = PAGE_SIZES[0];
 const DEFAULT_SORT: UserRequestSort = "time";
+/**
+ * How deep the server pages (proxy/user_api.go maxUserRequestsRows): a deeper page comes back as
+ * the last one within it, while the total stays uncapped. Every page size divides it.
+ */
+const MAX_PAGED_ROWS = 10_000;
 
 /** The Requests toolbar's status: undefined is All. */
 type Status = "success" | "failed" | undefined;
@@ -293,12 +298,19 @@ export const RecentRequestsCard = memo(function RecentRequestsCard(): JSX.Elemen
       </DataTableCard>
       {/* The pager sits under the card, as on Requests; the page size is the toolbar's Rows. */}
       {showPager ? (
-        <DataTablePagination
-          onPageChange={setPage}
-          page={shownPage}
-          pageSize={shownSize}
-          total={total}
-        />
+        <div className="flex flex-col gap-2">
+          <DataTablePagination
+            onPageChange={setPage}
+            page={shownPage}
+            pageSize={shownSize}
+            total={Math.min(total, MAX_PAGED_ROWS)}
+          />
+          {total > MAX_PAGED_ROWS ? (
+            <p className="text-muted-foreground text-xs leading-normal">
+              {t("requests.pagingCap", { max: formatNumber(MAX_PAGED_ROWS, lang) })}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       {/* A refetch keeps the open request by its key; one that left the page stays open, unstepped. */}
       <SteppedRequestSheet

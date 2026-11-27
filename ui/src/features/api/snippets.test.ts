@@ -169,6 +169,15 @@ describe("buildToolSnippets", () => {
     );
   });
 
+  it("Claude Code sends a given model for every alias, so a key limited to it is not refused", () => {
+    const claudeCode = buildToolSnippets(ORIGIN, "claude-haiku-4.5").claudeCode;
+    expect(claudeCode).toContain('export ANTHROPIC_MODEL="claude-haiku-4.5"');
+    expect(claudeCode).toContain('export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-haiku-4.5"');
+    expect(claudeCode).toContain('export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-haiku-4.5"');
+    expect(claudeCode).toContain('export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4.5"');
+    expect(claudeCode).not.toContain("claude-sonnet-4.5");
+  });
+
   it("Codex saves the model list it never fetches itself, with the key", () => {
     expect(tools.codexModels).toBe(
       [

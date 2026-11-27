@@ -48,4 +48,19 @@ describe("AccountFlags priority", () => {
     expect(screen.getByText("Weight 3")).toHaveClass("sr-only");
     expect(screen.queryByText("Priority 7")).not.toBeInTheDocument();
   });
+
+  it("adds the priority in the weighted mode while a key reaching the account routes by priority", async () => {
+    mockDb.apiKeys = mockDb.apiKeys.map((key, i) => ({
+      ...key,
+      enabled: true,
+      expired: false,
+      accountIds: [],
+      accountTags: [],
+      routingMode: i === 0 ? "priority" : "inherit",
+    }));
+    mockDb.settings.requireApiKey = true;
+    await renderFlags("weighted");
+    expect(await screen.findByText("Priority 7")).toHaveClass("sr-only");
+    expect(screen.getByText("Weight 3")).toHaveClass("sr-only");
+  });
 });

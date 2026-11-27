@@ -17,6 +17,8 @@ export interface DuplicateAccount {
   /** Enabled, not silenced or banned, and holding a token or key. */
   healthy: boolean;
   banStatus: string;
+  /** Why the server holds the account back; the suspension reason marks a Kiro suspension. */
+  banReason: string;
   silent: boolean;
   /** Unix seconds of the last usage refresh; 0 when never. */
   lastRefresh: number;

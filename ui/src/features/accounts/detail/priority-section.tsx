@@ -10,6 +10,7 @@ import {
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
+import { RoutedValue } from "./routed-value";
 
 const MIN_PRIORITY = 0;
 const MAX_PRIORITY = 999;
@@ -42,7 +43,7 @@ export function PriorityRow({ account }: { account: Account }): JSX.Element {
       open={open}
       save={save}
       title={t("detail.priority")}
-      value={String(account.priority)}
+      value={<RoutedValue account={account} mode="priority" value={account.priority} />}
     >
       <Field>
         <FieldLabel className="sr-only">{t("detail.priority")}</FieldLabel>

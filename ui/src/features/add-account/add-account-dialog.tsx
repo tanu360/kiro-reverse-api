@@ -29,7 +29,7 @@ import { IamFlow } from "./flows/iam-flow";
 import { LocalCacheFlow } from "./flows/local-cache-flow";
 import { MicrosoftFlow } from "./flows/microsoft-flow";
 import { SsoTokenFlow } from "./flows/sso-token-flow";
-import { reloginMethod } from "./lib/relogin-method";
+import { reloginKeepsOff, reloginMethod } from "./lib/relogin-method";
 import { MethodHead, MethodRail, MethodSelect } from "./method-list";
 
 export type AddAccountMethod =
@@ -186,6 +186,7 @@ export function AddAccountDialog({
   );
 
   const Flow = FLOWS[method];
+  const target = relogin ? t("relogin.target", { name: display(relogin.email, relogin.id) }) : "";
   // While a request runs, Escape and outside presses do nothing and the X is disabled; Cancel
   // still closes (it resets the sessions, which drops the late response).
   const onDialogOpenChange = (next: boolean, details?: { reason?: string }) => {
@@ -205,7 +206,9 @@ export function AddAccountDialog({
           {relogin ? (
             // A long email breaks anywhere instead of running past a phone-width dialog.
             <DialogDescription className="wrap-anywhere">
-              {t("relogin.target", { name: display(relogin.email, relogin.id) })}
+              {reloginKeepsOff(relogin)
+                ? t("common:text.joinSentences", { first: target, second: t("relogin.staysOff") })
+                : target}
             </DialogDescription>
           ) : (
             <DialogDescription className="sr-only">{t("description")}</DialogDescription>

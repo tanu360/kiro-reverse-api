@@ -50,17 +50,20 @@ function LimitField({
   id,
   limit,
   value,
+  disabled,
   onValueChange,
   ...aria
 }: AriaProps & {
   id: string;
   limit: Limit;
   value: number | null;
+  disabled: boolean;
   onValueChange: (value: number | null) => void;
 }): JSX.Element {
   return (
     <NumberField
       allowOutOfRange
+      disabled={disabled}
       id={id}
       max={limit.max}
       min={limit.min}
@@ -106,6 +109,21 @@ function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
     const { imageResize, imageResizeMaxDimension, imageResizeMaxKB } = draft.value;
     const dimensionOk = inRange(imageResizeMaxDimension, DIMENSION);
     const sizeOk = inRange(imageResizeMaxKB, SIZE_KB);
+    if (!imageResize) {
+      // Nothing reads the limits while resizing is off, and their fields cannot be fixed then:
+      // a value they cannot take keeps the saved one.
+      setInvalid({ dimension: false, size: false });
+      save({
+        imageResize,
+        imageResizeMaxDimension: dimensionOk
+          ? imageResizeMaxDimension
+          : (draft.saved.imageResizeMaxDimension ?? DIMENSION.fallback),
+        imageResizeMaxKB: sizeOk
+          ? imageResizeMaxKB
+          : (draft.saved.imageResizeMaxKB ?? SIZE_KB.fallback),
+      });
+      return;
+    }
     if (!dimensionOk || !sizeOk) {
       setInvalid({ dimension: !dimensionOk, size: !sizeOk });
       return;
@@ -133,15 +151,24 @@ function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
       <SwitchField
         checked={draft.value.imageResize}
         description={<Hint more={t("imageResizeMore")}>{t("imageResizeHint")}</Hint>}
-        onCheckedChange={(imageResize) => draft.set((prev) => ({ ...prev, imageResize }))}
+        onCheckedChange={(imageResize) => {
+          // Off, the fields cannot be fixed: their errors go with them.
+          if (!imageResize) setInvalid({ dimension: false, size: false });
+          draft.set((prev) => ({ ...prev, imageResize }));
+        }}
         title={t("imageResizeEnable")}
       />
       {/* One Field round each row: it marks the input invalid and adds the error, which sits
           under the description, to the input's description. */}
-      <Field className="items-stretch" invalid={invalid.dimension}>
+      <Field
+        className="items-stretch"
+        disabled={!draft.value.imageResize}
+        invalid={invalid.dimension}
+      >
         <SettingsRow
           control={
             <LimitField
+              disabled={!draft.value.imageResize}
               id={dimensionId}
               limit={DIMENSION}
               onValueChange={(value) => {
@@ -164,10 +191,11 @@ function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
           ) : null}
         </SettingsRow>
       </Field>
-      <Field className="items-stretch" invalid={invalid.size}>
+      <Field className="items-stretch" disabled={!draft.value.imageResize} invalid={invalid.size}>
         <SettingsRow
           control={
             <LimitField
+              disabled={!draft.value.imageResize}
               id={sizeId}
               limit={SIZE_KB}
               onValueChange={(value) => {

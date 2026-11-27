@@ -10,6 +10,7 @@
   "regionInvalid": "Informe uma região como us-east-1.",
   "relogin.title": "Entrar novamente",
   "relogin.target": "Entre novamente como {name}. A conta mantém apelido, notas, tags, prioridade, peso, proxy, estatísticas e histórico.",
+  "relogin.staysOff": "Ela continua desligada. Ligue-a depois para que volte à rotação.",
   "relogin.submit": "Entrar novamente",
   "relogin.success": "Login de {name} refeito.",
   "relogin.singleOnly": "Para entrar novamente, use uma única credencial. Cole apenas uma.",
@@ -149,6 +150,7 @@
   "apikey.keysHint": "Uma por linha. Adicione uma região a uma chave com {example}",
   "apikey.regionHint": "Usada para chaves sem sufixo de região:",
   "apikey.keyMissing": "Informe pelo menos uma chave de API do Kiro.",
+  "apikey.regionUnsupported": "Chaves de API do Kiro só funcionam em {regions}, não em {region}.",
   "group.signIn": "Entrar",
   "group.import": "Importar"
 }

@@ -10,6 +10,7 @@
   "regionInvalid": "Nhập khu vực dạng us-east-1.",
   "relogin.title": "Đăng nhập lại",
   "relogin.target": "Đăng nhập lại tài khoản {name}. Tài khoản vẫn giữ biệt danh, ghi chú, thẻ, mức ưu tiên, trọng số, proxy, thống kê và lịch sử.",
+  "relogin.staysOff": "Tài khoản vẫn ở trạng thái tắt. Hãy bật lại sau đó để đưa tài khoản quay lại vòng xoay.",
   "relogin.submit": "Đăng nhập lại",
   "relogin.success": "Đã đăng nhập lại {name}.",
   "relogin.singleOnly": "Đăng nhập lại chỉ nhận một thông tin xác thực. Chỉ dán một mục.",
@@ -145,6 +146,7 @@
   "apikey.keysHint": "Mỗi dòng một key. Thêm khu vực cho một key bằng {example}",
   "apikey.regionHint": "Dùng cho các key không có hậu tố khu vực:",
   "apikey.keyMissing": "Nhập ít nhất một Kiro API key.",
+  "apikey.regionUnsupported": "Kiro API key chỉ dùng được ở {regions}, không dùng được ở {region}.",
   "group.signIn": "Đăng nhập",
   "group.import": "Nhập"
 }

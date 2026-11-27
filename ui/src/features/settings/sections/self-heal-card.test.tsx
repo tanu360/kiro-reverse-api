@@ -135,12 +135,12 @@ describe("SelfHealCard", () => {
 
   it("saves the switch and both numbers in one patch; 0 rounds means no limit", async () => {
     const { card, user } = await renderCard();
-    await user.click(
-      within(card).getByRole("switch", { name: "Bring back accounts the proxy blocked" }),
-    );
     const rounds = within(card).getByLabelText("Maximum heals without a successful request");
     await user.clear(rounds);
     await user.type(rounds, "0");
+    await user.click(
+      within(card).getByRole("switch", { name: "Bring back accounts the proxy blocked" }),
+    );
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
     await expectAnnounced("Your settings were saved.");
@@ -152,6 +152,56 @@ describe("SelfHealCard", () => {
       },
     ]);
     expect(mockDb.accountHealth).toMatchObject({ enabled: false, maxRounds: 0 });
+  });
+
+  it("turns both numbers off while self-heal is off, as nothing reads them then", async () => {
+    const { card, user } = await renderCard();
+    const toggle = within(card).getByRole("switch", {
+      name: "Bring back accounts the proxy blocked",
+    });
+    const interval = within(card).getByLabelText("Minimum time between heals");
+    const rounds = within(card).getByLabelText("Maximum heals without a successful request");
+
+    await user.click(toggle);
+    expect(interval).toBeDisabled();
+    expect(rounds).toBeDisabled();
+    await user.click(toggle);
+    expect(interval).toBeEnabled();
+    expect(rounds).toBeEnabled();
+  });
+
+  it("saves self-heal off with the saved numbers when a field it ignores is out of range", async () => {
+    const { card, user } = await renderCard();
+    await user.clear(within(card).getByLabelText("Minimum time between heals"));
+    await user.click(
+      within(card).getByRole("switch", { name: "Bring back accounts the proxy blocked" }),
+    );
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+
+    await expectAnnounced("Your settings were saved.");
+    expect(await writes()).toEqual([
+      {
+        method: "POST",
+        path: "/account-health",
+        body: { enabled: false, minIntervalSec: 300, maxRounds: 5 },
+      },
+    ]);
+  });
+
+  it("leaves out a halt while self-heal is off, as no healing runs to resume", async () => {
+    mockDb.accountHealth.enabled = false;
+    mockDb.accountHealth.state = {
+      lastHealAt: mockNowUnix() - 120,
+      rounds: 5,
+      halted: true,
+      haltedAt: mockNowUnix() - 10,
+      lastHealed: 2,
+    };
+    const { card } = await renderCard();
+    expect(within(card).queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
+    expect(
+      within(card).queryByText(/^Self-heal stopped after reaching its limit/),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a halt with the last heal, and Resume lifts it", async () => {

@@ -72,7 +72,8 @@ const CHANGE_INVALIDATIONS: Record<ChangeEventType, ReadonlyArray<readonly unkno
     queryKeys.status,
     queryKeys.observe.overview(),
   ],
-  api_keys_changed: [queryKeys.apiKeys.all],
+  // The public link's status says whether a key is enabled (proxy/tunnel_api.go apiKeys).
+  api_keys_changed: [queryKeys.apiKeys.all, queryKeys.settings.tunnel()],
   settings_changed: [queryKeys.settings.all, queryKeys.observe.overview()],
   // The self-update's download progress and state (proxy/update_api.go).
   update_changed: [queryKeys.update],

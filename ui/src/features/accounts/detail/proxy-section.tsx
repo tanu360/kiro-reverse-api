@@ -3,7 +3,7 @@ import { type JSX, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { routesThroughPool } from "@/features/proxy-pool/lib/pool-model";
+import { poolHasEligibleProxy, routesThroughPool } from "@/features/proxy-pool/lib/pool-model";
 import { PoolProxyValue } from "@/features/proxy-pool/pool-assignment";
 import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { proxyQuery } from "@/lib/api/settings";
@@ -86,7 +86,15 @@ function ProxyValue({ accountId, proxyURL }: { accountId: string; proxyURL: stri
   const global = useQuery({ ...proxyQuery(), enabled: !proxyURL }).data;
   const pool = useQuery({ ...proxyPoolQuery(), enabled: !proxyURL }).data;
   if (proxyURL) return <span className="font-mono">{proxyDisplayUrl(proxyURL)}</span>;
-  if (routesThroughPool(pool)) return <PoolProxyValue accountId={accountId} view={pool} />;
+  // proxypool/manager.go Resolve: with no proxy to pick, the pool takes its fallback (the global
+  // proxy, or Direct), and with the fallback off every request fails.
+  const fallback = routesThroughPool(pool) && !poolHasEligibleProxy(pool);
+  if (routesThroughPool(pool) && !fallback) {
+    return <PoolProxyValue accountId={accountId} view={pool} />;
+  }
+  if (fallback && !pool?.directFallback) {
+    return <span className="min-w-0 text-destructive-foreground">{t("detail.proxyPoolNone")}</span>;
+  }
   return (
     <span className="flex min-w-0 items-center gap-2">
       {global === undefined ? null : global.proxyURL ? (
@@ -95,7 +103,7 @@ function ProxyValue({ accountId, proxyURL }: { accountId: string; proxyURL: stri
         <span className="min-w-0 truncate">{t("detail.proxyDirect")}</span>
       )}
       <Badge size="sm" tone="neutral">
-        {t("detail.proxyGlobal")}
+        {t(fallback ? "detail.proxyFallback" : "detail.proxyGlobal")}
       </Badge>
     </span>
   );

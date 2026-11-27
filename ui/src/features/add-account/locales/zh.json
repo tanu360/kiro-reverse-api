@@ -10,6 +10,7 @@
   "regionInvalid": "请输入类似 us-east-1 的区域。",
   "relogin.title": "重新登录",
   "relogin.target": "以 {name} 的身份重新登录。该账号会保留昵称、备注、标签、优先级、权重、代理、统计和历史记录。",
+  "relogin.staysOff": "该账号仍保持关闭。登录后请将其开启，才能重新参与轮询。",
   "relogin.submit": "重新登录",
   "relogin.success": "{name} 已重新登录。",
   "relogin.singleOnly": "重新登录只能使用一个凭证，请只粘贴一个。",
@@ -145,6 +146,7 @@
   "apikey.keysHint": "每行一个。如需为某个 API Key 指定区域，写法为 {example}",
   "apikey.regionHint": "用于未带区域后缀的 API Key：",
   "apikey.keyMissing": "请至少输入一个 Kiro API Key。",
+  "apikey.regionUnsupported": "Kiro API Key 仅支持 {regions}，不支持 {region}。",
   "group.signIn": "登录",
   "group.import": "导入"
 }

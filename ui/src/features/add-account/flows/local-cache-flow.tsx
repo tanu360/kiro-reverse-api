@@ -32,6 +32,7 @@ import {
   type LocalProvider,
   localCacheErrorField,
 } from "../lib/local-cache";
+import { reloginLocalProvider } from "../lib/relogin-method";
 import { useReloginFlow } from "../relogin";
 
 /**
@@ -110,7 +111,9 @@ export function LocalCacheFlow(): JSX.Element {
   const { sessions } = useFlow();
   const relogin = useReloginFlow();
   const formId = useFormId();
-  const [provider, setProvider] = useState<LocalProvider>("BuilderId");
+  const [provider, setProvider] = useState<LocalProvider>(() =>
+    reloginLocalProvider(relogin.target),
+  );
   const [tokenJson, setTokenJson] = useState("");
   const [clientJson, setClientJson] = useState("");
   const [problem, setProblem] = useState<LocalCacheError | null>(null);

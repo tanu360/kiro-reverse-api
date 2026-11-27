@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/lib/api/query-keys";
 import { AdminEventsProvider, type EventSourceLike } from "@/lib/events/admin-events";
+import { mockDb } from "@/lib/mocks/db";
 import { renderWithProviders } from "@/test/render";
 import { AccountHealNotices } from "./account-heal-notices";
 
@@ -108,5 +109,12 @@ describe("AccountHealNotices", () => {
     emit("resumed");
     expect(document.querySelector('[data-slot="live-announcer"]')?.textContent).toBe("");
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("drops the halt line once self-heal is off, as a heal that is off never halts", async () => {
+    mockDb.accountHealth = { ...mockDb.accountHealth, enabled: false };
+    const { emit } = await renderNotices();
+    emit("halted:5");
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 });

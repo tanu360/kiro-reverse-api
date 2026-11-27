@@ -55,7 +55,7 @@ function useSessionRedirects(): void {
           });
           return;
         }
-        if (reason === "restored") markSignInReason("admin", "restored");
+        // The backups page marks a restore's reason itself: it knows which password applies.
         if (reason === "signout" || reason === "restored") {
           void router.navigate({ to: "/login" });
         }

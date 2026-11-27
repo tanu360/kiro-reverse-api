@@ -60,6 +60,7 @@ function WholeNumberField({
   min,
   max,
   value,
+  disabled,
   onValueChange,
   ...aria
 }: AriaProps & {
@@ -67,11 +68,13 @@ function WholeNumberField({
   min: number;
   max: number;
   value: number | null;
+  disabled: boolean;
   onValueChange: (value: number | null) => void;
 }): JSX.Element {
   return (
     <NumberField
       allowOutOfRange
+      disabled={disabled}
       id={id}
       max={max}
       min={min}
@@ -137,6 +140,20 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
     const { enabled, minIntervalSec, maxRounds } = draft.value;
     const intervalOk = inRange(minIntervalSec, SELF_HEAL_INTERVAL_MIN, SELF_HEAL_INTERVAL_MAX);
     const roundsOk = inRange(maxRounds, 0, SELF_HEAL_ROUNDS_MAX);
+    if (!enabled) {
+      // Healing does not run while self-heal is off, and its fields cannot be fixed then: a
+      // value they cannot take keeps the saved one.
+      setIntervalInvalid(false);
+      setRoundsInvalid(false);
+      save({
+        enabled,
+        minIntervalSec: intervalOk
+          ? minIntervalSec
+          : (draft.saved.minIntervalSec ?? SELF_HEAL_INTERVAL_MIN),
+        maxRounds: roundsOk ? maxRounds : (draft.saved.maxRounds ?? 0),
+      });
+      return;
+    }
     setIntervalInvalid(!intervalOk);
     setRoundsInvalid(!roundsOk);
     if (!intervalOk || !roundsOk) return;
@@ -164,15 +181,23 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
       <SwitchField
         checked={draft.value.enabled}
         description={<Hint more={t("selfHeal.more")}>{t("selfHeal.hint")}</Hint>}
-        onCheckedChange={(enabled) => draft.set((prev) => ({ ...prev, enabled }))}
+        onCheckedChange={(enabled) => {
+          // Off, the fields cannot be fixed: their errors go with them.
+          if (!enabled) {
+            setIntervalInvalid(false);
+            setRoundsInvalid(false);
+          }
+          draft.set((prev) => ({ ...prev, enabled }));
+        }}
         title={t("selfHeal.enable")}
       />
       {/* One Field round each number row: it marks the input invalid and adds the error, which
           sits under the description, to the input's description. */}
-      <Field className="items-stretch" invalid={intervalInvalid}>
+      <Field className="items-stretch" disabled={!draft.value.enabled} invalid={intervalInvalid}>
         <SettingsRow
           control={
             <WholeNumberField
+              disabled={!draft.value.enabled}
               id={intervalId}
               max={SELF_HEAL_INTERVAL_MAX}
               min={SELF_HEAL_INTERVAL_MIN}
@@ -198,10 +223,11 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
           ) : null}
         </SettingsRow>
       </Field>
-      <Field className="items-stretch" invalid={roundsInvalid}>
+      <Field className="items-stretch" disabled={!draft.value.enabled} invalid={roundsInvalid}>
         <SettingsRow
           control={
             <WholeNumberField
+              disabled={!draft.value.enabled}
               id={roundsId}
               max={SELF_HEAL_ROUNDS_MAX}
               min={0}
@@ -224,7 +250,7 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
           ) : null}
         </SettingsRow>
       </Field>
-      <HealStatusRow maxRounds={health.maxRounds} state={health.state} />
+      <HealStatusRow enabled={health.enabled} maxRounds={health.maxRounds} state={health.state} />
     </SettingsSection>
   );
 }
@@ -236,13 +262,17 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
 function HealStatusRow({
   state,
   maxRounds,
+  enabled,
 }: {
   state: SelfHealState;
   maxRounds: number;
+  /** The saved switch: a halt matters only while healing runs (proxy/account_health.go try). */
+  enabled: boolean;
 }): JSX.Element {
   const { t } = useT("settings");
   const queryClient = useQueryClient();
   const resumeRef = useRef<HTMLButtonElement>(null);
+  const halted = enabled && state.halted;
   const resumed = useRef(false);
   // The warning goes once the refetch says it is running again; a failure shows under it.
   const resume = useMutation({
@@ -281,7 +311,7 @@ function HealStatusRow({
     <SettingsRow
       description={description}
       notice={
-        state.halted && resume.isError ? (
+        halted && resume.isError ? (
           <RowActionError
             error={resume.error}
             focusTarget={resumeRef}
@@ -292,7 +322,7 @@ function HealStatusRow({
       }
       title={t("selfHeal.status")}
     >
-      {state.halted ? (
+      {halted ? (
         <Alert role="status" variant="warning">
           <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
           <AlertDescription>{t("selfHeal.halted")}</AlertDescription>

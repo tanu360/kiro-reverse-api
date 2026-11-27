@@ -1,4 +1,5 @@
 import { UserCircleIcon } from "@hugeicons/core-free-icons";
+import { useQuery } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { KeyValueGrid, type KeyValueItem } from "@/components/shared/key-value-grid";
 import { InlineEditList } from "@/components/shared/property-list";
@@ -6,15 +7,17 @@ import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { upstreamQuery } from "@/lib/api/settings";
 import type { Account } from "@/lib/api/types";
 import { EMPTY } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { formatCreditAmount } from "../account-model";
+import { formatCreditAmount, isApiKeyAccount, refreshesThroughOidc } from "../account-model";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
 import { MachineIdRow } from "./machine-id-section";
 import { NotesRow, TagsRow } from "./metadata-section";
 import { PriorityRow } from "./priority-section";
 import { ProxyRow } from "./proxy-section";
+import { RegionValue } from "./region-value";
 import { WeightRow } from "./weight-section";
 
 /**
@@ -26,15 +29,32 @@ import { WeightRow } from "./weight-section";
  */
 export function AccountSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
+  const upstream = useQuery(upstreamQuery()).data;
+  // The global overrides beat the account's own region (proxy/kiro_region.go, auth/auth_region.go).
+  const regionNote =
+    upstream?.apiRegion && isApiKeyAccount(account)
+      ? t("detail.regionApiOverride", { region: upstream.apiRegion })
+      : upstream?.authRegion && refreshesThroughOidc(account)
+        ? t("detail.regionAuthOverride", { region: upstream.authRegion })
+        : undefined;
   const facts: KeyValueItem[] = [
     account.userId
       ? { label: t("detail.userId"), value: account.userId, span: 2, mono: true, copy: true }
       : { label: t("detail.userId"), value: EMPTY, span: 2 },
-    { label: t("detail.region"), value: account.region || "us-east-1" },
+    {
+      label: t("detail.region"),
+      value: <RegionValue note={regionNote} region={account.region || "us-east-1"} />,
+    },
     { label: t("columns.lastUsed"), value: <RelativeTime value={account.lastUsed} /> },
-    { label: t("detail.tokenExpiry"), value: <RelativeTime value={account.expiresAt} /> },
     { label: t("detail.lastRefresh"), value: <RelativeTime value={account.lastRefresh} /> },
   ];
+  // A Kiro API key never expires the way an OAuth token does (expiresAt stays 0).
+  if (!isApiKeyAccount(account)) {
+    facts.splice(3, 0, {
+      label: t("detail.tokenExpiry"),
+      value: <RelativeTime value={account.expiresAt} />,
+    });
+  }
   if (account.trialUsageLimit > 0) {
     facts.push(
       {

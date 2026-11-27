@@ -345,3 +345,23 @@ func TestAddCredentialRejectsDuplicateAPIKey(t *testing.T) {
 		t.Fatalf("expected ErrDuplicateKiroAPIKey on the credentials path, got %v", err)
 	}
 }
+
+func TestInRotation(t *testing.T) {
+	cases := []struct {
+		name string
+		acc  Account
+		want bool
+	}{
+		{"on", Account{Enabled: true}, true},
+		{"on with an active ban status", Account{Enabled: true, BanStatus: "ACTIVE"}, true},
+		{"off", Account{}, false},
+		{"silenced", Account{Enabled: true, Silent: true}, false},
+		{"banned", Account{Enabled: true, BanStatus: "BANNED"}, false},
+		{"held by the admin", Account{Enabled: true, BanStatus: "DISABLED"}, false},
+	}
+	for _, c := range cases {
+		if got := InRotation(c.acc); got != c.want {
+			t.Errorf("%s: InRotation = %v, want %v", c.name, got, c.want)
+		}
+	}
+}

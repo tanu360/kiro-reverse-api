@@ -37,6 +37,7 @@ type duplicateAccountView struct {
 	Enabled      bool   `json:"enabled"`
 	Healthy      bool   `json:"healthy"`
 	BanStatus    string `json:"banStatus"`
+	BanReason    string `json:"banReason"`
 	Silent       bool   `json:"silent"`
 	LastRefresh  int64  `json:"lastRefresh"`
 	ExpiresAt    int64  `json:"expiresAt"`
@@ -97,6 +98,7 @@ func (h *Handler) apiListDuplicateAccounts(w http.ResponseWriter, _ *http.Reques
 				Enabled:      a.Enabled,
 				Healthy:      config.IsHealthyAccount(&a),
 				BanStatus:    a.BanStatus,
+				BanReason:    a.BanReason,
 				Silent:       a.Silent,
 				LastRefresh:  a.LastRefresh,
 				ExpiresAt:    a.ExpiresAt,

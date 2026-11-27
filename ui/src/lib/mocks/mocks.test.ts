@@ -73,7 +73,11 @@ describe("mock database", () => {
     );
     find((a) => a.authMethod === "social" && a.provider === "Google" && a.expiresAt < now);
     find((a) => a.banStatus === "BANNED" && !a.enabled);
-    find((a) => a.banStatus === "SUSPENDED");
+    find(
+      (a) =>
+        a.banStatus === "BANNED" &&
+        a.banReason === "AWS temporarily suspended - unusual user activity detected",
+    );
     find(
       (a) =>
         a.authMethod === "api_key" &&
@@ -473,7 +477,7 @@ describe("full dataset (the browser default, polished for screenshots)", () => {
     ]) {
       expect(values(accounts, (a) => a.provider)).toContain(provider);
     }
-    for (const ban of ["", "ACTIVE", "BANNED", "SUSPENDED", "DISABLED"]) {
+    for (const ban of ["", "ACTIVE", "BANNED", "DISABLED"]) {
       expect(values(accounts, (a) => a.banStatus)).toContain(ban);
     }
     for (const overage of ["", "ENABLED", "DISABLED", "enabled"]) {

@@ -27,6 +27,7 @@ import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { markSignInReason } from "@/features/auth/sign-in-reason";
 import { announce } from "@/lib/announce";
 import {
   backupsQuery,
@@ -38,6 +39,8 @@ import {
 } from "@/lib/api/backups";
 import { isApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
+import { settingsQuery } from "@/lib/api/settings";
+import { tunnelQuery } from "@/lib/api/tunnel";
 import type { BackupEntry } from "@/lib/api/types";
 import { clearSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
@@ -198,22 +201,35 @@ export function BackupsPage(): JSX.Element {
     create.mutate();
   };
 
+  // config/backup.go keeps the ADMIN_PASSWORD password over the backup's.
+  const envPassword = useQuery(settingsQuery()).data?.adminPasswordFromEnv === true;
+  // proxy/backups_api.go applies the backup's public link settings once it has answered: a page
+  // that came through the link loses it when they differ.
+  const viaLink = useQuery(tunnelQuery()).data?.viaLink === true;
+
   // The server revoked every admin session, this one included. The root route sends the
-  // browser to sign-in, which says the backup was restored, once the session is cleared.
+  // browser to sign-in, which says the backup was restored (and with which password), once the
+  // session is cleared.
   const finishRestore = useCallback(() => {
+    markSignInReason("admin", envPassword ? "restoredEnvPassword" : "restored");
     clearSession("restored");
-  }, []);
+  }, [envPassword]);
 
   const restoreConfirm = useCallback(
     (title: string, target?: string) =>
       confirm({
         title,
         target,
-        description: t("restoreBody"),
+        description: viaLink
+          ? t("common:text.joinSentences", {
+              first: t("restoreBody"),
+              second: t("restoreViaLink"),
+            })
+          : t("restoreBody"),
         confirmLabel: t("restore"),
         variant: "danger",
       }),
-    [confirm, t],
+    [confirm, t, viaLink],
   );
 
   // Each row action runs without asking again from Try again: it was confirmed the first time.

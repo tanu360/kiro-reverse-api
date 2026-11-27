@@ -8,8 +8,12 @@ import { useT } from "@/lib/i18n";
 /** The admin's sign-in (/login) or a key holder's (/user/login). */
 type SignInPage = "admin" | "user";
 
-/** Why a session ended without a sign-out: it ran out, or a backup restore replaced it. */
-type SignInReason = "expired" | "restored";
+/**
+ * Why a session ended without a sign-out: it ran out, or a backup restore replaced it, keeping
+ * the backup's admin password or, with ADMIN_PASSWORD set, that one (config/backup.go
+ * writeRestoredConfig).
+ */
+type SignInReason = "expired" | "restored" | "restoredEnvPassword";
 
 const reasons = new Map<SignInPage, SignInReason>();
 
@@ -47,11 +51,13 @@ export function SignInReasonNotice({
   reason: SignInReason | null;
 }): JSX.Element | null {
   const { t } = useT();
-  if (reason === "restored") {
+  if (reason === "restored" || reason === "restoredEnvPassword") {
     return (
       <Alert data-slot="sign-in-reason" variant="success">
         <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
-        <AlertDescription>{t("backups:restored")}</AlertDescription>
+        <AlertDescription>
+          {t(reason === "restoredEnvPassword" ? "backups:restoredEnvPassword" : "backups:restored")}
+        </AlertDescription>
       </Alert>
     );
   }

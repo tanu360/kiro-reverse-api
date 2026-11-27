@@ -134,7 +134,7 @@ describe("AddAccountDialog in re-login mode", () => {
     const account = { ...accountBy("APIKey"), region: "eu-central-1" };
     const { user } = renderWithProviders(<Harness account={account} />);
     expect(await screen.findByRole("heading", { name: "Kiro API Key" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Region" })).toHaveValue("eu-central-1");
+    expect(screen.getByRole("combobox", { name: "Region" })).toHaveTextContent("eu-central-1");
 
     // One key, so the field says so: no "Kiro API keys" or "One per line".
     expect(screen.queryByRole("textbox", { name: "Kiro API keys" })).not.toBeInTheDocument();
@@ -148,6 +148,56 @@ describe("AddAccountDialog in re-login mode", () => {
       region: "eu-central-1",
       reloginAccountId: account.id,
     });
+  });
+
+  it("asks for a served region when an API key account's own is one Kiro does not serve", async () => {
+    const imports = logRequests("/auth/credentials");
+    const account = { ...accountBy("APIKey"), region: "us-west-2" };
+    const { user } = renderWithProviders(<Harness account={account} />);
+    const region = await screen.findByRole("combobox", { name: "Region" });
+    await user.type(screen.getByRole("textbox", { name: "Kiro API Key" }), "ksk_fresh");
+    await user.click(screen.getByRole("button", { name: "Sign in again" }));
+    expect(
+      await screen.findByText(
+        "Kiro API keys work in us-east-1 and eu-central-1 only, not us-west-2.",
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(region).toHaveFocus());
+    expect(imports.count).toBe(0);
+
+    // A key that names a served region of its own does not use the field.
+    await user.type(screen.getByRole("textbox", { name: "Kiro API Key" }), "|eu-central-1");
+    await user.click(screen.getByRole("button", { name: "Sign in again" }));
+    await waitFor(() => expect(imports.count).toBe(1));
+    expect(imports.bodies[0]).toMatchObject({ kiroApiKey: "ksk_fresh|eu-central-1", region: "" });
+  });
+
+  it("opens the local cache flow on the provider the account signed in with", async () => {
+    renderWithProviders(<Harness account={accountBy("Enterprise")} initialMethod="local" />);
+    expect(await screen.findByRole("combobox", { name: "Provider" })).toHaveTextContent(
+      "IAM Identity Center (Enterprise SSO)",
+    );
+  });
+
+  it("says a switched-off account stays off after signing in again", async () => {
+    const account = { ...accountBy("BuilderId"), enabled: false, banStatus: "DISABLED" as const };
+    renderWithProviders(<Harness account={account} />);
+    const dialog = await screen.findByRole("dialog", { name: "Sign in again" });
+    expect(
+      within(dialog).getByText(/It stays switched off\. Switch it on afterwards/),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about the switch for a banned account, whose ban the sign-in lifts", async () => {
+    const account = {
+      ...accountBy("BuilderId"),
+      enabled: false,
+      banStatus: "BANNED" as const,
+      banReason: "Authentication failed - token invalid or expired",
+    };
+    renderWithProviders(<Harness account={account} />);
+    const dialog = await screen.findByRole("dialog", { name: "Sign in again" });
+    expect(within(dialog).queryByText(/stays switched off/)).not.toBeInTheDocument();
   });
 
   it("takes exactly one credential", async () => {

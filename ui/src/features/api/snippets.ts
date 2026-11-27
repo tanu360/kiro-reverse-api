@@ -584,20 +584,27 @@ const CLAUDE_CODE_MODELS = {
 /** Where the Codex setup saves the /v1/codex/models list ("~" expands in Codex's config). */
 export const CODEX_CATALOG_FILE = "~/.codex/kiro-models.json";
 
-/** The Claude Code and Codex setups for a proxy reachable at `origin` (e.g. location.origin). */
+/**
+ * The Claude Code and Codex setups for a proxy reachable at `origin` (e.g. location.origin). A
+ * given `model` (a key limited to models) is every Claude Code alias too: the key's other models
+ * may not include CLAUDE_CODE_MODELS, and a model it may not call gets 403.
+ */
 export function buildToolSnippets(
   origin: string,
-  model: string = SNIPPET_MODEL,
+  model?: string,
 ): { claudeCode: string; codexModels: string; codex: string } {
   const env = SNIPPET_KEY_ENV;
+  const claudeModels = model
+    ? { main: model, opus: model, sonnet: model, haiku: model }
+    : CLAUDE_CODE_MODELS;
   return {
     claudeCode: lines(
       `export ANTHROPIC_BASE_URL="${origin}"`,
       `export ANTHROPIC_AUTH_TOKEN="$${env}"`,
-      `export ANTHROPIC_MODEL="${CLAUDE_CODE_MODELS.main}"`,
-      `export ANTHROPIC_DEFAULT_OPUS_MODEL="${CLAUDE_CODE_MODELS.opus}"`,
-      `export ANTHROPIC_DEFAULT_SONNET_MODEL="${CLAUDE_CODE_MODELS.sonnet}"`,
-      `export ANTHROPIC_DEFAULT_HAIKU_MODEL="${CLAUDE_CODE_MODELS.haiku}"`,
+      `export ANTHROPIC_MODEL="${claudeModels.main}"`,
+      `export ANTHROPIC_DEFAULT_OPUS_MODEL="${claudeModels.opus}"`,
+      `export ANTHROPIC_DEFAULT_SONNET_MODEL="${claudeModels.sonnet}"`,
+      `export ANTHROPIC_DEFAULT_HAIKU_MODEL="${claudeModels.haiku}"`,
       "claude",
     ),
     // -f: an error (a wrong key) writes no file; --create-dirs: a first Codex run has no ~/.codex.
@@ -607,7 +614,7 @@ export function buildToolSnippets(
       `  "${origin}/v1/codex/models"`,
     ),
     codex: lines(
-      `model = "${model}"`,
+      `model = "${model ?? SNIPPET_MODEL}"`,
       'model_provider = "kiro"',
       `model_catalog_json = "${CODEX_CATALOG_FILE}"`,
       "",

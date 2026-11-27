@@ -26,7 +26,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,9 +121,13 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
   const confirm = useConfirm();
   const server = useMemo(() => parseProxyUrl(config.proxyURL ?? ""), [config.proxyURL]);
   const direct = server.type === "none";
-  // With the pool on, Kiro traffic of accounts without their own proxy goes through the pool,
-  // not this route: say so, or "Direct" reads as this server's IP talking to Kiro.
-  const poolOn = useQuery(proxyPoolQuery()).data?.mode === "on";
+  // With the pool in use, Kiro traffic of accounts without their own proxy goes through the
+  // pool, not this route: say so, or "Direct" reads as this server's IP talking to Kiro. This
+  // proxy then carries requests only as the pool's fallback (proxypool/manager.go Resolve).
+  const pool = useQuery(proxyPoolQuery()).data;
+  const poolInUse = pool?.mode === "on" && pool.proxies.length > 0;
+  let hint = t("proxyHint");
+  if (poolInUse) hint = pool.directFallback ? t("proxyHintPoolOn") : t("proxyHintPoolOnNoFallback");
   // `session` remounts the form on each open, so it starts from the saved proxy.
   const [editor, setEditor] = useState({ open: false, session: 0 });
   const editRef = useRef<HTMLButtonElement>(null);
@@ -186,7 +190,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
   return (
     <SettingsGroup
       badge={status}
-      description={poolOn ? t("proxyHintPoolOn") : t("proxyHint")}
+      description={hint}
       id={SECTION_ID.outboundProxy}
       title={t("proxySettings")}
     >
@@ -403,12 +407,17 @@ function ProxyEditor({
               </Field>
               <Field className="min-w-0 items-stretch">
                 <FieldLabel>{t("proxyPassword")}</FieldLabel>
+                {/* A proxy URL carries no password without a username (buildProxyUrl drops it). */}
                 <PasswordInput
                   maxLength={255}
                   autoComplete="new-password"
+                  disabled={model.username.trim() === ""}
                   onChange={(password) => update({ ...model, password })}
                   value={model.password}
                 />
+                {model.username.trim() === "" ? (
+                  <FieldDescription>{t("proxyPasswordNeedsUsername")}</FieldDescription>
+                ) : null}
               </Field>
             </div>
           </Fieldset>

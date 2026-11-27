@@ -12,10 +12,10 @@ import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
+import { LiveStatusPill } from "@/features/accounts/account-activity";
 import {
   AccountIdentity,
   AuthIcon,
-  StatusPill,
   UsageMeter,
   useAccountName,
 } from "@/features/accounts/account-cells";
@@ -166,7 +166,7 @@ function TopAccountCard({
         // The status leads the meta line, as on the Accounts page cards, so the title keeps its
         // one line and the pill never drops under it.
         <span className="flex min-w-0 items-center gap-1.5">
-          <StatusPill account={account} size="sm" />
+          <LiveStatusPill account={account} size="sm" />
           {/* The rate the ring draws; the request counts are in the table and the sheet. */}
           <span className="truncate tabular-nums">
             {rate === null
@@ -284,7 +284,7 @@ export function TopAccounts(): JSX.Element {
         header: ta("columns.status"),
         className: "w-36",
         headerClassName: "w-36",
-        cell: (account) => <StatusPill account={account} />,
+        cell: (account) => <LiveStatusPill account={account} />,
       },
       {
         id: "actions",

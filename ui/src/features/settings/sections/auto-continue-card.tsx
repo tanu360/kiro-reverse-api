@@ -43,16 +43,19 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
 function ContinuationsField({
   id,
   value,
+  disabled,
   onValueChange,
   ...aria
 }: AriaProps & {
   id: string;
   value: number | null;
+  disabled: boolean;
   onValueChange: (value: number | null) => void;
 }): JSX.Element {
   return (
     <NumberField
       allowOutOfRange
+      disabled={disabled}
       id={id}
       max={MAX_CONTINUATIONS}
       min={1}
@@ -82,12 +85,24 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
 
   const onSubmit = () => {
     const { autoContinue, autoContinueMax } = draft.value;
-    if (
-      autoContinueMax === null ||
-      !Number.isInteger(autoContinueMax) ||
-      autoContinueMax < 1 ||
-      autoContinueMax > MAX_CONTINUATIONS
-    ) {
+    const maxOk =
+      autoContinueMax !== null &&
+      Number.isInteger(autoContinueMax) &&
+      autoContinueMax >= 1 &&
+      autoContinueMax <= MAX_CONTINUATIONS;
+    if (!autoContinue) {
+      // Nothing reads the limit while auto-continue is off, and its field cannot be fixed then:
+      // a value it cannot take keeps the saved one.
+      setMaxInvalid(false);
+      save({
+        autoContinue,
+        autoContinueMax: maxOk
+          ? autoContinueMax
+          : (draft.saved.autoContinueMax ?? DEFAULT_CONTINUATIONS),
+      });
+      return;
+    }
+    if (!maxOk) {
       setMaxInvalid(true);
       return;
     }
@@ -118,15 +133,20 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
             {t("autoContinueHint", { tokens: formatNumber(KIRO_ANSWER_TOKENS, lang) })}
           </Hint>
         }
-        onCheckedChange={(autoContinue) => draft.set((prev) => ({ ...prev, autoContinue }))}
+        onCheckedChange={(autoContinue) => {
+          // Off, the field cannot be fixed: its error goes with it.
+          if (!autoContinue) setMaxInvalid(false);
+          draft.set((prev) => ({ ...prev, autoContinue }));
+        }}
         title={t("autoContinueEnable")}
       />
       {/* One Field round the row: it marks the input invalid and adds the error, which sits
           under the description, to the input's description. */}
-      <Field className="items-stretch" invalid={maxInvalid}>
+      <Field className="items-stretch" disabled={!draft.value.autoContinue} invalid={maxInvalid}>
         <SettingsRow
           control={
             <ContinuationsField
+              disabled={!draft.value.autoContinue}
               id={maxId}
               onValueChange={(value) => {
                 setMaxInvalid(false);

@@ -86,9 +86,26 @@ describe("accountStatus", () => {
   const status = (overrides: Parameters<typeof makeAccount>[0]) =>
     accountStatus(makeAccount({ expiresAt: 0, ...overrides }), NOW_SEC);
 
+  it("keeps an account past its plan credits active while overage lets it serve (pool/account.go)", () => {
+    const spent = { usageLimit: 50, usageCurrent: 60 };
+    expect(status(spent)).toBe("outOfCredits");
+    expect(status({ ...spent, overageStatus: "ENABLED" })).toBe("active");
+    expect(accountStatus(makeAccount({ expiresAt: 0, ...spent }), NOW_SEC, true)).toBe("active");
+  });
+
+  it("counts a silenced account as disabled: the pool leaves it out", () => {
+    expect(status({ enabled: true, silent: true })).toBe("disabled");
+  });
+
   it("shows Banned or Suspended first, and counts an unknown ban value as banned", () => {
     expect(status({ banStatus: "BANNED", enabled: false })).toBe("banned");
-    expect(status({ banStatus: "SUSPENDED", enabled: false })).toBe("suspended");
+    expect(
+      status({
+        banStatus: "BANNED",
+        banReason: "AWS temporarily suspended - unusual user activity detected",
+        enabled: false,
+      }),
+    ).toBe("suspended");
     expect(status({ banStatus: "LOCKED" })).toBe("banned");
     expect(status({ banStatus: "BANNED", usageLimit: 50, usageCurrent: 60 })).toBe("banned");
   });
@@ -142,7 +159,13 @@ describe("filterAccounts / filterOptions", () => {
       region: "",
     }),
     makeAccount({ id: "c", email: "carol@example.com", enabled: false, banStatus: "BANNED" }),
-    makeAccount({ id: "d", email: "dave@example.com", enabled: false, banStatus: "SUSPENDED" }),
+    makeAccount({
+      id: "d",
+      email: "dave@example.com",
+      enabled: false,
+      banStatus: "BANNED",
+      banReason: "AWS temporarily suspended - unusual user activity detected",
+    }),
     makeAccount({
       id: "e",
       email: "erin@example.com",

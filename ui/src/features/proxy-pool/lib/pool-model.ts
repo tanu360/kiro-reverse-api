@@ -77,6 +77,14 @@ export function routesThroughPool(view: ProxyPoolView | undefined): view is Prox
   return view !== undefined && view.mode === "on" && view.proxies.length > 0;
 }
 
+/**
+ * Whether the pool has a proxy it may pick: switched on and not failed (proxypool/manager.go
+ * eligibleLocked). Without one, requests take the fallback, or fail while it is off.
+ */
+export function poolHasEligibleProxy(view: ProxyPoolView): boolean {
+  return view.proxies.some((proxy) => proxy.state !== "off" && proxy.state !== "auto_disabled");
+}
+
 /** The editor's state: the shared proxy form plus the label and the password choice. */
 export interface EditorModel {
   label: string;

@@ -10,6 +10,7 @@ import {
   toChannelInputs,
   validateChannelDraft,
   withDraft,
+  withSavedUnusedFields,
 } from "./alerts-model";
 
 function channel(overrides: Partial<AlertChannel> = {}): AlertChannel {
@@ -75,6 +76,64 @@ describe("invalidRulesFields", () => {
     expect(invalidRulesFields({ ...form, poolCooldownMinutes: null })).toEqual([
       "poolCooldownMinutes",
     ]);
+  });
+
+  it("skips a field whose rules are all off, as nothing reads it then", () => {
+    expect(
+      invalidRulesFields({ ...form, accountUsage: false, accountThresholds: "90, 80" }),
+    ).toEqual([]);
+    expect(invalidRulesFields({ ...form, poolUsage: false, poolThresholds: "" })).toEqual([]);
+    // The cooldown spaces both pool alerts: pool usage and no account available.
+    expect(invalidRulesFields({ ...form, poolUsage: false, poolCooldownMinutes: null })).toEqual([
+      "poolCooldownMinutes",
+    ]);
+    expect(
+      invalidRulesFields({
+        ...form,
+        poolUsage: false,
+        allUnavailable: false,
+        poolCooldownMinutes: null,
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("withSavedUnusedFields", () => {
+  const saved: RulesForm = {
+    accountUsage: true,
+    poolUsage: true,
+    accountBanned: true,
+    allUnavailable: true,
+    accountThresholds: "80, 90, 100",
+    poolThresholds: "70, 100",
+    poolCooldownMinutes: 30,
+    dailySummary: false,
+    dailySummaryMinute: 540,
+  };
+
+  it("keeps the saved value of a field its rules ignore when the typed one is invalid", () => {
+    const form: RulesForm = {
+      ...saved,
+      accountUsage: false,
+      accountThresholds: "90, 80",
+      poolUsage: false,
+      allUnavailable: false,
+      poolThresholds: "",
+      poolCooldownMinutes: null,
+    };
+    expect(withSavedUnusedFields(form, saved)).toEqual({
+      ...form,
+      accountThresholds: "80, 90, 100",
+      poolThresholds: "70, 100",
+      poolCooldownMinutes: 30,
+    });
+  });
+
+  it("keeps a valid typed value, and every field of a rule that is on", () => {
+    const form: RulesForm = { ...saved, accountUsage: false, accountThresholds: "50" };
+    expect(withSavedUnusedFields(form, saved)).toEqual(form);
+    const on: RulesForm = { ...saved, poolThresholds: "" };
+    expect(withSavedUnusedFields(on, saved)).toEqual(on);
   });
 });
 

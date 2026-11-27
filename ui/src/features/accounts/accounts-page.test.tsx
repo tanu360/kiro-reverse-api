@@ -243,6 +243,20 @@ describe("AccountsPage", () => {
     await waitFor(() => expect(toggle).not.toBeChecked());
   });
 
+  it("shows a silenced account's switch off, and turning it on puts it back in rotation", async () => {
+    const dana = mockDb.accounts.find((account) => account.email.startsWith("dana."));
+    if (!dana) throw new Error("fixture missing");
+    Object.assign(dana, { enabled: true, silent: true });
+    const bodies = captureBodies("put", "/accounts/:id");
+    const { table, user } = await renderAccounts();
+    const toggle = within(table).getByRole("switch", { name: `Enable ${DANA_MASKED}` });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    await waitFor(() => expect(bodies).toEqual([{ enabled: true }]));
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(dana.silent).toBe(false);
+  });
+
   it("asks before deleting an account and sends nothing on Cancel", async () => {
     const bodies = captureBodies("delete", "/accounts/:id");
     const { table, user } = await renderAccounts();
@@ -385,6 +399,29 @@ describe("AccountsPage layout", () => {
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(bodies).toHaveLength(1));
+  });
+
+  it("leaves banned accounts out of a batch Enable and says so, as the row switch does", async () => {
+    const bodies = captureBodies("post", "/accounts/batch");
+    const banned = mockDb.accounts.find((a) => a.email === DANA);
+    const other = mockDb.accounts.find((a) => a.email !== DANA);
+    if (!banned || !other) throw new Error("fixture accounts missing");
+    Object.assign(banned, { banStatus: "BANNED", enabled: false });
+    Object.assign(other, { banStatus: "", enabled: false, silent: false });
+    const { table, user } = await renderAccounts();
+    for (const account of [banned, other]) {
+      const name = `Select ${maskEmailsInText(account.email)}`;
+      await user.click(await within(table).findByRole("checkbox", { name }));
+    }
+
+    await user.click(screen.getByRole("button", { name: "Enable selected" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Enable 1 account?")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("1 banned account stays off. Sign in again to lift a ban."),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Enable" }));
+    await waitFor(() => expect(bodies).toEqual([{ ids: [other.id], action: "enable" }]));
   });
 
   it("refreshes the selection's models in one batch call and reports the result", async () => {
@@ -627,6 +664,12 @@ describe("AccountsPage layout", () => {
     release();
     await expectAnnounced("The account was deleted.");
     await waitFor(() => expect(within(table).queryByText(DANA_MASKED)).not.toBeInTheDocument());
+  });
+
+  it("turns Refresh models off while no account is in rotation, as the sweep reads only those", async () => {
+    mockDb.accounts = mockDb.accounts.map((account) => ({ ...account, enabled: false }));
+    await renderAccounts();
+    expect(screen.getByRole("button", { name: "Refresh models" })).toBeDisabled();
   });
 
   it("spins Refresh models while the sweep runs and reads out the result", async () => {

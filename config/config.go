@@ -506,12 +506,17 @@ func GetAccounts() []Account {
 	return accounts
 }
 
-func GetEnabledAccounts() []Account {
+// InRotation reports whether the pool may pick the account: switched on, not
+// silenced and not held back by a ban or the admin's DISABLED status.
+func InRotation(a Account) bool {
+	return a.Enabled && !a.Silent && (a.BanStatus == "" || a.BanStatus == "ACTIVE")
+}
 
+func GetEnabledAccounts() []Account {
 	all := GetAccounts()
 	var accounts []Account
 	for _, a := range all {
-		if a.Enabled && !a.Silent && (a.BanStatus == "" || a.BanStatus == "ACTIVE") {
+		if InRotation(a) {
 			accounts = append(accounts, a)
 		}
 	}

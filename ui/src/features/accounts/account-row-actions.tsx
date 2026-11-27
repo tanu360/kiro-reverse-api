@@ -21,7 +21,7 @@ import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { useAccountName } from "./account-cells";
-import { isBanned } from "./account-model";
+import { inRotation, isApiKeyAccount, isBanned, isSuspended } from "./account-model";
 import { useOpenRelogin } from "./relogin-context";
 import {
   useCopyAccountJson,
@@ -33,6 +33,11 @@ import {
 export interface RowActionHandlers {
   onTest: (account: Account) => void;
   onDetails: (account: Account) => void;
+}
+
+/** A Kiro API key has no token to refresh: its refresh only reads the usage again. */
+function refreshLabelOf(account: Account): "actions.refreshUsage" | "actions.refreshToken" {
+  return isApiKeyAccount(account) ? "actions.refreshUsage" : "actions.refreshToken";
 }
 
 /**
@@ -50,7 +55,7 @@ export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
   if (isBanned(account)) {
     const reason =
       serverDataText(account.banReason, t) ||
-      t(account.banStatus === "SUSPENDED" ? "lockedSwitch.suspended" : "lockedSwitch.banned");
+      t(isSuspended(account) ? "lockedSwitch.suspended" : "lockedSwitch.banned");
     return (
       <Tooltip>
         {/* The wrapper takes the hover: a disabled switch does not open a tooltip itself. */}
@@ -64,7 +69,9 @@ export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
   return (
     <Switch
       aria-label={label}
-      checked={account.enabled}
+      // On only while the pool may pick it: a silenced or held account reads as off, and turning
+      // it on lifts that too (apiUpdateAccount).
+      checked={inRotation(account)}
       disabled={toggle.isPending}
       onCheckedChange={(checked) => toggle.mutate(checked)}
       ref={switchRef}
@@ -202,8 +209,11 @@ export function AccountRowActions({
   const refreshRef = useRef<HTMLButtonElement | null>(null);
   const manage = useManageActions();
   // A failed refresh comes back to the refresh button (the menu's trigger on a card).
-  const refresh = useRefreshAccount(account.id, () =>
-    variant === "menu" ? manage.triggerRef.current : refreshRef.current,
+  const refreshLabel = refreshLabelOf(account);
+  const refresh = useRefreshAccount(
+    account.id,
+    () => (variant === "menu" ? manage.triggerRef.current : refreshRef.current),
+    isApiKeyAccount(account),
   );
   const menuItems = <ManageMenuItems account={account} manage={manage} />;
 
@@ -233,7 +243,7 @@ export function AccountRowActions({
         <MenuPopup align="end">
           <MenuItem disabled={refresh.isPending} onClick={() => refresh.mutate()}>
             <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-            {t("actions.refreshToken")}
+            {t(refreshLabel)}
           </MenuItem>
           <MenuItem onClick={() => onTest(account)}>
             <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
@@ -254,7 +264,7 @@ export function AccountRowActions({
       <IconAction
         busy={refresh.isPending}
         description={name}
-        label={t("actions.refreshToken")}
+        label={t(refreshLabel)}
         onClick={() => refresh.mutate()}
         ref={refreshRef}
       >
@@ -317,7 +327,8 @@ export function AccountSheetActions({
   const { t } = useT("accounts");
   const { t: tc } = useT();
   const refreshRef = useRef<HTMLButtonElement | null>(null);
-  const refresh = useRefreshAccount(account.id, () => refreshRef.current);
+  const refreshLabel = refreshLabelOf(account);
+  const refresh = useRefreshAccount(account.id, () => refreshRef.current, isApiKeyAccount(account));
   const manage = useManageActions();
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -333,7 +344,7 @@ export function AccountSheetActions({
         variant="secondary"
       >
         <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-        {t("actions.refreshToken")}
+        {t(refreshLabel)}
       </Button>
       <div className="ms-auto flex items-center gap-2">
         <span aria-hidden="true" className="text-muted-foreground max-sm:hidden">

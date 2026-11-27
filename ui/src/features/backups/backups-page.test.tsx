@@ -2,7 +2,10 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SignInReasonNotice, useSignInReason } from "@/features/auth/sign-in-reason";
 import { subscribeAnnouncements } from "@/lib/announce";
+import { settingsQuery } from "@/lib/api/settings";
+import { tunnelQuery } from "@/lib/api/tunnel";
 import type { BackupEntry } from "@/lib/api/types";
 import { getSession, type SessionChangeReason, subscribeSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
@@ -13,6 +16,12 @@ import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp, renderWithProviders } from "@/test/render";
 import { BackupsPage } from "./backups-page";
+
+/** The admin sign-in page's notice, as it reads the reason the restore marked. */
+function AdminSignInNotice() {
+  const { reason } = useSignInReason("admin");
+  return <SignInReasonNotice reason={reason} />;
+}
 
 vi.mock("@/lib/download", () => ({ saveBlob: vi.fn(), saveJson: vi.fn() }));
 
@@ -108,6 +117,9 @@ function listCard(): HTMLElement {
 function scheduleCard(): HTMLElement {
   return screen.getByRole("region", { name: "Schedule" });
 }
+
+const RESTORE_BODY =
+  "Current accounts and settings are replaced. A rollback point is saved first. You will be signed out.";
 
 function dialog(): HTMLElement {
   return screen.getByRole("alertdialog");
@@ -299,6 +311,49 @@ describe("BackupsPage", () => {
     // The sign-in page says the backup was restored (routes/-guards.test.tsx), nothing here.
     expect(order).toEqual(["session:restored"]);
     expect(getSession()).toBeNull();
+  });
+
+  it("warns, before a restore through the public link, that the page may disconnect", async () => {
+    // proxy/backups_api.go: the restored link settings apply once the answer is out.
+    mockServer.use(
+      http.get(apiUrl("/tunnel"), () =>
+        HttpResponse.json({ state: "running", enabled: true, viaLink: true }),
+      ),
+    );
+    const { user, queryClient } = await renderPage();
+    await waitFor(() =>
+      expect(queryClient.getQueryData(tunnelQuery().queryKey)?.viaLink).toBe(true),
+    );
+    await rowAction(user, dataRows()[0], "Restore");
+    expect(dialog()).toHaveAccessibleDescription(
+      `${RESTORE_BODY} You opened this page through the public link. If the backup's public link settings differ, this page disconnects: sign in again from the local address.`,
+    );
+  });
+
+  it("says nothing about the link when the page did not come through it", async () => {
+    const { user, queryClient } = await renderPage();
+    await waitFor(() =>
+      expect(queryClient.getQueryData(tunnelQuery().queryKey)?.viaLink).toBe(false),
+    );
+    await rowAction(user, dataRows()[0], "Restore");
+    expect(dialog()).toHaveAccessibleDescription(RESTORE_BODY);
+  });
+
+  it("tells the sign-in page that ADMIN_PASSWORD kept its password over the backup's", async () => {
+    mockDb.settings = { ...mockDb.settings, adminPasswordFromEnv: true };
+    const { user, queryClient } = await renderPage();
+    await waitFor(() =>
+      expect(queryClient.getQueryData(settingsQuery().queryKey)?.adminPasswordFromEnv).toBe(true),
+    );
+    await rowAction(user, dataRows()[0], "Restore");
+    await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(sessionEvents).toEqual(["restored"]));
+    renderWithProviders(<AdminSignInNotice />);
+    expect(
+      screen.getByText(
+        "Backup restored. Sign in with the ADMIN_PASSWORD password: the restore kept it, not the backup's.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows a failed restore's server message verbatim in the list card and keeps the session", async () => {
@@ -730,6 +785,61 @@ describe("ScheduleCard", () => {
     expect(save).not.toHaveAttribute("aria-disabled");
     await user.click(screen.getByRole("switch", { name: "Scheduled backup" }));
     expect(save).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("turns Frequency and Keep latest off while the schedule is off, as nothing reads them then", async () => {
+    const { user } = await renderPage();
+    const toggle = screen.getByRole("switch", { name: "Scheduled backup" });
+    const frequency = screen.getByRole("combobox", { name: "Frequency" });
+    const keep = screen.getByRole("textbox", { name: "Keep latest" });
+    expect(toggle).toBeChecked();
+    expect(frequency).not.toHaveAttribute("data-disabled");
+    expect(keep).toBeEnabled();
+
+    await user.click(toggle);
+    expect(frequency).toHaveAttribute("data-disabled");
+    expect(keep).toBeDisabled();
+    // Each says why, in its row's description.
+    const why = "Turn on Scheduled backup to change this.";
+    expect(frequency).toHaveAccessibleDescription(why);
+    expect(keep).toHaveAccessibleDescription(why);
+  });
+
+  it("saves the stored Frequency and Keep latest when the schedule is turned off", async () => {
+    const posts: unknown[] = [];
+    mockServer.use(
+      http.post(apiUrl("/backups/schedule"), async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json({ success: true });
+      }),
+    );
+    const { user } = await renderPage();
+    const keep = screen.getByRole("textbox", { name: "Keep latest" });
+    await user.clear(keep);
+    await user.type(keep, "30");
+    await user.click(screen.getByRole("combobox", { name: "Frequency" }));
+    await user.click(await screen.findByRole("option", { name: "Weekly" }));
+    await user.click(screen.getByRole("switch", { name: "Scheduled backup" }));
+    // A field that is off shows what is saved.
+    expect(keep).toHaveValue("14");
+    expect(screen.getByRole("combobox", { name: "Frequency" })).toHaveTextContent("Daily");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(posts).toEqual([{ enabled: false, cadence: "daily", keep: 14 }]));
+  });
+
+  it("leaves Save inactive once a schedule that was off is off again, edits and all", async () => {
+    mockDb.schedule = { enabled: false, cadence: "daily", keep: 14 };
+    const { user } = await renderPage();
+    const toggle = screen.getByRole("switch", { name: "Scheduled backup" });
+    const save = screen.getByRole("button", { name: "Save" });
+    await user.click(toggle);
+    const keep = screen.getByRole("textbox", { name: "Keep latest" });
+    await user.clear(keep);
+    expect(save).not.toHaveAttribute("aria-disabled");
+    await user.click(toggle);
+    expect(save).toHaveAttribute("aria-disabled", "true");
+    expect(keep).toHaveValue("14");
   });
 
   it("keeps focus on Save after saving instead of remounting the form", async () => {

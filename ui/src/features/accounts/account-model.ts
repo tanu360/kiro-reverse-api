@@ -79,6 +79,16 @@ export function isApiKeyAccount(account: Pick<Account, "authMethod">): boolean {
   return account.authMethod.toLowerCase() === "api_key";
 }
 
+/**
+ * Builder ID and IAM Identity Center tokens refresh through AWS OIDC, the only refresh the
+ * sign-in region override reaches; social, Microsoft and API key accounts never use it
+ * (auth/auth_region.go usesOIDCRefresh).
+ */
+export function refreshesThroughOidc(account: Pick<Account, "authMethod">): boolean {
+  const method = account.authMethod.toLowerCase();
+  return method !== "social" && method !== "external_idp" && !isApiKeyAccount(account);
+}
+
 // ---------------------------------------------------------------------------
 // Health and filters
 // ---------------------------------------------------------------------------
@@ -94,14 +104,38 @@ export function isHeld(account: Pick<Account, "banStatus">): boolean {
   return Boolean(account.banStatus) && account.banStatus !== "ACTIVE";
 }
 
+/** In the pool's rotation: on, not silenced and not held back (config.GetEnabledAccounts). */
+export function inRotation(account: Pick<Account, "enabled" | "silent" | "banStatus">): boolean {
+  return account.enabled && !account.silent && !isHeld(account);
+}
+
 /** Banned or suspended upstream: held back for any reason but the admin's own DISABLED. */
 export function isBanned(account: Pick<Account, "banStatus">): boolean {
   return isHeld(account) && account.banStatus !== DISABLED_BAN_STATUS;
 }
 
-/** Same rule as the server's exhausted check (pool/account.go). */
-function isOutOfCredits(account: Pick<Account, "usageLimit" | "usageCurrent">): boolean {
-  return account.usageLimit > 0 && account.usageCurrent >= account.usageLimit;
+/** The ban reasons the proxy writes with BANNED (proxy/account_failover.go). */
+export const BAN_REASON_SUSPENDED = "AWS temporarily suspended - unusual user activity detected";
+export const BAN_REASON_AUTH_FAILED = "Authentication failed - token invalid or expired";
+
+/**
+ * Suspended by Kiro: the proxy bans the account (BANNED) with the suspension reason; it never
+ * writes a status of its own for it (proxy/kiro_api.go, proxy/account_failover.go).
+ */
+export function isSuspended(account: Pick<Account, "banStatus" | "banReason">): boolean {
+  return isBanned(account) && account.banReason === BAN_REASON_SUSPENDED;
+}
+
+/**
+ * Same rule as the pool's over-limit check (pool/account.go): plan credits are spent and neither
+ * the account's own overage nor the global Allow over usage lets the pool keep serving it.
+ */
+function isOutOfCredits(
+  account: Pick<Account, "usageLimit" | "usageCurrent" | "overageStatus">,
+  allowOverUsage: boolean,
+): boolean {
+  if (account.usageLimit <= 0 || account.usageCurrent < account.usageLimit) return false;
+  return account.overageStatus.toUpperCase() !== "ENABLED" && !allowOverUsage;
 }
 
 /**
@@ -109,12 +143,19 @@ function isOutOfCredits(account: Pick<Account, "usageLimit" | "usageCurrent">): 
  * (banned, suspended, no token, out of credits, expired token, disabled by the admin, active).
  * An unknown ban status that is not ACTIVE counts as banned; DISABLED is the admin's switch.
  */
-export function accountStatus(account: Account, nowSec: number): AccountStatus {
-  if (isBanned(account)) return account.banStatus === "SUSPENDED" ? "suspended" : "banned";
+export function accountStatus(
+  account: Account,
+  nowSec: number,
+  allowOverUsage = false,
+): AccountStatus {
+  if (isBanned(account)) return isSuspended(account) ? "suspended" : "banned";
   if (!account.hasToken) return "noToken";
-  if (isOutOfCredits(account)) return "outOfCredits";
+  if (isOutOfCredits(account, allowOverUsage)) return "outOfCredits";
   if (account.expiresAt && account.expiresAt < nowSec) return "expired";
-  if (!account.enabled || account.banStatus === DISABLED_BAN_STATUS) return "disabled";
+  //! The pool leaves out a silenced account (config.GetEnabledAccounts) as it does a disabled one.
+  if (!account.enabled || account.silent || account.banStatus === DISABLED_BAN_STATUS) {
+    return "disabled";
+  }
   return "active";
 }
 
@@ -210,10 +251,15 @@ export type AccountFilters = Pick<AccountsSearch, "q" | FilterDimension>;
 /** The dimensions with one value per account; an account has any number of tags. */
 type SingleValueDimension = Exclude<FilterDimension, "tag">;
 
-function dimensionValue(account: Account, dimension: SingleValueDimension, nowSec: number): string {
+function dimensionValue(
+  account: Account,
+  dimension: SingleValueDimension,
+  nowSec: number,
+  allowOverUsage: boolean,
+): string {
   switch (dimension) {
     case "status":
-      return accountStatus(account, nowSec);
+      return accountStatus(account, nowSec, allowOverUsage);
     case "plan":
       return planKey(account);
     case "auth":
@@ -230,9 +276,10 @@ function matchesDimension(
   dimension: FilterDimension,
   filter: string,
   nowSec: number,
+  allowOverUsage: boolean,
 ): boolean {
   if (dimension === "tag") return hasTag(account, filter);
-  const value = dimensionValue(account, dimension, nowSec);
+  const value = dimensionValue(account, dimension, nowSec, allowOverUsage);
   return dimension === "status"
     ? matchesStatus(value as AccountStatus, filter as AccountStatusFilter)
     : value === filter;
@@ -257,13 +304,14 @@ export function filterAccounts(
   accounts: Account[],
   filters: AccountFilters,
   nowSec: number,
+  allowOverUsage = false,
 ): Account[] {
   const needle = (filters.q ?? "").trim().toLowerCase();
   const active = FILTER_DIMENSIONS.filter((dimension) => filters[dimension] !== undefined);
   return accounts.filter(
     (account) =>
       active.every((dimension) =>
-        matchesDimension(account, dimension, filters[dimension] as string, nowSec),
+        matchesDimension(account, dimension, filters[dimension] as string, nowSec, allowOverUsage),
       ) &&
       (!needle || matchesQuery(account, needle)),
   );
@@ -304,11 +352,12 @@ export function filterOptions(
   dimension: FilterDimension,
   t: TFunction,
   nowSec: number,
+  allowOverUsage = false,
 ): FilterOption[] {
   if (dimension === "tag") return tagOptions(accounts);
   const options = new Map<string, FilterOption>();
   for (const account of accounts) {
-    const value = dimensionValue(account, dimension, nowSec);
+    const value = dimensionValue(account, dimension, nowSec, allowOverUsage);
     const option = options.get(value);
     if (option) {
       option.count++;
@@ -368,6 +417,7 @@ export function sortAccounts(
   sort: AccountSort | undefined,
   desc: boolean,
   nowSec: number,
+  allowOverUsage = false,
 ): Account[] {
   if (!sort) return accounts;
   const key = (account: Account): number | string | null => {
@@ -375,7 +425,7 @@ export function sortAccounts(
       case "account":
         return (account.email || account.id).toLowerCase();
       case "status":
-        return statusRank(accountStatus(account, nowSec));
+        return statusRank(accountStatus(account, nowSec, allowOverUsage));
       case "usage": {
         const fraction = usageFraction(account);
         return fraction < 0 ? null : fraction;

@@ -128,12 +128,21 @@ export function ModelPicks({
       ) : null}
       {list}
       {models.data !== undefined ? (
-        <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-          {t("form.accountsSelectedCount", {
-            n: formatNumber(selected.length, lang),
-            total: formatNumber(rows.length, lang),
-          })}
-        </p>
+        <div
+          aria-live="polite"
+          className="flex flex-col gap-1 text-muted-foreground text-xs leading-normal"
+        >
+          <p className="tabular-nums">
+            {t("form.accountsSelectedCount", {
+              n: formatNumber(selected.length, lang),
+              total: formatNumber(rows.length, lang),
+            })}
+          </p>
+          {/* The other models' boxes turn off at the cap. */}
+          {selected.length >= MAX_KEY_MODELS ? (
+            <p>{t("form.modelsAtMax", { max: MAX_KEY_MODELS })}</p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

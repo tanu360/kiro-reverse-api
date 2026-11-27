@@ -21,7 +21,12 @@ import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
-import { assignedProxy, proxyName, routesThroughPool } from "@/features/proxy-pool/lib/pool-model";
+import {
+  assignedProxy,
+  poolHasEligibleProxy,
+  proxyName,
+  routesThroughPool,
+} from "@/features/proxy-pool/lib/pool-model";
 import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
 import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -381,10 +386,15 @@ function useTestProxy(account: Account): string {
   const pool = useQuery({ ...proxyPoolQuery(), enabled: !own }).data;
   if (own) return proxyDisplayUrl(own);
   if (routesThroughPool(pool)) {
-    const proxy = assignedProxy(pool, account.id);
-    return proxy ? maskText(proxyName(proxy)) : tp("account.pool");
+    if (poolHasEligibleProxy(pool)) {
+      const proxy = assignedProxy(pool, account.id);
+      return proxy ? maskText(proxyName(proxy)) : tp("account.pool");
+    }
+    // No proxy to pick: the fallback, or every request fails while it is off.
+    if (!pool.directFallback) return t("detail.proxyPoolNone");
   }
-  return global !== undefined && !global.proxyURL ? t("detail.proxyDirect") : t("test.globalProxy");
+  if (global === undefined) return EMPTY;
+  return global.proxyURL ? t("test.globalProxy") : t("detail.proxyDirect");
 }
 
 /**

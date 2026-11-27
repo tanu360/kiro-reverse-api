@@ -45,6 +45,8 @@ export function receiveServer<T>(
 
 export interface Draft<T> {
   value: T;
+  /** What the draft started from: the last saved copy. */
+  saved: T;
   set: (next: T | ((prev: T) => T)) => void;
   /** The draft differs from what it started from. */
   dirty: boolean;
@@ -88,6 +90,7 @@ export function useDraft<T>(server: T, equal: (a: T, b: T) => boolean = isEqual)
   const dirty = !equal(current.draft, current.base);
   return {
     value: current.draft,
+    saved: current.base,
     set,
     dirty,
     serverChanged: dirty && current.serverChanged,

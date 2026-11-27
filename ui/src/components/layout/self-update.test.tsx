@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { type SelfUpdate, updateButtonAction } from "./self-update";
+import { type SelfUpdate, serverPhase, updateButtonAction } from "./self-update";
 
 const t = (key: string, params?: Record<string, unknown>) =>
   params ? `${key} ${JSON.stringify(params)}` : key;
@@ -48,5 +48,25 @@ describe("updateButtonAction", () => {
       label: 'shell.update.statusDownloading {"percent":45}',
     });
     expect(updateButtonAction(update({ phase: "restarting" }), t).run).toBeUndefined();
+  });
+});
+
+describe("serverPhase", () => {
+  it("follows the server's state", () => {
+    expect(serverPhase(undefined, "3.6.0")).toBe("idle");
+    expect(serverPhase({ state: "downloading", supported: true, version: "3.6.0" }, "3.6.0")).toBe(
+      "downloading",
+    );
+    expect(serverPhase({ state: "ready", supported: true, version: "3.6.0" }, "3.6.0")).toBe(
+      "ready",
+    );
+  });
+
+  // updater.Start downloads a newer version over one that is ready; a restart would run the
+  // older one.
+  it("offers the newest release again while an older one waits in place", () => {
+    expect(serverPhase({ state: "ready", supported: true, version: "3.5.0" }, "3.6.0")).toBe(
+      "idle",
+    );
   });
 });

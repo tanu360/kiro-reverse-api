@@ -129,6 +129,19 @@ describe("ProxyPoolCard", () => {
     );
   });
 
+  it("asks for a username before a password, which the server refuses alone", async () => {
+    const { user } = await renderCard();
+    await user.click(screen.getByRole("button", { name: "Add proxy" }));
+    const dialog = await screen.findByRole("dialog");
+    const password = within(dialog).getByLabelText("Password");
+    expect(password).toBeDisabled();
+    expect(within(dialog).getByText("A password needs a username.")).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText("Username"), "alice");
+    expect(password).toBeEnabled();
+    expect(within(dialog).queryByText("A password needs a username.")).not.toBeInTheDocument();
+  });
+
   it("keeps the saved password when an edit leaves the field empty", async () => {
     seedProxyPoolMock({ proxies: [frankfurt] });
     const { user } = await renderCard();
@@ -608,5 +621,51 @@ describe("ProxyPoolCard", () => {
     const adoptWrites = (await writes()).filter((w) => w.path.endsWith("/adopt"));
     expect(adoptWrites).toHaveLength(1);
     expect(adoptWrites[0].path).toMatch(/^\/proxy-pool\/detected\/dx_[0-9a-f]+\/adopt$/);
+  });
+});
+
+describe("ProxyPoolCard settings the pool's state turns off", () => {
+  function clearAccountProxies(): void {
+    for (const account of mockDb.accounts) account.proxyURL = "";
+  }
+
+  it("turns the fallback off while the pool is off, as nothing reads it then", async () => {
+    seedProxyPoolMock({ proxies: [frankfurt] });
+    const { user } = await renderCard();
+    const fallback = screen.getByRole("switch", { name: "Fall back when no proxy is healthy" });
+    expect(fallback).toHaveAttribute("data-disabled");
+    expect(fallback).toHaveAccessibleDescription("Only used while the pool is on and has a proxy.");
+
+    await user.click(screen.getByRole("switch", { name: "Use the proxy pool" }));
+    await waitFor(() => expect(fallback).not.toHaveAttribute("data-disabled"));
+  });
+
+  it("turns the health check off while there is no proxy to check", async () => {
+    clearAccountProxies();
+    seedProxyPoolMock({});
+    await renderCard();
+    const interval = screen.getByRole("combobox", { name: "Health check" });
+    expect(interval).toHaveAttribute("data-disabled");
+    expect(interval).toHaveAccessibleDescription(
+      "Nothing to check: the pool is off, empty or has every proxy switched off, and no global or account proxy is set.",
+    );
+  });
+
+  it("has nothing to check while every pool proxy is switched off (CheckAll skips them)", async () => {
+    clearAccountProxies();
+    seedProxyPoolMock({ mode: "on", proxies: [{ ...frankfurt, enabled: false }] });
+    await renderCard();
+    expect(screen.getByRole("combobox", { name: "Health check" })).toHaveAttribute("data-disabled");
+    expect(screen.getByRole("button", { name: "Check all" })).toBeDisabled();
+  });
+
+  it("checks the global proxy while the pool is off", async () => {
+    clearAccountProxies();
+    mockDb.proxy.proxyURL = "http://open.example:8080";
+    seedProxyPoolMock({});
+    await renderCard();
+    expect(screen.getByRole("combobox", { name: "Health check" })).not.toHaveAttribute(
+      "data-disabled",
+    );
   });
 });

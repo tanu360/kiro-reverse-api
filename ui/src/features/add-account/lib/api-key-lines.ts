@@ -15,3 +15,17 @@ export function parseApiKeyLines(text: string, region: string): CredentialsImpor
       region: key.includes("|") ? "" : region,
     }));
 }
+
+/**
+ * The region a `ksk_...|region` key names, trimmed and lowercased as the server reads it
+ * (config.SplitKiroAPIKeyAndRegion); null for a key without one.
+ */
+export function keyRegion(key: string): string | null {
+  const bar = key.indexOf("|");
+  return bar < 0
+    ? null
+    : key
+        .slice(bar + 1)
+        .trim()
+        .toLowerCase();
+}

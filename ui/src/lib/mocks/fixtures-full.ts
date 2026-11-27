@@ -182,8 +182,8 @@ const BARE_TYPE: Record<string, string> = {
 };
 
 /** The ban reasons the Go server writes (proxy/kiro_api.go, proxy/account_failover.go). */
+/** Bans that are not a Kiro suspension (that one has its own health below). */
 const BAN_REASONS = [
-  "AWS temporarily suspended - unusual user activity detected",
   "Authentication failed - token invalid or expired",
   "AccessDeniedException: account access has been revoked (403)",
 ];
@@ -499,7 +499,7 @@ function randomAccount(
       health === "banned"
         ? "BANNED"
         : health === "suspended"
-          ? "SUSPENDED"
+          ? "BANNED"
           : health === "disabledBan"
             ? "DISABLED"
             : health === "cleared"
@@ -509,7 +509,7 @@ function randomAccount(
       health === "banned"
         ? pick(rng, BAN_REASONS)
         : health === "suspended"
-          ? "TEMPORARILY_SUSPENDED"
+          ? "AWS temporarily suspended - unusual user activity detected"
           : "",
     banTime: ["banned", "suspended", "disabledBan"].includes(health) ? banTime : 0,
     expiresAt,
@@ -2062,6 +2062,7 @@ export function seedFullDataset(now: number): FullDataset {
       imageResizeMaxKB: 800,
       logLevel: "info",
       logLevelFromEnv: false,
+      adminPasswordFromEnv: false,
     },
     thinking: {
       suffix: "-reasoning-extended",

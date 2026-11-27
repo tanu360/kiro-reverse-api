@@ -10,6 +10,7 @@
   "regionInvalid": "Enter a region like us-east-1.",
   "relogin.title": "Sign in again",
   "relogin.target": "Sign in again as {name}. The account keeps its nickname, notes, tags, priority, weight, proxy, stats and history.",
+  "relogin.staysOff": "It stays switched off. Switch it on afterwards to put it back in rotation.",
   "relogin.submit": "Sign in again",
   "relogin.success": "{name} is signed in again.",
   "relogin.singleOnly": "Signing in again takes one credential. Paste only one.",
@@ -158,6 +159,7 @@
   "apikey.keysHint": "One per line. Add a region to a key with {example}",
   "apikey.regionHint": "Used for keys without a region suffix:",
   "apikey.keyMissing": "Enter at least one Kiro API key.",
+  "apikey.regionUnsupported": "Kiro API keys work in {regions} only, not {region}.",
 
   "group.signIn": "Sign in",
   "group.import": "Import"

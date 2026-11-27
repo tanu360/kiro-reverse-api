@@ -160,7 +160,7 @@ describe("userKeyStatus", () => {
     expect(status({ expiresAt: now - 1 })).toBe("expired");
   });
 
-  it("reads a reached limit in the proxy's order: off, expired, tokens, credits, calls", () => {
+  it("reads a reached limit in the proxy's order: off (a token or credit limit), expired, calls", () => {
     expect(status(tokensOut)).toBe("tokenLimit");
     expect(status(creditsOut)).toBe("creditLimit");
     expect(status(callsOut)).toBe("callLimit");
@@ -168,7 +168,12 @@ describe("userKeyStatus", () => {
     expect(status({ ...creditsOut, ...callsOut })).toBe("creditLimit");
     // A call limit leaves the key on: off is the admin's doing.
     expect(status({ ...callsOut, enabled: false })).toBe("off");
-    expect(status({ ...tokensOut, expired: true, expiresAt: now - 1 })).toBe("expired");
+    // Turned off by its limit and expired too: the proxy refuses it as disabled first, and the
+    // admin's table shows Limit reached.
+    expect(status({ ...tokensOut, expired: true, expiresAt: now - 1 })).toBe("tokenLimit");
+    expect(status({ ...creditsOut, expiresAt: now - 1 })).toBe("creditLimit");
+    // On again past its limit: the proxy checks the expiry before the limit.
+    expect(status({ ...tokensOut, enabled: true, expiresAt: now - 1 })).toBe("expired");
     expect(status({ ...callsOut, expiresAt: now - 1 })).toBe("expired");
     // Short of a limit, or no limit at all.
     expect(status({ tokenLimit: 100, tokensUsed: 99, callLimit: 10, successfulCalls: 9 })).toBe(

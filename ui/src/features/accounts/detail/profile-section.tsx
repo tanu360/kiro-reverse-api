@@ -1,6 +1,6 @@
 import { CircleCheckIcon, ScanSearchIcon, UserSwitchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { type JSX, useRef, useState } from "react";
 import { ActionError } from "@/components/shared/action-error";
 import { ChoiceCard } from "@/components/shared/choice-card";
@@ -14,11 +14,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { announce } from "@/lib/announce";
 import { getAccountProfiles, setAccountProfile } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
+import { upstreamQuery } from "@/lib/api/settings";
 import type { Account, AccountProfilesResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { supportsKiroProfiles } from "../account-model";
 import { useInvalidateAccounts } from "../use-account-actions";
+import { RegionValue } from "./region-value";
 
 function defaultArn(result: AccountProfilesResponse): string {
   return (result.profiles.find((profile) => profile.current) ?? result.profiles[0])?.arn ?? "";
@@ -34,6 +36,8 @@ function defaultArn(result: AccountProfilesResponse): string {
  */
 export function ProfileSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
+  // The API region in Settings beats every account's profile region (proxy/kiro_region.go).
+  const apiRegion = useQuery(upstreamQuery()).data?.apiRegion;
   const supported = supportsKiroProfiles(account);
   const invalidate = useInvalidateAccounts();
   const [selectedArn, setSelectedArn] = useState("");
@@ -132,7 +136,12 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
         <PropertyList>
           <PropertyRow
             label={t("detail.profileRegion")}
-            value={account.activeRegion || "us-east-1"}
+            value={
+              <RegionValue
+                note={apiRegion ? t("detail.regionApiOverride", { region: apiRegion }) : undefined}
+                region={account.activeRegion || "us-east-1"}
+              />
+            }
           />
           <PropertyRow
             label={t("detail.profileMode")}

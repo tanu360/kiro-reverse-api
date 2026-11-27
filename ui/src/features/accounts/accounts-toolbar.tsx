@@ -48,6 +48,7 @@ import {
   statusFilterGroup,
   statusGroup,
 } from "./account-model";
+import { useAllowOverUsage } from "./use-allow-over-usage";
 
 /** The dimensions with a "Label: Value" select; status has the tabs (and the Issue select). */
 type FilterSelectDimension = Exclude<FilterDimension, "status">;
@@ -206,15 +207,16 @@ export const AccountsToolbar = memo(function AccountsToolbar({
     searchRef.current.select();
   });
 
+  const allowOverUsage = useAllowOverUsage();
   const options = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
     return Object.fromEntries(
       FILTER_DIMENSIONS.map((dimension) => [
         dimension,
-        filterOptions(accounts, dimension, t, nowSec),
+        filterOptions(accounts, dimension, t, nowSec, allowOverUsage),
       ]),
     ) as Record<FilterDimension, FilterOption[]>;
-  }, [accounts, t]);
+  }, [accounts, t, allowOverUsage]);
 
   const groupCounts = useMemo(() => {
     const counts: Record<StatusGroup, number> = { active: 0, attention: 0, disabled: 0 };

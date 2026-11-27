@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
+import { type JSX, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { SettingsPatch } from "@/lib/api/types";
@@ -8,11 +9,13 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
+import { AccountPicks } from "./account-picker";
 import { ApiAccessCard } from "./api-access-card";
-import { endOfLocalDay, expiryInDays } from "./api-key-form";
+import { endOfLocalDay, expiryInDays, MAX_KEY_MODELS, MAX_KEY_TAGS } from "./api-key-form";
 import { ApiPage } from "./api-page";
 import { ClientSnippetsCard } from "./client-snippets";
 import { EndpointsCard } from "./endpoints-card";
+import { ModelPicks } from "./model-picker";
 
 vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn() }));
 
@@ -740,27 +743,128 @@ describe("ApiPage", () => {
     await waitFor(() => expect(screen.queryByText("team-a")).not.toBeInTheDocument());
   });
 
-  it("warns about a lockout when deleting the last enabled key while keys are required", async () => {
+  it("turns Disable and Delete off for the last enabled key while keys are required", async () => {
     mockDb.settings.requireApiKey = true;
     for (const apiKey of mockDb.apiKeys) apiKey.enabled = apiKey.name === "team-a";
     const { user } = await renderPage();
     await screen.findByText("Clients must send an API key");
     await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
-    const confirm = await screen.findByRole("alertdialog");
-    expect(within(confirm).getByText(/Every client is locked out/)).toBeInTheDocument();
+    // The server refuses both (409 api_key_lockout), so the menu does not offer them.
+    const reason = "The last enabled key, while API keys are required";
+    const disable = await screen.findByRole("menuitem", { name: new RegExp(`^Disable ${reason}`) });
+    const remove = screen.getByRole("menuitem", { name: new RegExp(`^Delete ${reason}`) });
+    expect(disable).toHaveAttribute("aria-disabled", "true");
+    expect(remove).toHaveAttribute("aria-disabled", "true");
   });
 
-  it("refuses to require an API key while no key is enabled", async () => {
+  it("turns Require an API key off while no key is enabled, and says why", async () => {
+    // The server refuses it (409 api_key_lockout): the switch does not offer it.
     for (const apiKey of mockDb.apiKeys) apiKey.enabled = false;
-    const { user } = await renderPage();
-    await screen.findByText("Any client can call the proxy");
-    await user.click(screen.getByRole("switch", { name: "Require an API key" }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(
-      await screen.findByText("Create and enable at least one API key before you require one."),
-    ).toBeInTheDocument();
+    await renderPage();
+    const toggle = screen.getByRole("switch", { name: "Require an API key" });
+    await waitFor(() => expect(toggle).toHaveAttribute("data-disabled"));
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("api-access-state")).toHaveTextContent(
+      /^Create and enable at least one API key before you require one\.$/,
+    );
     expect(settingsPosts).toHaveLength(0);
+  });
+
+  it("says calls through the public link still need a key while keys are not required", async () => {
+    mockDb.tunnel.pinned = { enabled: true, state: "running", url: "https://kiro.tail1234.ts.net" };
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("api-access-state")).toHaveTextContent(
+        /^Clients can call without a key, except through the public link$/,
+      ),
+    );
+  });
+
+  it("says keys apply only through the public link while they are not required", async () => {
+    await renderPage();
+    const card = screen.getByRole("region", { name: "API keys" });
+    const note =
+      /While Require an API key is off, keys apply only to calls through the public link\./;
+    expect(await within(card).findByText(note)).toBeInTheDocument();
+  });
+
+  it("leaves out the public link note while keys are required", async () => {
+    mockDb.settings.requireApiKey = true;
+    await renderPage();
+    await screen.findByText("Clients must send an API key");
+    expect(screen.queryByText(/keys apply only to calls through the public link/)).toBeNull();
+  });
+
+  it("turns Reset usage off for a key with no usage, and says why", async () => {
+    const { user } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for local-dev" }));
+    const reset = await screen.findByRole("menuitem", { name: /^Reset usage No usage to reset$/ });
+    expect(reset).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("notes that a key with one account has no routing to pick, keeping the select", async () => {
+    const [first, second] = mockDb.accounts;
+    if (!first || !second) throw new Error("missing seeded data");
+    // Privacy off, so the accounts go by their addresses.
+    const { user } = renderWithProviders(<ApiPage />, { privacy: false });
+    await screen.findAllByText("team-a");
+    await user.click(screen.getByRole("button", { name: "Create API key" }));
+    const dialog = await screen.findByRole("dialog");
+    await toAccessStep(user, dialog);
+    const note = /Not used while the key can use only one account\./;
+    await user.click(scopeRadio(dialog, "Accounts", "Only selected"));
+    await user.click(
+      await within(dialog).findByRole("checkbox", { name: (name) => name.includes(first.email) }),
+    );
+    expect(within(dialog).getByText(note)).toBeInTheDocument();
+    expect(within(dialog).getByRole("combobox", { name: "Routing mode" })).not.toHaveAttribute(
+      "data-disabled",
+    );
+    await user.click(
+      within(dialog).getByRole("checkbox", { name: (name) => name.includes(second.email) }),
+    );
+    expect(within(dialog).queryByText(note)).not.toBeInTheDocument();
+  });
+
+  it("warns when none of a key's picked accounts is enabled", async () => {
+    const off = mockDb.accounts.find((account) => !account.enabled);
+    const on = mockDb.accounts.find((account) => account.enabled && account.email);
+    if (!off || !on) throw new Error("missing seeded data");
+    const { user } = renderWithProviders(<ApiPage />, { privacy: false });
+    await screen.findAllByText("team-a");
+    await user.click(screen.getByRole("button", { name: "Create API key" }));
+    const dialog = await screen.findByRole("dialog");
+    await toAccessStep(user, dialog);
+    const warning = "None of these accounts is enabled, so the key's requests fail.";
+    await user.click(scopeRadio(dialog, "Accounts", "Only selected"));
+    await user.click(
+      await within(dialog).findByRole("checkbox", { name: (name) => name.includes(off.email) }),
+    );
+    expect(within(dialog).getByText(warning)).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("checkbox", { name: (name) => name.includes(on.email) }),
+    );
+    expect(within(dialog).queryByText(warning)).not.toBeInTheDocument();
+  });
+
+  it("warns for a picked account that is on but silenced, as the pool leaves it out", async () => {
+    const silenced = mockDb.accounts.find((account) => account.enabled && account.email);
+    if (!silenced) throw new Error("missing seeded data");
+    silenced.silent = true;
+    const { user } = renderWithProviders(<ApiPage />, { privacy: false });
+    await screen.findAllByText("team-a");
+    await user.click(screen.getByRole("button", { name: "Create API key" }));
+    const dialog = await screen.findByRole("dialog");
+    await toAccessStep(user, dialog);
+    await user.click(scopeRadio(dialog, "Accounts", "Only selected"));
+    await user.click(
+      await within(dialog).findByRole("checkbox", {
+        name: (name) => name.includes(silenced.email),
+      }),
+    );
+    expect(
+      within(dialog).getByText("None of these accounts is enabled, so the key's requests fail."),
+    ).toBeInTheDocument();
   });
 
   it("leaves the enabled-key check to the server while the key list failed to load", async () => {
@@ -957,6 +1061,28 @@ describe("Endpoints and Client setup given Require API key (the key holder's pag
     expect(sent("GET", "/settings").length).toBeGreaterThan(0);
   });
 
+  it("asks for a key when this page came through the public link, as every call there needs one", async () => {
+    mockDb.settings.requireApiKey = false;
+    mockDb.tunnel.pinned = {
+      enabled: true,
+      state: "running",
+      url: "https://kiro.tail1234.ts.net",
+      viaLink: true,
+    };
+    renderWithProviders(
+      <>
+        <EndpointsCard />
+        <ClientSnippetsCard />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
+        /^Clients send an API key as Authorization: Bearer <key> or X-Api-Key: <key>\./,
+      ),
+    );
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
   it("reads no settings and speaks to the key holder while keys are required", async () => {
     mockDb.settings.requireApiKey = false;
     await renderCards(true);
@@ -985,6 +1111,52 @@ describe("Endpoints and Client setup given Require API key (the key holder's pag
     expect(screen.getByRole("tabpanel", { name: "Codex" })).toHaveTextContent(
       'model = "claude-haiku-4.5"',
     );
+    // Claude Code sends the given model for every alias, so a key limited to it is not refused.
+    await user.click(screen.getByRole("tab", { name: "Claude Code" }));
+    const claudeCode = screen.getByRole("tabpanel", { name: "Claude Code" });
+    expect(claudeCode).toHaveTextContent('ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4.5"');
+    expect(claudeCode).not.toHaveTextContent("claude-sonnet-4.5");
+    expect(claudeCode).toHaveTextContent("The model lines pick a model your key can call.");
     expect(requests.filter((r) => r.path.startsWith("/admin/api"))).toEqual([]);
+  });
+});
+
+/** The account picks with their tags in state, as the key form holds them. */
+function TagPicks({ initial }: { initial: string[] }): JSX.Element {
+  const [tags, setTags] = useState(initial);
+  return (
+    <AccountPicks
+      invalid={false}
+      onSelectedChange={() => {}}
+      onTagsChange={setTags}
+      selected={[]}
+      tags={tags}
+    />
+  );
+}
+
+/** The model picks with their models in state, as the key form holds them. */
+function Models({ initial }: { initial: string[] }): JSX.Element {
+  const [models, setModels] = useState(initial);
+  return <ModelPicks onSelectedChange={setModels} selected={models} />;
+}
+
+describe("Account and model picks at their caps", () => {
+  it("says why the other tags turn off once a key has the most it can pick", async () => {
+    const tags = Array.from({ length: MAX_KEY_TAGS }, (_, index) => `tag-${index}`);
+    const { user } = renderWithProviders(<TagPicks initial={tags} />);
+    const cap = "A key can pick at most 10 tags.";
+    expect(await screen.findByText(cap)).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /^tag-0/ }));
+    expect(screen.queryByText(cap)).not.toBeInTheDocument();
+  });
+
+  it("says why the other models turn off once a key has the most it can allow", async () => {
+    const models = Array.from({ length: MAX_KEY_MODELS }, (_, index) => `model-${index}`);
+    const { user } = renderWithProviders(<Models initial={models} />);
+    const cap = "A key can allow at most 50 models.";
+    expect(await screen.findByText(cap)).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "model-0" }));
+    expect(screen.queryByText(cap)).not.toBeInTheDocument();
   });
 });

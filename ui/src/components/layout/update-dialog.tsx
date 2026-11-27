@@ -153,13 +153,14 @@ export function binaryCommand(archive: ReleaseArchive): string {
 }
 
 /**
- * The method the How to update tab opens on: Docker Compose in a container (the image steps are
- * one tap away), the binary when the server runs outside one, Compose for a server that did not
- * say (older than the runtime fields).
+ * The method How to update recommends and opens on: Docker Compose in a container (the image
+ * steps are one tap away), the binary outside one when a release archive is built for its
+ * platform. None for a server that did not say (older than the runtime fields) or runs on a
+ * platform with no archive (the updater's "platform" reason); How to update then opens on Compose.
  */
-export function preferredMethod(server?: VersionResponse): UpdateMethod {
+export function preferredMethod(server?: VersionResponse): UpdateMethod | null {
   if (server?.docker) return "compose";
-  return server?.os ? "binary" : "compose";
+  return releaseArchive(server).known ? "binary" : null;
 }
 
 export function UpdateDialog({
@@ -489,7 +490,11 @@ function SelfUpdateCard({
             {t("shell.update.restarting")}
           </p>
           <p className="text-pretty text-muted-foreground text-sm leading-relaxed">
-            {t("shell.update.restartingNote", { latest: update.status?.installed ?? latest })}
+            {/* updater.BeginRestart: the restart runs the release in place, which the status names
+                (as installed while a later download's failure shows, then as its version). */}
+            {t("shell.update.restartingNote", {
+              latest: update.status?.installed ?? update.status?.version ?? latest,
+            })}
           </p>
         </div>
       );
@@ -600,7 +605,7 @@ const UPDATE_METHODS = [
 
 /**
  * The three ways to update as radio cards, opening on the one that fits this server
- * (preferredMethod, marked Recommended once the server has said what it runs on), then that
+ * (preferredMethod, marked Recommended when one fits what the server said it runs on), then that
  * way's steps. The binary steps name the archive for the server's own platform, which may not be
  * the browser's; its card says which.
  */
@@ -624,11 +629,11 @@ function HowToUpdate({
   const offered = UPDATE_METHODS.filter((item) => !methods || methods.includes(item.id));
   const preferred = preferredMethod(server);
   const [method, setMethod] = useState<UpdateMethod>(
-    offered.some((item) => item.id === preferred) ? preferred : (offered[0]?.id ?? "compose"),
+    preferred && offered.some((item) => item.id === preferred)
+      ? preferred
+      : (offered[0]?.id ?? "compose"),
   );
   const archive = releaseArchive(server);
-  // Only a server that reported its platform or container gets a recommendation.
-  const reported = Boolean(server?.docker || server?.os);
   const env = { env: "DATA_DIR" };
   const reload = t("shell.update.reload", { latest });
 
@@ -705,7 +710,7 @@ function HowToUpdate({
             title={
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 {t(item.label)}
-                {reported && item.id === preferred ? (
+                {item.id === preferred ? (
                   <Badge size="sm" tone="primary">
                     {t("shell.update.recommended")}
                   </Badge>

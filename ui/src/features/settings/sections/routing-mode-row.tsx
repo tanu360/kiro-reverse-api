@@ -1,11 +1,12 @@
 import type { JSX } from "react";
-import { SettingsRow } from "@/components/shared/settings-rows";
+import { ROW_DESCRIPTION, SettingsRow } from "@/components/shared/settings-rows";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
   isRoutingMode,
   ROUTING_MODE_LABEL,
   ROUTING_MODES,
+  useKeysWithOwnRoutingMode,
 } from "@/features/accounts/use-routing-mode";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -23,6 +24,7 @@ export function RoutingModeRow({ settings }: { settings: Settings }): JSX.Elemen
     isRoutingMode(settings.routingMode) ? settings.routingMode : "weighted",
     (routingMode) => ({ routingMode }),
   );
+  const ownModeKeys = useKeysWithOwnRoutingMode().length;
   return (
     <SettingsRow
       control={
@@ -65,6 +67,10 @@ export function RoutingModeRow({ settings }: { settings: Settings }): JSX.Elemen
         ) : null
       }
       title={t("routingMode.title")}
-    />
+    >
+      {ownModeKeys > 0 ? (
+        <p className={ROW_DESCRIPTION}>{t("routingMode.keysOverride", { count: ownModeKeys })}</p>
+      ) : null}
+    </SettingsRow>
   );
 }

@@ -45,7 +45,8 @@ import {
   usagePercent,
 } from "./account-model";
 import { TagBadges } from "./account-tags";
-import { useRoutingMode } from "./use-routing-mode";
+import { useAllowOverUsage } from "./use-allow-over-usage";
+import { useRoutingModeInUse } from "./use-routing-mode";
 
 /**
  * The one coloured pill of a row. Colour carries the meaning: red stops the account (a ban, no
@@ -83,7 +84,8 @@ export function StatusPill({
   const { t } = useT("accounts");
   // Re-renders once a minute: a token that expires turns the pill without a refetch.
   useMinuteClock();
-  const status = accountStatus(account, nowSec());
+  const allowOverUsage = useAllowOverUsage();
+  const status = accountStatus(account, nowSec(), allowOverUsage);
   const pill = STATUS_PILL[status];
   // The pool also writes a reason when it switches an account off (banStatus DISABLED).
   const held = status === "banned" || status === "suspended" || status === "disabled";
@@ -192,9 +194,10 @@ function PriorityFlag({ priority, label }: { priority: number; label: string }):
 }
 
 /**
- * Weight (or, with `showPriority` in the priority routing mode, the priority instead), an active
- * trial and overage, as quiet marks after the email. Nothing when plain. Only the Accounts page
- * passes `showPriority`, so other lists (the Overview) neither change nor fetch the routing mode.
+ * Weight (with `showPriority`, the priority and the weight each while some routing over the
+ * account reads it), an active trial and overage, as quiet marks after the email. Nothing when
+ * plain. Only the Accounts page passes `showPriority`, so other lists (the Overview) neither
+ * change nor fetch the routing modes.
  */
 export function AccountFlags({
   account,
@@ -210,15 +213,11 @@ export function AccountFlags({
   );
 }
 
+/** The priority and the weight each show while some routing over the account reads it. */
 function RoutedAccountFlags({ account }: { account: Account }): JSX.Element | null {
-  const mode = useRoutingMode();
-  return (
-    <FlagList
-      account={account}
-      priorityMode={mode === "priority"}
-      showWeight={mode === "weighted"}
-    />
-  );
+  const priority = useRoutingModeInUse("priority", account);
+  const weighted = useRoutingModeInUse("weighted", account);
+  return <FlagList account={account} priorityMode={priority} showWeight={weighted} />;
 }
 
 function FlagList({
@@ -228,7 +227,7 @@ function FlagList({
 }: {
   account: Account;
   priorityMode: boolean;
-  /** Off in the reset-first mode, where weight changes nothing. */
+  /** Off while no routing over the account is weighted: weight changes nothing then. */
   showWeight?: boolean;
 }): JSX.Element | null {
   const { t, lang } = useT("accounts");
@@ -244,7 +243,8 @@ function FlagList({
         priority={account.priority}
       />,
     );
-  } else if (showWeight && account.weight >= 2) {
+  }
+  if (showWeight && account.weight >= 2) {
     flags.push(
       <Flag icon={WeightIcon} key="weight" label={t("weightShort", { weight: account.weight })} />,
     );

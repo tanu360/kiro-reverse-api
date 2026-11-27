@@ -24,6 +24,7 @@ import {
 } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 import { MAX_NOTES, MAX_TAGS, normalizeTag, normalizeTags, tagKey } from "./account-metadata";
+import { isSuspended } from "./account-model";
 
 // Accounts endpoints over mockDb, with the Go server's semantics (research area-accounts §1).
 
@@ -106,16 +107,16 @@ function isBanned(account: Account): boolean {
   return account.banStatus !== "" && account.banStatus !== "ACTIVE";
 }
 
-/** enabled:true on a banned account resets the ban and the silent flags (Go apiUpdateAccount). */
+/** enabled:true lifts a hold and always clears the silent flags (Go apiUpdateAccount). */
 function enableAccount(account: Account): void {
   if (isBanned(account)) {
     account.banStatus = "ACTIVE";
     account.banReason = "";
     account.banTime = 0;
-    account.silent = false;
-    account.silentReason = "";
-    account.silentTime = 0;
   }
+  account.silent = false;
+  account.silentReason = "";
+  account.silentTime = 0;
   account.enabled = true;
 }
 
@@ -264,6 +265,7 @@ function duplicateGroups(): DuplicateGroup[] {
           enabled: account.enabled,
           healthy: healthy(account),
           banStatus: account.banStatus,
+          banReason: account.banReason,
           silent: account.silent,
           lastRefresh: account.lastRefresh,
           expiresAt: account.expiresAt,
@@ -405,7 +407,7 @@ export const handlers: HttpHandler[] = [
     if (action === "refresh") {
       const results = eachRequested(ids, (account) => {
         // The suspended branch marks the account instead of failing it.
-        if (account.banStatus === "SUSPENDED") {
+        if (isSuspended(account)) {
           account.enabled = false;
           return { ok: true, status: "suspended" };
         }
@@ -533,7 +535,7 @@ export const handlers: HttpHandler[] = [
     if (!account) return jsonError(404, "Account not found");
     await mockDelay();
     // The suspended branch marks the account and answers without `info`.
-    if (account.banStatus === "SUSPENDED") {
+    if (isSuspended(account)) {
       account.enabled = false;
       accountsChanged(account.id);
       return HttpResponse.json({ success: true, message: "Account status updated" });

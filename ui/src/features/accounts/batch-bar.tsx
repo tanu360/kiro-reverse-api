@@ -32,7 +32,7 @@ import { type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import type { ReportAccountFailure } from "./account-failure";
-import { describeFailures } from "./account-model";
+import { describeFailures, isBanned } from "./account-model";
 import { useInvalidateAccounts } from "./use-account-actions";
 
 /**
@@ -155,10 +155,33 @@ export function useBatchActions({
 
   const run = async (action: BatchAction) => {
     if (running || selectedIds.length === 0) return;
-    const ids = [...selectedIds];
+    // The row switch never turns a banned account on (signing in again lifts a ban), so Enable
+    // leaves the banned ones out too, though the server would clear their ban.
+    const banned = new Set(
+      action === "enable"
+        ? accounts
+            .filter((account) => selectedIds.includes(account.id) && isBanned(account))
+            .map((a) => a.id)
+        : [],
+    );
+    const ids = selectedIds.filter((id) => !banned.has(id));
+    if (ids.length === 0) {
+      report({
+        error: null,
+        message: t("batch.enableAllBanned", { count: banned.size }),
+        target: () => target(action),
+        accountIds: [...banned],
+      });
+      return;
+    }
     const ok = await confirm({
       title: t(CONFIRM_KEYS[action], { count: ids.length }),
-      description: action === "delete" ? t("confirmDelete.body") : undefined,
+      description:
+        action === "delete"
+          ? t("confirmDelete.body")
+          : banned.size > 0
+            ? t("batch.enableSkipsBanned", { count: banned.size })
+            : undefined,
       confirmLabel: t(`batch.verb.${action}`),
       variant: action === "disable" || action === "delete" ? "danger" : "default",
     });

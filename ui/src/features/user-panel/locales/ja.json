@@ -72,5 +72,6 @@
   "requests.description": "このキーで送信されたリクエストを新しい順に表示します。",
   "requests.caption": "最近のリクエスト",
   "requests.emptyTitle": "リクエストはまだありません",
-  "requests.emptyBody": "このキーで送信されたリクエストがここに表示されます。"
+  "requests.emptyBody": "このキーで送信されたリクエストがここに表示されます。",
+  "requests.pagingCap": "ページ送りで見られるのは最初の {max} 件までです。ほかのリクエストは並べ替えや絞り込みで表示してください。"
 }

@@ -1,5 +1,4 @@
-import { ShieldKeyIcon, TriangleAlertIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { ShieldKeyIcon } from "@hugeicons/core-free-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useRef, useState } from "react";
 import { ActionError } from "@/components/shared/action-error";
@@ -12,37 +11,44 @@ import {
   SwitchField,
 } from "@/components/shared/settings-rows";
 import { useDraftGuard } from "@/components/shared/use-draft-guard";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSavedFlash } from "@/hooks/use-saved-flash";
 import { announce } from "@/lib/announce";
 import { apiKeysQuery } from "@/lib/api/api-keys";
 import { queryKeys } from "@/lib/api/query-keys";
 import { settingsQuery, updateSettings } from "@/lib/api/settings";
+import { type TunnelStatus, tunnelQuery } from "@/lib/api/tunnel";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { countEnabledKeys } from "./api-key-form";
 
+function selectLinkOn(status: TunnelStatus): boolean {
+  return status.enabled;
+}
+
 /**
  * "Require an API key" (moved from the old Settings API card), as a Settings row. The switch is
  * a draft until Save, and leaving the page with an unsaved draft asks first.
- * The server refuses to require keys while none is enabled (409 api_key_lockout); the UI checks
- * first, so the warning shows here without a round trip.
+ * The server refuses to require keys while none is enabled (409 api_key_lockout): once the keys
+ * are loaded, the switch stays off then and says why. While keys load or failed, or when the last
+ * key goes after the switch was turned on, the server's refusal shows on Save.
  */
 export function ApiAccessCard(): JSX.Element {
   const { t } = useT("api");
   const queryClient = useQueryClient();
   const settings = useQuery(settingsQuery());
   const keys = useQuery(apiKeysQuery());
+  // Calls through the public link need a key even while keys are not required (proxy/auth.go).
+  const { data: linkOn } = useQuery({ ...tunnelQuery(), select: selectLinkOn });
   const [draft, setDraft] = useState<boolean | null>(null);
-  const [showKeyWarning, setShowKeyWarning] = useState(false);
   const savedFlash = useSavedFlash();
   const saveRef = useRef<HTMLButtonElement>(null);
 
   const saved = settings.data?.requireApiKey ?? false;
   const checked = draft ?? saved;
   const dirty = settings.data !== undefined && checked !== saved;
+  const locked = !saved && !checked && keys.data !== undefined && countEnabledKeys(keys.data) === 0;
 
   useDraftGuard(dirty, {
     message: {
@@ -70,12 +76,6 @@ export function ApiAccessCard(): JSX.Element {
 
   const onSave = () => {
     if (save.isPending || !dirty) return;
-    // Only once the keys are loaded: while they load or failed, the count is no answer.
-    if (checked && keys.data && countEnabledKeys(keys.data) === 0) {
-      setShowKeyWarning(true);
-      return;
-    }
-    setShowKeyWarning(false);
     save.mutate(checked);
   };
 
@@ -95,7 +95,13 @@ export function ApiAccessCard(): JSX.Element {
   }
 
   // The hint follows the switch; SaveFooter's "Unsaved changes" says when it is only a draft.
-  const hint = checked ? t("access.stateOn") : t("access.stateOff");
+  const hint = locked
+    ? t("access.enabledApiKeyRequired")
+    : checked
+      ? t("access.stateOn")
+      : linkOn
+        ? t("access.stateOffLink")
+        : t("access.stateOff");
 
   // Title-only header, as the Settings cards: the row itself says what the switch does.
   return (
@@ -131,37 +137,25 @@ export function ApiAccessCard(): JSX.Element {
         <SwitchField
           checked={checked}
           description={<span data-testid="api-access-state">{hint}</span>}
-          disabled={save.isPending}
+          disabled={locked || save.isPending}
           notice={
-            showKeyWarning || failed ? (
-              <>
-                {showKeyWarning ? (
-                  <Alert variant="warning">
-                    <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
-                    <AlertDescription>{t("access.enabledApiKeyRequired")}</AlertDescription>
-                  </Alert>
-                ) : null}
-                {/* The draft stays, so Try again sends it again; focus goes to Save as the notice
-                    goes. */}
-                {failed ? (
-                  <ActionError
-                    error={save.error}
-                    onDismiss={() => {
-                      save.reset();
-                      saveRef.current?.focus();
-                    }}
-                    onRetry={() => {
-                      saveRef.current?.focus();
-                      onSave();
-                    }}
-                  />
-                ) : null}
-              </>
+            // The draft stays, so Try again sends it again; focus goes to Save as the notice goes.
+            failed ? (
+              <ActionError
+                error={save.error}
+                onDismiss={() => {
+                  save.reset();
+                  saveRef.current?.focus();
+                }}
+                onRetry={() => {
+                  saveRef.current?.focus();
+                  onSave();
+                }}
+              />
             ) : null
           }
           onCheckedChange={(next) => {
             setDraft(next);
-            setShowKeyWarning(false);
             savedFlash.clear();
             save.reset();
           }}

@@ -73,5 +73,6 @@
   "requests.description": "Requests made with this key, newest first.",
   "requests.caption": "Recent requests",
   "requests.emptyTitle": "No requests yet",
-  "requests.emptyBody": "Requests made with this key appear here."
+  "requests.emptyBody": "Requests made with this key appear here.",
+  "requests.pagingCap": "Only the first {max} requests can be paged. Sort or filter to see others."
 }

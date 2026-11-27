@@ -153,7 +153,9 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
       <SwitchField
         checked={pending ?? overageEnabled(account)}
         description={t("detail.overageHint")}
-        disabled={!capable || toggle.isPending}
+        //! The server refuses only turning overage on for an account that is not capable
+        //! (apiSetAccountOverage): one that still has it on can always turn it off.
+        disabled={(!capable && !overageEnabled(account)) || toggle.isPending}
         onCheckedChange={(checked) => toggle.mutate(checked)}
         status={
           toggle.isPending ? (

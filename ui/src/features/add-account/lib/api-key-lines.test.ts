@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseApiKeyLines } from "./api-key-lines";
+import { keyRegion, parseApiKeyLines } from "./api-key-lines";
 
 describe("parseApiKeyLines", () => {
   it("trims every line and skips blank ones", () => {
@@ -23,5 +23,16 @@ describe("parseApiKeyLines", () => {
 
   it("returns nothing for blank input", () => {
     expect(parseApiKeyLines(" \n \n", "us-east-1")).toEqual([]);
+  });
+});
+
+describe("keyRegion", () => {
+  it("reads the region after the bar, trimmed and lowercased as the server does", () => {
+    expect(keyRegion("ksk_a|EU-Central-1 ")).toBe("eu-central-1");
+    expect(keyRegion("ksk_a| ap-northeast-1")).toBe("ap-northeast-1");
+  });
+
+  it("is null for a key without a bar", () => {
+    expect(keyRegion("ksk_plain")).toBeNull();
   });
 });

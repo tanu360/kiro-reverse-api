@@ -454,8 +454,8 @@ export function seedAccounts(): Account[] {
       profileArn: DEFAULT_PROFILE,
       machineId: machine(),
       enabled: false,
-      banStatus: "SUSPENDED",
-      banReason: "TEMPORARILY_SUSPENDED",
+      banStatus: "BANNED",
+      banReason: "AWS temporarily suspended - unusual user activity detected",
       banTime: now - 5 * HOUR,
       expiresAt: now + 20 * 60,
       subscriptionType: "Q_DEVELOPER_STANDALONE_PRO_PLUS",
@@ -1474,6 +1474,7 @@ export function defaultSettings(): Settings {
     imageResizeMaxKB: 400,
     logLevel: "info",
     logLevelFromEnv: false,
+    adminPasswordFromEnv: false,
   };
 }
 

@@ -76,16 +76,19 @@ function seedKey(form: ScheduleForm): string {
 /** The cadence Select; the row's title and description name and describe its trigger. */
 function FrequencySelect({
   value,
+  disabled,
   onValueChange,
   ...aria
 }: RowAria & {
   value: BackupCadence;
+  disabled: boolean;
   onValueChange: (value: BackupCadence) => void;
 }): JSX.Element {
   const { t } = useT("backups");
   const items = CADENCES.map((cadence) => ({ value: cadence, label: t(cadence) }));
   return (
     <Select
+      disabled={disabled}
       items={items}
       onValueChange={(next) => {
         if (next) onValueChange(next as BackupCadence);
@@ -114,16 +117,19 @@ function KeepField({
   id,
   value,
   max,
+  disabled,
   onValueChange,
   ...aria
 }: RowAria & {
   id: string;
   value: number | null;
   max: number;
+  disabled: boolean;
   onValueChange: (value: number | null) => void;
 }): JSX.Element {
   return (
     <NumberField
+      disabled={disabled}
       id={id}
       max={max}
       min={KEEP_MIN}
@@ -219,16 +225,18 @@ function PruneFailedNotice({
 /**
  * A row whose value the server can reject: the Field round it marks the control invalid and adds
  * the error to the control's description. The error goes under the whole row (text and control),
- * at the row's width and padding, not into the text column.
+ * at the row's width and padding, not into the text column. `disabled` turns the whole row off.
  */
 function FieldRow({
   error,
+  disabled,
   ...row
 }: Omit<ComponentProps<typeof SettingsRow>, "children" | "className"> & {
   error?: string;
+  disabled: boolean;
 }): JSX.Element {
   return (
-    <Field className="items-stretch gap-0" invalid={error !== undefined}>
+    <Field className="items-stretch gap-0" disabled={disabled} invalid={error !== undefined}>
       <SettingsRow {...row} notice={error ? <FieldError match>{error}</FieldError> : null} />
     </Field>
   );
@@ -385,12 +393,24 @@ function ScheduleFormCard({
         <SwitchField
           checked={enabled}
           description={<RunTimes schedule={schedule} />}
-          onCheckedChange={setEnabled}
+          onCheckedChange={(next) => {
+            setEnabled(next);
+            // Off, the fields cannot be edited: they go back to what is saved, so Save keeps that
+            // and an edit made while the schedule was on does not count.
+            if (!next) {
+              setCadence(initial.cadence);
+              setKeep(initial.keep);
+              setInvalid(null);
+            }
+          }}
           title={t("scheduleEnabled")}
         />
         <FieldRow
           control={
+            // proxy/backup_scheduler.go: a schedule that is off neither runs nor prunes, so its
+            // frequency and keep do nothing until it is on.
             <FrequencySelect
+              disabled={!enabled}
               onValueChange={(value) => {
                 if (invalid === "cadence") setInvalid(null);
                 setCadence(value);
@@ -399,12 +419,15 @@ function ScheduleFormCard({
             />
           }
           controlWidth="number"
+          description={enabled ? undefined : t("scheduleOffHint")}
+          disabled={!enabled}
           error={invalid === "cadence" ? invalidMessage("cadence") : undefined}
           title={t("frequency")}
         />
         <FieldRow
           control={
             <KeepField
+              disabled={!enabled}
               id={keepId}
               max={keepMax(initial.keep)}
               onValueChange={(value) => {
@@ -415,7 +438,8 @@ function ScheduleFormCard({
             />
           }
           controlWidth="number"
-          description={t("keepHint")}
+          description={enabled ? t("keepHint") : t("scheduleOffHint")}
+          disabled={!enabled}
           error={invalid === "keep" ? invalidMessage("keep") : undefined}
           htmlFor={keepId}
           title={t("keepTitle")}

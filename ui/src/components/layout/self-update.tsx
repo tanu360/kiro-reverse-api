@@ -36,6 +36,16 @@ export type SelfUpdatePhase =
   | "restarting"
   | "error";
 
+/**
+ * Where the server's update stands for `target`. A release put in place before `target` came out
+ * reads as idle: a restart would run that older one, and updater.Start downloads `target` over it.
+ */
+export function serverPhase(status: UpdateStatus | undefined, target: string): SelfUpdatePhase {
+  const state = status?.state ?? "idle";
+  if (state === "ready" && status?.version && status.version !== target) return "idle";
+  return state;
+}
+
 export interface SelfUpdate {
   /** The server's answer; undefined until it is in, and never asked of a server in a container. */
   status: UpdateStatus | undefined;
@@ -130,14 +140,15 @@ export function useSelfUpdateController({
 
   // A download the server refused (or never got) fails here; once the server reports a download
   // under way or in place (another tab started it), that wins.
-  const startFailed = begin.isError && (status?.state ?? "idle") === "idle";
+  const onServer = serverPhase(status, target);
+  const startFailed = begin.isError && onServer === "idle";
   const phase: SelfUpdatePhase = restarting
     ? "restarting"
     : restartError || startFailed
       ? "error"
       : begin.isPending
         ? "starting"
-        : (status?.state ?? "idle");
+        : onServer;
   const startError = startFailed ? errorMessage(begin.error, t) : undefined;
   const error = restartError ?? startError ?? (status ? updateErrorText(status, t) : undefined);
 

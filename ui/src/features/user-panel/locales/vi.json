@@ -72,5 +72,6 @@
   "requests.description": "Các yêu cầu gửi bằng key này, mới nhất trước.",
   "requests.caption": "Yêu cầu gần đây",
   "requests.emptyTitle": "Chưa có yêu cầu",
-  "requests.emptyBody": "Các yêu cầu gửi bằng key này sẽ hiển thị ở đây."
+  "requests.emptyBody": "Các yêu cầu gửi bằng key này sẽ hiển thị ở đây.",
+  "requests.pagingCap": "Chỉ phân trang được {max} yêu cầu đầu tiên. Sắp xếp hoặc lọc để xem các yêu cầu khác."
 }

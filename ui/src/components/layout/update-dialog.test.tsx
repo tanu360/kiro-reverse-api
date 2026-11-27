@@ -146,11 +146,15 @@ describe("release archive", () => {
 });
 
 describe("preferredMethod", () => {
-  it("opens Compose in a container, the binary outside one, Compose when unknown", () => {
+  it("recommends Compose in a container and the binary outside one", () => {
     expect(preferredMethod({ ...LINUX, docker: true })).toBe("compose");
     expect(preferredMethod(LINUX)).toBe("binary");
-    expect(preferredMethod({ version: "2.1.0" })).toBe("compose");
-    expect(preferredMethod(undefined)).toBe("compose");
+  });
+
+  it("recommends nothing when the server did not say, or no archive is built for its platform", () => {
+    expect(preferredMethod({ version: "2.1.0" })).toBeNull();
+    expect(preferredMethod(undefined)).toBeNull();
+    expect(preferredMethod({ version: "2.1.0", os: "freebsd", arch: "amd64" })).toBeNull();
   });
 });
 
@@ -321,9 +325,14 @@ describe("UpdateDialog", () => {
     );
   });
 
-  it("points at the linux-x64 archive and says how to pick another when the platform is unknown", async () => {
-    renderDialog({ changelog: "", server: { version: "2.1.0", os: "freebsd", arch: "amd64" } });
-    await screen.findByRole("radio", { name: /^Binary/, checked: true });
+  it("recommends no binary for a platform with no archive, and its steps say how to pick one", async () => {
+    const { user } = renderDialog({
+      changelog: "",
+      server: { version: "2.1.0", os: "freebsd", arch: "amd64", docker: false },
+    });
+    expect(await screen.findByRole("radio", { name: /^Docker Compose/ })).toBeChecked();
+    expect(screen.queryByText("Recommended")).toBeNull();
+    await user.click(screen.getByRole("radio", { name: /^Binary/ }));
     expect(screen.getByText(/For another platform, use its archive/)).toBeInTheDocument();
   });
 
@@ -419,7 +428,24 @@ describe("UpdateDialog self-update", () => {
   it("says it is restarting, with no other action", async () => {
     renderSelfUpdate(selfUpdate({ phase: "restarting" }));
     expect(await screen.findByText("Restarting…")).toBeInTheDocument();
+    expect(
+      screen.getByText("This page reloads once the proxy is back on 2.2.0."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Update by hand instead" })).toBeNull();
+  });
+
+  // updater.BeginRestart: after a later download failed, the restart runs the release still in
+  // place, and the status names it as its version (installed is gone).
+  it("names the release it restarts into, not the newest", async () => {
+    renderSelfUpdate(
+      selfUpdate({
+        phase: "restarting",
+        status: { state: "restarting", supported: true, version: "2.1.5" },
+      }),
+    );
+    expect(
+      await screen.findByText("This page reloads once the proxy is back on 2.1.5."),
+    ).toBeInTheDocument();
   });
 
   it("shows why it failed and tries again", async () => {

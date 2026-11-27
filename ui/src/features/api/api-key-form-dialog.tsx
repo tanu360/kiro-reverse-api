@@ -438,9 +438,16 @@ function RoutingSelect({ form, ...aria }: AriaProps & { form: KeyForm }): JSX.El
   );
 }
 
-/** How the key's requests pick an account; the select under the text, at the row's width. */
+/**
+ * How the key's requests pick an account; the select under the text, at the row's width. A key
+ * limited to one account has nothing to pick from: the mode stays editable, with a note, for
+ * when more accounts are added.
+ */
 function RoutingRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.Element {
   const { t } = useT("api");
+  const { accountScope, accountIds, accountTags } = form.values;
+  const oneAccount =
+    accountScope === "selected" && accountIds.length === 1 && accountTags.length === 0;
   return (
     <SettingsRow
       className={rowClass(place)}
@@ -448,7 +455,14 @@ function RoutingRow({ form, place }: { form: KeyForm; place: RowPlace }): JSX.El
       control={<RoutingSelect form={form} />}
       // Under the text: "Same as Settings (Reset first)" is too long to sit beside it.
       controlWidth="block"
-      description={t("form.routingModeShort")}
+      description={
+        oneAccount
+          ? t("common:text.joinSentences", {
+              first: t("form.routingModeShort"),
+              second: t("form.routingOneAccount"),
+            })
+          : t("form.routingModeShort")
+      }
       title={t("form.routingMode")}
     />
   );

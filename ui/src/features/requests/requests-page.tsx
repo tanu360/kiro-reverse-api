@@ -347,6 +347,7 @@ export function RequestsPage(): JSX.Element {
       <SteppedRequestSheet
         getKey={rowKey}
         onShowConversation={showConversation}
+        persistent={data?.persistent !== false}
         ref={sheet}
         rows={rows}
       />

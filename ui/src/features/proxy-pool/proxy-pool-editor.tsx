@@ -103,6 +103,7 @@ export function ProxyEditor({
   const id = useId();
   const editing = proxy !== undefined;
   const [model, setModel] = useState<EditorModel>(() => editorModel(proxy));
+  const hasUsername = model.proxy.username.trim() !== "";
   const [showErrors, setShowErrors] = useState(false);
   const errors = editorErrors(model);
   const update = (proxyModel: ProxyModel) => setModel((prev) => ({ ...prev, proxy: proxyModel }));
@@ -261,19 +262,23 @@ export function ProxyEditor({
               </Field>
               <Field className="min-w-0 items-stretch">
                 <FieldLabel>{t("settings:proxyPassword")}</FieldLabel>
+                {/* proxypool/url.go refuses a password without a username, and editorRequest drops
+                    one: the field waits for a username. */}
                 <PasswordInput
                   maxLength={255}
                   autoComplete="new-password"
-                  disabled={model.clearPassword}
+                  disabled={model.clearPassword || !hasUsername}
                   onChange={(password) => update({ ...model.proxy, password })}
                   value={model.proxy.password}
                 />
-                {proxy?.hasPassword ? (
+                {!hasUsername ? (
+                  <FieldDescription>{t("editor.passwordNeedsUsername")}</FieldDescription>
+                ) : proxy?.hasPassword ? (
                   <FieldDescription>{t("editor.passwordKeep")}</FieldDescription>
                 ) : null}
               </Field>
             </div>
-            {proxy?.hasPassword ? (
+            {proxy?.hasPassword && hasUsername ? (
               <Label className="self-start" variant="option">
                 <Checkbox
                   checked={model.clearPassword}

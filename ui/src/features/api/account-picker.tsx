@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { accountMeta, useAccountName } from "@/features/accounts/account-cells";
 import { tagKey } from "@/features/accounts/account-metadata";
+import { inRotation } from "@/features/accounts/account-model";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { Account } from "@/lib/api/types";
 import { compareText, formatNumber } from "@/lib/format";
@@ -72,7 +73,8 @@ interface AccountPicksProps {
  *
  * Tags pick accounts too: every account carrying a picked tag joins the picked ones, now and
  * whenever an account is tagged later. A picked tag no account carries stays listed with a
- * warning, as such a key gets no account at all.
+ * warning, as such a key gets no account at all. Picks that reach no account in rotation get a
+ * warning too: every request with the key fails then.
  */
 export function AccountPicks({
   selected,
@@ -124,9 +126,13 @@ export function AccountPicks({
   };
   const reached = scopedAccountIds(list, selected, tags);
   const reachedKnown = [...reached].filter((id) => known.has(id)).length;
+  const noneEnabled =
+    loaded &&
+    selected.length + tags.length > 0 &&
+    !list.some((account) => inRotation(account) && reached.has(account.id));
 
   const description = (account: Account) =>
-    [accountMeta(account, ta), account.enabled ? "" : t("form.accountsDisabled")]
+    [accountMeta(account, ta), inRotation(account) ? "" : t("form.accountsDisabled")]
       .filter(Boolean)
       .join(" · ");
 
@@ -213,6 +219,12 @@ export function AccountPicks({
               })}
             </div>
           </ScrollArea>
+          {/* The other tags' boxes turn off at the cap (config.MaxAccountTags). */}
+          {tags.length >= MAX_KEY_TAGS ? (
+            <p className="text-muted-foreground text-xs leading-normal">
+              {t("form.tagsAtMax", { max: MAX_KEY_TAGS })}
+            </p>
+          ) : null}
         </fieldset>
       ) : null}
       <InputGroup>
@@ -239,18 +251,23 @@ export function AccountPicks({
       ) : null}
       {rows}
       {loaded ? (
-        <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-          {tags.length > 0
-            ? t("form.accountsReachedCount", {
-                count: list.length,
-                n: formatNumber(reachedKnown, lang),
-                total: formatNumber(list.length, lang),
-              })
-            : t("form.accountsSelectedCount", {
-                n: formatNumber(selected.length, lang),
-                total: formatNumber(list.length + removed.length, lang),
-              })}
-        </p>
+        <div aria-live="polite" className="flex flex-col gap-1 text-xs leading-normal">
+          <p className="text-muted-foreground tabular-nums">
+            {tags.length > 0
+              ? t("form.accountsReachedCount", {
+                  count: list.length,
+                  n: formatNumber(reachedKnown, lang),
+                  total: formatNumber(list.length, lang),
+                })
+              : t("form.accountsSelectedCount", {
+                  n: formatNumber(selected.length, lang),
+                  total: formatNumber(list.length + removed.length, lang),
+                })}
+          </p>
+          {noneEnabled ? (
+            <p className="text-warning-foreground">{t("form.accountsNoneEnabled")}</p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

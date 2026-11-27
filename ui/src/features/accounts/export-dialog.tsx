@@ -34,6 +34,7 @@ import {
   type StatusGroup,
   statusGroup,
 } from "./account-model";
+import { useAllowOverUsage } from "./use-allow-over-usage";
 
 type ExportTask = "copy" | "download";
 type QuickGroup = "all" | StatusGroup;
@@ -144,12 +145,16 @@ export const ExportDialog = memo(function ExportDialog({
   }
 
   // The status of every account, for the quick picks: All, Active, Needs attention, Disabled.
+  const allowOverUsage = useAllowOverUsage();
   const groups = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
     return new Map(
-      accounts.map((account) => [account.id, statusGroup(accountStatus(account, now))]),
+      accounts.map((account) => [
+        account.id,
+        statusGroup(accountStatus(account, now, allowOverUsage)),
+      ]),
     );
-  }, [accounts]);
+  }, [accounts, allowOverUsage]);
   // Each quick pick's ids, once per list instead of on every render and click.
   const groupIdLists = useMemo(
     () =>

@@ -24,7 +24,7 @@ import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { STATUS_PILL } from "./account-cells";
-import { authLabel, isApiKeyAccount, isBanned, isHeld } from "./account-model";
+import { authLabel, isApiKeyAccount, isBanned, isHeld, isSuspended } from "./account-model";
 
 /** A group's identity across refetches: its account ids, in order. */
 function groupKey(group: DuplicateGroup): string {
@@ -40,7 +40,7 @@ export function unusableStatus(
   account: DuplicateAccount,
 ): "banned" | "suspended" | "disabled" | "noToken" | null {
   if (account.healthy) return null;
-  if (isBanned(account)) return account.banStatus === "SUSPENDED" ? "suspended" : "banned";
+  if (isBanned(account)) return isSuspended(account) ? "suspended" : "banned";
   if (!account.enabled || account.silent || isHeld(account)) return "disabled";
   return "noToken";
 }

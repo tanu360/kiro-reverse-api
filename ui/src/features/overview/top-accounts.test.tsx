@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import type { Account } from "@/lib/api/types";
+import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
@@ -72,5 +74,38 @@ describe("TopAccounts", () => {
     await waitFor(() =>
       expect(within(rows[1]).getByRole("button", { name: "More actions" })).toHaveFocus(),
     );
+  });
+
+  it("reads Cooling down for an active account the pool skips, as the Accounts page does", async () => {
+    const base = mockDb.accounts.find(
+      (item) => item.enabled && item.hasToken && item.authMethod !== "api_key",
+    );
+    if (!base) throw new Error("fixture has no signed-in account");
+    const cooling: Account = {
+      ...base,
+      id: "cooling",
+      banStatus: "",
+      banReason: "",
+      silent: false,
+      expiresAt: 4_000_000_000,
+      usageCurrent: 0,
+      usageLimit: 50,
+    };
+    mockServer.use(
+      http.get(apiUrl("/accounts"), () => HttpResponse.json([cooling])),
+      http.get(apiUrl("/observe/account-activity"), () =>
+        HttpResponse.json({
+          nowUnix: 1_800_000_000,
+          dayStartUnix: 1_799_990_000,
+          rpmLimit: 0,
+          accounts: { cooling: { today: 4, rpm: 0, atLimit: false, cooldownUntil: 1_800_000_045 } },
+        }),
+      ),
+    );
+    const { rows } = await renderCard();
+    expect(
+      await within(rows[0]).findByRole("button", { name: /^Cooling down/ }),
+    ).toBeInTheDocument();
+    expect(within(rows[0]).queryByText("Active")).not.toBeInTheDocument();
   });
 });

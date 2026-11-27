@@ -10,7 +10,7 @@ import { copyText } from "@/lib/clipboard";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { type AccountFailure, useAccountFailurePlace } from "./account-failure";
-import { buildCopyJson } from "./account-model";
+import { buildCopyJson, isHeld } from "./account-model";
 
 /** The control an action came from, for focus when its failure notice goes. */
 type Target = () => HTMLElement | null | undefined;
@@ -46,27 +46,46 @@ function useFailures() {
 }
 
 /**
- * PUT {enabled} with an optimistic list update; an error reverts the row and is said in the
- * card, where Try again sends the same state again.
+ * The row as the server leaves it after PUT {enabled} (apiUpdateAccount): turning an account on
+ * also lifts its hold and its silence, so it is back in rotation.
+ */
+function withEnabled(account: Account, enabled: boolean): Account {
+  if (!enabled) return { ...account, enabled };
+  return {
+    ...account,
+    enabled,
+    silent: false,
+    banStatus: isHeld(account) ? "ACTIVE" : account.banStatus,
+  };
+}
+
+/**
+ * PUT {enabled} with an optimistic list update; an error puts the row back as it was and is said
+ * in the card, where Try again sends the same state again.
  */
 export function useToggleEnabled(account: Account, target?: Target) {
   const queryClient = useQueryClient();
   const invalidate = useInvalidateAccounts();
   const failures = useFailures();
   const listKey = queryKeys.accounts.list();
-  const setEnabled = (enabled: boolean) =>
+  const replaceRow = (next: (item: Account) => Account) =>
     queryClient.setQueryData<Account[]>(listKey, (list) =>
-      list?.map((item) => (item.id === account.id ? { ...item, enabled } : item)),
+      list?.map((item) => (item.id === account.id ? next(item) : item)),
     );
   const mutation = useMutation({
     mutationFn: (enabled: boolean) => updateAccount(account.id, { enabled }),
     onMutate: async (enabled) => {
       failures.clear();
       await queryClient.cancelQueries({ queryKey: listKey });
-      setEnabled(enabled);
+      const before = queryClient
+        .getQueryData<Account[]>(listKey)
+        ?.find((item) => item.id === account.id);
+      replaceRow((item) => withEnabled(item, enabled));
+      return { before };
     },
-    onError: (error, enabled) => {
-      setEnabled(!enabled);
+    onError: (error, enabled, context) => {
+      const before = context?.before;
+      if (before) replaceRow(() => before);
       failures.fail({
         error,
         retry: () => mutation.mutate(enabled),
@@ -81,9 +100,10 @@ export function useToggleEnabled(account: Account, target?: Target) {
 
 /**
  * Token and usage refresh. The answer may lack `info` (suspended branch), so it only refetches.
- * The row's refresh control spins meanwhile; the new expiry and status show the result.
+ * The row's refresh control spins meanwhile; the new expiry and status show the result. A Kiro API
+ * key (`apiKey`) has no token to refresh: only its usage is read again (refreshAccountNow).
  */
-export function useRefreshAccount(accountId: string, target?: Target) {
+export function useRefreshAccount(accountId: string, target?: Target, apiKey = false) {
   const { t } = useT("accounts");
   const invalidate = useInvalidateAccounts();
   const failures = useFailures();
@@ -91,7 +111,7 @@ export function useRefreshAccount(accountId: string, target?: Target) {
     mutationFn: () => refreshAccount(accountId),
     onMutate: () => failures.clear(),
     onSuccess: () => {
-      announce(t("refreshSuccess"));
+      announce(t(apiKey ? "refreshUsageSuccess" : "refreshSuccess"));
       return invalidate();
     },
     onError: (error) => {

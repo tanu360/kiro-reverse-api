@@ -19,6 +19,7 @@ import (
 	"kiro-proxy/updater"
 	"math"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -3109,13 +3110,18 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 
-	oldEnabled := existing.Enabled
+	//! Back in rotation is what needs fresh models: turning on a silenced account counts too.
+	wasInRotation := config.InRotation(*existing)
 	if v, ok := updates["enabled"].(bool); ok {
 		existing.Enabled = v
 		if v && existing.BanStatus != "" && existing.BanStatus != "ACTIVE" {
 			existing.BanStatus = "ACTIVE"
 			existing.BanReason = ""
 			existing.BanTime = 0
+		}
+		//! The pool leaves out every silent account (config.GetEnabledAccounts): turning one on
+		//! clears it, as the batch Enable does, or it reads as on while no request reaches it.
+		if v {
 			existing.Silent = false
 			existing.SilentReason = ""
 			existing.SilentTime = 0
@@ -3163,7 +3169,7 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 
 	h.pool.Reload()
 
-	if !oldEnabled && existing.Enabled && existing.AccessToken != "" {
+	if !wasInRotation && config.InRotation(*existing) && existing.AccessToken != "" {
 		go func(acc config.Account) {
 			if err := h.fetchAndCacheAccountModels(&acc); err != nil {
 				logger.Warnf("[ModelsCache] Auto-refresh failed for re-enabled account %s: %v", acc.Email, err)
@@ -3351,7 +3357,7 @@ func (h *Handler) batchSetEnabled(w http.ResponseWriter, ids []string, enabled b
 	matched, slots, results := matchAccounts(ids)
 	var toRefreshModels []config.Account
 	for i, a := range matched {
-		wasEnabled := a.Enabled
+		wasInRotation := config.InRotation(a)
 		a.Enabled = enabled
 		if enabled {
 			if a.BanStatus != "" && a.BanStatus != "ACTIVE" {
@@ -3370,7 +3376,7 @@ func (h *Handler) batchSetEnabled(w http.ResponseWriter, ids []string, enabled b
 			continue
 		}
 		results[slots[i]].OK = true
-		if enabled && !wasEnabled && a.AccessToken != "" {
+		if !wasInRotation && config.InRotation(a) && a.AccessToken != "" {
 			toRefreshModels = append(toRefreshModels, a)
 		}
 	}
@@ -4043,6 +4049,10 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 
 		"logLevel":        logLevel,
 		"logLevelFromEnv": logLevelFromEnv,
+
+		//! ADMIN_PASSWORD puts its password back at every start (main.go), so a password changed
+		//! here lasts only until the next restart.
+		"adminPasswordFromEnv": os.Getenv("ADMIN_PASSWORD") != "",
 	})
 }
 

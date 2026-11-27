@@ -10,6 +10,7 @@
   "regionInvalid": "us-east-1 のようなリージョンを入力してください。",
   "relogin.title": "再サインイン",
   "relogin.target": "{name} として再サインインします。アカウントのニックネーム、メモ、タグ、優先度、重み、プロキシ、統計、履歴は保持されます。",
+  "relogin.staysOff": "アカウントはオフのままです。ローテーションに戻すには、サインイン後にオンにしてください。",
   "relogin.submit": "再サインイン",
   "relogin.success": "{name} の再サインインが完了しました。",
   "relogin.singleOnly": "再サインインに使える認証情報は 1 つだけです。1 つだけ貼り付けてください。",
@@ -145,6 +146,7 @@
   "apikey.keysHint": "1 行に 1 つ入力します。キーにリージョンを指定する場合の形式：{example}",
   "apikey.regionHint": "リージョン接尾辞のないキーに使用します：",
   "apikey.keyMissing": "Kiro API キーを 1 つ以上入力してください。",
+  "apikey.regionUnsupported": "Kiro API キーは {regions} でのみ使用でき、{region} では使用できません。",
   "group.signIn": "サインイン",
   "group.import": "インポート"
 }

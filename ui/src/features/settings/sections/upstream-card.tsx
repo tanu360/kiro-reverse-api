@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { queryKeys } from "@/lib/api/query-keys";
-import { updateUpstreamConfig, upstreamQuery } from "@/lib/api/settings";
+import { endpointQuery, updateUpstreamConfig, upstreamQuery } from "@/lib/api/settings";
 import type { ApiDomain, UpstreamConfig } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { regionChars } from "@/lib/input-filters";
@@ -191,6 +191,16 @@ function UpstreamForm({ config }: { config: UpstreamConfig }): JSX.Element {
   };
 
   const host = effectiveHost(draft.value.apiDomain, draft.value.apiRegion);
+  // With every account on CreateResponse, chat goes to runtime.<region>.kiro.dev whatever the
+  // domain (proxy/kiro_responses.go); the domain then only moves web search.
+  const chatOnResponses = useQuery(endpointQuery()).data?.chatApi === "responses";
+  const autoRegion = draft.value.apiRegion === AUTO_REGION;
+  let hostLine = autoRegion ? "upstream.effectiveHostAuto" : "upstream.effectiveHost";
+  if (chatOnResponses) {
+    hostLine = autoRegion
+      ? "upstream.effectiveHostResponsesAuto"
+      : "upstream.effectiveHostResponses";
+  }
   return (
     <SettingsSection
       footer={
@@ -219,16 +229,7 @@ function UpstreamForm({ config }: { config: UpstreamConfig }): JSX.Element {
         description={t("upstream.domainHint")}
         title={t("upstream.domain")}
       >
-        <p className={ROW_DESCRIPTION}>
-          {fillNodes(
-            t(
-              draft.value.apiRegion === AUTO_REGION
-                ? "upstream.effectiveHostAuto"
-                : "upstream.effectiveHost",
-            ),
-            { host: <Code>{host}</Code> },
-          )}
-        </p>
+        <p className={ROW_DESCRIPTION}>{fillNodes(t(hostLine), { host: <Code>{host}</Code> })}</p>
       </SettingsRow>
       <SettingsRow
         control={

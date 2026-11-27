@@ -454,6 +454,31 @@ describe("empty and partial data", () => {
     expect(within(statusTabs).getByRole("tab", { selected: true })).toHaveFocus();
   });
 
+  it("pages only as deep as the server reads, and says so", async () => {
+    // The server reads at most 10,000 of the key's rows (proxy/user_api.go maxUserRequestsRows)
+    // and answers a deeper page with the last one within them; its total is uncapped.
+    const rows = Array.from({ length: 10 }, (_, index) => row({ requestId: `req_${index}` }));
+    serve({ requests: requestsBody(rows, 25_000) });
+    await renderPanel();
+    await tableRows();
+    expect(screen.getByRole("button", { name: "Page 1,000" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Page 2,500" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Only the first 10,000 requests can be paged. Sort or filter to see others.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing of the paging depth while every request fits in it", async () => {
+    const rows = Array.from({ length: 10 }, (_, index) => row({ requestId: `req_${index}` }));
+    serve({ requests: requestsBody(rows, 10_000) });
+    await renderPanel();
+    await tableRows();
+    expect(screen.getByRole("button", { name: "Page 1,000" })).toBeInTheDocument();
+    expect(screen.queryByText(/can be paged/)).not.toBeInTheDocument();
+  });
+
   it("turns the badge and notice to expired when the expiry passes on an open page", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const expiresAt = Math.floor(Date.now() / 1000) + 10;

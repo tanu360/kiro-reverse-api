@@ -210,6 +210,35 @@ describe("AccountDetailSheet", () => {
     expect(within(row).queryByText("Leave empty to use the global proxy.")).toBeNull();
   });
 
+  it("shows the fallback, or that requests fail, while no pool proxy can be used", async () => {
+    onTestFinished(resetProxyPoolMock);
+    const off = {
+      id: "px_off",
+      label: "Tokyo",
+      url: "socks5://10.1.0.1:1080",
+      username: "",
+      password: "",
+      createdAt: 0,
+      enabled: false,
+      health: { status: "ok" as const, latencyMs: 90 },
+    };
+    mockDb.proxy.proxyURL = "";
+    seedProxyPoolMock({ mode: "on", directFallback: true, proxies: [off] });
+    const first = await openSheet(dana());
+    const facts = section(first.sheet, "Account");
+    expect(await within(facts).findByText("Fallback")).toBeInTheDocument();
+    expect(within(facts).getByText("Direct")).toBeInTheDocument();
+    first.unmount();
+
+    seedProxyPoolMock({ mode: "on", directFallback: false, proxies: [off] });
+    const { sheet } = await openSheet(dana());
+    expect(
+      await within(section(sheet, "Account")).findByText(
+        "No pool proxy can be used and the fallback is off: requests fail.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("reverts the overage switch when AWS fails", async () => {
     mockServer.use(
       http.post(apiUrl("/accounts/:id/overage"), () => jsonError(502, "upstream timeout")),
@@ -232,6 +261,47 @@ describe("AccountDetailSheet", () => {
       within(overage).getByRole("switch", { name: "Enable overage upstream" }),
     ).toHaveAttribute("data-disabled");
     expect(within(overage).getByText("Not available for this account")).toBeInTheDocument();
+  });
+
+  it("still lets overage be turned off on an account that is not capable (the server only refuses on)", async () => {
+    const account = notCapable();
+    account.overageStatus = "ENABLED";
+    const bodies = capture("post", "/accounts/:id/overage");
+    const { sheet, user } = await openSheet(account);
+    const overage = section(sheet, "Overage (AWS)");
+    const toggle = within(overage).getByRole("switch", { name: "Enable overage upstream" });
+    expect(toggle).not.toHaveAttribute("data-disabled");
+    await user.click(toggle);
+    await waitFor(() => expect(bodies).toEqual([{ enabled: false }]));
+  });
+
+  it("offers Refresh usage and no token expiry for a Kiro API key, which has no token to refresh", async () => {
+    const { sheet } = await openSheet(apiKeyAccount());
+    expect(within(sheet).getByRole("button", { name: "Refresh usage" })).toBeInTheDocument();
+    expect(within(sheet).queryByRole("button", { name: "Refresh token" })).not.toBeInTheDocument();
+    const facts = section(sheet, "Account");
+    expect(within(facts).queryByText("Token expiry")).not.toBeInTheDocument();
+  });
+
+  it("notes the API region in Settings beside a Kiro API key's own region", async () => {
+    mockDb.upstream = { ...mockDb.upstream, apiRegion: "eu-central-1" };
+    const { sheet } = await openSheet(apiKeyAccount());
+    expect(
+      await within(section(sheet, "Account")).findByText(
+        "Requests go to eu-central-1, the API region in Settings.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("notes the sign-in region in Settings for a Builder ID or Identity Center account", async () => {
+    mockDb.upstream = { ...mockDb.upstream, authRegion: "eu-west-1" };
+    const account = accountBy((a) => ["idc", "IdC"].includes(a.authMethod));
+    const { sheet } = await openSheet(account);
+    expect(
+      await within(section(sheet, "Account")).findByText(
+        "Tokens refresh in eu-west-1, the sign-in region in Settings.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("hides the Kiro profile section for sign-ins without profiles", async () => {

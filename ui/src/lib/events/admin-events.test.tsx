@@ -313,8 +313,12 @@ describe("change events", () => {
     ]);
   });
 
-  it("refetches API keys on api_keys_changed", async () => {
-    expect(await invalidatedAfterBurst("api_keys_changed")).toEqual([queryKeys.apiKeys.all]);
+  it("refetches API keys and the public link's status on api_keys_changed", async () => {
+    // The link's status says whether a key is enabled, for the Public link card's warning.
+    expect(await invalidatedAfterBurst("api_keys_changed")).toEqual([
+      queryKeys.apiKeys.all,
+      queryKeys.settings.tunnel(),
+    ]);
   });
 
   it("refetches settings and the overview on settings_changed", async () => {
@@ -355,7 +359,10 @@ describe("change events", () => {
       queryKeys.observe.overview(),
     ]);
     await advance(CHANGE_DEBOUNCE_MS / 2);
-    expect(invalidate).toHaveBeenLastCalledWith({ queryKey: queryKeys.apiKeys.all });
+    expect(invalidate.mock.calls.slice(4).map(([filters]) => filters?.queryKey)).toEqual([
+      queryKeys.apiKeys.all,
+      queryKeys.settings.tunnel(),
+    ]);
   });
 
   it("drops pending refetches when the stream closes", async () => {

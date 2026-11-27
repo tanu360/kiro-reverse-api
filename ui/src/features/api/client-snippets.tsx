@@ -6,7 +6,6 @@ import {
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useQuery } from "@tanstack/react-query";
 import {
   type ComponentProps,
   type CSSProperties,
@@ -35,7 +34,6 @@ import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
-import { settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -54,6 +52,7 @@ import {
   sdkProvider,
   usesSdk,
 } from "./snippets";
+import { useKeyRequiredHere } from "./use-key-required";
 
 const CODEX_CONFIG_FILE = "~/.codex/config.toml";
 
@@ -318,8 +317,9 @@ export function ClientSnippetsCard({
   // A key holder (requireApiKey given) has one key: the card speaks of it, and leaves "keys are
   // not required" to the panel's own alert, which says what that means for their usage.
   const keyHolder = requireApiKey !== undefined;
-  const settings = useQuery({ ...settingsQuery(), enabled: !keyHolder });
-  const required = requireApiKey ?? settings.data?.requireApiKey;
+  // Through the public link every call needs a key, so "any value works" is not said there.
+  const keyRequired = useKeyRequiredHere(!keyHolder);
+  const required = requireApiKey ?? keyRequired;
   const origin = window.location.origin;
   const tools = useMemo(() => buildToolSnippets(origin, model), [origin, model]);
   const env = { env: SNIPPET_KEY_ENV };
@@ -367,7 +367,7 @@ export function ClientSnippetsCard({
             <RequestBuilder model={model} origin={origin} />
           </StackedPanel>
           <StackedPanel className="flex min-w-0 flex-col gap-4" value="claude-code">
-            <Hint>{t("snippets.claudeCodeHint")}</Hint>
+            <Hint>{t(model ? "snippets.claudeCodeHintModel" : "snippets.claudeCodeHint")}</Hint>
             <Snippet
               code={tools.claudeCode}
               language="bash"

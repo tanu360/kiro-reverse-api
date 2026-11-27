@@ -73,5 +73,6 @@
   "requests.description": "Requisições feitas com esta chave, das mais novas para as mais antigas.",
   "requests.caption": "Requisições recentes",
   "requests.emptyTitle": "Nenhuma requisição por enquanto",
-  "requests.emptyBody": "As requisições feitas com esta chave aparecem aqui."
+  "requests.emptyBody": "As requisições feitas com esta chave aparecem aqui.",
+  "requests.pagingCap": "Só as primeiras {max} requisições podem ser paginadas. Ordene ou filtre para ver as outras."
 }

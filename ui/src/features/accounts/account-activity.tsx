@@ -13,6 +13,7 @@ import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./account-cells";
 import { accountStatus } from "./account-model";
+import { useAllowOverUsage } from "./use-allow-over-usage";
 
 /** Why the pool skips the account: the limit, and that every try counts against it. */
 function atLimitHint(activity: AccountActivityView, t: TFunction, lang: Lang): string {
@@ -113,7 +114,8 @@ export function LiveStatusPill({
 }): JSX.Element {
   const { t, lang } = useT("accounts");
   const activity = useAccountActivity(account.id).data;
-  const active = accountStatus(account, Math.floor(Date.now() / 1000)) === "active";
+  const allowOverUsage = useAllowOverUsage();
+  const active = accountStatus(account, Math.floor(Date.now() / 1000), allowOverUsage) === "active";
   if (activity && activity.cooldownSeconds > 0 && active) {
     return (
       <SkipHint

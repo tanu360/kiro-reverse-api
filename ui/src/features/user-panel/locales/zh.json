@@ -72,5 +72,6 @@
   "requests.description": "使用此 API Key 发出的请求，最新的在前。",
   "requests.caption": "最近请求",
   "requests.emptyTitle": "暂无请求",
-  "requests.emptyBody": "使用此 API Key 发出的请求会显示在这里。"
+  "requests.emptyBody": "使用此 API Key 发出的请求会显示在这里。",
+  "requests.pagingCap": "只能翻页查看前 {max} 条请求。排序或筛选可查看其他请求。"
 }

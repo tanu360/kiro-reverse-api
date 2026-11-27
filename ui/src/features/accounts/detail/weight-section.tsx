@@ -10,6 +10,7 @@ import {
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
+import { RoutedValue } from "./routed-value";
 
 const MIN_WEIGHT = 0;
 const MAX_WEIGHT = 10;
@@ -38,7 +39,7 @@ export function WeightRow({ account }: { account: Account }): JSX.Element {
       open={open}
       save={save}
       title={t("detail.weight")}
-      value={String(account.weight)}
+      value={<RoutedValue account={account} mode="weighted" value={account.weight} />}
     >
       <Field>
         <FieldLabel className="sr-only">{t("detail.weight")}</FieldLabel>

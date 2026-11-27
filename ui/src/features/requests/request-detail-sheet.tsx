@@ -108,6 +108,12 @@ interface RequestDetailSheetProps extends RequestViewOptions {
    * key holder, whose page makes no admin call.
    */
   actions?: boolean;
+  /**
+   * The log came from the database (the list's `persistent`). Default true. Without it the list
+   * is the in-memory fallback, and Conversation and Replay are left out: both read the database
+   * (proxy/request_replay.go).
+   */
+  persistent?: boolean;
 }
 
 /**
@@ -133,6 +139,7 @@ export function RequestDetailSheet({
   messages = true,
   details = false,
   actions = true,
+  persistent = true,
 }: RequestDetailSheetProps): JSX.Element {
   const { t } = useT("requests");
   // Stepping through an open sheet moves the footer's position at once and shows the record as
@@ -168,6 +175,8 @@ export function RequestDetailSheet({
       })),
     [accountId],
   );
+  // Conversation and Replay: admin actions that read the database.
+  const history = actions && persistent;
   const openConversation = useCallback(() => setConversationOpen(true), []);
   const openReplay = useCallback(() => setReplayOpen(true), []);
 
@@ -185,6 +194,7 @@ export function RequestDetailSheet({
       <RequestDetailHeader
         actions={actions}
         canOpenAccount={canOpenAccount}
+        history={history}
         onOpenAccount={openAccount}
         onOpenConversation={openConversation}
         onOpenReplay={openReplay}
@@ -222,7 +232,7 @@ export function RequestDetailSheet({
           />
         </div>
       </ResponsiveSheetFooter>
-      {actions && shown?.conversationId ? (
+      {history && shown?.conversationId ? (
         <ConversationSheet
           conversationId={shown.conversationId}
           currentId={shown.id}
@@ -239,7 +249,7 @@ export function RequestDetailSheet({
           open={conversationOpen && open}
         />
       ) : null}
-      {actions && shown?.hasBody ? (
+      {history && shown?.hasBody ? (
         <ReplayDialog
           key={`replay-${shown.id}`}
           onOpenChange={setReplayOpen}
@@ -286,16 +296,16 @@ export function SteppedRequestSheet({
   getKey,
   onShowConversation,
   ...options
-}: RequestViewOptions & {
-  ref: Ref<RequestSheetHandle>;
-  /** The page's rows, in the table's order. */
-  rows: RequestRecord[];
-  /** The table's row ID. */
-  getKey: (record: RequestRecord, index: number) => string;
-  /** Closes the sheet and filters the log to one conversation (from the conversation sheet). */
-  onShowConversation?: (conversationId: string) => void;
-  actions?: boolean;
-}): JSX.Element {
+}: RequestViewOptions &
+  Pick<RequestDetailSheetProps, "actions" | "persistent"> & {
+    ref: Ref<RequestSheetHandle>;
+    /** The page's rows, in the table's order. */
+    rows: RequestRecord[];
+    /** The table's row ID. */
+    getKey: (record: RequestRecord, index: number) => string;
+    /** Closes the sheet and filters the log to one conversation (from the conversation sheet). */
+    onShowConversation?: (conversationId: string) => void;
+  }): JSX.Element {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [open, setOpen] = useState(false);
   const keys = useMemo(() => rows.map((row, index) => getKey(row, index)), [rows, getKey]);
@@ -363,6 +373,7 @@ const RequestDetailHeader = memo(function RequestDetailHeader({
   record,
   actions,
   canOpenAccount,
+  history,
   onOpenAccount,
   onOpenConversation,
   onOpenReplay,
@@ -370,6 +381,8 @@ const RequestDetailHeader = memo(function RequestDetailHeader({
   record: RequestRecord | null;
   actions: boolean;
   canOpenAccount: boolean;
+  /** Conversation and Replay can read the database. */
+  history: boolean;
   onOpenAccount: () => void;
   onOpenConversation: () => void;
   onOpenReplay: () => void;
@@ -415,13 +428,13 @@ const RequestDetailHeader = memo(function RequestDetailHeader({
               {t("detail.openAccount")}
             </Button>
           ) : null}
-          {record.conversationId ? (
+          {history && record.conversationId ? (
             <Button onClick={onOpenConversation} size="sm" variant="secondary">
               <HugeiconsIcon aria-hidden="true" icon={BubbleChatIcon} />
               {t("detail.openConversation")}
             </Button>
           ) : null}
-          {record.hasBody && record.id !== undefined ? (
+          {history && record.hasBody && record.id !== undefined ? (
             <Button onClick={onOpenReplay} size="sm" variant="secondary">
               <HugeiconsIcon aria-hidden="true" icon={PlayIcon} />
               {t("detail.replay")}

@@ -457,6 +457,13 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const interval = pending?.checkIntervalMin ?? view.checkIntervalMin;
   const empty = view.proxies.length === 0;
   const anyProxy = !empty || view.detected.length > 0;
+  // proxypool/manager.go: Resolve reads the fallback only while the pool is on with a proxy, and
+  // CheckAll checks the pool's proxies that are switched on and the detected ones; tick runs it
+  // while the pool is on and whenever a proxy is detected.
+  const poolInUse = on && !empty;
+  const poolCheckable = view.proxies.some((proxy) => proxy.enabled);
+  const nothingToCheck = !(on && poolCheckable) && view.detected.length === 0;
+  const checkAllEmpty = !poolCheckable && view.detected.length === 0;
   const openEditor = (proxy?: PoolProxy) =>
     setEditor((prev) => ({ open: true, session: prev.session + 1, proxy }));
 
@@ -492,6 +499,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
           </Button>
           {anyProxy ? (
             <Button
+              disabled={checkAllEmpty}
               loading={checkAll.isPending}
               onClick={() => checkAll.mutate()}
               ref={checkAllRef}
@@ -548,8 +556,8 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       </SwitchField>
       <SwitchField
         checked={fallback}
-        description={t("card.fallbackHint")}
-        disabled={settings.isPending}
+        description={poolInUse ? t("card.fallbackHint") : t("card.fallbackUnused")}
+        disabled={!poolInUse || settings.isPending}
         onCheckedChange={(directFallback) => saveSettings({ directFallback })}
         switchRef={fallbackRef}
         title={t("card.fallbackTitle")}
@@ -557,13 +565,13 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       <SettingsRow
         control={
           <IntervalSelect
-            disabled={settings.isPending}
+            disabled={nothingToCheck || settings.isPending}
             onChange={(checkIntervalMin) => saveSettings({ checkIntervalMin })}
             triggerRef={intervalRef}
             value={interval}
           />
         }
-        description={t("card.intervalHint")}
+        description={nothingToCheck ? t("card.intervalUnused") : t("card.intervalHint")}
         title={t("card.intervalTitle")}
       />
 

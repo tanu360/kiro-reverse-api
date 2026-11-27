@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { act, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { markSignInReason } from "@/features/auth/sign-in-reason";
 import { getFirstRun } from "@/lib/api/session";
 import { USER_API_BASE } from "@/lib/api/user-panel";
 import { isAuthenticated, type Session, type SessionChangeReason } from "@/lib/auth/session";
@@ -166,6 +167,8 @@ describe("route guards", () => {
     authed.mockReturnValue(true);
     const { router, user } = await renderApp("/backups");
     authed.mockReturnValue(false);
+    // The backups page marks the reason as its restore ends the session.
+    markSignInReason("admin", "restored");
     act(() => {
       for (const listener of sessionListeners) listener(null, "restored");
     });

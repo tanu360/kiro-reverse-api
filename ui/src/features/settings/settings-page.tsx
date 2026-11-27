@@ -434,6 +434,7 @@ function SectionNav({
       : undefined,
     "settings-prompt-filter": promptFilter
       ? promptFilter.filterClaudeCode ||
+        promptFilter.filterStripBoundaries ||
         promptFilter.filterEnvNoise ||
         promptFilter.rules.some((rule) => rule.enabled)
       : undefined,

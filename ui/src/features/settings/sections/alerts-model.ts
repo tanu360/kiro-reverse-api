@@ -128,13 +128,47 @@ function validCooldown(value: number | null): value is number {
   );
 }
 
-/** The fields that fail the server's rules, in form order. */
+/**
+ * Whether a field's rules are on (proxy/alerts.go evaluate): the thresholds serve their own
+ * rule, and the cooldown spaces both pool alerts, pool usage and no account available.
+ */
+export function rulesFieldInUse(form: RulesForm, field: RulesField): boolean {
+  switch (field) {
+    case "accountThresholds":
+      return form.accountUsage;
+    case "poolThresholds":
+      return form.poolUsage;
+    case "poolCooldownMinutes":
+      return form.poolUsage || form.allUnavailable;
+  }
+}
+
+function validRulesField(form: RulesForm, field: RulesField): boolean {
+  if (field === "poolCooldownMinutes") return validCooldown(form.poolCooldownMinutes);
+  return parseThresholds(form[field]).ok;
+}
+
+const RULES_FIELDS: RulesField[] = ["accountThresholds", "poolThresholds", "poolCooldownMinutes"];
+
+/**
+ * The fields that fail the server's rules, in form order. A field whose rules are off is not
+ * checked: nothing reads it, and its field is off too, so it cannot be fixed.
+ */
 export function invalidRulesFields(form: RulesForm): RulesField[] {
-  const invalid: RulesField[] = [];
-  if (!parseThresholds(form.accountThresholds).ok) invalid.push("accountThresholds");
-  if (!parseThresholds(form.poolThresholds).ok) invalid.push("poolThresholds");
-  if (!validCooldown(form.poolCooldownMinutes)) invalid.push("poolCooldownMinutes");
-  return invalid;
+  return RULES_FIELDS.filter(
+    (field) => rulesFieldInUse(form, field) && !validRulesField(form, field),
+  );
+}
+
+/** The form with the saved value of each field its rules ignore and that holds an invalid value. */
+export function withSavedUnusedFields(form: RulesForm, saved: RulesForm): RulesForm {
+  const out = { ...form };
+  for (const field of RULES_FIELDS) {
+    if (!rulesFieldInUse(form, field) && !validRulesField(form, field)) {
+      Object.assign(out, { [field]: saved[field] });
+    }
+  }
+  return out;
 }
 
 /**
