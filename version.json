@@ -1,5 +1,5 @@
 {
-  "version": "4.2.0",
-  "changelog": "🧭 Every page now shows how settings depend on each other: a control another setting makes do nothing stays visible, turns off and says why, and notes appear where one setting overrides another. Kiro's newer chat API is marked New, and replayed thinking now goes to Kiro as reasoning, so clients no longer see \"Provider blocked the response\".",
+  "version": "4.2.1",
+  "changelog": "📐 Settings rows keep their field level with the title: a setting an environment variable sets shows a \"Set by\" badge, and long warnings sit in a strip along the bottom of the row.\n📱 Card actions stay beside their title at every width: where the labels do not fit, buttons show only their icon and a tab switch becomes one button that cycles, alike on every page. Buttons have even padding on both sides.\n🧠 Thinking a client replays as <think> text no longer makes Claude refuse, Sonnet on Kiro's newer chat API accepts a history with several thinking blocks, and a refused request says so in the request log.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
